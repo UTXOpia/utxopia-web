@@ -58,12 +58,20 @@ export function useDepositStatus(
   const isConnectedRef = useRef(false);
   const depositRef = useRef<DepositStatusResponse | null>(null);
 
-  // Keep refs in sync
-  onStatusChangeRef.current = onStatusChange;
-  onClaimableRef.current = onClaimable;
-  onErrorRef.current = onError;
-  isConnectedRef.current = isConnected;
-  depositRef.current = deposit;
+  // Keep refs in sync outside render for React Compiler compatibility.
+  useEffect(() => {
+    onStatusChangeRef.current = onStatusChange;
+    onClaimableRef.current = onClaimable;
+    onErrorRef.current = onError;
+  }, [onStatusChange, onClaimable, onError]);
+
+  useEffect(() => {
+    isConnectedRef.current = isConnected;
+  }, [isConnected]);
+
+  useEffect(() => {
+    depositRef.current = deposit;
+  }, [deposit]);
 
   // Stable fetch function — no state in deps
   const fetchStatus = useCallback(async () => {

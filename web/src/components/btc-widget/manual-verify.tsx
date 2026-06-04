@@ -64,6 +64,40 @@ export function ManualVerify() {
   const [headerSubmitted, setHeaderSubmitted] = useState(false);
   const [headerTxSig, setHeaderTxSig] = useState<string | null>(null);
 
+  // Core function to fetch all verification data
+  const fetchVerificationData = useCallback(async (transactionId: string) => {
+    try {
+      // Get transaction info
+      const btcNetwork = getConfig().bitcoinNetwork;
+      const txInfo = await getTransactionInfo(transactionId, btcNetwork);
+
+      if (!txInfo.confirmed || !txInfo.blockHash) {
+        setError("Transaction not confirmed yet");
+        return;
+      }
+
+      // Get block header
+      const blockHeader = await getBlockHeader(txInfo.blockHash, btcNetwork);
+
+      // Get merkle proof
+      const merkleProof = await getMerkleProof(transactionId, btcNetwork);
+      merkleProof.blockHash = txInfo.blockHash;
+
+      // Get confirmations
+      const tipHeight = await getTipHeight(btcNetwork);
+      const confirmations = tipHeight - txInfo.blockHeight! + 1;
+
+      setVerificationData({
+        txInfo,
+        blockHeader,
+        merkleProof,
+        confirmations,
+      });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to fetch verification data");
+    }
+  }, []);
+
   // Fetch transaction info by address
   const handleLookupAddress = useCallback(async () => {
     if (!taprootAddress.trim()) {
@@ -116,7 +150,7 @@ export function ManualVerify() {
     } finally {
       setLoading(false);
     }
-  }, [taprootAddress]);
+  }, [fetchVerificationData, taprootAddress]);
 
   // Fetch verification data by txid
   const handleLookupTxid = useCallback(async () => {
@@ -129,42 +163,7 @@ export function ManualVerify() {
     setError(null);
     await fetchVerificationData(txid.trim());
     setLoading(false);
-  }, [txid]);
-
-  // Core function to fetch all verification data
-  const fetchVerificationData = async (transactionId: string) => {
-    try {
-      // Get transaction info
-      const btcNetwork = getConfig().bitcoinNetwork;
-      const txInfo = await getTransactionInfo(transactionId, btcNetwork);
-
-      if (!txInfo.confirmed || !txInfo.blockHash) {
-        setError("Transaction not confirmed yet");
-        return;
-      }
-
-      // Get block header
-      const blockHeader = await getBlockHeader(txInfo.blockHash, btcNetwork);
-
-      // Get merkle proof
-      const merkleProof = await getMerkleProof(transactionId, btcNetwork);
-      merkleProof.blockHash = txInfo.blockHash;
-
-      // Get confirmations
-      const tipHeight = await getTipHeight(btcNetwork);
-      const confirmations = tipHeight - txInfo.blockHeight! + 1;
-
-      setVerificationData({
-        txInfo,
-        blockHeader,
-        merkleProof,
-        confirmations,
-      });
-
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to fetch verification data");
-    }
-  };
+  }, [fetchVerificationData, txid]);
 
   // Copy to clipboard
   const copyToClipboard = useCallback(async (text: string, key: string) => {

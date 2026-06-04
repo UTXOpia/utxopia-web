@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback, useEffect, useMemo } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, TransactionInstruction, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, NATIVE_MINT, getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, createCloseAccountInstruction } from "@solana/spl-token";
@@ -83,12 +83,18 @@ export function useSnsName(): UseSnsNameReturn {
   const [isLoading, setIsLoading] = useState(false);
   const [isRegistering, setIsRegistering] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const walletAuthority = wallet.publicKey && wallet.signTransaction
-    ? { publicKey: wallet.publicKey, label: "wallet" as const }
-    : null;
-  const privyAuthority = privySolana.publicKey
-    ? { publicKey: privySolana.publicKey, label: "privy" as const }
-    : null;
+  const walletAuthority = useMemo(
+    () => wallet.publicKey && wallet.signTransaction
+      ? { publicKey: wallet.publicKey, label: "wallet" as const }
+      : null,
+    [wallet.publicKey, wallet.signTransaction],
+  );
+  const privyAuthority = useMemo(
+    () => privySolana.publicKey
+      ? { publicKey: privySolana.publicKey, label: "privy" as const }
+      : null,
+    [privySolana.publicKey],
+  );
   const activeAuthority = walletAuthority ?? privyAuthority;
   const canRegister = Boolean(walletAuthority || privySolana.enabled);
 
@@ -476,7 +482,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, lookupSnsName, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, stealthAddress, walletAuthority?.publicKey]);
+  }, [connection, lookupSnsName, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, stealthAddress, walletAuthority]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {

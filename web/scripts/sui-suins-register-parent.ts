@@ -80,24 +80,55 @@ function loadKeypair() {
   throw new Error(`No matching Sui key found in ${keystorePath}`);
 }
 
+type SuinsObjectResult = {
+  object?: {
+    id?: string;
+    objectId?: string;
+    content?: unknown | Promise<unknown>;
+  };
+};
+
+type SuinsDynamicField = {
+  id: string;
+  name: {
+    type: string;
+    bcs: Uint8Array | number[];
+  };
+};
+
+type SuinsCoreClient = {
+  getObject(args: unknown): Promise<SuinsObjectResult>;
+  getDynamicFields(args: { parentId: string; limit: number }): Promise<{ dynamicFields: SuinsDynamicField[] }>;
+  getDynamicObjectField?: (args: { parentId: string; name: SuinsDynamicField["name"] }) => Promise<SuinsObjectResult>;
+};
+
+function isPromiseLike(value: unknown): value is Promise<unknown> {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    "then" in value &&
+    typeof (value as { then?: unknown }).then === "function"
+  );
+}
+
 function adaptCoreClientForSuins(client: SuiClient) {
-  const core = client.core as any;
+  const core = client.core as unknown as SuinsCoreClient;
   const getObject = core.getObject.bind(core);
 
-  core.getObject = async (args: any) => {
-    const result = await getObject(args) as any;
+  core.getObject = async (args: unknown) => {
+    const result = await getObject(args);
     if (result.object) {
       result.object.objectId ??= result.object.id;
-      if (result.object.content && typeof result.object.content.then === "function") {
+      if (isPromiseLike(result.object.content)) {
         result.object.content = await result.object.content;
       }
     }
     return result;
   };
 
-  core.getDynamicObjectField = async ({ parentId, name }: any) => {
+  core.getDynamicObjectField = async ({ parentId, name }) => {
     const fields = await core.getDynamicFields({ parentId, limit: 100 });
-    const field = fields.dynamicFields.find((candidate: any) =>
+    const field = fields.dynamicFields.find((candidate) =>
       candidate.name.type === name.type &&
       Buffer.from(candidate.name.bcs).equals(Buffer.from(name.bcs))
     );
@@ -106,7 +137,7 @@ function adaptCoreClientForSuins(client: SuiClient) {
     const result = await core.getObject({
       objectId: field.id,
       include: { type: true, content: true, bcs: true, owner: true },
-    } as any);
+    });
     if (result.object) result.object.objectId ??= result.object.id;
     return { object: result.object };
   };
