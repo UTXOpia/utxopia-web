@@ -68,7 +68,13 @@ export interface NetworkConfig {
     explorerUrl: string;
     packageId: string;
     pool: SuiSharedObjectRef;
+    /** Poseidon commitment tree — required by transact since the hardened ABI. */
+    commitmentTree?: SuiSharedObjectRef;
     btcDepositRegistry?: SuiSharedObjectRef;
+    /** Pool UTXO set — consumed by the SPV complete_deposit PTB. */
+    utxoSet?: SuiSharedObjectRef;
+    /** BTC SPV light client — required for trustless deposits once initialized. */
+    lightClient?: SuiSharedObjectRef;
     nullifierRegistry: SuiSharedObjectRef;
     redemptionQueue: SuiSharedObjectRef;
     redemptionCap: SuiObjectRef;
