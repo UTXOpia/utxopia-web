@@ -1,21 +1,75 @@
-.DS_Store
-node_modules/
-.next/
-out/
-dist/
-coverage/
-.data/
+# See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-.env
-.env.*
+# dependencies
+/node_modules
+/.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# testing
+/coverage
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+
+# misc
+.DS_Store
+*.pem
+
+/.wrangler/
+
+# debug
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# env files (can opt-in for committing if needed)
+.env*
 !.env.example
 
-*.log
-*.tsbuildinfo
+# vercel
+.vercel
 
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+
+# runtime data (commitment index)
+/data/
+/.data/
+
+# Circuit proving artifacts (large WASM/zkey files)
+# Allow tier-1+2 circuits (N+M <= 5) for Vercel; rest served via CDN
+/public/circuits/groth16/joinsplit_*/
+!/public/circuits/groth16/joinsplit_1x1/
+!/public/circuits/groth16/joinsplit_1x2/
+!/public/circuits/groth16/joinsplit_1x3/
+!/public/circuits/groth16/joinsplit_1x4/
+!/public/circuits/groth16/joinsplit_2x1/
+!/public/circuits/groth16/joinsplit_2x2/
+!/public/circuits/groth16/joinsplit_2x3/
+!/public/circuits/groth16/joinsplit_3x1/
+!/public/circuits/groth16/joinsplit_3x2/
+!/public/circuits/groth16/joinsplit_4x1/
+.env*.local
+images/
+
+# Faucet cooldown state — per-deployment runtime data, never committed.
+.faucet-cooldown.json
+.faucet-limits.json
+
+# Keypairs / state secrets
 *state*.json
 *keypair*.json
 *demo-seed*
-*.pem
 *.key
-
