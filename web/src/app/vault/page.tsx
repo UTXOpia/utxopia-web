@@ -1,0 +1,446 @@
+"use client";
+
+/**
+ * VaultPage — main dashboard for the private Bitcoin vault.
+ *
+ * Sections:
+ * - Stealth Address: displays user's stealth address or prompts to connect
+ * - SNS Name: register/update .utxopia.sol human-readable stealth address
+ * - Claimable Notes: shows total spendable zkBTC balance from stealth inbox
+ * - Feature Cards: quick links to Deposit, Transfer, Portfolio, Explorer
+ * - Quick Guide: 3-step overview of how Private Bitcoin works
+ * - Auth Modal: passkey registration/login or wallet connection
+ * - Viewing Key Export: hold-to-copy modal for read-only key sharing
+ *
+ * Authentication supports:
+ * - WebAuthn passkeys (PRF-derived deterministic keys)
+ * - Solana wallet (signature-derived keys)
+ * - View-only mode (viewing key import)
+ */
+
+import { useEffect, useState } from "react";
+import { motion } from "framer-motion";
+import {
+  Shield,
+  Key,
+  Copy,
+  Check,
+  Loader2,
+  LogOut,
+  Globe,
+  RefreshCw,
+  Eye,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
+import { SiteHeader } from "@/components/site-header";
+import { SiteFooter } from "@/components/site-footer";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import { useUTXOpiaKeys } from "@/hooks/use-utxopia";
+import { usePasskey } from "@/hooks/use-passkey";
+import { useUTXOpiaStore } from "@/stores";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { useSnsName } from "@/hooks/use-sns-name";
+import { useStealthInbox } from "@/hooks/use-utxopia";
+import { getConfig } from "@utxopia/sdk";
+import { notifyCopied } from "@/lib/notifications";
+import { useTokenPrices } from "@/hooks/use-token-prices";
+import { OnboardingModal } from "@/components/onboarding-modal";
+import { AuthModal } from "@/components/auth-modal";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainAdapter } from "@/lib/chain-registry";
+import { SuiDashboard } from "@/components/sui/sui-dashboard";
+import { VaultActions } from "@/components/vault/vault-actions";
+import { VaultBackupCard } from "@/components/vault/vault-backup-card";
+import { VaultBalance } from "@/components/vault/vault-balance";
+import { VaultGuide } from "@/components/vault/vault-guide";
+import { VaultNetworkStatus } from "@/components/vault/vault-network-status";
+import { VaultTokenList } from "@/components/vault/vault-token-list";
+import { ViewKeyModal } from "@/components/vault/view-key-modal";
+import { SnsNameTip } from "@/components/vault/sns-name-tip";
+import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
+import { hasBackupForKeys } from "@/lib/vault-backup";
+import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
+
+export default function VaultPage() {
+  const wallet = useWallet();
+  const { setVisible } = useWalletModal();
+  const {
+    keys,
+    isViewOnly,
+    stealthAddressEncoded,
+    isLoading,
+    error,
+    deriveKeys,
+    clearKeys,
+  } = useUTXOpiaKeys();
+  const { copied: snsCopied, copy: copySns } = useCopyToClipboard();
+  const { copied: stealthCopied, copy: copyStealth } = useCopyToClipboard();
+  const { copied: viewKeyCopied, copy: copyViewKey } = useCopyToClipboard();
+  const {
+    registeredSnsName,
+    hasRegisteredSnsName,
+    needsUpdate: snsNeedsUpdate,
+    isLoading: isLoadingSnsName,
+    isRegistering: isRegisteringSns,
+    error: snsError,
+    canRegister: canRegisterSnsName,
+    registerSnsSubdomain,
+    updateSnsStealthData,
+  } = useSnsName();
+  const {
+    balancesByToken,
+    depositCount,
+    isLoading: isLoadingInbox,
+    refresh: refreshInbox,
+  } = useStealthInbox();
+
+  const {
+    isSupported: passkeySupported,
+    hasCredential: hasPasskeyCredential,
+    isLoading: passkeyLoading,
+    error: passkeyError,
+    register: registerPasskey,
+    authenticate: authenticatePasskey,
+  } = usePasskey();
+
+  const tokenPrices = useTokenPrices();
+  const { networkId, config: networkConfig } = useChainEnvironment();
+  const bitcoinNetworkLabel =
+    networkConfig.bitcoin.network.charAt(0).toUpperCase() +
+    networkConfig.bitcoin.network.slice(1);
+  const solanaNetworkLabel =
+    networkId.charAt(0).toUpperCase() + networkId.slice(1);
+
+  const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
+  const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
+
+  const handlePasskeyRegister = async () => {
+    const seed = await registerPasskey();
+    if (seed) {
+      await deriveKeysFromPasskeySeed(seed);
+      setAuthModalOpen(false);
+    }
+  };
+
+  const handlePasskeyAuthenticate = async () => {
+    const seed = await authenticatePasskey();
+    if (seed) {
+      await deriveKeysFromPasskeySeed(seed);
+      setAuthModalOpen(false);
+    }
+  };
+
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+  const [viewKeyModalOpen, setViewKeyModalOpen] = useState(false);
+  const [hasRecoveryBackup, setHasRecoveryBackup] = useState(false);
+
+  const isPasskeyUser = keys && keys.solanaPublicKey.every((b: number) => b === 0);
+  const [showSnsInput, setShowSnsInput] = useState(false);
+  const [snsNameInput, setSnsNameInput] = useState("");
+
+  useEffect(() => {
+    setHasRecoveryBackup(hasBackupForKeys(keys));
+  }, [keys]);
+
+  if (getChainAdapter(networkConfig).id === "sui") {
+    return (
+      <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col">
+        <SiteHeader />
+        <SuiDashboard />
+        <SiteFooter />
+      </main>
+    );
+  }
+
+  const snsConfig = getConfig();
+  const parentDomain = snsConfig.snsParentDomain || "utxopia";
+  const hasVaultValue =
+    depositCount > 0 ||
+    Object.values(balancesByToken).some((balance) => balance > 0n);
+  const showSnsTip =
+    !!keys &&
+    !isViewOnly &&
+    canRegisterSnsName &&
+    !hasRegisteredSnsName &&
+    !isLoadingSnsName &&
+    hasVaultValue;
+
+  const handleRegisterSnsName = async () => {
+    if (!snsNameInput) return;
+    try {
+      await claimPrivateReceiveName({
+        chain: "solana",
+        name: snsNameInput,
+        networkId,
+        solanaClaim: registerSnsSubdomain,
+      });
+      setShowSnsInput(false);
+      setSnsNameInput("");
+    } catch {
+      // useSnsName owns the user-facing error state for Solana registration.
+    }
+  };
+
+  return (
+    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col">
+      <SiteHeader />
+
+      <div className="flex-1 flex flex-col items-center pt-24 pb-8 px-4">
+      <motion.div
+        className={cn(
+          "bg-card border border-solid border-gray/30 p-4 sm:p-8",
+          "w-[680px] max-w-[calc(100vw-32px)] rounded-[16px]",
+          "glow-border cyber-corners relative z-10"
+        )}
+        initial={{ opacity: 0, y: 20, scale: 0.98 }}
+        animate={{ opacity: 1, y: 0, scale: 1 }}
+        transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
+      >
+          {/* Wallet Header — identity bar */}
+          <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              {(keys || isViewOnly) ? (
+                <>
+                  {/* Identity chip */}
+                  {hasRegisteredSnsName ? (
+                    <button
+                      onClick={() => { copySns(`${registeredSnsName}.${parentDomain}.sol`); notifyCopied(`.${parentDomain}.sol name`); }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-green-500/10 hover:bg-green-500/15 transition-colors group cursor-pointer min-w-0"
+                      title={`Copy .${parentDomain}.sol name`}
+                    >
+                      <Globe className="w-3.5 h-3.5 text-green-400 shrink-0" />
+                      <span className="text-body2-semibold text-green-400 truncate">
+                        {registeredSnsName}.{parentDomain}.sol
+                      </span>
+                      {snsCopied ? (
+                        <Check className="w-3 h-3 text-green-400 shrink-0" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-green-400/40 group-hover:text-green-400 transition-colors shrink-0" />
+                      )}
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() => { copyStealth(stealthAddressEncoded || ""); notifyCopied("Private address"); }}
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-privacy/10 hover:bg-privacy/15 transition-colors group cursor-pointer min-w-0"
+                      title="Copy private address"
+                    >
+                      <Key className="w-3.5 h-3.5 text-privacy shrink-0" />
+                      <code className="text-[12px] font-mono text-privacy truncate">
+                        {stealthAddressEncoded ? `${stealthAddressEncoded.slice(0, 8)}...${stealthAddressEncoded.slice(-6)}` : ""}
+                      </code>
+                      {stealthCopied ? (
+                        <Check className="w-3 h-3 text-green-400 shrink-0" />
+                      ) : (
+                        <Copy className="w-3 h-3 text-privacy/40 group-hover:text-privacy transition-colors shrink-0" />
+                      )}
+                    </button>
+                  )}
+                  {isViewOnly && (
+                    <span className="px-2 py-0.5 rounded-full bg-btc/10 border border-btc/20 text-[10px] text-btc font-semibold uppercase shrink-0">
+                      View Only
+                    </span>
+                  )}
+                </>
+              ) : (
+                <span className="text-body2-semibold text-foreground">Wallet</span>
+              )}
+            </div>
+            <div className="flex items-center gap-1 shrink-0">
+              {keys && (
+                <button
+                  onClick={() => setViewKeyModalOpen(true)}
+                  className="p-1.5 rounded-[8px] text-gray/50 hover:text-btc hover:bg-btc/10 transition-colors cursor-pointer"
+                  title="Export viewing key"
+                >
+                  <Eye className="w-4 h-4" />
+                </button>
+              )}
+              {(keys || isViewOnly) && (
+                <button
+                  onClick={() => clearKeys(wallet.publicKey?.toBase58())}
+                  className="p-1.5 rounded-[8px] text-gray/50 hover:text-red-400 hover:bg-red-500/10 transition-colors cursor-pointer"
+                  title="Log out"
+                >
+                  <LogOut className="w-4 h-4" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          {/* Secondary identity line — private address when SNS is primary + action links */}
+          {(keys && !isViewOnly) && (
+            <div className="flex items-center gap-3 mb-4 px-1">
+              {hasRegisteredSnsName && (
+                <button
+                  onClick={() => { copyStealth(stealthAddressEncoded || ""); notifyCopied("Private address"); }}
+                  className="flex items-center gap-1 group cursor-pointer"
+                  title="Copy private address"
+                >
+                  <code className="text-[11px] font-mono text-gray/35 group-hover:text-gray/55 transition-colors">
+                    {stealthAddressEncoded ? `${stealthAddressEncoded.slice(0, 10)}...${stealthAddressEncoded.slice(-8)}` : ""}
+                  </code>
+                  <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                </button>
+              )}
+              {!isPasskeyUser && isLoadingSnsName && (
+                <span className="flex items-center gap-1 text-[11px] text-gray/35">
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Checking name...
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* SNS needs update warning */}
+          {keys && snsNeedsUpdate && (
+            <button
+              onClick={updateSnsStealthData}
+              disabled={isRegisteringSns}
+              className={cn(
+                "w-full flex items-center justify-center gap-2 mb-4 px-3 py-1.5 rounded-[8px]",
+                "bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20",
+                "text-caption text-yellow-400 transition-colors cursor-pointer",
+                "disabled:opacity-50 disabled:cursor-not-allowed"
+              )}
+            >
+              {isRegisteringSns ? (
+                <>
+                  <Loader2 className="w-3 h-3 animate-spin" />
+                  Updating...
+                </>
+              ) : (
+                <>
+                  <RefreshCw className="w-3 h-3" />
+                  Update SNS record
+                </>
+              )}
+            </button>
+          )}
+
+          {/* ═══ Hero Balance ═══ */}
+          {!keys && !isViewOnly ? (
+            /* Not connected — centered CTA */
+            <div className="flex flex-col items-center py-10">
+              <div className="w-16 h-16 rounded-2xl bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-4">
+                <Shield className="w-7 h-7 text-privacy" />
+              </div>
+              <h1 className="text-[22px] font-bold text-foreground mb-1">Private wallet</h1>
+              <p className="text-caption text-gray/60 mb-6">
+                Hold and send funds without exposing balances or recipients.
+              </p>
+              <button
+                onClick={() => setAuthModalOpen(true)}
+                className={cn(
+                  "inline-flex items-center gap-2 px-7 py-3 rounded-full",
+                  "bg-privacy hover:bg-privacy/80",
+                  "text-body2 text-background font-semibold transition-all duration-200 cursor-pointer",
+                  "hover:shadow-[0_0_24px_rgba(20,241,149,0.25)]",
+                  "active:scale-95"
+                )}
+              >
+                <Key className="w-4 h-4" />
+                Create private wallet
+              </button>
+            </div>
+          ) : (
+            <>
+              <VaultBalance
+                balancesByToken={balancesByToken}
+                isLoading={isLoadingInbox}
+                tokenPrices={tokenPrices}
+                onRefresh={refreshInbox}
+              />
+
+              {!isViewOnly && (
+                <VaultFirstSteps
+                  hasBackup={hasRecoveryBackup}
+                  hasFunds={hasVaultValue}
+                />
+              )}
+
+              {showSnsTip && (
+                <SnsNameTip
+                  parentDomain={parentDomain}
+                  open={showSnsInput}
+                  value={snsNameInput}
+                  error={snsError}
+                  isRegistering={isRegisteringSns}
+                  onOpen={() => setShowSnsInput(true)}
+                  onChange={setSnsNameInput}
+                  onRegister={handleRegisterSnsName}
+                  onCancel={() => {
+                    setShowSnsInput(false);
+                    setSnsNameInput("");
+                  }}
+                />
+              )}
+
+              <VaultActions
+                networkId={networkId}
+                isViewOnly={isViewOnly}
+                depositCount={depositCount}
+              />
+
+              <VaultBackupCard
+                keys={keys}
+                isViewOnly={isViewOnly}
+                depositCount={depositCount}
+                onBackupComplete={() => setHasRecoveryBackup(true)}
+              />
+
+              <VaultTokenList
+                balancesByToken={balancesByToken}
+                depositCount={depositCount}
+                isLoading={isLoadingInbox}
+                tokenPrices={tokenPrices}
+              />
+            </>
+          )}
+
+          <VaultGuide />
+
+          <VaultNetworkStatus
+            bitcoinNetworkLabel={bitcoinNetworkLabel}
+            solanaNetworkLabel={solanaNetworkLabel}
+          />
+
+
+        </motion.div>
+
+      {/* First-time user onboarding */}
+      <OnboardingModal />
+
+      {/* Auth modal */}
+      <AuthModal
+        open={authModalOpen}
+        onOpenChange={setAuthModalOpen}
+        auth={{
+          passkeySupported,
+          hasPasskeyCredential,
+          passkeyLoading,
+          walletLoading: isLoading,
+          walletConnected: wallet.connected,
+          error: error || passkeyError,
+          onPasskeyRegister: handlePasskeyRegister,
+          onPasskeyAuthenticate: handlePasskeyAuthenticate,
+          onWalletConnect: () => { setAuthModalOpen(false); setVisible(true); },
+          onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
+          onViewOnlyLogin: (viewingKey) => { loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
+        }}
+      />
+
+      {/* Export Viewing Key modal */}
+      {viewKeyModalOpen && keys && (
+        <ViewKeyModal
+          keys={keys}
+          copied={viewKeyCopied}
+          onCopy={copyViewKey}
+          onClose={() => setViewKeyModalOpen(false)}
+        />
+      )}
+      </div>
+      <SiteFooter />
+    </main>
+  );
+}
