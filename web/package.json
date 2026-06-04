@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
-    "copy-circuits": "mkdir -p public/circuits/groth16 && for c in ../sdk/circuits/joinsplit_*; do n=$(basename $c); mkdir -p public/circuits/groth16/$n/${n}_js && cp $c/${n}_js/${n}.wasm public/circuits/groth16/$n/${n}_js/ && cp $c/${n}.zkey public/circuits/groth16/$n/; done"
+    "copy-circuits": "CIRCUITS_DIR=${UTXOPIA_CIRCUITS_DIR:-../../utxopia-circuits/circuits}; mkdir -p public/circuits/groth16 && for c in \"$CIRCUITS_DIR\"/build/joinsplit_*; do n=$(basename \"$c\"); mkdir -p public/circuits/groth16/$n/${n}_js && cp \"$c/${n}_js/${n}.wasm\" public/circuits/groth16/$n/${n}_js/ && cp \"$c/${n}.zkey\" public/circuits/groth16/$n/; done"
   },
   "dependencies": {
     "@bonfida/spl-name-service": "^3.0.21",
@@ -33,7 +33,7 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.0",
-    "@utxopia/sdk": "github:UTXOpia/utxopia-sdk#c00c838",
+    "@utxopia/sdk": "github:UTXOpia/utxopia-sdk#main",
     "bs58": "^5.0.0",
     "canvas-confetti": "^1.9.4",
     "circomlibjs": "^0.1.7",
