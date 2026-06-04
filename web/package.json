@@ -4,13 +4,14 @@
   "private": true,
   "scripts": {
     "dev": "next dev --webpack",
-    "build": "cd ../sdk && bun run build && cd ../web && next build --webpack",
+    "build": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
     "copy-circuits": "mkdir -p public/circuits/groth16 && for c in ../sdk/circuits/joinsplit_*; do n=$(basename $c); mkdir -p public/circuits/groth16/$n/${n}_js && cp $c/${n}_js/${n}.wasm public/circuits/groth16/$n/${n}_js/ && cp $c/${n}.zkey public/circuits/groth16/$n/; done"
   },
   "dependencies": {
+    "@bonfida/spl-name-service": "^3.0.21",
     "@farcaster/mini-app-solana": "^2.0.0",
     "@mysten/sui": "^1.0.0",
     "@mysten/suins": "^1.1.4",
@@ -32,8 +33,7 @@
     "@solana/wallet-adapter-react": "^0.15.39",
     "@solana/wallet-adapter-react-ui": "^0.9.39",
     "@solana/web3.js": "^1.98.0",
-    "@utxopia/sdk": "file:../sdk",
-    "@utxopia/sdk-sui": "workspace:*",
+    "@utxopia/sdk": "github:UTXOpia/utxopia-sdk#c00c838",
     "bs58": "^5.0.0",
     "canvas-confetti": "^1.9.4",
     "circomlibjs": "^0.1.7",
@@ -54,6 +54,7 @@
     "zustand": "^5.0.10"
   },
   "devDependencies": {
+    "@happy-dom/global-registrator": "^20.10.1",
     "@tailwindcss/postcss": "^4",
     "@testing-library/jest-dom": "^6.6.3",
     "@testing-library/react": "^16.0.1",

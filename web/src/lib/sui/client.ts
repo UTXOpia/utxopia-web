@@ -8,7 +8,7 @@ import {
   getExtendedEphemeralPublicKey,
   jwtToAddress,
 } from "@mysten/sui/zklogin";
-import { UTXOpiaSuiAdapter } from "@utxopia/sdk-sui";
+import { UTXOpiaSuiAdapter } from "@utxopia/sdk/sui";
 import { networkForChain } from "@/lib/chain-registry";
 import { detectNetwork, getNetworkConfig } from "@/lib/network-config";
 
