@@ -35,7 +35,7 @@ export interface RpcTxMeta {
   blockTime: number;
   announcements: RpcAnnouncement[];
   nullifierPdas: string[];
-  /** UTXOpia instruction discriminator (1=complete_deposit, 13=demo, 14=transact, 29=shield) */
+  /** UTXOpia instruction discriminator (11=complete_deposit, 12=shield, 13=transact, 14=unshield, 15=redeem) */
   instructionDisc: number | null;
 }
 

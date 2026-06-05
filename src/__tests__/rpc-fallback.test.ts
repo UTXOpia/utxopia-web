@@ -3,8 +3,8 @@
  *
  * The RPC fallback scans on-chain transaction logs when the
  * backend is unavailable. It must correctly detect:
- * - disc=1  → real BTC deposit
- * - disc=29 → SPL shield
+ * - disc=11 → real BTC deposit
+ * - disc=12 → SPL shield
  */
 
 import { describe, it, expect } from "bun:test";
@@ -67,8 +67,8 @@ function encodeBase58(bytes: Uint8Array): string {
 // =============================================================================
 
 describe("RPC fallback: instruction discriminator extraction", () => {
-  const VERIFY_DISC = 1;
-  const SHIELD_DISC = 29;
+  const VERIFY_DISC = 11;
+  const SHIELD_DISC = 12;
   const UTXOPIA_PROGRAM_ID = "8fqRet9WB5PECvKfWmzTPSusJgQz1onzxTLfHD75XKim";
 
   /** Simulate extractInstructionDisc from rpc-fallback.ts */
@@ -115,14 +115,14 @@ describe("RPC fallback: instruction discriminator extraction", () => {
     };
   }
 
-  it("detects real BTC deposit (disc=1)", () => {
+  it("detects real BTC deposit (disc=11)", () => {
     const result = buildMockTxResult(VERIFY_DISC);
-    expect(extractInstructionDisc(result)).toBe(1);
+    expect(extractInstructionDisc(result)).toBe(VERIFY_DISC);
   });
 
-  it("detects shield (disc=29)", () => {
+  it("detects shield (disc=12)", () => {
     const result = buildMockTxResult(SHIELD_DISC);
-    expect(extractInstructionDisc(result)).toBe(29);
+    expect(extractInstructionDisc(result)).toBe(SHIELD_DISC);
   });
 
   it("returns null for non-UTXOpia transaction", () => {
@@ -156,7 +156,7 @@ describe("RPC fallback: instruction discriminator extraction", () => {
 
 describe("Base58 encoding/decoding roundtrip", () => {
   it("roundtrips instruction data correctly", () => {
-    const original = new Uint8Array([29, 0, 0, 0, 0, 0, 0xc3, 0x50]); // disc=29, amount=50000 LE
+    const original = new Uint8Array([12, 0, 0, 0, 0, 0, 0xc3, 0x50]); // disc=12, amount=50000 LE
     const encoded = encodeBase58(original);
     const decoded = decodeBase58(encoded);
     expect(decoded).toEqual(original);

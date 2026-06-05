@@ -195,11 +195,11 @@ export async function GET(request: Request) {
         const isVerifiedNoTracker = !tracker && a.is_verified;
 
         // Detect instruction type:
-        // - is_verified + has btc_deposit_txid = real BTC SPV (disc=1)
-        // - otherwise with token_id = SPL shield (disc=29)
+        // - is_verified + has btc_deposit_txid = real BTC SPV (disc=11)
+        // - otherwise with token_id = SPL shield (disc=12)
         const isBtcDeposit = a.is_verified && !!a.btc_deposit_txid;
         const isSplShield = !isBtcDeposit && !!a.token_id;
-        const disc = isBtcDeposit ? 1 : isSplShield ? 29 : 1;
+        const disc = isBtcDeposit ? 11 : isSplShield ? 12 : 11;
 
         return {
           txSignature: a.tx_signature,
@@ -305,8 +305,8 @@ export async function GET(request: Request) {
       const txMetas = await fetchAnnouncementsFromRpc(0); // type=0 = deposits
       const deposits: ExplorerDeposit[] = [];
 
-      // disc=1 is complete_deposit (real BTC)
-      const VERIFY_DISC = 1;
+      // disc=11 is complete_deposit (real BTC)
+      const VERIFY_DISC = 11;
 
       for (const tx of txMetas) {
         const isVerified = tx.instructionDisc === VERIFY_DISC;
