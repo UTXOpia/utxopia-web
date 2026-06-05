@@ -113,11 +113,12 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
 
 /** Vertical timeline showing withdrawal lifecycle */
 function WithdrawTimeline({ tx, redemption: r }: { tx: TransferTx; redemption?: RedemptionRecord }) {
-  const { config } = useChainEnvironment();
+  const { config, networkId } = useChainEnvironment();
   const chain = getChainAdapter(config);
   const chainName = chain.displayName;
   const chainIcon = getChainIcon(config);
   const chainTxUrl = (id: string) => getChainTransactionUrl(config, id);
+  const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const statusOrder: Record<string, number> = { Pending: 1, Processing: 2, "BTC Sent": 3, Completed: 4 };
   const completedFromTx = tx.status === "confirmed" && tx.outputs.some((output) => output.type === "withdraw" && output.btcTxid);
   const current = completedFromTx ? 4 : (statusOrder[r?.status ?? "Pending"] ?? (tx.status === "confirmed" ? 2 : 1));
@@ -185,7 +186,7 @@ function WithdrawTimeline({ tx, redemption: r }: { tx: TransferTx; redemption?: 
                 <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                 <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                 <a
-                  href={step.icon === "btc" ? `${getMempoolExplorerUrl()}/tx/${step.txId}` : chainTxUrl(step.txId)}
+                  href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : chainTxUrl(step.txId)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn("transition-colors p-0.5", step.icon === "btc" ? "text-btc/40 hover:text-btc" : getChainMutedLinkClass(config))}

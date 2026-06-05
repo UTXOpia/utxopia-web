@@ -6,6 +6,7 @@ import { formatBtc, truncateMiddle } from "@/lib/utils/formatting";
 import { useUTXOpiaStore, type ActiveWithdrawal, type WithdrawalStatus } from "@/stores/utxopia-store";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 const STATUS_CONFIG: Record<WithdrawalStatus, {
   label: string;
@@ -49,7 +50,8 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
   const config = STATUS_CONFIG[withdrawal.status];
   const Icon = config.icon;
   const isAnimating = withdrawal.status === "processing" || withdrawal.status === "broadcasting";
-  const explorerUrl = getMempoolExplorerUrl();
+  const { networkId } = useChainEnvironment();
+  const explorerUrl = getMempoolExplorerUrl(networkId);
 
   return (
     <div className="p-4 rounded-[12px] border border-gray/15 bg-muted">

@@ -22,12 +22,12 @@ import { BitcoinIcon } from "@/components/bitcoin-wallet-selector";
 import type { RedemptionRecord } from "@/hooks/use-explorer";
 import { formatAmount } from "@/lib/utils/formatting";
 import useSWR from "swr";
-import { getMempoolExplorerUrl } from "@/lib/btc-network";
+import { getEsploraApiUrl, getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo, scriptToAddress } from "./helpers";
-import { getEsploraApiUrl } from "@/lib/btc-network";
 import { getSolanaExplorerTxUrl, getSolanaExplorerAddressUrl } from "@/lib/solana-network";
 import { Th, Td, TypeBadge, StatusDot, FlowCell, SolanaLink, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 /** Format raw sats as trimmed BTC string */
 const fmtBtc = (sats: number) => formatAmount(sats, 8);
@@ -38,14 +38,21 @@ const fmtBtc = (sats: number) => formatAmount(sats, 8);
 
 const REQUIRED_CONFIRMATIONS = 6;
 
-function BtcConfirmationStatus({ txid, onMinerFee }: { txid: string; onMinerFee?: (fee: number) => void }) {
+function BtcConfirmationStatus({
+  txid,
+  esploraApiUrl,
+  onMinerFee,
+}: {
+  txid: string;
+  esploraApiUrl: string;
+  onMinerFee?: (fee: number) => void;
+}) {
   const [confirmations, setConfirmations] = useState<number | null>(null);
   const [blockHeight, setBlockHeight] = useState<number | null>(null);
   const [relayedHeight, setRelayedHeight] = useState<number | null>(null);
   const [minerFee, setMinerFee] = useState<number | null>(null);
 
   useEffect(() => {
-    const esploraApiUrl = getEsploraApiUrl();
     let cancelled = false;
     async function fetchStatus() {
       try {
@@ -84,7 +91,7 @@ function BtcConfirmationStatus({ txid, onMinerFee }: { txid: string; onMinerFee?
     fetchStatus();
     const interval = setInterval(fetchStatus, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [txid]);
+  }, [esploraApiUrl, onMinerFee, txid]);
 
   if (confirmations === null) return null;
 
@@ -172,6 +179,9 @@ function getEffectiveStatus(r: RedemptionRecord): string {
 // =============================================================================
 
 function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
+  const { networkId } = useChainEnvironment();
+  const btcExplorerUrl = getMempoolExplorerUrl(networkId);
+  const esploraApiUrl = getEsploraApiUrl(networkId);
   const status = getEffectiveStatus(redemption);
   const stepOrder = WITHDRAWAL_STATUS_ORDER[status] ?? 0;
   const isFailed = stepOrder === -1;
@@ -251,7 +261,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate(btcAddr, 10, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={btcAddr} label="BTC Address" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/address/${btcAddr}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${btcExplorerUrl}/address/${btcAddr}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -315,7 +325,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                     <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                     <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                     <a
-                      href={step.icon === "btc" ? `${getMempoolExplorerUrl()}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
+                      href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn("transition-colors p-0.5", step.icon === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}
@@ -327,7 +337,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                 {/* BTC Sent — block height, confirmations, miner fee */}
                 {step.key === "btc_sent" && step.done && !redemption.simulated && redemption.btcTxid && (
                   <div className="mt-1.5">
-                    <BtcConfirmationStatus txid={redemption.btcTxid} onMinerFee={setBtcMinerFee} />
+                    <BtcConfirmationStatus txid={redemption.btcTxid} esploraApiUrl={esploraApiUrl} onMinerFee={setBtcMinerFee} />
                   </div>
                 )}
                 {/* Complete Redemption — burn amount + pool fee */}

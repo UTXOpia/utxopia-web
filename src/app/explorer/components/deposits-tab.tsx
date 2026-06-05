@@ -23,6 +23,7 @@ import { useExplorer, toDepositRecord } from "@/hooks/use-explorer";
 import type { DepositRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import Image from "next/image";
 import { truncate, timeAgo } from "./helpers";
 import { Th, Td, SolanaLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
@@ -49,6 +50,8 @@ function getDepositStatusDot(status: string | null): { variant: StatusDotVariant
 // =============================================================================
 
 function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; config: ShieldTypeConfig; isBtc: boolean }) {
+  const { networkId } = useChainEnvironment();
+  const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const d = deposit;
   // For BTC deposits:
   //   depositAmountSats = original deposit to taproot
@@ -107,7 +110,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate(d.btcMeta?.taprootAddress, 10, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={d.btcMeta?.taprootAddress} label="Address" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/address/${d.btcMeta?.taprootAddress}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${btcExplorerUrl}/address/${d.btcMeta?.taprootAddress}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -119,7 +122,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate(d.btcMeta.depositTxid, 8, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={d.btcMeta.depositTxid} label="BTC Tx" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/tx/${d.btcMeta.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${btcExplorerUrl}/tx/${d.btcMeta.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -131,7 +134,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate(d.btcMeta.sweepTxid, 8, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={d.btcMeta.sweepTxid} label="Sweep Tx" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/tx/${d.btcMeta.sweepTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${btcExplorerUrl}/tx/${d.btcMeta.sweepTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
@@ -204,6 +207,8 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
 
 /** Vertical timeline showing deposit lifecycle transactions */
 function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
+  const { networkId } = useChainEnvironment();
+  const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const stepOrder = DEPOSIT_STATUS_ORDER[d.status ?? ""] ?? 0;
   const isDirectVaultDeposit = !d.btcMeta?.sweepTxid;
 
@@ -287,7 +292,7 @@ function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
                 <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                 <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                 <a
-                  href={step.txType === "btc" ? `${getMempoolExplorerUrl()}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
+                  href={step.txType === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn("transition-colors p-0.5", step.txType === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}
@@ -371,6 +376,8 @@ export function DepositRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { networkId } = useChainEnvironment();
+  const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const d = deposit;
   // Use tokenSymbol from backend if available, fall back to heuristic
   const tokenSym = d.tokenSymbol ?? (d.tokenId ? resolveTokenSymbolSync(d.tokenId) : null);
@@ -434,7 +441,7 @@ export function DepositRow({
           {d.txSignature ? (
             <SolanaLink signature={d.txSignature} />
           ) : d.btcMeta?.depositTxid ? (
-            <a href={`${getMempoolExplorerUrl()}/tx/${d.btcMeta?.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc/60 hover:text-btc transition-colors p-0.5" title="View BTC tx">
+            <a href={`${btcExplorerUrl}/tx/${d.btcMeta?.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc/60 hover:text-btc transition-colors p-0.5" title="View BTC tx">
               <ExternalLink className="w-3 h-3" />
             </a>
           ) : null}
