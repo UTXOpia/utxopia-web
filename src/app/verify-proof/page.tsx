@@ -26,11 +26,11 @@ type KnownCircuit =
   | "custom";
 
 const KNOWN_CIRCUITS: { value: KnownCircuit; label: string }[] = [
-  { value: "ownership", label: "ownership — Phase 4 threshold proof" },
-  { value: "range_sum_4", label: "range_sum_4 — N=4 (flat hash)" },
-  { value: "range_sum", label: "range_sum — N=8 (flat hash)" },
-  { value: "range_sum_16", label: "range_sum_16 — N=16 (chunked hash)" },
-  { value: "custom", label: "Custom — upload your own vkey.json" },
+  { value: "ownership", label: "ownership, Phase 4 threshold proof" },
+  { value: "range_sum_4", label: "range_sum_4, N=4 (flat hash)" },
+  { value: "range_sum", label: "range_sum, N=8 (flat hash)" },
+  { value: "range_sum_16", label: "range_sum_16, N=16 (chunked hash)" },
+  { value: "custom", label: "Custom, upload your own vkey.json" },
 ];
 
 type VerifyResult =
@@ -111,7 +111,7 @@ export default function VerifyProofPage() {
   }
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4 py-12">
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4 py-12">
       <div className="w-full max-w-[640px] mb-4 flex items-center justify-between relative z-10">
         <Link
           href="/"
@@ -127,7 +127,7 @@ export default function VerifyProofPage() {
         className={cn(
           "bg-card border border-solid border-gray/30 p-6",
           "w-[640px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10",
+          "relative z-10",
         )}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -137,7 +137,7 @@ export default function VerifyProofPage() {
           <div>
             <h1 className="text-heading6 text-foreground">Verify a Groth16 proof</h1>
             <p className="text-caption text-gray">
-              Auditor tool — checks ownership / range-sum proofs without bun + snarkjs locally.
+              Auditor tool for checking ownership and range-sum proofs in the browser.
             </p>
           </div>
         </div>

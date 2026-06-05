@@ -8,7 +8,7 @@ import { detectNetwork, getNetworkConfig, hrefWithChain, type NetworkId } from "
 import { cn } from "@/lib/utils";
 
 /**
- * Regtest BTC faucet — only renders when the active network's BTC layer is
+ * Regtest BTC faucet. Only renders when the active network's BTC layer is
  * `regtest` (i.e. the hybrid stack). On testnet4 / mainnet the page shows a
  * "not available on this network" hint instead of a working form, so the
  * route is safe to merge even before the backend wiring lands.
@@ -16,7 +16,14 @@ import { cn } from "@/lib/utils";
  * Backend wiring lives at `/api/faucet/regtest`.
  */
 export default function FaucetPage() {
+  const [mounted, setMounted] = useState(false);
+
+  useEffect(() => {
+    setMounted(true);
+  }, []);
+
   const network = useMemo(() => {
+    if (!mounted) return null;
     try {
       const currentNetwork = detectNetwork();
       getNetworkConfig(currentNetwork);
@@ -24,7 +31,7 @@ export default function FaucetPage() {
     } catch {
       return null;
     }
-  }, []);
+  }, [mounted]);
 
   const config = network ? getNetworkConfig(network, { applyEnvOverrides: false }) : null;
   const chain = config ? getChainAdapter(config) : null;
@@ -32,8 +39,16 @@ export default function FaucetPage() {
   const chainHref = (href: string) => network ? hrefWithChain(href, network) : href;
   const isSui = chain?.id === "sui";
 
+  if (!mounted) {
+    return (
+      <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
+        <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-warning animate-spin" />
+      </main>
+    );
+  }
+
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
           href={chainHref("/")}
@@ -51,7 +66,7 @@ export default function FaucetPage() {
         className={cn(
           "bg-card border border-solid border-gray/30 p-6",
           "w-[480px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10",
+          "relative z-10",
         )}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -199,7 +214,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
         setResult({
           kind: "cooldown",
           retryAfterSec: body.retryAfterSec,
-          message: body.error ?? `cooldown active — try again in ${body.retryAfterSec}s`,
+          message: body.error ?? `Cooldown active. Try again in ${body.retryAfterSec}s.`,
         });
       } else if (!res.ok || !body.ok) {
         setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
@@ -346,7 +361,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       )}
       {result?.kind === "cooldown" && (
         <div className="p-3 rounded-[10px] border border-warning/30 bg-warning/5 text-caption text-warning">
-          {cooldownLeft > 0 ? `Cooldown — try again in ${cooldownLeft}s` : "Cooldown cleared, try again."}
+          {cooldownLeft > 0 ? `Cooldown active. Try again in ${cooldownLeft}s.` : "Cooldown cleared. Try again."}
         </div>
       )}
       {result?.kind === "err" && (

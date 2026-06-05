@@ -11,7 +11,7 @@ import { hrefWithChain } from "@/lib/network-config";
 function ClaimRedirect() {
   const router = useRouter();
   const { networkId: network } = useChainEnvironment();
-  // Read from hash fragment (#note=) only — never sent to server
+  // Read from hash fragment (#note=) only. It is never sent to the server.
   const [noteParam, setNoteParam] = useState<string | null>(null);
 
   useEffect(() => {
@@ -44,7 +44,7 @@ function ClaimRedirect() {
   // If redirecting, show spinner
   if (noteParam) {
     return (
-      <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
+      <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-purple animate-spin" />
         <p className="text-body2 text-gray mt-4">Redirecting to Pay...</p>
       </main>
@@ -53,7 +53,7 @@ function ClaimRedirect() {
 
   // No param: show simple phrase input
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
           href={hrefWithChain("/vault", network)}
@@ -68,7 +68,7 @@ function ClaimRedirect() {
         className={cn(
           "bg-card border border-solid border-gray/30 p-6",
           "w-[480px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10"
+          "relative z-10"
         )}
       >
         <div className="flex items-center gap-3 mb-4">
@@ -123,7 +123,7 @@ export default function ClaimPage() {
   return (
     <Suspense
       fallback={
-        <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
+        <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
           <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-purple animate-spin" />
         </main>
       }

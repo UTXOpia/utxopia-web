@@ -18,26 +18,26 @@ export default function ProvePage() {
 
   if (!mounted) {
     return (
-      <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
+      <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-privacy animate-spin" />
       </main>
     );
   }
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay hacker-grid scan-line flex flex-col items-center justify-center p-4">
+    <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       {/* Header */}
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
           href={hrefWithChain("/vault", network)}
-          className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors hover-glow"
+          className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
           Back to Vault
         </Link>
-        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-privacy/10 border border-privacy/20 neon-border-pulse">
-          <Shield className="w-3 h-3 text-privacy privacy-glow" />
-          <span className="text-caption text-privacy neon-privacy">SPV Verify</span>
+        <div className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-privacy/10 border border-privacy/20">
+          <Shield className="w-3 h-3 text-privacy" />
+          <span className="text-caption text-privacy">SPV Verify</span>
         </div>
       </div>
 
@@ -46,7 +46,7 @@ export default function ProvePage() {
         className={cn(
           "bg-card border border-solid border-gray/30 p-4",
           "w-[480px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10 crt-scanlines"
+          "relative z-10"
         )}
       >
         <ManualVerify />

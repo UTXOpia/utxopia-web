@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * ManualVerify — manual SPV verification UI for BTC deposits.
+ * ManualVerify: manual SPV verification UI for BTC deposits.
  *
  * Allows users to manually verify a Bitcoin deposit by:
  * 1. Looking up a Taproot address or txid
@@ -209,7 +209,7 @@ export function ManualVerify() {
       if (result.exists) {
         setHeaderSubmitted(true);
       } else {
-        throw new Error("Block header not yet relayed on-chain. The header-relayer service submits headers automatically — please wait and retry.");
+        throw new Error("Block header not yet relayed on-chain. The header-relayer service submits headers automatically. Please wait and retry.");
       }
     } catch (err) {
       console.error("[Header] Check failed:", err);
@@ -234,12 +234,12 @@ export function ManualVerify() {
     <div className="flex flex-col">
       {/* Header */}
       <div className="flex items-center gap-3 mb-4">
-        <div className="p-2 rounded-[10px] bg-privacy/10 border border-privacy/20 pulse-glow">
-          <Shield className="w-5 h-5 text-privacy privacy-glow" />
+        <div className="p-2 rounded-[10px] bg-privacy/10 border border-privacy/20">
+          <Shield className="w-5 h-5 text-privacy" />
         </div>
         <div>
           <p className="text-body2-semibold text-foreground">Manual SPV Verification</p>
-          <p className="text-caption text-gray terminal-text">Verify Bitcoin deposit with block header</p>
+          <p className="text-caption text-gray">Verify Bitcoin deposit with block header</p>
         </div>
       </div>
 
