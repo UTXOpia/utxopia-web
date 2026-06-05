@@ -35,8 +35,9 @@ import {
 import { formatBlockHeaderForChain, formatMerkleProofForChain } from "@/lib/spv/verify";
 import { zkBTCApi } from "@/lib/api/client";
 import { getEsploraApiUrl, getMempoolExplorerUrl } from "@/lib/btc-network";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
-import { getConfig } from "@utxopia/sdk";
+import type { NetworkConfig } from "@/lib/network-config";
 
 interface VerificationData {
   txInfo: TransactionInfo;
@@ -45,9 +46,29 @@ interface VerificationData {
   confirmations: number;
 }
 
+type SpvBitcoinNetwork = "mainnet" | "testnet" | "testnet4" | "signet" | "regtest";
+
+function spvBitcoinNetwork(config: NetworkConfig): SpvBitcoinNetwork {
+  const network = config.bitcoin.network;
+  if (
+    network === "mainnet" ||
+    network === "testnet" ||
+    network === "testnet4" ||
+    network === "signet" ||
+    network === "regtest"
+  ) {
+    return network;
+  }
+  return "testnet4";
+}
+
 export function ManualVerify() {
   const { publicKey, connected, signTransaction } = useWallet();
   const { connection } = useConnection();
+  const { networkId, config } = useChainEnvironment();
+  const esploraApiUrl = getEsploraApiUrl(networkId);
+  const explorerUrl = getMempoolExplorerUrl(networkId);
+  const btcNetwork = spvBitcoinNetwork(config);
 
   // Input state
   const [taprootAddress, setTaprootAddress] = useState("");
@@ -68,7 +89,6 @@ export function ManualVerify() {
   const fetchVerificationData = useCallback(async (transactionId: string) => {
     try {
       // Get transaction info
-      const btcNetwork = getConfig().bitcoinNetwork;
       const txInfo = await getTransactionInfo(transactionId, btcNetwork);
 
       if (!txInfo.confirmed || !txInfo.blockHash) {
@@ -96,7 +116,7 @@ export function ManualVerify() {
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to fetch verification data");
     }
-  }, []);
+  }, [btcNetwork]);
 
   // Fetch transaction info by address
   const handleLookupAddress = useCallback(async () => {
@@ -112,7 +132,7 @@ export function ManualVerify() {
     try {
       // Fetch transactions for address from mempool.space
       const response = await fetch(
-        `${getEsploraApiUrl()}/address/${taprootAddress}/txs`
+        `${esploraApiUrl}/address/${taprootAddress}/txs`
       );
 
       if (!response.ok) {
@@ -150,7 +170,7 @@ export function ManualVerify() {
     } finally {
       setLoading(false);
     }
-  }, [fetchVerificationData, taprootAddress]);
+  }, [esploraApiUrl, fetchVerificationData, taprootAddress]);
 
   // Fetch verification data by txid
   const handleLookupTxid = useCallback(async () => {
@@ -462,7 +482,7 @@ export function ManualVerify() {
           {/* View on Explorer */}
           <div className="flex gap-2">
             <a
-              href={`${getMempoolExplorerUrl()}/tx/${txid}`}
+              href={`${explorerUrl}/tx/${txid}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-tertiary flex-1 justify-center"
@@ -470,7 +490,7 @@ export function ManualVerify() {
               View TX <ExternalLink className="w-3 h-3" />
             </a>
             <a
-              href={`${getMempoolExplorerUrl()}/block/${verificationData.blockHeader.hash}`}
+              href={`${explorerUrl}/block/${verificationData.blockHeader.hash}`}
               target="_blank"
               rel="noopener noreferrer"
               className="btn-tertiary flex-1 justify-center"

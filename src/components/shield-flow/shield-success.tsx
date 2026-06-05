@@ -6,6 +6,7 @@ import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { cn } from "@/lib/utils";
 import type { SHIELD_TOKENS } from "@/lib/supported-tokens";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 type ShieldToken = (typeof SHIELD_TOKENS)[number];
 
@@ -25,6 +26,7 @@ export function ShieldSuccess({
   onReset,
 }: ShieldSuccessProps) {
   const isBtc = selectedToken.isBtcNative;
+  const { networkId } = useChainEnvironment();
 
   return (
     <div className={cn("space-y-4 text-center py-6", className)}>
@@ -51,7 +53,7 @@ export function ShieldSuccess({
       )}
       {walletDepositResult?.txid && (
         <a
-          href={`${getMempoolExplorerUrl()}/tx/${walletDepositResult.txid}`}
+          href={`${getMempoolExplorerUrl(networkId)}/tx/${walletDepositResult.txid}`}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 text-caption text-btc hover:text-btc/80 transition-colors"

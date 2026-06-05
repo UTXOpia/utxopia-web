@@ -4,8 +4,8 @@ import { Clock, CheckCircle2, Loader2, AlertCircle, ExternalLink, Bitcoin } from
 import { cn } from "@/lib/utils";
 import { formatBtc, truncateMiddle } from "@/lib/utils/formatting";
 import { useUTXOpiaStore, type ActiveWithdrawal, type WithdrawalStatus } from "@/stores/utxopia-store";
-import { getConfig } from "@utxopia/sdk";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import { getMempoolExplorerUrl } from "@/lib/btc-network";
 
 const STATUS_CONFIG: Record<WithdrawalStatus, {
   label: string;
@@ -49,7 +49,7 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
   const config = STATUS_CONFIG[withdrawal.status];
   const Icon = config.icon;
   const isAnimating = withdrawal.status === "processing" || withdrawal.status === "broadcasting";
-  const esploraUrl = getConfig().esploraUrl.replace("/api", "");
+  const explorerUrl = getMempoolExplorerUrl();
 
   return (
     <div className="p-4 rounded-[12px] border border-gray/15 bg-muted">
@@ -88,7 +88,7 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
           <div className="flex justify-between items-center text-body2">
             <span className="text-gray">BTC TX</span>
             <a
-              href={`${esploraUrl}/tx/${withdrawal.btcTxid}`}
+              href={`${explorerUrl}/tx/${withdrawal.btcTxid}`}
               target="_blank"
               rel="noopener noreferrer"
               className="font-mono text-btc text-xs hover:underline flex items-center gap-1"
