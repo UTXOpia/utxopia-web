@@ -19,7 +19,7 @@ export interface TreeProofResponse {
 }
 
 export interface TreeStatusResponse {
-  root: string;
+  root: string | null;
   next_index: number;
   size: number;
   announcements?: number;
@@ -52,9 +52,9 @@ export async function getTreeProofFromBackend(
  * Get tree status from the backend.
  * Returns null if backend is unavailable.
  */
-export async function getTreeStatus(): Promise<TreeStatusResponse | null> {
+export async function getTreeStatus(network?: NetworkId): Promise<TreeStatusResponse | null> {
   try {
-    const url = `${getBackendUrl()}/api/tree/status`;
+    const url = `${getBackendUrl(network)}/api/tree/status`;
     const res = await fetch(url, {
       signal: AbortSignal.timeout(3000),
     });
