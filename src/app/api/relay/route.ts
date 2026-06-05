@@ -1,7 +1,7 @@
 /**
- * Unified Proof Relay API
+ * Solana Proof Relay API
  *
- * Single endpoint for all JoinSplit modes:
+ * Compatibility endpoint for Solana JoinSplit modes:
  * - mode="transfer" → TRANSACT (disc=13) — private transfer
  * - mode="unshield" → UNSHIELD (disc=14) — public withdrawal to SPL token (multi-output)
  * - mode="redeem"   → REDEEM (disc=15)   — atomic JoinSplit + BTC withdrawal (multi-output)

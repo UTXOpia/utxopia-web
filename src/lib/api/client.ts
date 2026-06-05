@@ -8,7 +8,7 @@
  * - Deposit status checked via mempool.space directly (no backend needed)
  *
  * Backend provides:
- * 1. POST /api/relay - Unified relay (transfer, unshield, redeem)
+ * 1. POST /api/sol/relay - Solana relay (transfer, unshield, redeem)
  * 2. GET /api/withdrawal/:id - Check withdrawal status
  */
 

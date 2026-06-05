@@ -350,8 +350,8 @@ const DISCLOSURE_ITEMS: DisclosureItem[] = [
     icon: Send,
     title: "Outgoing Sender Memos",
     status: "shipped",
-    desc: "Per-output XChaCha20-Poly1305 envelopes encrypted to the sender's outgoing viewing key. AAD = commitment || leafIndex prevents move-the-memo attacks. Rust transact (disc 13) emits per output when memos are attached; SDK helper buildSenderMemosForTransact composes them client-side; /api/relay forwards them opaquely (viewing keys never leave the client); auditor honors ViewPermissions.INCOMING_ONLY to suppress OUT records when the delegation forbids them.",
-    detail: "sdk/src/sender-memo.ts · web/src/app/api/relay/route.ts · sdk/src/auditor.ts",
+    desc: "Per-output XChaCha20-Poly1305 envelopes encrypted to the sender's outgoing viewing key. AAD = commitment || leafIndex prevents move-the-memo attacks. Rust transact (disc 13) emits per output when memos are attached; SDK helper buildSenderMemosForTransact composes them client-side; /api/sol/relay forwards them opaquely (viewing keys never leave the client); auditor honors ViewPermissions.INCOMING_ONLY to suppress OUT records when the delegation forbids them.",
+    detail: "sdk/src/sender-memo.ts · web/src/app/api/sol/relay/route.ts · sdk/src/auditor.ts",
   },
   {
     id: "selective-disclosure-proofs",

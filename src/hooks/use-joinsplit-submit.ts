@@ -74,11 +74,12 @@ export function useJoinSplitSubmit() {
 
       let relayResult: { success: boolean; signature?: string; error?: string };
 
-      const relayUrl = getChainAdapter(chainEnv.config).id === "sui"
+      const chainId = getChainAdapter(chainEnv.config).id;
+      const relayUrl = chainId === "sui"
         ? `/api/sui/relay?network=${encodeURIComponent(chainEnv.networkId)}`
-        : "/api/relay";
+        : "/api/sol/relay";
 
-      if (params.relayMode === "unshield" && getChainAdapter(chainEnv.config).id === "sui") {
+      if (params.relayMode === "unshield" && chainId === "sui") {
         throw new Error("Sui public unshield is not enabled yet");
       }
 
