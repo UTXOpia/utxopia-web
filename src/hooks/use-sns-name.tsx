@@ -15,7 +15,7 @@ import {
   sha256Hash,
   type SnsStealthAddress,
 } from "@utxopia/sdk";
-import { detectNetwork } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 /** SPL Name Service instruction discriminators */
 const SNS_DISC_UPDATE = 1;
@@ -74,6 +74,7 @@ export function useSnsName(): UseSnsNameReturn {
   const wallet = useWallet();
   const privySolana = usePrivySolanaAuthority();
   const { stealthAddress } = useUTXOpiaKeys();
+  const { networkId } = useChainEnvironment();
 
   const [registeredSnsName, setRegisteredSnsName] = useState<string | null>(null);
   const [hasRegisteredSnsName, setHasRegisteredSnsName] = useState(false);
@@ -117,7 +118,7 @@ export function useSnsName(): UseSnsNameReturn {
     owner: PublicKey,
     stealthData: Uint8Array,
   ): Promise<"success" | "unavailable"> => {
-    const networkQuery = `?network=${encodeURIComponent(detectNetwork())}`;
+    const networkQuery = `?network=${encodeURIComponent(networkId)}`;
     const prepareResp = await fetch(`/api/sns/register${networkQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -154,7 +155,7 @@ export function useSnsName(): UseSnsNameReturn {
       throw new Error(submitted?.error || "Failed to submit sponsored SNS registration");
     }
     return "success";
-  }, [signAndSubmitSnsTransaction]);
+  }, [networkId, signAndSubmitSnsTransaction]);
 
   // Resolve an SNS name to stealth keys
   const lookupSnsName = useCallback(async (name: string): Promise<SnsStealthAddress | null> => {
