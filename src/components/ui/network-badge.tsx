@@ -3,12 +3,16 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Beaker } from "lucide-react";
-import { detectNetwork, hrefWithChain, NETWORK_META } from "@/lib/network-config";
+import { detectNetwork, hrefWithChain, NETWORK_CHANGE_EVENT, NETWORK_META } from "@/lib/network-config";
 
 function subscribe(onChange: () => void) {
   if (typeof window === "undefined") return () => {};
   window.addEventListener("storage", onChange);
-  return () => window.removeEventListener("storage", onChange);
+  window.addEventListener(NETWORK_CHANGE_EVENT, onChange);
+  return () => {
+    window.removeEventListener("storage", onChange);
+    window.removeEventListener(NETWORK_CHANGE_EVENT, onChange);
+  };
 }
 
 /**

@@ -28,6 +28,7 @@ import { getSolanaExplorerTxUrl, getSolanaExplorerAddressUrl } from "@/lib/solan
 import { Th, Td, TypeBadge, StatusDot, FlowCell, SolanaLink, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import type { NetworkId } from "@/lib/network-config";
 
 /** Format raw sats as trimmed BTC string */
 const fmtBtc = (sats: number) => formatAmount(sats, 8);
@@ -41,10 +42,12 @@ const REQUIRED_CONFIRMATIONS = 6;
 function BtcConfirmationStatus({
   txid,
   esploraApiUrl,
+  networkId,
   onMinerFee,
 }: {
   txid: string;
   esploraApiUrl: string;
+  networkId: NetworkId;
   onMinerFee?: (fee: number) => void;
 }) {
   const [confirmations, setConfirmations] = useState<number | null>(null);
@@ -60,7 +63,7 @@ function BtcConfirmationStatus({
         const [txResp, tipResp, relayResp] = await Promise.all([
           fetch(`${esploraApiUrl}/tx/${txid}`),
           fetch(`${esploraApiUrl}/blocks/tip/height`),
-          fetch("/api/relayer/meta").catch((err) => { console.error("[BtcConfirmationStatus] relayer meta fetch error:", err); return null; }),
+          fetch(`/api/relayer/meta?network=${encodeURIComponent(networkId)}`).catch((err) => { console.error("[BtcConfirmationStatus] relayer meta fetch error:", err); return null; }),
         ]);
         if (cancelled) return;
 
@@ -91,7 +94,7 @@ function BtcConfirmationStatus({
     fetchStatus();
     const interval = setInterval(fetchStatus, 30_000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [esploraApiUrl, onMinerFee, txid]);
+  }, [esploraApiUrl, networkId, onMinerFee, txid]);
 
   if (confirmations === null) return null;
 
@@ -337,7 +340,12 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                 {/* BTC Sent — block height, confirmations, miner fee */}
                 {step.key === "btc_sent" && step.done && !redemption.simulated && redemption.btcTxid && (
                   <div className="mt-1.5">
-                    <BtcConfirmationStatus txid={redemption.btcTxid} esploraApiUrl={esploraApiUrl} onMinerFee={setBtcMinerFee} />
+                    <BtcConfirmationStatus
+                      txid={redemption.btcTxid}
+                      esploraApiUrl={esploraApiUrl}
+                      networkId={networkId}
+                      onMinerFee={setBtcMinerFee}
+                    />
                   </div>
                 )}
                 {/* Complete Redemption — burn amount + pool fee */}
@@ -468,10 +476,11 @@ export function WithdrawalRow({
 // =============================================================================
 
 export function WithdrawalsTab() {
+  const { networkId } = useChainEnvironment();
   const { data, error: swrError, isLoading, mutate } = useSWR<RedemptionRecord[]>(
-    "explorer-redemptions",
+    ["explorer-redemptions", networkId],
     async () => {
-      const resp = await fetch("/api/explorer/redemptions");
+      const resp = await fetch(`/api/explorer/redemptions?network=${encodeURIComponent(networkId)}`);
       if (!resp.ok) return [];
       const json = await resp.json();
       return json.redemptions ?? [];

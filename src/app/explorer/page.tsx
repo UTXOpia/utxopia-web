@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useCallback, Suspense, Fragment } from "react";
+import { useState, useMemo, useCallback, useEffect, Suspense, Fragment } from "react";
 import {
   ArrowDownToLine,
   ArrowUpDown,
@@ -16,7 +16,7 @@ import { useTokenPrices } from "@/hooks/use-token-prices";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { cn } from "@/lib/utils";
-import { NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
+import { detectNetwork, NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
 import { TypeFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState } from "./components/shared";
@@ -197,10 +197,10 @@ function ExplorerContent({ network }: { network: NetworkId }) {
 // Main Page
 // =============================================================================
 
-export default function ExplorerPage() {
-  const { networkId: network } = useChainEnvironment();
+function ExplorerBody({ network }: { network: NetworkId }) {
   const synced = useSyncStatus(network);
   const tone = useMemo(() => getExplorerTone(network), [network]);
+
   return (
     <main className="min-h-screen bg-background overflow-x-hidden flex flex-col">
       <SiteHeader />
@@ -257,6 +257,31 @@ export default function ExplorerPage() {
       <SiteFooter />
     </main>
   );
+}
+
+export default function ExplorerPage() {
+  const { networkId: network } = useChainEnvironment();
+  const [clientReady, setClientReady] = useState(false);
+  const currentBrowserNetwork = typeof window === "undefined" ? network : detectNetwork();
+  const networkReady = clientReady && network === currentBrowserNetwork;
+
+  useEffect(() => {
+    setClientReady(true);
+  }, []);
+
+  if (!networkReady) {
+    return (
+      <main className="min-h-screen bg-background overflow-x-hidden flex flex-col">
+        <SiteHeader />
+        <div className="container mx-auto px-4 pt-24 pb-8 relative z-10 max-w-7xl flex-1">
+          <LoadingState />
+        </div>
+        <SiteFooter />
+      </main>
+    );
+  }
+
+  return <ExplorerBody network={network} />;
 }
 
 function getExplorerTone(network: NetworkId) {
