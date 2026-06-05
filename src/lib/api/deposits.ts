@@ -316,7 +316,7 @@ export async function getStealthDepositStatus(
   depositId: string
 ): Promise<StealthDepositStatusResponse> {
   const response = await fetch(
-    `/api/stealth/${depositId}`,
+    `/api/stealth/status/${encodeURIComponent(depositId)}`,
     {
       method: "GET",
       headers: {
