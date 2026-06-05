@@ -344,13 +344,6 @@ export default function VaultPage() {
             </div>
           ) : (
             <>
-              <VaultBalance
-                balancesByToken={balancesByToken}
-                isLoading={isLoadingInbox}
-                tokenPrices={tokenPrices}
-                onRefresh={refreshInbox}
-              />
-
               {!isViewOnly && (
                 <VaultFirstSteps
                   keys={keys}
@@ -359,6 +352,13 @@ export default function VaultPage() {
                   onBackupComplete={() => setHasRecoveryBackup(true)}
                 />
               )}
+
+              <VaultBalance
+                balancesByToken={balancesByToken}
+                isLoading={isLoadingInbox}
+                tokenPrices={tokenPrices}
+                onRefresh={refreshInbox}
+              />
 
               {showSnsTip && (
                 <SnsNameTip

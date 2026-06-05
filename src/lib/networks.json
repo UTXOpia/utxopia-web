@@ -97,27 +97,27 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0xc0816105992326466a5b75b5aa9a65ee22f2d472c2afa2652aeeac4e4263e43d",
+      "packageId": "0x49e668da6c468cd0a2313e03fe9bc260999adc2486e980cec9172104de6923db",
       "pool": {
-        "objectId": "0x2e2300230987e78a385027647df77d2f46e390a4f0c3570c4e2fbe07442146b5",
-        "initialSharedVersion": "889180395"
+        "objectId": "0xc9d55e6fc6f04c88adae116b7ba413122af7236a662ffb8990e630bf31fdd0e8",
+        "initialSharedVersion": "889180411"
       },
       "nullifierRegistry": {
-        "objectId": "0x5db62b1d42280338ae7385d61fc80db645efe07b2a651e3fe1d15ca0fcf5beca",
-        "initialSharedVersion": "889180399"
+        "objectId": "0xc16d66f3b66524d315787cf23abdd7c664677e7daca516631d0f6f965851b40d",
+        "initialSharedVersion": "889180415"
       },
       "redemptionQueue": {
-        "objectId": "0x4ed37e714def18ff8f48ff6ea1e6604d56a3d8245e5ae242b0abcb421c4a6a32",
-        "initialSharedVersion": "889180400"
+        "objectId": "0xc118ac30a727aabc9642825ebf4260381b9652716c689c23fad2cbe89deb09eb",
+        "initialSharedVersion": "889180416"
       },
       "redemptionCap": {
-        "objectId": "0xed6a0f4bf417a75fe152d6ae929390e580e5fd08820effedbc0259253fb01b12",
-        "version": "889180400",
-        "digest": "25Eok3qot3sDWRwUnCmRm7qjJeZHP66oH2eDzWKWuZGc"
+        "objectId": "0x52a4b2b6bcda8e160f29fc3e53273d830f6365aa27dcf6ae1e3ac96f71bd2918",
+        "version": "889180416",
+        "digest": "RkJmzSDEUUpTC2sGy4g8hDAXMBwmB5FpLuzEKNmTced"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x2afe006b0eb2af088efc0f2215332ede38892a8ad3c2b7010dabfc71c1fab9a2",
-        "initialSharedVersion": "889180401"
+        "objectId": "0x09f2c39f7ea6df54ffea3fce228759e6efe4474ee866bc551d085ba4d771c379",
+        "initialSharedVersion": "889180417"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -146,20 +146,20 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "7d8d5d6933a079982af47e3ddf98908aa2f29ccd321fc8d43986a6a5186cf2f2",
-          "registerTxDigest": "69n2uDFGztZHZjcfhJ2EJZvVCAj2Vu88iS44t6DGH1pk"
+          "registerTxDigest": "9YvLWhTJ29NDhVSvyeN46UPsNgNnqgFzhDzFuihFTRQ2"
         }
       },
       "commitmentTree": {
-        "objectId": "0x05610021098146c92cec90059f4200b051f4fafc58dd7315f9b36a4b6818e943",
-        "initialSharedVersion": "889180396"
+        "objectId": "0x38542096faea30a72598d30e61c2346833ce33b42d6a935ecd4989eb0d62e28a",
+        "initialSharedVersion": "889180412"
       },
       "btcDepositRegistry": {
-        "objectId": "0xe89c5025851395d7f1b0120e0a97e84d6e87405f3048e7db8c8ab1d5eb5cce64",
-        "initialSharedVersion": "889180397"
+        "objectId": "0x5c487c506dd9420ca5f49763a5491dbf28767fd2d61c79d97e0f75c3bfdc65c5",
+        "initialSharedVersion": "889180413"
       },
       "utxoSet": {
-        "objectId": "0xe77fbdea3f5976ff48cc50258459ff42b86af81a50baaff649139764130cc27f",
-        "initialSharedVersion": "889180398"
+        "objectId": "0x867669a0d9d7a2b46540fa810b179d790c8661e72838a625152847aae1991ce8",
+        "initialSharedVersion": "889180414"
       }
     }
   },
@@ -274,31 +274,31 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0xc0816105992326466a5b75b5aa9a65ee22f2d472c2afa2652aeeac4e4263e43d",
+      "packageId": "0x49e668da6c468cd0a2313e03fe9bc260999adc2486e980cec9172104de6923db",
       "pool": {
-        "objectId": "0x2e2300230987e78a385027647df77d2f46e390a4f0c3570c4e2fbe07442146b5",
-        "initialSharedVersion": "889180395"
+        "objectId": "0xc9d55e6fc6f04c88adae116b7ba413122af7236a662ffb8990e630bf31fdd0e8",
+        "initialSharedVersion": "889180411"
       },
       "btcDepositRegistry": {
-        "objectId": "0xe89c5025851395d7f1b0120e0a97e84d6e87405f3048e7db8c8ab1d5eb5cce64",
-        "initialSharedVersion": "889180397"
+        "objectId": "0x5c487c506dd9420ca5f49763a5491dbf28767fd2d61c79d97e0f75c3bfdc65c5",
+        "initialSharedVersion": "889180413"
       },
       "nullifierRegistry": {
-        "objectId": "0x5db62b1d42280338ae7385d61fc80db645efe07b2a651e3fe1d15ca0fcf5beca",
-        "initialSharedVersion": "889180399"
+        "objectId": "0xc16d66f3b66524d315787cf23abdd7c664677e7daca516631d0f6f965851b40d",
+        "initialSharedVersion": "889180415"
       },
       "redemptionQueue": {
-        "objectId": "0x4ed37e714def18ff8f48ff6ea1e6604d56a3d8245e5ae242b0abcb421c4a6a32",
-        "initialSharedVersion": "889180400"
+        "objectId": "0xc118ac30a727aabc9642825ebf4260381b9652716c689c23fad2cbe89deb09eb",
+        "initialSharedVersion": "889180416"
       },
       "redemptionCap": {
-        "objectId": "0xed6a0f4bf417a75fe152d6ae929390e580e5fd08820effedbc0259253fb01b12",
-        "version": "889180400",
-        "digest": "25Eok3qot3sDWRwUnCmRm7qjJeZHP66oH2eDzWKWuZGc"
+        "objectId": "0x52a4b2b6bcda8e160f29fc3e53273d830f6365aa27dcf6ae1e3ac96f71bd2918",
+        "version": "889180416",
+        "digest": "RkJmzSDEUUpTC2sGy4g8hDAXMBwmB5FpLuzEKNmTced"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x2afe006b0eb2af088efc0f2215332ede38892a8ad3c2b7010dabfc71c1fab9a2",
-        "initialSharedVersion": "889180401"
+        "objectId": "0x09f2c39f7ea6df54ffea3fce228759e6efe4474ee866bc551d085ba4d771c379",
+        "initialSharedVersion": "889180417"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -330,16 +330,16 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "7d8d5d6933a079982af47e3ddf98908aa2f29ccd321fc8d43986a6a5186cf2f2",
-          "registerTxDigest": "69n2uDFGztZHZjcfhJ2EJZvVCAj2Vu88iS44t6DGH1pk"
+          "registerTxDigest": "9YvLWhTJ29NDhVSvyeN46UPsNgNnqgFzhDzFuihFTRQ2"
         }
       },
       "commitmentTree": {
-        "objectId": "0x05610021098146c92cec90059f4200b051f4fafc58dd7315f9b36a4b6818e943",
-        "initialSharedVersion": "889180396"
+        "objectId": "0x38542096faea30a72598d30e61c2346833ce33b42d6a935ecd4989eb0d62e28a",
+        "initialSharedVersion": "889180412"
       },
       "utxoSet": {
-        "objectId": "0xe77fbdea3f5976ff48cc50258459ff42b86af81a50baaff649139764130cc27f",
-        "initialSharedVersion": "889180398"
+        "objectId": "0x867669a0d9d7a2b46540fa810b179d790c8661e72838a625152847aae1991ce8",
+        "initialSharedVersion": "889180414"
       }
     }
   }

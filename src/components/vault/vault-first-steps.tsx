@@ -10,7 +10,6 @@ import {
   Copy,
   Download,
   PlusCircle,
-  Send,
   ShieldCheck,
 } from "lucide-react";
 import type { UTXOpiaKeys } from "@utxopia/sdk";
@@ -49,6 +48,7 @@ export function VaultFirstSteps({
   if (hasFunds && hasBackup) return null;
 
   const doneCount = (hasFunds ? 1 : 0) + (hasBackup ? 1 : 0);
+  const totalSteps = 2;
 
   const handleDownloadBackup = () => {
     if (!identity) return;
@@ -82,7 +82,7 @@ export function VaultFirstSteps({
         <span className="text-caption font-semibold text-foreground">
           Set up your wallet
         </span>
-        <span className="text-caption text-gray">{doneCount} of 3 done</span>
+        <span className="text-caption text-gray">{doneCount} of {totalSteps} done</span>
         <ChevronDown
           className={cn(
             "ml-auto h-3.5 w-3.5 shrink-0 text-gray transition-transform",
@@ -182,20 +182,6 @@ export function VaultFirstSteps({
                 </button>
               </div>
             )}
-          </div>
-
-          {/* Step 3: Send privately */}
-          <div className="flex items-start gap-2.5 rounded-[9px] bg-muted/30 px-2.5 py-2">
-            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-              <Circle className="h-4 w-4 text-gray/45" />
-            </div>
-            <Send className="mt-0.5 h-4 w-4 shrink-0 text-gray/60" />
-            <div className="min-w-0 flex-1">
-              <p className="text-caption font-semibold text-foreground">Send privately</p>
-              <p className="text-[11px] text-gray/60">
-                Pay a private address, chain wallet, Bitcoin address, or claim link.
-              </p>
-            </div>
           </div>
         </div>
       )}
