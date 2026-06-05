@@ -321,10 +321,10 @@ export async function POST(request: NextRequest) {
     const nullifierBytes = nullifiers.map((n, i) => validateHexField(hexToBytes, n, `nullifiers[${i}]`, 32));
     const commitmentBytes = commitmentsOut.map((c, i) => validateHexField(hexToBytes, c, `commitmentsOut[${i}]`, 32));
 
-    // Stealth data: accept >= 40 bytes per entry (72 for transact/unshield, 40+ for redeem)
+    // Stealth data: all JoinSplit modes use 72-byte envelopes.
     const stealthDataBytes = stealthData.map((s, i) => {
       const bytes = hexToBytes(s);
-      if (bytes.length < 40) throw new Error(`stealthData[${i}]: expected >= 40 bytes, got ${bytes.length}`);
+      if (bytes.length !== 72) throw new Error(`stealthData[${i}]: expected 72 bytes, got ${bytes.length}`);
       return bytes;
     });
 

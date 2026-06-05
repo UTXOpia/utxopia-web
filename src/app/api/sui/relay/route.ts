@@ -152,6 +152,9 @@ function validateCommon(body: SuiRelayRequest): void {
   if (body.stealthData.length !== expectedStealthCount) {
     throw new Error(`Expected ${expectedStealthCount} stealth data entries, got ${body.stealthData.length}`);
   }
+  body.stealthData.forEach((value, i) => {
+    validateHex(value, `stealthData[${i}]`, 72);
+  });
   if (body.mode === "redeem") {
     if (!body.redeemAmounts?.length || !body.btcScripts?.length) {
       throw new Error("Redeem requires redeemAmounts[] and btcScripts[]");

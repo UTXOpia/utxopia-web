@@ -87,7 +87,7 @@ export function reduceToFieldOnChain(bytes: Uint8Array): bigint {
  * Solana max tx size = 1232 bytes.
  *
  * Relay uses proof_source=1: proof (256 bytes) offloaded to ChadBuffer,
- * stealth data (M×40 bytes) remains in instruction data.
+ * stealth data (M×72 bytes) remains in instruction data.
  */
 export function estimateTransactionSize(nInputs: number, nOutputs: number): number {
   const numAccounts = 7 + nInputs;
