@@ -57,11 +57,11 @@ export async function POST(request: NextRequest) {
     const boundParamsHash = hexToBytes(body.boundParamsHash);
     const nullifiers = body.nullifiers.map((value, i) => validateHex(value, `nullifiers[${i}]`, 32));
     const commitments = body.commitmentsOut.map((value, i) => validateHex(value, `commitmentsOut[${i}]`, 32));
+    const stealthData = body.stealthData.map((value, i) => validateHex(value, `stealthData[${i}]`, undefined));
     const publicInputs = concatBytes([merkleRoot, boundParamsHash, ...nullifiers, ...commitments]);
     const vkHash = getVkHash(cfg, body.nInputs, body.nOutputs);
 
-    const tx = body.mode === "redeem"
-      ? await adapter.buildRedemptionTransaction({
+    const redemptionInput: Parameters<UTXOpiaSuiAdapter["buildRedemptionTransaction"]>[0] = {
         inputNotes: nullifiers.map((nullifier, i) => ({
           commitment: body.commitmentsOut[i] ?? "",
           nullifier: bytesToHex(nullifier),
@@ -81,7 +81,11 @@ export async function POST(request: NextRequest) {
         amountsSats: (body.redeemAmounts ?? []).map((amount) => BigInt(amount)),
         maxFeesSats: (body.redeemAmounts ?? []).map(() => BigInt(process.env.UTXOPIA_SUI_REDEEM_MAX_FEE_SATS ?? "20000")),
         nPublicOutputs: body.redeemAmounts?.length ?? 0,
-      })
+        stealthData,
+      };
+
+    const tx = body.mode === "redeem"
+      ? await adapter.buildRedemptionTransaction(redemptionInput)
       : await adapter.buildTransactTransaction({
         inputNotes: nullifiers.map((nullifier, i) => ({
           commitment: body.commitmentsOut[i] ?? "",
