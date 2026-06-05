@@ -45,13 +45,14 @@ function BtcConfirmationStatus({ txid, onMinerFee }: { txid: string; onMinerFee?
   const [minerFee, setMinerFee] = useState<number | null>(null);
 
   useEffect(() => {
+    const esploraApiUrl = getEsploraApiUrl();
     let cancelled = false;
     async function fetchStatus() {
       try {
         // Fetch BTC tx details + tip + on-chain relayed header height in parallel
         const [txResp, tipResp, relayResp] = await Promise.all([
-          fetch(`${getEsploraApiUrl()}/tx/${txid}`),
-          fetch(`${getEsploraApiUrl()}/blocks/tip/height`),
+          fetch(`${esploraApiUrl}/tx/${txid}`),
+          fetch(`${esploraApiUrl}/blocks/tip/height`),
           fetch("/api/relayer/meta").catch((err) => { console.error("[BtcConfirmationStatus] relayer meta fetch error:", err); return null; }),
         ]);
         if (cancelled) return;

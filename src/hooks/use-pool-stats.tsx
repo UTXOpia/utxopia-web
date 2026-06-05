@@ -89,8 +89,8 @@ async function fetchPoolStats(network: NetworkId): Promise<PoolStats> {
   };
 }
 
-export function usePoolStats() {
-  const network = detectNetwork();
+export function usePoolStats(networkId?: NetworkId) {
+  const network = networkId ?? detectNetwork();
   const { data: stats, error, isLoading, mutate } = useSWR<PoolStats>(
     ["pool-stats", network],
     () => fetchPoolStats(network),

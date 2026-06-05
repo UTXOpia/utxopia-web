@@ -18,7 +18,7 @@ import type {
 } from "./types";
 import { ApiError } from "./errors";
 import { API_ENDPOINTS, getBackendUrl } from "./constants";
-import { getConfig } from "@utxopia/sdk";
+import { getEsploraApiUrl } from "@/lib/btc-network";
 
 /**
  * UTXOpia API Client (Minimal - Redemption Only)
@@ -100,7 +100,7 @@ export { zkBTCApiClient };
 
 /** Get mempool API URL from SDK config (single source of truth) */
 function getMempoolApiUrl(): string {
-  return getConfig().esploraUrl;
+  return getEsploraApiUrl();
 }
 const REQUIRED_CONFIRMATIONS = 2;
 

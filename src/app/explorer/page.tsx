@@ -13,11 +13,11 @@ import { useExplorer } from "@/hooks/use-explorer";
 import type { ExplorerTransaction } from "@/hooks/use-explorer";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
-import { getBackendUrl } from "@/lib/api/constants";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { cn } from "@/lib/utils";
-import { detectNetwork, NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
+import { NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 import { TypeFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState } from "./components/shared";
 import type { FilterType, TokenFilter } from "./components/shared";
@@ -32,7 +32,7 @@ function useSyncStatus(network: NetworkId) {
   const { data } = useSWR<{ synced: boolean }>(
     ["tree-sync-status", network],
     async () => {
-      const resp = await fetch(`${getBackendUrl(network)}/api/tree/status`);
+      const resp = await fetch(`/api/tree/status?network=${encodeURIComponent(network)}`);
       if (!resp.ok) return { synced: true };
       const json = await resp.json();
       return { synced: json.synced ?? true };
@@ -46,12 +46,12 @@ function useSyncStatus(network: NetworkId) {
 // Explorer Content
 // =============================================================================
 
-function ExplorerContent() {
+function ExplorerContent({ network }: { network: NetworkId }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [selectedTokens, setSelectedTokens] = useState<Set<TokenFilter>>(() => new Set(["btc", "sol", "usdc", "usdt"] as TokenFilter[]));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
-  const { transactions: allTransactions, refresh: refreshAll } = useExplorer();
+  const { transactions: allTransactions, refresh: refreshAll } = useExplorer(network);
 
   const toggle = useCallback((key: string) => {
     setExpanded((prev) => {
@@ -111,7 +111,7 @@ function ExplorerContent() {
   }, [allTransactions, activeFilter, selectedTokens]);
 
   // TVL from on-chain pool state (same as main page)
-  const { stats } = usePoolStats();
+  const { stats } = usePoolStats(network);
   const prices = useTokenPrices();
 
   const totalShieldedDisplay = useMemo(() => {
@@ -178,6 +178,7 @@ function ExplorerContent() {
                     <TransferRow
                       key={`${tx.type}-${rowKey}`}
                       tx={tx}
+                      network={network}
                       expanded={expanded.has(rowKey)}
                       onToggle={() => toggle(rowKey)}
                     />
@@ -197,7 +198,7 @@ function ExplorerContent() {
 // =============================================================================
 
 export default function ExplorerPage() {
-  const network = useMemo(() => detectNetwork(), []);
+  const { networkId: network } = useChainEnvironment();
   const synced = useSyncStatus(network);
   const tone = useMemo(() => getExplorerTone(network), [network]);
   return (
@@ -236,7 +237,7 @@ export default function ExplorerPage() {
 
         <div className="flex-1 flex flex-col">
           <Suspense fallback={<LoadingState />}>
-            <ExplorerContent />
+            <ExplorerContent network={network} />
           </Suspense>
         </div>
 

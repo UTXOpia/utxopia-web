@@ -2,7 +2,7 @@
 
 import useSWR from "swr";
 import type { IndexerLeaf } from "@utxopia/sdk";
-import { detectNetwork } from "@/lib/network-config";
+import { detectNetwork, type NetworkId } from "@/lib/network-config";
 
 // =============================================================================
 // Types
@@ -213,8 +213,8 @@ const SWR_OPTIONS = {
  *
  * Types: shield | transfer | unshield | withdraw
  */
-export function useExplorer() {
-  const network = detectNetwork();
+export function useExplorer(networkId?: NetworkId) {
+  const network = networkId ?? detectNetwork();
   const { data, error, isLoading, mutate } = useSWR<ExplorerTransaction[]>(
     ["explorer-unified", network],
     async () => {

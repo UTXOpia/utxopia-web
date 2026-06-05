@@ -10,11 +10,12 @@ import { RedeemDetails } from "./redeem-details";
 import { UnshieldDetails } from "./unshield-details";
 import { StandardTransferDetails } from "./standard-transfer-details";
 import type { TransferTx } from "./detail-helpers";
+import type { NetworkId } from "@/lib/network-config";
 
-export function TransferDetails({ tx, redemption }: { tx: TransferTx; redemption?: RedemptionRecord }) {
+export function TransferDetails({ tx, redemption, network }: { tx: TransferTx; redemption?: RedemptionRecord; network?: NetworkId }) {
   const kind = getTransferKind(tx);
-  if (kind === "shield") return <ShieldDetails tx={tx} />;
-  if (kind === "withdraw") return <RedeemDetails tx={tx} redemption={redemption} />;
+  if (kind === "shield") return <ShieldDetails tx={tx} network={network} />;
+  if (kind === "withdraw") return <RedeemDetails tx={tx} redemption={redemption} network={network} />;
   if (kind === "unshield") return <UnshieldDetails tx={tx} />;
   return <StandardTransferDetails tx={tx} />;
 }

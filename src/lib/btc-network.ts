@@ -5,7 +5,7 @@
  */
 import { getConfig } from "@utxopia/sdk";
 import { BitcoinNetworkType } from "sats-connect";
-import { getNetworkConfig } from "./network-config";
+import { detectNetwork, getNetworkConfig, type NetworkId } from "./network-config";
 
 /** sats-connect network enum for Xverse/Leather wallets */
 export function getSatsConnectNetwork(): BitcoinNetworkType {
@@ -51,9 +51,9 @@ export function getUnisatFallbackNetwork(): string {
  *  Reads `bitcoin.explorerUrl` from the active network config, so hybrid
  *  surfaces `btc.utxopia.com/regtest` instead of localhost. Falls back to
  *  per-network mempool.space defaults if no config is loaded yet. */
-export function getMempoolExplorerUrl(): string {
+export function getMempoolExplorerUrl(network?: NetworkId): string {
   try {
-    const url = getNetworkConfig().bitcoin.explorerUrl;
+    const url = getNetworkConfig(network ?? detectNetwork()).bitcoin.explorerUrl;
     if (url) return url;
   } catch {
     /* fall through to legacy switch */
@@ -75,8 +75,19 @@ export function getMempoolExplorerUrl(): string {
   }
 }
 
-/** Esplora API base URL (for fetch calls) — re-exports from SDK config */
-export function getEsploraApiUrl(): string {
+/** Esplora API base URL (for fetch calls).
+ *  Prefer the app's selected network config over SDK globals so browser
+ *  network switches do not leak stale mempool/regtest endpoints. */
+export function getEsploraApiUrl(network?: NetworkId): string {
+  try {
+    const explorer = getNetworkConfig(network ?? detectNetwork()).bitcoin.explorerUrl;
+    if (explorer) {
+      const trimmed = explorer.replace(/\/$/, "");
+      return trimmed.endsWith("/api") ? trimmed : `${trimmed}/api`;
+    }
+  } catch {
+    /* fall through to SDK config */
+  }
   return getConfig().esploraUrl;
 }
 

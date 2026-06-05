@@ -2,6 +2,7 @@
 
 import useSWR from "swr";
 import { getEsploraApiUrl } from "@/lib/btc-network";
+import type { NetworkId } from "@/lib/network-config";
 
 async function fetchTipHeight(url: string): Promise<number> {
   const res = await fetch(url);
@@ -15,9 +16,10 @@ async function fetchTipHeight(url: string): Promise<number> {
 /** Current BTC tip height for the active network. Refreshes every 15s so
  *  confirmation counts advance live without per-row polling. Returns null
  *  until the first fetch lands. */
-export function useBtcTipHeight(): number | null {
+export function useBtcTipHeight(network?: NetworkId): number | null {
+  const apiUrl = getEsploraApiUrl(network);
   const { data } = useSWR(
-    `${getEsploraApiUrl()}/blocks/tip/height`,
+    `${apiUrl}/blocks/tip/height`,
     fetchTipHeight,
     { refreshInterval: 15_000, revalidateOnFocus: true, dedupingInterval: 5_000 },
   );

@@ -24,8 +24,9 @@ import {
   NullifierRow,
   CommitmentRow,
 } from "./detail-helpers";
+import type { NetworkId } from "@/lib/network-config";
 
-export function RedeemDetails({ tx, redemption }: { tx: TransferTx; redemption?: RedemptionRecord }) {
+export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; redemption?: RedemptionRecord; network?: NetworkId }) {
   const tokenSym = tx.tokenSymbol ?? (tx.tokenId ? resolveTokenSymbolSync(tx.tokenId) : null);
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
   const r = redemption;
@@ -78,7 +79,7 @@ export function RedeemDetails({ tx, redemption }: { tx: TransferTx; redemption?:
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate((getTxUnshieldRecipient(tx) ?? ""), 10, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={(getTxUnshieldRecipient(tx) ?? "")} label="BTC Address" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/address/${(getTxUnshieldRecipient(tx) ?? "")}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${getMempoolExplorerUrl(network)}/address/${(getTxUnshieldRecipient(tx) ?? "")}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>

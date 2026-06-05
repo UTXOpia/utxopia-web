@@ -21,6 +21,7 @@ import { SUPPORTED_TOKENS, formatTokenAmount, getTokenBySymbol } from "@/lib/sup
 import { resolveTokenSymbolSync } from "@/lib/token-map";
 import { TransferDetails } from "./transfer-details";
 import { useBtcTipHeight, confirmationsFromHeight } from "@/hooks/use-btc-tip-height";
+import type { NetworkId } from "@/lib/network-config";
 
 // =============================================================================
 // Transfer Row — single unified table row + expandable detail
@@ -63,11 +64,13 @@ function getShieldStatus(status: string): { variant: StatusDotVariant; label: st
 
 export function TransferRow({
   tx,
+  network,
   expanded,
   onToggle,
   redemption,
 }: {
   tx: TransferTx;
+  network?: NetworkId;
   expanded: boolean;
   onToggle: () => void;
   redemption?: RedemptionRecord;
@@ -76,7 +79,7 @@ export function TransferRow({
   const isUnshieldOrWithdraw = kind === "unshield" || kind === "withdraw";
   const tokenSym = tx.tokenSymbol ?? (tx.tokenId ? resolveTokenSymbolSync(tx.tokenId) : null);
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
-  const btcTip = useBtcTipHeight();
+  const btcTip = useBtcTipHeight(network);
   const liveDepositConfs = confirmationsFromHeight(tx.btcMeta?.depositBlockHeight, btcTip)
     ?? tx.btcMeta?.confirmations;
 
@@ -183,7 +186,7 @@ export function TransferRow({
             <SolanaLink signature={tx.txSignature} />
           ) : tx.btcMeta?.depositTxid ? (
             <a
-              href={`${getMempoolExplorerUrl()}/tx/${tx.btcMeta.depositTxid}`}
+              href={`${getMempoolExplorerUrl(network)}/tx/${tx.btcMeta.depositTxid}`}
               target="_blank"
               rel="noopener noreferrer"
               className="text-caption text-gray hover:text-foreground transition-colors"
@@ -197,7 +200,7 @@ export function TransferRow({
       {expanded && (
         <tr>
           <td colSpan={8} className="p-0">
-            <TransferDetails tx={tx} redemption={redemption} />
+            <TransferDetails tx={tx} redemption={redemption} network={network} />
           </td>
         </tr>
       )}

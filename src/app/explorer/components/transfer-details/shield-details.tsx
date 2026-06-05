@@ -8,8 +8,9 @@ import { SUPPORTED_TOKENS, formatTokenAmount, getTokenBySymbol } from "@/lib/sup
 import { resolveTokenSymbolSync } from "@/lib/token-map";
 import { CommitmentRow, type TransferTx } from "./detail-helpers";
 import { useBtcTipHeight, confirmationsFromHeight } from "@/hooks/use-btc-tip-height";
+import type { NetworkId } from "@/lib/network-config";
 
-export function ShieldDetails({ tx }: { tx: TransferTx }) {
+export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: NetworkId }) {
   const tokenSym = tx.tokenSymbol ?? (tx.tokenId ? resolveTokenSymbolSync(tx.tokenId) : null);
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
   const isBtc = token.isBtcNative || token.symbol === "BTC" || token.symbol === "zkBTC";
@@ -29,7 +30,7 @@ export function ShieldDetails({ tx }: { tx: TransferTx }) {
   // Live BTC confirmations — prefer the (immutable) block height stored in
   // btcMeta and recompute against the current tip, fall back to the tracker's
   // mempool conf count for still-pending deposits.
-  const tipHeight = useBtcTipHeight();
+  const tipHeight = useBtcTipHeight(network);
   const liveDepositConfs = confirmationsFromHeight(btcMeta?.depositBlockHeight, tipHeight)
     ?? btcMeta?.confirmations;
   const liveSweepConfs = confirmationsFromHeight(btcMeta?.sweepBlockHeight, tipHeight)
@@ -77,7 +78,7 @@ export function ShieldDetails({ tx }: { tx: TransferTx }) {
                 <code className="text-caption font-mono text-foreground/80 truncate">{truncate(btcMeta.depositTxid, 8, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={btcMeta.depositTxid} label="BTC Tx" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl()}/tx/${btcMeta.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <a href={`${getMempoolExplorerUrl(network)}/tx/${btcMeta.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>
