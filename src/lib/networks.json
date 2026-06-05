@@ -274,31 +274,39 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0x49e668da6c468cd0a2313e03fe9bc260999adc2486e980cec9172104de6923db",
+      "packageId": "0x8155c0fae2cde9a3fb8e902768b2e88381d561e7b11739c6a2d6cc5ae41eddb4",
       "pool": {
-        "objectId": "0xc9d55e6fc6f04c88adae116b7ba413122af7236a662ffb8990e630bf31fdd0e8",
-        "initialSharedVersion": "889180411"
+        "objectId": "0x3550fa36f7e588bea69b03c78508d183e7f3c20601c621f590761585e94c892b",
+        "initialSharedVersion": "891159242"
+      },
+      "commitmentTree": {
+        "objectId": "0x2bb96a68ba152d91e83072e9f8d38689b662a7fd3d920318c2dd1448c54c417c",
+        "initialSharedVersion": "891159243"
       },
       "btcDepositRegistry": {
-        "objectId": "0x5c487c506dd9420ca5f49763a5491dbf28767fd2d61c79d97e0f75c3bfdc65c5",
-        "initialSharedVersion": "889180413"
+        "objectId": "0xdd25d0c02e15f1bd88d05bbf1a1b0f4393cb2c8638a360af9f4057bb21ac8ac5",
+        "initialSharedVersion": "891159244"
+      },
+      "utxoSet": {
+        "objectId": "0x8bc5bc2ea916a78a5ff9e9c7d9a06f6cb914dfdafb9245d16c51bf66e83cf84f",
+        "initialSharedVersion": "891159245"
       },
       "nullifierRegistry": {
-        "objectId": "0xc16d66f3b66524d315787cf23abdd7c664677e7daca516631d0f6f965851b40d",
-        "initialSharedVersion": "889180415"
+        "objectId": "0x3ae6395b7033eb68270f79d2486aa1dea22e5c18ff82dd6c42796cf4ee1ab692",
+        "initialSharedVersion": "891159246"
       },
       "redemptionQueue": {
-        "objectId": "0xc118ac30a727aabc9642825ebf4260381b9652716c689c23fad2cbe89deb09eb",
-        "initialSharedVersion": "889180416"
+        "objectId": "0x8d1e37f7f7588a131d665297dfbdc5b6a54ccd52c9fcc87185a2ff83b50c5d68",
+        "initialSharedVersion": "891159247"
       },
       "redemptionCap": {
-        "objectId": "0x52a4b2b6bcda8e160f29fc3e53273d830f6365aa27dcf6ae1e3ac96f71bd2918",
-        "version": "889180416",
-        "digest": "RkJmzSDEUUpTC2sGy4g8hDAXMBwmB5FpLuzEKNmTced"
+        "objectId": "0xe4a269152e1170f503768e09425aaa7703872fcb10aa502376163eb114e45e38",
+        "version": "891159247",
+        "digest": "J3MLMhvmdZYPJuSNMuQ6MhUjyTpz5DDBBPTCkEz9nyUC"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x09f2c39f7ea6df54ffea3fce228759e6efe4474ee866bc551d085ba4d771c379",
-        "initialSharedVersion": "889180417"
+        "objectId": "0xc3ff0d30ee5b77023376fbd1ce10f155ee2ae9bc22e98ceb68dd6c56647f4791",
+        "initialSharedVersion": "891159248"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -330,16 +338,8 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "7d8d5d6933a079982af47e3ddf98908aa2f29ccd321fc8d43986a6a5186cf2f2",
-          "registerTxDigest": "9YvLWhTJ29NDhVSvyeN46UPsNgNnqgFzhDzFuihFTRQ2"
+          "registerTxDigest": "3pVRsDRTutbNiakxSw8ixTr1L3xQZezjasXSA8myTk5L"
         }
-      },
-      "commitmentTree": {
-        "objectId": "0x38542096faea30a72598d30e61c2346833ce33b42d6a935ecd4989eb0d62e28a",
-        "initialSharedVersion": "889180412"
-      },
-      "utxoSet": {
-        "objectId": "0x867669a0d9d7a2b46540fa810b179d790c8661e72838a625152847aae1991ce8",
-        "initialSharedVersion": "889180414"
       }
     }
   }

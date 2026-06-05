@@ -3,7 +3,7 @@ import path from "node:path";
 import { SuinsClient } from "@mysten/suins";
 import { SuiClient } from "@mysten/sui/client";
 
-type SuiPocState = {
+type UtxopiaSuiState = {
   network?: string;
   rpcUrl?: string;
   suins?: {
@@ -14,9 +14,9 @@ type SuiPocState = {
 };
 
 const root = path.resolve(process.cwd(), "..");
-const stateFile = process.env.UTXOPIA_SUI_STATE_FILE ?? path.join(root, "chains/sui/sui-poc-state.json");
+const stateFile = process.env.UTXOPIA_SUI_STATE_FILE ?? path.join(root, "utxopia-sui-programs/utxopia-sui-state.json");
 const state = existsSync(stateFile)
-  ? JSON.parse(readFileSync(stateFile, "utf8")) as SuiPocState
+  ? JSON.parse(readFileSync(stateFile, "utf8")) as UtxopiaSuiState
   : {};
 
 const rpcUrl = process.env.UTXOPIA_SUI_RPC_URL ?? state.rpcUrl ?? "https://fullnode.testnet.sui.io:443";

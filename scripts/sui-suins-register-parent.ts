@@ -9,7 +9,7 @@ import { Secp256r1Keypair } from "@mysten/sui/keypairs/secp256r1";
 import { Transaction } from "@mysten/sui/transactions";
 import { fromBase64 } from "@mysten/sui/utils";
 
-type SuiPocState = {
+type UtxopiaSuiState = {
   network?: string;
   rpcUrl?: string;
   relayer?: {
@@ -29,9 +29,9 @@ const DEFAULT_MAX_PAYMENT = 1_000_000_000n;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{64}$/;
 
 const root = path.resolve(process.cwd(), "..");
-const stateFile = process.env.UTXOPIA_SUI_STATE_FILE ?? path.join(root, "chains/sui/sui-poc-state.json");
+const stateFile = process.env.UTXOPIA_SUI_STATE_FILE ?? path.join(root, "utxopia-sui-programs/utxopia-sui-state.json");
 const state = existsSync(stateFile)
-  ? (JSON.parse(readFileSync(stateFile, "utf8")) as SuiPocState)
+  ? (JSON.parse(readFileSync(stateFile, "utf8")) as UtxopiaSuiState)
   : {};
 
 const rpcUrl = process.env.UTXOPIA_SUI_RPC_URL ?? state.rpcUrl ?? "https://fullnode.testnet.sui.io:443";
