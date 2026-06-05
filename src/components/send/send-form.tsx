@@ -28,6 +28,7 @@ import { validateBtcAddress } from "@/components/ui/btc-address-input";
 import { parseSats } from "@/lib/utils/validation";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
+import { hrefWithChain } from "@/lib/network-config";
 import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
 import { resolveSuiNsUtxopiaRecord } from "@/lib/sui/suins";
 import {
@@ -416,7 +417,7 @@ export function SendForm() {
           : intent.kind === "unshield"
             ? "cashout_wallet"
             : "private_send";
-      router.push(`/vault/activity?result=${result}`);
+      router.push(hrefWithChain(`/vault/activity?result=${result}`, chainEnv.networkId));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Send failed");
     } finally {

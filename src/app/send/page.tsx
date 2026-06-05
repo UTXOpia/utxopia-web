@@ -5,6 +5,7 @@ import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { SendForm } from "@/components/send/send-form";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
+import { hrefWithChain } from "@/lib/network-config";
 
 export default function SendPage() {
   const chainEnv = useChainEnvironment();
@@ -12,7 +13,7 @@ export default function SendPage() {
 
   return (
     <FlowPageLayout
-      backHref="/vault"
+      backHref={hrefWithChain("/vault", chainEnv.networkId)}
       backLabel="Back"
       width={460}
       badges={[

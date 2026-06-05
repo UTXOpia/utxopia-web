@@ -344,11 +344,11 @@ function ActivityContent() {
 
 export default function ActivityPage() {
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center py-8 px-4 sm:py-12">
+    <main className="min-h-screen bg-background flex flex-col items-center py-8 px-4 sm:py-12">
       {/* Header — Back + Badges */}
       <div className="w-full mb-4 flex items-center justify-between relative z-10" style={{ maxWidth: "480px" }}>
         <Link
-          href="/vault"
+          href={hrefWithChain("/vault", detectNetwork())}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

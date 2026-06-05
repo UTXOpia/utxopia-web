@@ -144,7 +144,7 @@ export default function VaultPage() {
 
   if (getChainAdapter(networkConfig).id === "sui") {
     return (
-      <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col">
+      <main className="min-h-screen bg-background flex flex-col">
         <SiteHeader />
         <SuiDashboard />
         <SiteFooter />
@@ -182,15 +182,15 @@ export default function VaultPage() {
   };
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col">
+    <main className="min-h-screen bg-background flex flex-col">
       <SiteHeader />
 
       <div className="flex-1 flex flex-col items-center pt-24 pb-8 px-4">
       <motion.div
         className={cn(
-          "bg-card border border-solid border-gray/30 p-4 sm:p-8",
-          "w-[680px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10"
+          "bg-card border border-solid border-gray/25 p-4 sm:p-8",
+          "w-[680px] max-w-[calc(100vw-32px)] rounded-[14px]",
+          "relative z-10"
         )}
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -387,6 +387,7 @@ export default function VaultPage() {
                 balancesByToken={balancesByToken}
                 depositCount={depositCount}
                 isLoading={isLoadingInbox}
+                networkId={networkId}
                 tokenPrices={tokenPrices}
               />
             </>

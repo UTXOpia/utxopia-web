@@ -5,7 +5,7 @@ import { motion } from "framer-motion";
 import { ChevronRight, Droplets, PlusCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isChainHybridNetwork } from "@/lib/chain-registry";
-import type { NetworkId } from "@/lib/network-config";
+import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 
 interface VaultActionsProps {
   networkId: NetworkId;
@@ -32,7 +32,7 @@ export function VaultActions({
         {actions.map((action) => (
           <Link
             key={action.label}
-            href={action.href}
+            href={hrefWithChain(action.href, networkId)}
             className="flex flex-col items-center gap-1.5 group cursor-pointer"
           >
             <motion.div
@@ -59,7 +59,7 @@ export function VaultActions({
       {depositCount > 0 && (
         <div className="flex justify-center mb-5">
           <Link
-            href="/vault/activity"
+            href={hrefWithChain("/vault/activity", networkId)}
             className="flex items-center gap-1 text-[11px] text-gray/40 hover:text-gray/60 transition-colors cursor-pointer"
           >
             View activity <ChevronRight className="w-3 h-3" />

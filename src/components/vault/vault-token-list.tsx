@@ -5,12 +5,14 @@ import Link from "next/link";
 import { ArrowRight, ChevronRight, Loader2, PlusCircle } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
+import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import type { TokenPrices } from "@/hooks/use-token-prices";
 
 interface VaultTokenListProps {
   balancesByToken: Record<string, bigint>;
   depositCount: number;
   isLoading: boolean;
+  networkId: NetworkId;
   tokenPrices: TokenPrices;
 }
 
@@ -18,6 +20,7 @@ export function VaultTokenList({
   balancesByToken,
   depositCount,
   isLoading,
+  networkId,
   tokenPrices,
 }: VaultTokenListProps) {
   const hasAnyBalance = VAULT_TOKENS.some(
@@ -40,7 +43,7 @@ export function VaultTokenList({
         <span className="text-[11px] text-gray/50 uppercase tracking-wider font-medium">Tokens</span>
         {depositCount > 0 && (
           <Link
-            href="/vault/activity?tab=notes"
+            href={hrefWithChain("/vault/activity?tab=notes", networkId)}
             className="flex items-center gap-0.5 text-[11px] text-privacy/60 hover:text-privacy transition-colors cursor-pointer"
           >
             View activity
@@ -51,7 +54,7 @@ export function VaultTokenList({
 
       <div className="rounded-[14px] border border-gray/10 overflow-hidden divide-y divide-gray/8">
         {!hasAnyBalance && !isLoading ? (
-          <VaultTokenEmptyState />
+          <VaultTokenEmptyState networkId={networkId} />
         ) : (
           sortedTokens.map((token) => {
             const rawBalance = Number(balancesByToken?.[token.shieldedSymbol] ?? 0n);
@@ -92,7 +95,7 @@ export function VaultTokenList({
   );
 }
 
-function VaultTokenEmptyState() {
+function VaultTokenEmptyState({ networkId }: { networkId: NetworkId }) {
   return (
     <div className="flex flex-col items-center py-8 px-4">
       <div className="w-12 h-12 rounded-full bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-3">
@@ -103,7 +106,7 @@ function VaultTokenEmptyState() {
         Add BTC or a supported chain token to start.
       </p>
       <Link
-        href="/vault/deposit"
+        href={hrefWithChain("/vault/deposit", networkId)}
         className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-privacy hover:bg-privacy/85 text-background text-sm font-medium transition-all duration-200 cursor-pointer active:scale-[0.98]"
       >
         Add your first funds

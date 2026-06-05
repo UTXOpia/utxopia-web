@@ -3,11 +3,15 @@
 import { Settings as SettingsIcon } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { PreferencesForm } from "@/components/settings/preferences-form";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 export default function SettingsPage() {
+  const chainEnv = useChainEnvironment();
+
   return (
     <FlowPageLayout
-      backHref="/vault"
+      backHref={hrefWithChain("/vault", chainEnv.networkId)}
       backLabel="Back"
       width={560}
       badges={[

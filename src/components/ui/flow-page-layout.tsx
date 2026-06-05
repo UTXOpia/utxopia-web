@@ -134,7 +134,7 @@ export function FlowPageLayout({
   const titleConfig = colorConfig[titleColor];
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center py-8 px-4 sm:py-12">
+    <main className="min-h-screen bg-background flex flex-col items-center py-8 px-4 sm:py-12">
       {/* Header */}
       <div
         className="w-full mb-4 flex items-center justify-between relative z-10"
@@ -157,9 +157,9 @@ export function FlowPageLayout({
       {/* Widget */}
       <div
         className={cn(
-          "bg-card border border-solid border-gray/30 p-4",
-          "max-w-[calc(100vw-32px)] rounded-[16px]",
-          "glow-border cyber-corners relative z-10"
+          "bg-card border border-solid border-gray/25 p-4 sm:p-5",
+          "max-w-[calc(100vw-32px)] rounded-[14px]",
+          "relative z-10"
         )}
         style={{ width: `${width}px` }}
       >
@@ -178,12 +178,12 @@ export function FlowPageLayout({
           )}
           <div>
             <h1 className="text-heading6 text-foreground">{title}</h1>
-            <p className="text-caption text-gray">{description}</p>
+            <p className="text-caption text-gray-light/75">{description}</p>
           </div>
         </div>
 
-        {/* Content — min height ensures footer stays at bottom when empty */}
-        <div className="min-h-[40vh]">
+        {/* Content area keeps short flows stable without making empty forms feel oversized. */}
+        <div className="min-h-[220px]">
           <ErrorBoundary>
             {children}
           </ErrorBoundary>
