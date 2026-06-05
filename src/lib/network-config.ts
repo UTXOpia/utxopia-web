@@ -214,8 +214,14 @@ function defaultNetworkForChain(chain: ChainQuery): NetworkId {
     : adapter.defaultNetwork;
 }
 
+function normalizeChainQuery(value: string | null): ChainQuery | null {
+  if (value === "sol" || value === "solana") return "sol";
+  if (value === "sui") return "sui";
+  return null;
+}
+
 function networkFromQuery(params: URLSearchParams, preferred?: NetworkId | null): NetworkId | null {
-  const chain = params.get("chain") as ChainQuery | null;
+  const chain = normalizeChainQuery(params.get("chain"));
   const exact = params.get("network");
   if (isKnownNetwork(exact) && (!chain || networkChain(exact) === chain)) {
     return exact;

@@ -33,7 +33,8 @@ function getChainDepositRenderer(config: NetworkConfig): ChainDepositRenderer {
 }
 
 export function renderChainDeposit(props: ChainDepositRouteProps): ReactNode {
-  return getChainDepositRenderer(props.config)(props);
+  const Renderer = getChainDepositRenderer(props.config);
+  return <Renderer {...props} />;
 }
 
 function SolanaDepositPage({ networkId }: ChainDepositRouteProps) {
