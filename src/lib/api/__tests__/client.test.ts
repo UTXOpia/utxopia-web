@@ -10,44 +10,6 @@ describe("zkBTCApiClient", () => {
     mockFetch.mockReset();
   });
 
-  describe("redeem", () => {
-    it("sends correct request to redeem endpoint", async () => {
-      const mockResponse = {
-        request_id: "test_request_123",
-        status: "pending",
-        estimated_completion: Math.floor(Date.now() / 1000) + 3600,
-      };
-
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: async () => mockResponse,
-      } as any);
-
-      const result = await zkBTCApi.redeem(100_000_000, "bc1qtest", "solana_addr");
-
-      expect(result).toEqual(mockResponse);
-      expect(mockFetch).toHaveBeenCalled();
-
-      // Verify request body
-      const callArgs = mockFetch.mock.calls[0] as any[];
-      const body = JSON.parse(callArgs[1].body);
-      expect(body.amount_sats).toBe(100_000_000);
-      expect(body.btc_address).toBe("bc1qtest");
-      expect(body.solana_address).toBe("solana_addr");
-    });
-
-    it("throws ApiError on failed request", async () => {
-      mockFetch.mockResolvedValueOnce({
-        ok: false,
-        status: 400,
-        statusText: "Bad Request",
-        json: async () => ({ error: "Invalid amount" }),
-      } as any);
-
-      await expect(zkBTCApi.redeem(0, "bc1qtest", "solana")).rejects.toThrow();
-    });
-  });
-
   describe("getWithdrawalStatus", () => {
     it("fetches withdrawal status correctly", async () => {
       const mockResponse = {

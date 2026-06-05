@@ -10,8 +10,6 @@
  */
 
 export const API_ENDPOINTS = {
-  // Solana relay endpoint (all JoinSplit modes: transfer, unshield, redeem)
-  RELAY: "/api/sol/relay",
   WITHDRAWAL_STATUS: (id: string) => `/api/withdrawal/status/${encodeURIComponent(id)}`,
 
   // Block header status (Next.js API route -> Solana RPC)

@@ -119,18 +119,6 @@ export interface BalanceResponse {
   pending_withdrawals: number;
 }
 
-export interface RedeemRequest {
-  amount_sats: number;
-  btc_address: string;
-  solana_address: string;
-}
-
-export interface RedeemResponse {
-  success: boolean;
-  request_id?: string;
-  message?: string;
-}
-
 export interface WithdrawalStatusResponse {
   request_id: string;
   status: "pending" | "processing" | "broadcasting" | "completed" | "failed";

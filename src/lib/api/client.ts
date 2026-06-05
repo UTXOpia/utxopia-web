@@ -3,18 +3,15 @@
  *
  * Architecture:
  * - Most operations (deposit, claim, split) are handled client-side via SDK + Solana
- * - Only redemption (BTC withdrawal) requires backend (server-side BTC signing)
+ * - JoinSplit relay submission is handled by @utxopia/sdk's submitToRelay()
  * - Block headers are submitted by the backend header-relayer service (batch only)
  * - Deposit status checked via mempool.space directly (no backend needed)
  *
  * Backend provides:
- * 1. POST /api/sol/relay - Solana relay (transfer, unshield, redeem)
- * 2. GET /api/withdrawal/:id - Check withdrawal status
+ * 1. GET /api/withdrawal/:id - Check withdrawal status
  */
 
 import type {
-  RedeemRequest,
-  RedeemResponse,
   WithdrawalStatusResponse,
   DepositStatusResponse,
   HeaderStatusResponse,
@@ -62,38 +59,6 @@ class zkBTCApiClient {
     } catch (error) {
       throw ApiError.fromUnknown(error);
     }
-  }
-
-  // ============ Redemption (Backend Required) ============
-
-  /**
-   * Redeem zkBTC tokens for BTC withdrawal
-   *
-   * This is the main backend operation - BTC signing must happen server-side.
-   * The backend redemption processor will:
-   * 1. Verify the burn transaction on Solana
-   * 2. Build and sign the BTC withdrawal transaction
-   * 3. Broadcast to Bitcoin network
-   *
-   * @param amountSats - Amount to redeem in satoshis
-   * @param btcAddress - Bitcoin address for withdrawal
-   * @param solanaAddress - Solana address that burned the zkBTC
-   */
-  async redeem(
-    amountSats: number,
-    btcAddress: string,
-    solanaAddress: string
-  ): Promise<RedeemResponse> {
-    const body: RedeemRequest = {
-      amount_sats: amountSats,
-      btc_address: btcAddress,
-      solana_address: solanaAddress,
-    };
-
-    return this.request<RedeemResponse>(API_ENDPOINTS.RELAY, {
-      method: "POST",
-      body: JSON.stringify(body),
-    });
   }
 
   /**
