@@ -273,7 +273,7 @@ function buildSuiExplorerTransactions(config: NetworkConfig, events: SuiEvent[])
         fee,
         payout: amount == null || fee == null ? undefined : Math.max(0, amount - fee),
         requestId: redemptionId,
-        btcScript: bytesField(requestPayload.btc_address_hash),
+        btcScript: bytesField(requestPayload.btc_script),
         btcTxid: bytesField(completionPayload.btc_txid, true),
         localStatus: redemption.completion ? "Completed" : "Processing",
       }],
