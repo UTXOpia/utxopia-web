@@ -62,42 +62,26 @@ export async function POST(request: NextRequest) {
     const vkHash = getVkHash(cfg, body.nInputs, body.nOutputs);
 
     const redemptionInput: Parameters<UTXOpiaSuiAdapter["buildRedemptionTransaction"]>[0] = {
-        inputNotes: nullifiers.map((nullifier, i) => ({
-          commitment: body.commitmentsOut[i] ?? "",
-          nullifier: bytesToHex(nullifier),
-          tokenId: "zkbtc",
-          leafIndex: i,
-        })),
-        btcAddress: body.btcScripts?.[0] ?? "",
-        amountSats: BigInt(body.redeemAmounts?.[0] ?? "0"),
-        maxFeeSats: BigInt(process.env.UTXOPIA_SUI_REDEEM_MAX_FEE_SATS ?? "20000"),
-        proof: proofPoints,
-        vkHash,
-        publicInputs,
-        proofPoints,
-        nullifiers,
-        commitmentsOut: commitments,
-        btcScripts: (body.btcScripts ?? []).map((script, i) => validateHex(script, `btcScripts[${i}]`, undefined)),
-        amountsSats: (body.redeemAmounts ?? []).map((amount) => BigInt(amount)),
-        maxFeesSats: (body.redeemAmounts ?? []).map(() => BigInt(process.env.UTXOPIA_SUI_REDEEM_MAX_FEE_SATS ?? "20000")),
-        nPublicOutputs: body.redeemAmounts?.length ?? 0,
-        stealthData,
-      };
+      nInputs: body.nInputs,
+      nOutputs: body.nOutputs,
+      proof: proofPoints,
+      vkHash,
+      publicInputs,
+      proofPoints,
+      nullifiers,
+      commitmentsOut: commitments,
+      btcScripts: (body.btcScripts ?? []).map((script, i) => validateHex(script, `btcScripts[${i}]`, undefined)),
+      amountsSats: (body.redeemAmounts ?? []).map((amount) => BigInt(amount)),
+      maxFeesSats: (body.redeemAmounts ?? []).map(() => BigInt(process.env.UTXOPIA_SUI_REDEEM_MAX_FEE_SATS ?? "20000")),
+      nPublicOutputs: body.redeemAmounts?.length ?? 0,
+      stealthData,
+    };
 
     const tx = body.mode === "redeem"
       ? await adapter.buildRedemptionTransaction(redemptionInput)
       : await adapter.buildTransactTransaction({
-        inputNotes: nullifiers.map((nullifier, i) => ({
-          commitment: body.commitmentsOut[i] ?? "",
-          nullifier: bytesToHex(nullifier),
-          tokenId: "zkbtc",
-          leafIndex: i,
-        })),
-        outputs: body.commitmentsOut.map((commitment, i) => ({
-          recipient: commitment,
-          tokenId: "zkbtc",
-          amount: 0n,
-        })),
+        nInputs: body.nInputs,
+        nOutputs: body.nOutputs,
         proof: proofPoints,
         boundParamsHash: body.boundParamsHash,
         vkHash,
@@ -217,10 +201,6 @@ function hexToBytes(hex: string): Uint8Array {
     throw new Error("Invalid hex string");
   }
   return Uint8Array.from(Buffer.from(normalized, "hex"));
-}
-
-function bytesToHex(bytes: Uint8Array): string {
-  return Buffer.from(bytes).toString("hex");
 }
 
 function concatBytes(parts: Uint8Array[]): Uint8Array {
