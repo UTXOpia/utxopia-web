@@ -16,6 +16,8 @@ import { useTokenPrices } from "@/hooks/use-token-prices";
 import { getBackendUrl } from "@/lib/api/constants";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { cn } from "@/lib/utils";
+import { detectNetwork, NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
 
 import { TypeFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState } from "./components/shared";
 import type { FilterType, TokenFilter } from "./components/shared";
@@ -26,11 +28,11 @@ import { getTokenByFilter, formatTokenAmount, tvlToUsd, type TokenFilterId } fro
 // Sync status — shows when backend indexer is catching up
 // =============================================================================
 
-function useSyncStatus() {
+function useSyncStatus(network: NetworkId) {
   const { data } = useSWR<{ synced: boolean }>(
-    "tree-sync-status",
+    ["tree-sync-status", network],
     async () => {
-      const resp = await fetch(`${getBackendUrl()}/api/tree/status`);
+      const resp = await fetch(`${getBackendUrl(network)}/api/tree/status`);
       if (!resp.ok) return { synced: true };
       const json = await resp.json();
       return { synced: json.synced ?? true };
@@ -195,7 +197,9 @@ function ExplorerContent() {
 // =============================================================================
 
 export default function ExplorerPage() {
-  const synced = useSyncStatus();
+  const network = useMemo(() => detectNetwork(), []);
+  const synced = useSyncStatus(network);
+  const tone = useMemo(() => getExplorerTone(network), [network]);
   return (
     <main className="min-h-screen bg-background hacker-bg noise-overlay overflow-x-hidden flex flex-col">
       <SiteHeader />
@@ -203,8 +207,8 @@ export default function ExplorerPage() {
         {/* Title */}
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-3">
-            <div className="h-px w-8 bg-gradient-to-r from-privacy/50 to-transparent" />
-            <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-privacy/60">On-Chain Data</span>
+            <div className={cn("h-px w-8 bg-gradient-to-r to-transparent", tone.rule)} />
+            <span className={cn("text-[11px] font-mono uppercase tracking-[0.2em]", tone.eyebrow)}>On-Chain Data</span>
           </div>
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div>
@@ -212,13 +216,13 @@ export default function ExplorerPage() {
               <p className="text-sm text-gray font-light">Browse all shielded pool activity</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
-              <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-privacy/5 border border-privacy/15">
-                <Shield className="w-3 h-3 text-privacy" />
-                <span className="text-[10px] font-mono text-privacy/70">Shielded Pool</span>
+              <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border", tone.poolPill)}>
+                <Shield className={cn("w-3 h-3", tone.icon)} />
+                <span className={cn("text-[10px] font-mono", tone.mutedText)}>Shielded Pool</span>
               </div>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/30 border border-gray/10">
-                <span className="w-1.5 h-1.5 rounded-full bg-yellow-400 animate-pulse" />
-                <span className="text-[10px] font-mono text-gray/50">Devnet</span>
+                <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", tone.dot)} />
+                <span className="text-[10px] font-mono text-gray/50">{tone.networkLabel}</span>
               </div>
               {!synced && (
                 <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-orange-500/5 border border-orange-500/15">
@@ -237,10 +241,10 @@ export default function ExplorerPage() {
         </div>
 
         {/* Privacy Note */}
-        <div className="mt-6 p-3 glass-card border-privacy/15 rounded-[16px]">
+        <div className={cn("mt-6 p-3 glass-card rounded-[16px]", tone.noteBorder)}>
           <div className="flex items-center gap-2 mb-1">
-            <Shield className="w-4 h-4 text-privacy" />
-            <span className="text-caption text-privacy">Privacy Preserved</span>
+            <Shield className={cn("w-4 h-4", tone.icon)} />
+            <span className={cn("text-caption", tone.text)}>Privacy Preserved</span>
           </div>
           <p className="text-caption text-gray">
             Transfer amounts are encrypted with zero-knowledge proofs. Only commitments and
@@ -252,4 +256,24 @@ export default function ExplorerPage() {
       <SiteFooter />
     </main>
   );
+}
+
+function getExplorerTone(network: NetworkId) {
+  const isSui = networkChain(network) === "sui";
+  const networkLabel = network === "sui-regtest"
+    ? "Sui Regtest"
+    : NETWORK_META.find((item) => item.id === network)?.label ?? network;
+  return {
+    networkLabel,
+    rule: isSui ? "from-sui/50" : "from-privacy/50",
+    eyebrow: isSui ? "text-sui/60" : "text-privacy/60",
+    poolPill: isSui
+      ? "bg-sui/5 border-sui/15"
+      : "bg-privacy/5 border-privacy/15",
+    icon: isSui ? "text-sui" : "text-privacy",
+    mutedText: isSui ? "text-sui/70" : "text-privacy/70",
+    text: isSui ? "text-sui" : "text-privacy",
+    noteBorder: isSui ? "border-sui/15" : "border-privacy/15",
+    dot: isSui ? "bg-sui" : "bg-yellow-400",
+  };
 }

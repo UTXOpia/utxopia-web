@@ -27,6 +27,7 @@ import { EmptyInbox } from "@/components/stealth-inbox";
 import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import type { InboxNote } from "@/stores/utxopia-store";
+import { detectNetwork, hrefWithChain } from "@/lib/network-config";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -69,6 +70,7 @@ function timeAgo(ts: number): string {
 function ActivityRow({ note }: { note: InboxNote }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
+  const network = useMemo(() => detectNetwork(), []);
   const tokenPrices = useTokenPrices();
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
@@ -189,7 +191,7 @@ function ActivityRow({ note }: { note: InboxNote }) {
             {/* Footer — explorer link */}
             <div className="px-3.5 py-2 border-t border-gray/8">
               <Link
-                href="/explorer"
+                href={hrefWithChain("/explorer", network)}
                 className="inline-flex items-center gap-1.5 text-[11px] text-privacy hover:text-privacy/80 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >

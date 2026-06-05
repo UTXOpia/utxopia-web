@@ -3,7 +3,7 @@
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
 import { Beaker } from "lucide-react";
-import { detectNetwork, NETWORK_META } from "@/lib/network-config";
+import { detectNetwork, hrefWithChain, NETWORK_META } from "@/lib/network-config";
 
 function subscribe(onChange: () => void) {
   if (typeof window === "undefined") return () => {};
@@ -35,7 +35,7 @@ export function NetworkBadge() {
 
   return (
     <Link
-      href="/settings"
+      href={hrefWithChain("/settings", active)}
       title={`Active network: ${label}. Click to change.`}
       className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-medium uppercase tracking-wide hover:bg-amber-500/20 transition-colors"
     >

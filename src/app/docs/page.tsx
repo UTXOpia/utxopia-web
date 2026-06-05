@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { useMemo } from "react";
 import { type LucideIcon } from "lucide-react";
 import {
   Shield,
@@ -45,6 +46,7 @@ import {
   useAllSectionIds,
 } from "@/components/docs/docs-sidebar";
 import { useActiveSection } from "@/hooks/use-active-section";
+import { detectNetwork, hrefWithChain } from "@/lib/network-config";
 
 /* ── Simple card wrapper ── */
 
@@ -380,6 +382,7 @@ const SECURITY_ITEMS = [
 /* ── Page ── */
 
 export default function DocsPage() {
+  const network = useMemo(() => detectNetwork(), []);
   const sectionIds = useAllSectionIds();
   const activeSection = useActiveSection(sectionIds);
 
@@ -562,7 +565,7 @@ export default function DocsPage() {
                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Link>
                   <Link
-                    href="/explorer"
+                    href={hrefWithChain("/explorer", network)}
                     className="btn-tertiary btn-pill inline-flex items-center gap-2 px-4 sm:px-5 py-2.5 text-sm border border-gray/10 hover:bg-muted/50 hover:border-gray/20 transition-all"
                   >
                     View Explorer
