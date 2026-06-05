@@ -1,11 +1,40 @@
-import { getChainAdapter } from "@/lib/chain-registry";
-import type { NetworkConfig } from "@/lib/network-config";
+import { getChainAdapter, networkForChain } from "@/lib/chain-registry";
+import type { NetworkConfig, NetworkId } from "@/lib/network-config";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 
-export function getChainTransactionUrl(config: NetworkConfig, txId: string): string {
+export type SuiExplorerNetwork = "mainnet" | "testnet" | "devnet";
+
+export function getSuiExplorerNetwork(networkId?: NetworkId): SuiExplorerNetwork {
+  if (!networkId) return "testnet";
+  const suiNetwork = networkForChain(networkId, "sui");
+  switch (suiNetwork) {
+    case "sui-testnet":
+    case "sui-regtest":
+      return "testnet";
+    default:
+      return "testnet";
+  }
+}
+
+export function getSuiObjectUrl(baseUrl: string, objectId: string, networkId?: NetworkId): string {
+  return `${cleanExplorerBaseUrl(baseUrl)}/object/${objectId}?network=${getSuiExplorerNetwork(networkId)}`;
+}
+
+export function getSuiTransactionUrl(baseUrl: string, txId: string, networkId?: NetworkId): string {
+  return `${cleanExplorerBaseUrl(baseUrl)}/txblock/${txId}?network=${getSuiExplorerNetwork(networkId)}`;
+}
+
+export function makeSuiExplorerLinks(baseUrl: string, networkId?: NetworkId) {
+  return {
+    object: (objectId: string) => getSuiObjectUrl(baseUrl, objectId, networkId),
+    tx: (txId: string) => getSuiTransactionUrl(baseUrl, txId, networkId),
+  };
+}
+
+export function getChainTransactionUrl(config: NetworkConfig, txId: string, networkId?: NetworkId): string {
   const chain = getChainAdapter(config);
   if (chain.id === "sui" && config.sui) {
-    return `${config.sui.explorerUrl.replace(/\/$/, "")}/txblock/${txId}?network=testnet`;
+    return getSuiTransactionUrl(config.sui.explorerUrl, txId, networkId);
   }
   return getSolanaExplorerTxUrl(txId);
 }
@@ -27,4 +56,8 @@ export function getChainMutedLinkClass(config: NetworkConfig): string {
   return chain.id === "sui"
     ? "text-sui/40 hover:text-sui"
     : "text-purple-400/40 hover:text-purple-400";
+}
+
+function cleanExplorerBaseUrl(baseUrl: string): string {
+  return baseUrl.replace(/\/$/, "");
 }

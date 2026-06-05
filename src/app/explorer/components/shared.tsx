@@ -277,8 +277,8 @@ export function Td({ children, className, colSpan }: { children?: React.ReactNod
 // --- Links ---
 
 export function ChainTxLink({ signature }: { signature: string }) {
-  const { config } = useChainEnvironment();
-  const href = getChainTransactionUrl(config, signature);
+  const { config, networkId } = useChainEnvironment();
+  const href = getChainTransactionUrl(config, signature, networkId);
 
   return (
     <a

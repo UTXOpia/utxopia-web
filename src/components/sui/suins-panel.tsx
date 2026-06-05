@@ -20,6 +20,7 @@ import {
   type SuiNsUtxopiaRecord,
 } from "@/lib/sui/suins";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
+import { getSuiObjectUrl, getSuiTransactionUrl } from "@/lib/chain-links";
 import { cn } from "@/lib/utils";
 
 type PanelState = "idle" | "loading" | "success" | "error";
@@ -182,7 +183,7 @@ export function SuiNsPanel({
             </div>
             {record.nftId && (
               <a
-                href={`${explorerBaseUrl.replace(/\/$/, "")}/object/${record.nftId}?network=testnet`}
+                href={getSuiObjectUrl(explorerBaseUrl, record.nftId, networkId)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-gray/10 px-2 py-1 text-[11px] text-gray transition-colors hover:text-sui"
@@ -219,7 +220,7 @@ export function SuiNsPanel({
             {message && <p>{message}</p>}
             {digest && (
               <a
-                href={`${explorerBaseUrl.replace(/\/$/, "")}/txblock/${digest}?network=testnet`}
+                href={getSuiTransactionUrl(explorerBaseUrl, digest, networkId)}
                 target="_blank"
                 rel="noreferrer"
                 className="mt-1 inline-flex max-w-full items-center gap-1 font-mono text-[11px] text-sui hover:text-sui/80"

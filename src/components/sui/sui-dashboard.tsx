@@ -24,6 +24,7 @@ import {
 import { SuiAuthPanel } from "@/components/sui/sui-auth-panel";
 import { SuiNsPanel } from "@/components/sui/suins-panel";
 import { isChainHybridNetwork, networkForChain } from "@/lib/chain-registry";
+import { makeSuiExplorerLinks } from "@/lib/chain-links";
 import { detectNetwork, getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import {
   clearSuiAuthState,
@@ -85,7 +86,7 @@ export function SuiDashboard() {
 
 function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig }) {
   const isHybrid = isChainHybridNetwork(networkId, "sui");
-  const explorer = useMemo(() => makeExplorer(sui.explorerUrl), [sui.explorerUrl]);
+  const explorer = useMemo(() => makeSuiExplorerLinks(sui.explorerUrl, networkId), [sui.explorerUrl, networkId]);
   const [poolProbe, setPoolProbe] = useState<ObjectProbe>({ state: "idle" });
   const [authOpen, setAuthOpen] = useState(() => {
     if (typeof window === "undefined") return false;
@@ -542,14 +543,6 @@ function TechRow({ label, value, href }: { label: string; value: string; href?: 
       {content}
     </a>
   );
-}
-
-function makeExplorer(base: string) {
-  const clean = base.replace(/\/$/, "");
-  return {
-    object: (id: string) => `${clean}/object/${id}?network=testnet`,
-    tx: (digest: string) => `${clean}/txblock/${digest}?network=testnet`,
-  };
 }
 
 function shorten(value: string, start = 10, end = 8): string {

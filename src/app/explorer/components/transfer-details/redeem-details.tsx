@@ -117,7 +117,7 @@ function WithdrawTimeline({ tx, redemption: r }: { tx: TransferTx; redemption?: 
   const chain = getChainAdapter(config);
   const chainName = chain.displayName;
   const chainIcon = getChainIcon(config);
-  const chainTxUrl = (id: string) => getChainTransactionUrl(config, id);
+  const chainTxUrl = (id: string) => getChainTransactionUrl(config, id, networkId);
   const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const statusOrder: Record<string, number> = { Pending: 1, Processing: 2, "BTC Sent": 3, Completed: 4 };
   const completedFromTx = tx.status === "confirmed" && tx.outputs.some((output) => output.type === "withdraw" && output.btcTxid);
