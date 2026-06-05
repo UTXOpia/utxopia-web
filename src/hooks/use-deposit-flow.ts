@@ -14,6 +14,7 @@ import { useNotesStore } from "@/stores/notes-store";
 import { registerDeposit } from "@/lib/api/deposits";
 import { getBtcSignerNetwork } from "@/lib/btc-network";
 import { notifyError } from "@/lib/notifications";
+import { parseDepositOpReturnHex } from "@/lib/deposit-op-return";
 
 export interface DepositPreview {
   depositAddress: string;
@@ -151,8 +152,7 @@ export function useDepositFlow() {
       });
 
       // Register with backend tracker (retry up to 3 times)
-      const ephemeralPubHex = opReturnHex.slice(0, 64);
-      const npkHex = opReturnHex.slice(64);
+      const { ephemeralPubHex, npkHex } = parseDepositOpReturnHex(opReturnHex);
       (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {

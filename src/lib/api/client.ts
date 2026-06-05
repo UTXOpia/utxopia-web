@@ -252,12 +252,12 @@ export async function getDepositStatusFromMempool(
       };
     }
 
-    // Extract OP_RETURN data (scriptpubkey_type === "op_return")
-    // Format: 6a40<64 bytes hex> where 6a=OP_RETURN, 40=OP_PUSHBYTES_64
+    // Extract compact deposit OP_RETURN data (scriptpubkey_type === "op_return").
+    // Format: 6a49<payload> where 6a=OP_RETURN, 49=OP_PUSHBYTES_73.
     let opReturnHex: string | undefined;
     for (const vout of depositTx.vout) {
-      if (vout.scriptpubkey_type === "op_return" && vout.scriptpubkey.length >= 132) {
-        // Strip prefix: 6a (OP_RETURN) + 40 (PUSHBYTES_64) = 4 hex chars
+      if (vout.scriptpubkey_type === "op_return" && vout.scriptpubkey.length >= 150) {
+        // Strip prefix: 6a (OP_RETURN) + 49 (PUSHBYTES_73) = 4 hex chars
         opReturnHex = vout.scriptpubkey.slice(4);
         break;
       }

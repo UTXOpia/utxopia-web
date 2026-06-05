@@ -5,7 +5,7 @@
  * bitcoin-cli the same way `scripts/hybrid/send-to.ts` does. It supports:
  *   - legacy raw `bcrt1...` drips
  *   - `utxo:...` stealth-address airdrops, where the route builds the actual
- *     UTXOpia deposit tx with the required 64-byte OP_RETURN.
+ *     UTXOpia deposit tx with the compact deposit OP_RETURN.
  *
  * Guard rails:
  *   - regtest-only: refuses unless the active network config uses regtest BTC
@@ -44,6 +44,7 @@ import {
 } from "@/lib/network-config";
 import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
 import { getBackendUrl } from "@/lib/api/constants";
+import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
 import {
   createNonInteractiveDeposit,
   createDirectVaultDeposit,
@@ -380,11 +381,12 @@ async function createDepositForStealth(
 }> {
   const meta = decodeStealthMetaAddress(stealthAddress);
   const btcNetwork = cfg?.bitcoin?.network === "regtest" ? "regtest" : "testnet";
+  const opReturnContext = depositOpReturnContextForNetworkConfig(cfg as NetworkConfig);
   const vaultKeyHex = cfg?.ika?.dwalletXOnlyPubkey;
 
   if (vaultKeyHex && !/^0+$/.test(vaultKeyHex)) {
     const vaultKey = Uint8Array.from(Buffer.from(vaultKeyHex, "hex"));
-    const deposit = await createDirectVaultDeposit(meta, vaultKey, btcNetwork);
+    const deposit = await createDirectVaultDeposit(meta, vaultKey, btcNetwork, opReturnContext);
     return { btcAddress: deposit.btcAddress, opReturnPayload: deposit.opReturnPayload };
   }
 
@@ -396,7 +398,7 @@ async function createDepositForStealth(
   if (groupPubkey.length !== 32) {
     throw new Error("active network group pubkey must be 32 bytes");
   }
-  const deposit = await createNonInteractiveDeposit(meta, groupPubkey, btcNetwork);
+  const deposit = await createNonInteractiveDeposit(meta, groupPubkey, btcNetwork, undefined, opReturnContext);
   return { btcAddress: deposit.btcAddress, opReturnPayload: deposit.opReturnPayload };
 }
 

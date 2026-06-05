@@ -7,6 +7,8 @@ import {
   setupKeysFromAuthSignature,
 } from "@utxopia/sdk";
 import type { AuthSignatureKeyDerivationOptions } from "@utxopia/sdk";
+import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
+import { getNetworkConfig } from "@/lib/network-config";
 
 const DEV_REGTEST_GROUP_PUBKEY = hexToBytes(
   "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798",
@@ -50,6 +52,8 @@ export async function createSuiUtxopiaAuthPreviewFromSignature(
     setup.stealthMetaAddress,
     DEV_REGTEST_GROUP_PUBKEY,
     "regtest",
+    undefined,
+    depositOpReturnContextForNetworkConfig(getNetworkConfig("sui-regtest")),
   );
 
   return {

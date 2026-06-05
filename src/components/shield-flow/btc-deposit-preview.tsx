@@ -3,6 +3,7 @@
 import { AlertCircle, ArrowRight, ChevronDown, Loader2, Shield, Wallet } from "lucide-react";
 import type { BtcDepositState } from "@/hooks/use-btc-deposit";
 import { cn } from "@/lib/utils";
+import { parseDepositOpReturnHex } from "@/lib/deposit-op-return";
 
 interface BtcDepositPreviewProps {
   className?: string;
@@ -27,6 +28,7 @@ export function BtcDepositPreview({
   const estimatedFee = estimatedVsize * 2;
   const changeAmount = totalInput - depositPreview.depositAmountSats - estimatedFee;
   const insufficientFunds = totalInput < depositPreview.depositAmountSats + estimatedFee;
+  const opReturnParts = parseDepositOpReturnHex(depositPreview.opReturnHex);
 
   return (
     <div className={cn("space-y-3", className)}>
@@ -92,14 +94,14 @@ export function BtcDepositPreview({
           <div className="flex items-center gap-2">
             <div className="w-6 h-6 rounded-full bg-privacy/15 flex items-center justify-center"><Shield className="w-3 h-3 text-privacy" /></div>
             <span className="text-caption font-semibold text-privacy">ZK Metadata</span>
-            <span className="text-[10px] text-privacy/50">64 bytes</span>
+            <span className="text-[10px] text-privacy/50">73 bytes</span>
           </div>
           <ChevronDown className={cn("w-3.5 h-3.5 text-gray transition-transform duration-200", btcDeposit.showOpReturn && "rotate-180")} />
         </button>
         {btcDeposit.showOpReturn && (
           <div className="mt-2 pt-2 border-t border-privacy/10 space-y-1.5">
-            <div><p className="text-[10px] text-gray mb-0.5">Ephemeral Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{depositPreview.opReturnHex.slice(0, 64)}</code></div>
-            <div><p className="text-[10px] text-gray mb-0.5">Note Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{depositPreview.opReturnHex.slice(64)}</code></div>
+            <div><p className="text-[10px] text-gray mb-0.5">Ephemeral Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.ephemeralPubHex}</code></div>
+            <div><p className="text-[10px] text-gray mb-0.5">Note Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.npkHex}</code></div>
           </div>
         )}
       </div>
