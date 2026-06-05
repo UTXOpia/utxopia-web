@@ -24,10 +24,18 @@ export interface DepositOpReturnContext {
   poolTag: Uint8Array;
 }
 
+export type DepositAddressNetwork = "mainnet" | "testnet" | "regtest";
+
 export function depositOpReturnContextForNetworkConfig(cfg: NetworkConfig): DepositOpReturnContext {
   return cfg.chain === "sui"
     ? suiDepositOpReturnContext(cfg)
     : solanaDepositOpReturnContext(cfg);
+}
+
+export function depositAddressNetworkForNetworkConfig(cfg: NetworkConfig): DepositAddressNetwork {
+  if (cfg.bitcoin.network === "mainnet") return "mainnet";
+  if (cfg.bitcoin.network === "regtest") return "regtest";
+  return "testnet";
 }
 
 export function parseDepositOpReturnHex(opReturnHex: string): {

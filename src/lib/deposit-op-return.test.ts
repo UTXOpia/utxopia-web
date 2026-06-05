@@ -1,5 +1,8 @@
 import { describe, expect, it } from "bun:test";
-import { depositOpReturnContextForNetworkConfig } from "./deposit-op-return";
+import {
+  depositAddressNetworkForNetworkConfig,
+  depositOpReturnContextForNetworkConfig,
+} from "./deposit-op-return";
 import { getNetworkConfig } from "./network-config";
 
 describe("deposit OP_RETURN context", () => {
@@ -32,5 +35,17 @@ describe("deposit OP_RETURN context", () => {
     );
 
     expect(Buffer.from(solana.poolTag).equals(Buffer.from(sui.poolTag))).toBe(false);
+  });
+
+  it("maps active Bitcoin networks to address derivation networks", () => {
+    expect(depositAddressNetworkForNetworkConfig(
+      getNetworkConfig("devnet", { applyEnvOverrides: false }),
+    )).toBe("testnet");
+    expect(depositAddressNetworkForNetworkConfig(
+      getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }),
+    )).toBe("regtest");
+    expect(depositAddressNetworkForNetworkConfig(
+      getNetworkConfig("sui-regtest", { applyEnvOverrides: false }),
+    )).toBe("regtest");
   });
 });

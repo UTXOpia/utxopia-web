@@ -14,6 +14,7 @@ import { getBtcSignerNetwork } from "@/lib/btc-network";
 import { notifyError } from "@/lib/notifications";
 import { BTC_DUST_LIMIT } from "@/lib/btc-constants";
 import {
+  depositAddressNetworkForNetworkConfig,
   depositOpReturnContextForNetworkConfig,
   parseDepositOpReturnHex,
 } from "@/lib/deposit-op-return";
@@ -84,8 +85,9 @@ export function useBtcDeposit({
     try {
       const client = UTXOpiaClient.instance();
       const opReturnContext = depositOpReturnContextForNetworkConfig(networkConfig);
+      const network = depositAddressNetworkForNetworkConfig(networkConfig);
       const [deposit, utxos] = await Promise.all([
-        client.prepareDeposit({ recipient: resolvedMeta, opReturnContext }),
+        client.prepareDeposit({ recipient: resolvedMeta, network, opReturnContext }),
         btcWallet.getPaymentUtxos(),
       ]);
 
