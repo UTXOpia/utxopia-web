@@ -69,7 +69,7 @@ export function deriveCommitmentTreePDA(
   programId: PublicKey = getUTXOpiaProgramId()
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE)],
+    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), Buffer.from([0, 0, 0, 0])],
     programId
   );
 }

@@ -30,7 +30,7 @@ const getUTXOpiaSDK = () => import("@utxopia/sdk");
 
 import {
   buildVerifyTransactionInstructionData,
-  buildVerifyStealthDepositInstructionData,
+  buildCompleteDepositInstructionData,
   AUTHORITY_SIZE,
 } from "@utxopia/sdk";
 
@@ -443,7 +443,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     });
 
     // 7. Build complete_deposit instruction
-    const verifyDepositData = buildVerifyStealthDepositInstructionData({
+    const completeDepositData = buildCompleteDepositInstructionData({
       sweepTxid: sweepTxidInternal,
       blockHeight,
       sweepTxSize: sweepRawBytes.length,
@@ -468,7 +468,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
         { pubkey: depositBuffer.bufferPubkey, isSigner: false, isWritable: false },
         { pubkey: depositReceiptPDA, isSigner: false, isWritable: true },
       ],
-      data: Buffer.from(verifyDepositData),
+      data: Buffer.from(completeDepositData),
     });
 
     // 8. Submit both instructions in one transaction
