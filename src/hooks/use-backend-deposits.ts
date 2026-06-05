@@ -5,16 +5,18 @@ import {
   fetchAllDeposits,
   type DepositStatusResponse,
 } from "@/lib/api/deposits";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 /**
  * Hook to fetch all deposits from the backend tracker API.
  * Polls every 30s via SWR revalidation.
  */
 export function useBackendDeposits() {
+  const { networkId } = useChainEnvironment();
   const { data, error, isLoading, mutate } = useSWR<DepositStatusResponse[]>(
-    "backend-deposits",
+    ["backend-deposits", networkId],
     async () => {
-      const result = await fetchAllDeposits();
+      const result = await fetchAllDeposits(networkId);
       return result.deposits ?? [];
     },
     {

@@ -46,7 +46,7 @@ export function useBtcDeposit({
   onError,
 }: UseBtcDepositParams) {
   const btcWallet = useBitcoinWalletStore();
-  const { config: networkConfig } = useChainEnvironment();
+  const { networkId, config: networkConfig } = useChainEnvironment();
 
   const [btcAmount, setBtcAmount] = useState("");
   const [walletDepositing, setWalletDepositing] = useState(false);
@@ -158,7 +158,13 @@ export function useBtcDeposit({
       (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
-            const res = await registerDeposit(depositPreview.depositAddress, npkHex, depositPreview.depositAmountSats, ephemeralPubHex);
+            const res = await registerDeposit(
+              depositPreview.depositAddress,
+              npkHex,
+              depositPreview.depositAmountSats,
+              ephemeralPubHex,
+              networkId,
+            );
             if (res.deposit_id) useNotesStore.getState().updateNote(opReturnHex, { depositId: res.deposit_id });
             return;
           } catch {

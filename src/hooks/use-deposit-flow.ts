@@ -37,7 +37,7 @@ export interface DepositResult {
 
 export function useDepositFlow() {
   const btcWallet = useBitcoinWalletStore();
-  const { config: networkConfig } = useChainEnvironment();
+  const { networkId, config: networkConfig } = useChainEnvironment();
 
   // Recipient
   const [resolvedMeta, setResolvedMeta] = useState<StealthMetaAddress | null>(null);
@@ -169,6 +169,7 @@ export function useDepositFlow() {
               npkHex,
               depositPreview.depositAmountSats,
               ephemeralPubHex,
+              networkId,
             );
             if (res.deposit_id) {
               useNotesStore.getState().updateNote(opReturnHex, { depositId: res.deposit_id });

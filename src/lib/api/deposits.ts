@@ -9,12 +9,21 @@
 
 import { ApiError } from "./errors";
 import { getBackendUrl } from "./constants";
+import type { NetworkId } from "@/lib/network-config";
 
 // WebSocket needs the public backend URL (can't proxy through Next.js)
-const getTrackerWsUrl = () => {
-  const base = getBackendUrl();
+const getTrackerWsUrl = (network?: NetworkId) => {
+  const base = getBackendUrl(network);
   return base.replace("http://", "ws://").replace("https://", "wss://");
 };
+
+function withNetworkQuery(path: string, network?: NetworkId): string {
+  if (!network) return path;
+  const [base, search = ""] = path.split("?");
+  const params = new URLSearchParams(search);
+  params.set("network", network);
+  return `${base}?${params.toString()}`;
+}
 
 // =============================================================================
 // Types
@@ -84,9 +93,10 @@ export interface DepositStatusUpdate {
  * @param depositId - The deposit ID to retry
  */
 export async function retryDeposit(
-  depositId: string
+  depositId: string,
+  network?: NetworkId,
 ): Promise<{ success: boolean; message?: string }> {
-  const response = await fetch(`/api/tracker/retry/${depositId}`, {
+  const response = await fetch(withNetworkQuery(`/api/tracker/retry/${depositId}`, network), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
   });
@@ -104,10 +114,10 @@ export async function retryDeposit(
 /**
  * Fetch all deposits from backend
  */
-export async function fetchAllDeposits(): Promise<{
+export async function fetchAllDeposits(network?: NetworkId): Promise<{
   deposits: DepositStatusResponse[];
 }> {
-  const response = await fetch("/api/deposits");
+  const response = await fetch(withNetworkQuery("/api/deposits", network));
   if (!response.ok) {
     throw new Error(`Failed to fetch deposits: ${response.status}`);
   }
@@ -188,6 +198,7 @@ export async function registerDeposit(
   commitment: string,
   amountSats: number,
   ephemeralPub?: string,
+  network?: NetworkId,
 ): Promise<RegisterDepositResponse> {
   const body: RegisterDepositRequest = {
     taproot_address: taprootAddress,
@@ -196,7 +207,7 @@ export async function registerDeposit(
     ephemeral_pub: ephemeralPub,
   };
 
-  const response = await fetch(`/api/deposits`, {
+  const response = await fetch(withNetworkQuery("/api/deposits", network), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -220,10 +231,11 @@ export async function registerDeposit(
  * @param depositId - The deposit ID returned from registerDeposit
  */
 export async function getDepositStatus(
-  depositId: string
+  depositId: string,
+  network?: NetworkId,
 ): Promise<DepositStatusResponse> {
   const response = await fetch(
-    `/api/deposits/${depositId}`,
+    withNetworkQuery(`/api/deposits/${depositId}`, network),
     {
       method: "GET",
       headers: {
@@ -248,10 +260,11 @@ export async function getDepositStatus(
  * @param address - The Bitcoin taproot address (tb1p... or bc1p...)
  */
 export async function getDepositByAddress(
-  address: string
+  address: string,
+  network?: NetworkId,
 ): Promise<DepositStatusResponse> {
   const response = await fetch(
-    `/api/deposits/by-address/${encodeURIComponent(address)}`,
+    withNetworkQuery(`/api/deposits/by-address/${encodeURIComponent(address)}`, network),
     {
       method: "GET",
       headers: {
@@ -282,14 +295,15 @@ export async function getDepositByAddress(
  */
 export async function prepareStealthDeposit(
   viewingPub: string,
-  spendingPub: string
+  spendingPub: string,
+  network?: NetworkId,
 ): Promise<PrepareStealthDepositResponse> {
   const body: PrepareStealthDepositRequest = {
     viewing_pub: viewingPub,
     spending_pub: spendingPub,
   };
 
-  const response = await fetch(`/api/stealth/prepare`, {
+  const response = await fetch(withNetworkQuery("/api/stealth/prepare", network), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
@@ -313,10 +327,11 @@ export async function prepareStealthDeposit(
  * @param depositId - The deposit ID returned from prepareStealthDeposit
  */
 export async function getStealthDepositStatus(
-  depositId: string
+  depositId: string,
+  network?: NetworkId,
 ): Promise<StealthDepositStatusResponse> {
   const response = await fetch(
-    `/api/stealth/status/${encodeURIComponent(depositId)}`,
+    withNetworkQuery(`/api/stealth/status/${encodeURIComponent(depositId)}`, network),
     {
       method: "GET",
       headers: {
@@ -345,9 +360,10 @@ export function subscribeToStealthDeposit(
     onError?: (error: Event) => void;
     onClose?: (event: CloseEvent) => void;
     onOpen?: () => void;
-  }
+  },
+  network?: NetworkId,
 ): { ws: WebSocket; unsubscribe: () => void } {
-  const wsUrl = getTrackerWsUrl();
+  const wsUrl = getTrackerWsUrl(network);
 
   const ws = new WebSocket(`${wsUrl}/ws/stealth/${depositId}`);
 
@@ -400,9 +416,10 @@ export interface DepositWebSocketOptions {
  */
 export function subscribeToDepositStatus(
   depositId: string,
-  options: DepositWebSocketOptions
+  options: DepositWebSocketOptions,
+  network?: NetworkId,
 ): { ws: WebSocket; unsubscribe: () => void } {
-  const wsUrl = getTrackerWsUrl();
+  const wsUrl = getTrackerWsUrl(network);
 
   const ws = new WebSocket(`${wsUrl}/ws/deposits/${depositId}`);
 

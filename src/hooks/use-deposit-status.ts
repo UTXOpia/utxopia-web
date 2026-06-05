@@ -9,6 +9,7 @@ import {
   type DepositStatusUpdate,
   isDepositTerminal,
 } from "@/lib/api/deposits";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 export interface UseDepositStatusOptions {
   useWebSocket?: boolean;
@@ -38,6 +39,7 @@ export function useDepositStatus(
   depositId: string | null,
   options: UseDepositStatusOptions = {}
 ): UseDepositStatusResult {
+  const { networkId } = useChainEnvironment();
   const {
     useWebSocket = true,
     pollInterval = 10000,
@@ -78,7 +80,7 @@ export function useDepositStatus(
     if (!depositId) return;
 
     try {
-      const data = await getDepositStatus(depositId);
+      const data = await getDepositStatus(depositId, networkId);
       setDeposit(data);
 
       if (prevStatusRef.current !== data.status) {
@@ -100,7 +102,7 @@ export function useDepositStatus(
     } finally {
       setIsLoading(false);
     }
-  }, [depositId]); // Only depends on depositId
+  }, [depositId, networkId]);
 
   // Handle WebSocket updates
   const handleStatusUpdate = useCallback(
@@ -147,12 +149,12 @@ export function useDepositStatus(
       onOpen: () => setIsConnected(true),
       onClose: () => setIsConnected(false),
       onError: () => setIsConnected(false),
-    });
+    }, networkId);
 
     return () => {
       unsubscribe();
     };
-  }, [depositId, useWebSocket, handleStatusUpdate]);
+  }, [depositId, useWebSocket, handleStatusUpdate, networkId]);
 
   // Initial fetch + polling (stable — no dep on deposit state)
   useEffect(() => {
