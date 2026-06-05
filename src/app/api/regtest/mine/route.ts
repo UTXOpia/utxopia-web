@@ -9,10 +9,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { resolveRegtestRouteConfig } from "@/lib/server/regtest-route-context";
 
 const exec = promisify(execFile);
 
-const BTC_NETWORK = process.env.NEXT_PUBLIC_BTC_NETWORK ?? "";
 const CONTAINER = process.env.REGTEST_MINE_DOCKER_CONTAINER
   || process.env.REGTEST_FAUCET_DOCKER_CONTAINER
   || "utxopia-esplora-regtest";
@@ -56,10 +56,11 @@ function truncate(s: string, n: number): string {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
-  if (BTC_NETWORK !== "regtest") {
+  const routeContext = resolveRegtestRouteConfig(req);
+  if ("error" in routeContext) {
     return NextResponse.json(
-      { ok: false, error: `regtest miner only available on regtest; current network=${BTC_NETWORK || "unknown"}` },
-      { status: 400 },
+      { ok: false, error: routeContext.error },
+      { status: routeContext.status },
     );
   }
 
