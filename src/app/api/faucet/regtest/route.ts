@@ -318,7 +318,7 @@ async function relaySuiDeposit(input: {
   depositVout?: number;
 }): Promise<SuiDepositRelayResult> {
   const root = projectRoot();
-  const script = path.join(root, "chains/sui/scripts/relay-deposit.ts");
+  const script = path.join(root, "sui-programs/scripts/relay-deposit.ts");
   const bunBin = process.env.BUN_BIN || "bun";
   const args = [
     script,
