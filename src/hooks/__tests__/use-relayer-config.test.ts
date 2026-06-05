@@ -46,7 +46,7 @@ describe("useRelayerConfig", () => {
   });
 
   it("returns parsed relayer meta after successful fetch", async () => {
-    global.fetch = mock(() =>
+    const fetchMock = mock(() =>
       Promise.resolve({
         ok: true,
         json: () =>
@@ -58,14 +58,16 @@ describe("useRelayerConfig", () => {
             service_fee_bps: 50,
           }),
       })
-    ) as any;
+    );
+    global.fetch = fetchMock as any;
 
-    const { result } = renderHook(() => useRelayerConfig(mockToken));
+    const { result } = renderHook(() => useRelayerConfig(mockToken, "sui-regtest"));
 
     await waitFor(() => {
       expect(result.current.relayerMetaLoaded).toBe(true);
     });
 
+    expect(fetchMock).toHaveBeenCalledWith("/api/relayer/meta?network=sui-regtest");
     expect(result.current.relayerMeta).toEqual({
       stealthMeta: "some-stealth-meta",
       relayerFeeSats: 3000,

@@ -6,6 +6,7 @@ import {
   RELAYER_FEE_SATS,
   type PayToken,
 } from "@/components/send/_lifted/helpers";
+import type { NetworkId } from "@/lib/network-config";
 
 interface RelayerMeta {
   stealthMeta: string | null;
@@ -15,12 +16,13 @@ interface RelayerMeta {
   serviceFeeBps: number;
 }
 
-export function useRelayerConfig(selectedToken: PayToken) {
+export function useRelayerConfig(selectedToken: PayToken, networkId?: NetworkId) {
   const [relayerMeta, setRelayerMeta] = useState<RelayerMeta | null>(null);
 
   useEffect(() => {
+    const query = networkId ? `?network=${encodeURIComponent(networkId)}` : "";
     // Fetch all fee config from backend (reads on-chain pool state internally)
-    fetch("/api/relayer/meta")
+    fetch(`/api/relayer/meta${query}`)
       .then((r) => (r.ok ? r.json() : null))
       .catch((err) => { console.error("[RelayerConfig] fetch error:", err); return null; })
       .then((data) => {
@@ -33,7 +35,7 @@ export function useRelayerConfig(selectedToken: PayToken) {
           serviceFeeBps: data.service_fee_bps ?? 0,
         });
       });
-  }, []);
+  }, [networkId]);
 
   // Derived values
   const relayerMetaLoaded = relayerMeta !== null;

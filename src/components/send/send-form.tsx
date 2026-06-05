@@ -256,7 +256,7 @@ export function SendForm() {
     [effectiveToken],
   );
   const { relayerMeta, effectiveRelayerFee } =
-    useRelayerConfig(selectedPayToken);
+    useRelayerConfig(selectedPayToken, chainEnv.networkId);
 
   const amountSats = parseSats(state.amount) ?? 0;
   const totalNeeded = amountSats + effectiveRelayerFee;
