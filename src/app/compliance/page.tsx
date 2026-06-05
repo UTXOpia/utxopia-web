@@ -27,7 +27,7 @@ import { hrefWithChain } from "@/lib/network-config";
  * hasn't) opted into across the four-phase compliance pillar so they can
  * see their auditor surface area at a glance.
  *
- * Read-only — fixes live on the existing Settings, /audit/issued, and
+ * Read-only. Fixes live on the existing Settings, /audit/issued, and
  * CLI surfaces. This page is the "you are here" map.
  */
 
@@ -154,7 +154,7 @@ export default function CompliancePage() {
   const liveCount = checks.filter(Boolean).length;
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay">
+    <main className="min-h-screen bg-background">
       <SiteHeader />
 
       <div className="max-w-3xl mx-auto px-4 sm:px-6 pt-28 sm:pt-32 pb-12">
@@ -184,7 +184,7 @@ export default function CompliancePage() {
           </h1>
           <p className="text-sm text-gray font-light max-w-2xl leading-relaxed">
             Every signal you publish or share gives auditors more visibility
-            into your shielded activity — and you control each independently.
+            into your shielded activity, and you control each independently.
             Nothing here is set by default; you opt into each layer when you
             want it.
           </p>
@@ -218,7 +218,7 @@ export default function CompliancePage() {
           <CheckRow
             icon={<Send className="w-4 h-4 text-gray-light" />}
             title="Designated auditor pubkey"
-            desc="Optional 32-byte Solana pubkey on your SNS record, telling senders who you've granted read-only access to. Just a hint — the actual viewing key share is still out-of-band."
+            desc="Optional 32-byte Solana pubkey on your SNS record, telling senders who you've granted read-only access to. It is a hint; the actual viewing key share is still out-of-band."
             status={auditorBase58 ? "ok" : isAuditorDisclosable ? "warn" : "off"}
             statusLabel={
               auditorBase58
@@ -236,7 +236,7 @@ export default function CompliancePage() {
           <CheckRow
             icon={<ShieldCheck className="w-4 h-4 text-gray-light" />}
             title="Delegated view keys issued"
-            desc="Encrypted, slot-scoped viewing keys you've handed to specific auditors. Each one lets the recipient scan your IN (+ OUT, once sender memos populate) records over the chosen slot range — never spend."
+            desc="Encrypted, slot-scoped viewing keys you've handed to specific auditors. Each one lets the recipient scan your IN (+ OUT, once sender memos populate) records over the chosen slot range, but never spend."
             status={delegations.length > 0 ? "ok" : "off"}
             statusLabel={
               delegations.length === 0
@@ -258,13 +258,13 @@ export default function CompliancePage() {
           />
         </div>
 
-        {/* What's missing — contextual nudges */}
+        {/* What's missing: contextual nudges */}
         {liveCount < 4 && (
           <div className="mt-8 p-4 rounded-xl border border-gray/15 bg-muted/10">
             <h3 className="text-sm font-medium mb-2">Next step</h3>
             <p className="text-xs text-gray leading-relaxed">
               {!sns.hasRegisteredSnsName
-                ? "Register an SNS subdomain first — every other signal hangs off it. Head to Settings."
+                ? "Register an SNS subdomain first. Every other signal hangs off it. Head to Settings."
                 : !isAuditorDisclosable
                   ? "Flip the auditor-disclosable bit if you want senders to know you're OK receiving audit memos. Head to Settings."
                   : !auditorBase58
@@ -280,8 +280,8 @@ export default function CompliancePage() {
             What auditors with your viewing key still can&apos;t see
           </h3>
           <ul className="text-xs text-gray space-y-1 leading-relaxed list-disc pl-4">
-            <li>Your spending key — they read but never sign on your behalf.</li>
-            <li>Your funds — issuing a viewing key doesn&apos;t move anything.</li>
+            <li>Your spending key. They read but never sign on your behalf.</li>
+            <li>Your funds. Issuing a viewing key doesn&apos;t move anything.</li>
             <li>
               Outgoing flows from before sender-memos shipped, or transfers
               with sender memos disabled (NEXT_PUBLIC_DISABLE_SENDER_MEMOS=1).

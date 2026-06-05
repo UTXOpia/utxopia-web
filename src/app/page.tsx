@@ -13,7 +13,6 @@ import { SiteFooter } from "@/components/site-footer";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
 import { GradientBorderCard } from "@/components/ui/gradient-border-card";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
-import { MouseSpotlight } from "@/components/ui/mouse-spotlight";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
@@ -232,19 +231,12 @@ export default function Home() {
   const txCount = transactions.length;
 
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay overflow-x-hidden">
-      <MouseSpotlight />
+    <main className="min-h-screen bg-background overflow-x-hidden">
       <SiteHeader />
 
       <div className="relative z-10">
         {/* ═══════════════ HERO ═══════════════ */}
         <section className="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-28 pb-12 relative">
-          <div className="absolute inset-0 pointer-events-none">
-            <div className="absolute top-[10%] left-[15%] w-[500px] h-[500px] rounded-full bg-btc/4 blur-[150px]" />
-            <div className="absolute bottom-[5%] right-[10%] w-[400px] h-[400px] rounded-full bg-sol/3 blur-[150px]" />
-            <div className="absolute top-[40%] left-[50%] -translate-x-1/2 w-[600px] h-[300px] rounded-full bg-purple/3 blur-[120px]" />
-          </div>
-
           <div className="max-w-4xl mx-auto text-center relative z-10">
             <ScrollReveal delay={0.1}>
               <h1 className="hero-title text-foreground">
@@ -322,7 +314,7 @@ export default function Home() {
                         </div>
                       </React.Fragment>
                     ))}
-                    {/* TVL — total value locked across all tokens */}
+                    {/* TVL: total value locked across all tokens */}
                     {(stats?.tokenTVL?.length ?? 0) > 0 && (
                       <>
                         <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray/20 to-transparent" />
@@ -339,7 +331,7 @@ export default function Home() {
                               }
                               return (
                                 <span className="text-2xl font-semibold tracking-tight text-foreground/60">
-                                  —
+                                  No TVL
                                 </span>
                               );
                             })()}
@@ -417,11 +409,9 @@ export default function Home() {
           </div>
         </section>
 
-        {/* ═══════════════ HOW IT WORKS — Original bento cards ═══════════════ */}
+        {/* ═══════════════ HOW IT WORKS ═══════════════ */}
         <section className="w-full py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
           <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
-          <div className="absolute top-[10%] right-[-5%] w-[40%] h-[40%] rounded-full bg-privacy/3 blur-[100px] pointer-events-none" />
-          <div className="absolute bottom-[10%] left-[-5%] w-[35%] h-[35%] rounded-full bg-btc/3 blur-[100px] pointer-events-none" />
 
           <div className="max-w-7xl mx-auto relative z-10">
             <ScrollReveal>
@@ -444,10 +434,6 @@ export default function Home() {
           <div className="max-w-4xl mx-auto relative z-10">
             <ScrollReveal variant="scaleIn">
               <div className="rounded-[20px] border border-privacy/15 bg-gradient-to-br from-privacy/5 via-transparent to-purple/5 p-8 md:p-12 text-center relative overflow-hidden">
-                <div className="absolute inset-0 pointer-events-none opacity-30">
-                  <div className="absolute top-[-20%] left-[20%] w-[400px] h-[400px] rounded-full blur-[120px] bg-privacy/10" />
-                  <div className="absolute bottom-[-20%] right-[20%] w-[300px] h-[300px] rounded-full blur-[100px] bg-purple/10" />
-                </div>
                 <div className="relative z-10">
                   <h2 className="section-title text-3xl md:text-4xl text-foreground mb-3">
                     Start <span className="text-privacy">Shielding</span>

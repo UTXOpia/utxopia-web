@@ -25,7 +25,7 @@ import { TransferRow, getTransferKind } from "./components/transfers-tab";
 import { getTokenByFilter, formatTokenAmount, tvlToUsd, type TokenFilterId } from "@/lib/supported-tokens";
 
 // =============================================================================
-// Sync status — shows when backend indexer is catching up
+// Sync status: shows when backend indexer is catching up
 // =============================================================================
 
 function useSyncStatus(network: NetworkId) {
@@ -63,7 +63,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
   }, []);
 
 
-  // All transactions come from useExplorer() — already sorted by timestamp desc
+  // All transactions come from useExplorer(), already sorted by timestamp desc.
 
   // Counts by type (withdraw counts as unshield)
   const counts = useMemo(() => {
@@ -99,7 +99,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
       }
     }
 
-    // Token filter (only applies to shield and unshield — transfers are token-agnostic)
+    // Token filter only applies to shield and unshield. Transfers are token-agnostic.
     if (selectedTokens.size < 4) {
       items = items.filter((t) => {
         if (t.type === "transfer") return true;
@@ -115,9 +115,9 @@ function ExplorerContent({ network }: { network: NetworkId }) {
   const prices = useTokenPrices();
 
   const totalShieldedDisplay = useMemo(() => {
-    if (!stats?.tokenTVL?.length) return "—";
+    if (!stats?.tokenTVL?.length) return "No TVL";
     const total = tvlToUsd(stats.tokenTVL, prices);
-    if (total === 0) return "—";
+    if (total === 0) return "No TVL";
     return `$${total.toLocaleString(undefined, { maximumFractionDigits: 2 })}`;
   }, [stats, prices]);
 
@@ -202,7 +202,7 @@ export default function ExplorerPage() {
   const synced = useSyncStatus(network);
   const tone = useMemo(() => getExplorerTone(network), [network]);
   return (
-    <main className="min-h-screen bg-background hacker-bg noise-overlay overflow-x-hidden flex flex-col">
+    <main className="min-h-screen bg-background overflow-x-hidden flex flex-col">
       <SiteHeader />
       <div className="container mx-auto px-4 pt-24 pb-8 relative z-10 max-w-7xl flex-1 flex flex-col">
         {/* Title */}
@@ -249,7 +249,7 @@ export default function ExplorerPage() {
           </div>
           <p className="text-caption text-gray">
             Transfer amounts are encrypted with zero-knowledge proofs. Only commitments and
-            nullifiers are visible on-chain — no amounts or sender/recipient information is exposed.
+            nullifiers are visible on-chain. Amounts and sender/recipient information are not exposed.
           </p>
         </div>
 
