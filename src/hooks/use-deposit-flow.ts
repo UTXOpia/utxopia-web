@@ -14,7 +14,11 @@ import { useNotesStore } from "@/stores/notes-store";
 import { registerDeposit } from "@/lib/api/deposits";
 import { getBtcSignerNetwork } from "@/lib/btc-network";
 import { notifyError } from "@/lib/notifications";
-import { parseDepositOpReturnHex } from "@/lib/deposit-op-return";
+import {
+  depositOpReturnContextForNetworkConfig,
+  parseDepositOpReturnHex,
+} from "@/lib/deposit-op-return";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 export interface DepositPreview {
   depositAddress: string;
@@ -32,6 +36,7 @@ export interface DepositResult {
 
 export function useDepositFlow() {
   const btcWallet = useBitcoinWalletStore();
+  const { config: networkConfig } = useChainEnvironment();
 
   // Recipient
   const [resolvedMeta, setResolvedMeta] = useState<StealthMetaAddress | null>(null);
@@ -77,8 +82,9 @@ export function useDepositFlow() {
 
     try {
       const client = UTXOpiaClient.instance();
+      const opReturnContext = depositOpReturnContextForNetworkConfig(networkConfig);
       const [deposit, utxos] = await Promise.all([
-        client.prepareDeposit({ recipient: resolvedMeta }),
+        client.prepareDeposit({ recipient: resolvedMeta, opReturnContext }),
         btcWallet.getPaymentUtxos(),
       ]);
 

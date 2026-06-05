@@ -13,7 +13,11 @@ import { registerDeposit } from "@/lib/api/deposits";
 import { getBtcSignerNetwork } from "@/lib/btc-network";
 import { notifyError } from "@/lib/notifications";
 import { BTC_DUST_LIMIT } from "@/lib/btc-constants";
-import { parseDepositOpReturnHex } from "@/lib/deposit-op-return";
+import {
+  depositOpReturnContextForNetworkConfig,
+  parseDepositOpReturnHex,
+} from "@/lib/deposit-op-return";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 export interface DepositPreview {
   depositAddress: string;
@@ -41,6 +45,7 @@ export function useBtcDeposit({
   onError,
 }: UseBtcDepositParams) {
   const btcWallet = useBitcoinWalletStore();
+  const { config: networkConfig } = useChainEnvironment();
 
   const [btcAmount, setBtcAmount] = useState("");
   const [walletDepositing, setWalletDepositing] = useState(false);
@@ -78,8 +83,9 @@ export function useBtcDeposit({
 
     try {
       const client = UTXOpiaClient.instance();
+      const opReturnContext = depositOpReturnContextForNetworkConfig(networkConfig);
       const [deposit, utxos] = await Promise.all([
-        client.prepareDeposit({ recipient: resolvedMeta }),
+        client.prepareDeposit({ recipient: resolvedMeta, opReturnContext }),
         btcWallet.getPaymentUtxos(),
       ]);
 
@@ -106,7 +112,7 @@ export function useBtcDeposit({
     } finally {
       setBuildingPreview(false);
     }
-  }, [resolvedMeta, btcAmount, btcWallet, onError]);
+  }, [resolvedMeta, btcAmount, btcWallet, networkConfig, onError]);
 
   // ── BTC: Confirm & sign PSBT ──
   const confirmAndSign = useCallback(async () => {
