@@ -9,11 +9,14 @@ import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
 import { TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainAdapter } from "@/lib/chain-registry";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
 export function useJoinSplitSubmit() {
   const prover = useProver();
+  const chainEnv = useChainEnvironment();
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [txSignature, setTxSignature] = useState<string | null>(null);
@@ -71,6 +74,14 @@ export function useJoinSplitSubmit() {
 
       let relayResult: { success: boolean; signature?: string; error?: string };
 
+      const relayUrl = getChainAdapter(chainEnv.config).id === "sui"
+        ? `/api/sui/relay?network=${encodeURIComponent(chainEnv.networkId)}`
+        : "/api/relay";
+
+      if (params.relayMode === "unshield" && getChainAdapter(chainEnv.config).id === "sui") {
+        throw new Error("Sui public unshield is not enabled yet");
+      }
+
       if (params.relayMode === "redeem") {
         const treeStealthData = params.stealthDataArrays.slice(0, -1);
         const requestNonce = BigInt(Date.now());
@@ -81,7 +92,7 @@ export function useJoinSplitSubmit() {
           redeemAmounts: [(redeemAmountSats ?? 0n).toString()],
           btcScripts: [bytesToHex(params.btcScriptPubKey!)],
           requestNonces: [requestNonce.toString()],
-        });
+        }, relayUrl);
       } else if (params.relayMode === "unshield") {
         const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
         const { PublicKey } = await import("@solana/web3.js");
@@ -103,7 +114,7 @@ export function useJoinSplitSubmit() {
           unshieldAmounts: [unshieldAmount.toString()],
           recipientAddresses: [recipientPubkey.toBase58()],
           recipientTokenAccounts: [recipientTokenAccount.toBase58()],
-        });
+        }, relayUrl);
       } else {
         // Transfer mode: opportunistically attach sender memos so the sender
         // retains an encrypted, AAD-bound record of their own outgoing
@@ -162,7 +173,7 @@ export function useJoinSplitSubmit() {
           stealthData: params.stealthDataArrays.map((sd) => bytesToHex(sd)),
           relayerFeeOutputIndex: params.relayerFeeOutputIndex,
           senderMemos: senderMemosHex,
-        });
+        }, relayUrl);
       }
 
       if (!relayResult.success) {
@@ -184,7 +195,7 @@ export function useJoinSplitSubmit() {
       setStatus("error");
       setStatusMessage("");
     }
-  }, [prover]);
+  }, [prover, chainEnv]);
 
   const reset = useCallback(() => {
     setStatus("idle");
