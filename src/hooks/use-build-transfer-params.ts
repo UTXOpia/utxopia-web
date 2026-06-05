@@ -172,6 +172,11 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   // 4. Add change output (use bigint to avoid precision loss)
   const totalInput = inputsData.reduce((sum, d) => sum + d.note.amount, 0n);
   const totalOutput = sendAmounts.reduce((sum, a) => sum + a, 0n);
+  if (totalOutput > totalInput) {
+    throw new Error(
+      `Insufficient shielded balance: selected notes total ${totalInput} sats, outputs require ${totalOutput} sats`,
+    );
+  }
   const changeSats = Number(totalInput - totalOutput);
 
   if (changeSats > 0) {
