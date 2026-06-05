@@ -46,9 +46,10 @@ function getRpcUrl(config?: NetworkConfig): string {
 
 async function deriveCommitmentTreePda(programId: string): Promise<string> {
   const { getProgramDerivedAddress, address } = await import("@solana/kit");
+  const treeIndex = new Uint8Array(4);
   const [pda] = await getProgramDerivedAddress({
     programAddress: address(programId),
-    seeds: [new TextEncoder().encode("commitment_tree")],
+    seeds: [new TextEncoder().encode("commitment_tree"), treeIndex],
   });
   return pda;
 }

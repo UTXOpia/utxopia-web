@@ -29,7 +29,7 @@ export function useJoinSplitSubmit() {
     setTxSignature(null);
 
     try {
-      const { bytesToHex, UTXOpiaClient, getConfig } = await import("@utxopia/sdk");
+      const { bytesToHex, UTXOpiaClient } = await import("@utxopia/sdk");
 
       // Initialize prover if needed
       if (!prover.isInitialized) {
@@ -98,7 +98,7 @@ export function useJoinSplitSubmit() {
         const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
         const { PublicKey } = await import("@solana/web3.js");
         const recipientPubkey = new PublicKey(params.unshieldRecipientAddress!);
-        const zkbtcMint = new PublicKey(getConfig().zkbtcMint);
+        const zkbtcMint = new PublicKey(chainEnv.config.tokens.zkbtcMint);
         const TOKEN_2022_PID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
         const recipientTokenAccount = getAssociatedTokenAddressSync(
           zkbtcMint, recipientPubkey, false, TOKEN_2022_PID,
@@ -130,13 +130,13 @@ export function useJoinSplitSubmit() {
           try {
             const { buildSenderMemosForTransact, fetchCommitmentTree, hexToBytes } =
               await import("@utxopia/sdk");
-            const { Connection } = await import("@solana/web3.js");
+            const { Connection, PublicKey } = await import("@solana/web3.js");
             const { deriveCommitmentTreePDA } = await import("@/lib/solana/pdas");
 
-            const rpcUrl = getConfig().solanaRpcUrl;
+            const rpcUrl = chainEnv.config.solana.rpcUrl;
             if (!rpcUrl) throw new Error("solanaRpcUrl missing from config");
             const connection = new Connection(rpcUrl, "confirmed");
-            const [treePda] = deriveCommitmentTreePDA();
+            const [treePda] = deriveCommitmentTreePDA(new PublicKey(chainEnv.config.solana.utxopiaProgramId));
 
             // fetchCommitmentTree types its `connection` arg as a duck-typed
             // shape that returns `{ data: Uint8Array }`. Solana web3.js
