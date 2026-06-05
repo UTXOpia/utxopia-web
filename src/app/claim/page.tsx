@@ -5,9 +5,12 @@ import { useRouter } from "next/navigation";
 import { ArrowLeft, Key, Shield } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 function ClaimRedirect() {
   const router = useRouter();
+  const { networkId: network } = useChainEnvironment();
   // Read from hash fragment (#note=) only — never sent to server
   const [noteParam, setNoteParam] = useState<string | null>(null);
 
@@ -26,15 +29,15 @@ function ClaimRedirect() {
   // If note param present, redirect to Pay with the phrase in hash
   useEffect(() => {
     if (noteParam) {
-      router.replace(`/vault/pay#note=${encodeURIComponent(noteParam)}`);
+      router.replace(hrefWithChain(`/vault/pay#note=${encodeURIComponent(noteParam)}`, network));
     }
-  }, [noteParam, router]);
+  }, [network, noteParam, router]);
 
   const [phrase, setPhrase] = useState("");
 
   const handleGo = () => {
     if (phrase.trim().length >= 8) {
-      router.push(`/vault/pay#note=${encodeURIComponent(phrase.trim())}`);
+      router.push(hrefWithChain(`/vault/pay#note=${encodeURIComponent(phrase.trim())}`, network));
     }
   };
 
@@ -53,7 +56,7 @@ function ClaimRedirect() {
     <main className="min-h-screen bg-background hacker-bg noise-overlay flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
-          href="/vault"
+          href={hrefWithChain("/vault", network)}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

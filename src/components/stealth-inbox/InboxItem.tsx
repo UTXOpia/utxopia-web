@@ -7,6 +7,8 @@ import { cn } from "@/lib/utils";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { useTokenPrices } from "@/hooks/use-token-prices";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 function getTokenForNote(note: InboxNote): SupportedToken {
   const sym = note.tokenSymbol;
@@ -58,6 +60,7 @@ function formatFullDate(timestamp: number): string {
 
 export function InboxItem({ note }: InboxItemProps) {
   const router = useRouter();
+  const { networkId } = useChainEnvironment();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const token = getTokenForNote(note);
@@ -71,7 +74,7 @@ export function InboxItem({ note }: InboxItemProps) {
       leafIndex: note.leafIndex.toString(),
       amount: note.amount.toString(),
     });
-    router.push(`/vault/pay?${params.toString()}`);
+    router.push(hrefWithChain(`/vault/pay?${params.toString()}`, networkId));
   };
 
   const handleCopy = async (e: React.MouseEvent) => {

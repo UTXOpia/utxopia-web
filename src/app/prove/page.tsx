@@ -5,9 +5,12 @@ import Link from "next/link";
 import { ArrowLeft, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ManualVerify } from "@/components/btc-widget/manual-verify";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 export default function ProvePage() {
   const [mounted, setMounted] = useState(false);
+  const { networkId: network } = useChainEnvironment();
 
   useEffect(() => {
     setMounted(true);
@@ -26,7 +29,7 @@ export default function ProvePage() {
       {/* Header */}
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
-          href="/vault"
+          href={hrefWithChain("/vault", network)}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors hover-glow"
         >
           <ArrowLeft className="w-4 h-4" />

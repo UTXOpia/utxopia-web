@@ -19,6 +19,8 @@ import { SiteFooter } from "@/components/site-footer";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { SnsComplianceFlags, type DelegationRecord } from "@utxopia/sdk";
 import { cn } from "@/lib/utils";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 /**
  * Compliance posture dashboard. Aggregates everything the user has (or
@@ -114,6 +116,7 @@ function CheckRow({
 }
 
 export default function CompliancePage() {
+  const { networkId: network } = useChainEnvironment();
   const sns = useSnsName();
 
   // Read delegations the user has issued (stored locally by the
@@ -158,7 +161,7 @@ export default function CompliancePage() {
         {/* Header */}
         <div className="mb-4 flex items-center justify-between">
           <Link
-            href="/vault"
+            href={hrefWithChain("/vault", network)}
             className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
           >
             <ArrowLeft className="w-4 h-4" />

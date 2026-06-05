@@ -28,6 +28,7 @@ import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/s
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import type { InboxNote } from "@/stores/utxopia-store";
 import { detectNetwork, hrefWithChain } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -343,6 +344,7 @@ function ActivityContent() {
 }
 
 export default function ActivityPage() {
+  const { networkId } = useChainEnvironment();
   return (
     <main className="min-h-screen bg-background flex flex-col items-center py-8 px-4 sm:py-12">
       {/* Header — Back + Badges */}
@@ -394,7 +396,7 @@ export default function ActivityPage() {
 
           {/* Footer inside card */}
           <div className="flex flex-row justify-between items-center gap-2 mt-2 text-gray px-2 pt-2">
-            <a href="/docs" className="hover:text-gray-light transition-colors text-caption">UTXOpia</a>
+            <Link href={hrefWithChain("/docs", networkId)} className="hover:text-gray-light transition-colors text-caption">UTXOpia</Link>
           </div>
         </div>
       </div>

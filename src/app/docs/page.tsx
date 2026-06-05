@@ -517,7 +517,7 @@ export default function DocsPage() {
                 subtitle={
                   <>
                     UTXOpia isn&apos;t an unaccountable mixer. Compliance tooling is built into the protocol &mdash; across four layers &mdash; so users can prove what they need to prove without surrendering custody. Each layer has its own deployment status; check your own posture at{" "}
-                    <Link href="/compliance" className="text-privacy hover:underline">/compliance</Link>.
+                    <Link href={hrefWithChain("/compliance", network)} className="text-privacy hover:underline">/compliance</Link>.
                   </>
                 }
               />
@@ -557,7 +557,7 @@ export default function DocsPage() {
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
                   <Link
-                    href="/vault"
+                    href={hrefWithChain("/vault", network)}
                     className="btn-privacy btn-pill inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 text-sm sm:text-base transition-shadow"
                   >
                     <Shield className="w-4 h-4 sm:w-5 sm:h-5" />

@@ -4,6 +4,8 @@ import Link from "next/link";
 import { ArrowLeft, LockKeyhole } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 
 export type FlowColor = "btc" | "privacy" | "sol" | "purple" | "gray";
 
@@ -99,15 +101,16 @@ function HeaderBadge({ icon, label, color }: Badge) {
 }
 
 function Footer() {
+  const { networkId: network } = useChainEnvironment();
   return (
     <div className="flex flex-row justify-between items-center gap-2 mt-4 text-gray px-2 pt-4 border-t border-gray/15">
       <div className="flex flex-row items-center gap-4">
-        <a
-          href="/docs"
+        <Link
+          href={hrefWithChain("/docs", network)}
           className="hover:text-gray-light transition-colors text-caption"
         >
           UTXOpia
-        </a>
+        </Link>
       </div>
     </div>
   );
