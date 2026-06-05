@@ -53,11 +53,8 @@ import { getRelayerKeypair } from "@/lib/server/relayer";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
 
 import {
-  getBlockHeaderByHeight,
-  getMerkleProof,
-} from "@/lib/spv/mempool";
-
-import {
+  type BlockHeader,
+  type MerkleProof,
   reverseBytes,
 } from "@/lib/spv/mempool";
 // hexToBytes imported lazily via getUTXOpiaSDK()
@@ -65,7 +62,7 @@ import {
 import {
   buildMerkleProofPath,
 } from "@/lib/spv/verify";
-import { getHeliusRpcUrl } from "@/lib/helius-server";
+import { resolveVerifyConfig } from "@/lib/server/verify-routing";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -193,15 +190,65 @@ function stripWitness(raw: Uint8Array): Uint8Array {
 /**
  * Fetch raw transaction hex from mempool.space
  */
-async function fetchRawTxHex(txid: string, network: string = "testnet"): Promise<string> {
-  const baseUrl = network === "mainnet"
-    ? "https://mempool.space/api"
-    : `https://mempool.space/${network}/api`;
-  const resp = await fetch(`${baseUrl}/tx/${txid}/hex`);
+async function fetchRawTxHex(txid: string, esploraApiUrl: string): Promise<string> {
+  const resp = await fetch(`${esploraApiUrl}/tx/${txid}/hex`);
   if (!resp.ok) {
     throw new Error(`Failed to fetch raw tx: ${resp.status} ${resp.statusText}`);
   }
   return resp.text();
+}
+
+async function fetchMerkleProof(txid: string, esploraApiUrl: string): Promise<MerkleProof> {
+  const resp = await fetch(`${esploraApiUrl}/tx/${txid}/merkle-proof`);
+  if (!resp.ok) {
+    throw new Error(`Failed to fetch merkle proof: ${resp.status} ${resp.statusText}`);
+  }
+  const proof = await resp.json() as { block_height: number; pos: number; merkle: string[] };
+  return {
+    blockHeight: proof.block_height,
+    blockHash: "",
+    txIndex: proof.pos,
+    merkleProof: proof.merkle,
+  };
+}
+
+async function fetchBlockHeaderByHeight(height: number, esploraApiUrl: string): Promise<BlockHeader> {
+  const hashResp = await fetch(`${esploraApiUrl}/block-height/${height}`);
+  if (!hashResp.ok) {
+    throw new Error(`Failed to fetch block hash: ${hashResp.status} ${hashResp.statusText}`);
+  }
+  const blockHash = (await hashResp.text()).trim();
+
+  const blockResp = await fetch(`${esploraApiUrl}/block/${blockHash}`);
+  if (!blockResp.ok) {
+    throw new Error(`Failed to fetch block: ${blockResp.status} ${blockResp.statusText}`);
+  }
+  const blockInfo = await blockResp.json() as {
+    height: number;
+    version: number;
+    previousblockhash: string;
+    merkle_root: string;
+    timestamp: number;
+    bits: number;
+    nonce: number;
+  };
+
+  const headerResp = await fetch(`${esploraApiUrl}/block/${blockHash}/header`);
+  if (!headerResp.ok) {
+    throw new Error(`Failed to fetch block header: ${headerResp.status} ${headerResp.statusText}`);
+  }
+
+  return {
+    height: blockInfo.height,
+    hash: blockHash,
+    version: blockInfo.version,
+    previousBlockHash: blockInfo.previousblockhash,
+    merkleRoot: blockInfo.merkle_root,
+    timestamp: blockInfo.timestamp,
+    bits: blockInfo.bits,
+    nonce: blockInfo.nonce,
+    rawHeader: (await headerResp.text()).trim(),
+  };
 }
 
 /**
@@ -344,6 +391,14 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
   const spvHexToBytes = hexToBytes;
 
   try {
+    const verifyContext = resolveVerifyConfig(request);
+    if ("error" in verifyContext) {
+      return NextResponse.json(
+        { success: false, error: verifyContext.error },
+        { status: verifyContext.status },
+      );
+    }
+
     const body: VerifyRequest = await request.json();
     const { sweepTxid, depositTxid, blockHeight } = body;
 
@@ -365,16 +420,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     }
 
     const connection = new Connection(
-      getHeliusRpcUrl(),
+      verifyContext.config.solana.rpcUrl,
       "confirmed"
     );
-    const network = (process.env.NEXT_PUBLIC_BTC_NETWORK || "testnet") as "mainnet" | "testnet" | "testnet4" | "signet" | "regtest";
 
     // 1. Fetch raw tx hex from mempool.space and strip SegWit witness data
-    console.log("[Verify] Fetching raw transactions...");
+    console.log(`[Verify] Fetching raw transactions on ${verifyContext.bitcoinNetwork} via ${verifyContext.esploraApiUrl}...`);
     const [sweepRawHex, depositRawHex] = await Promise.all([
-      fetchRawTxHex(sweepTxid, network),
-      fetchRawTxHex(depositTxid, network),
+      fetchRawTxHex(sweepTxid, verifyContext.esploraApiUrl),
+      fetchRawTxHex(depositTxid, verifyContext.esploraApiUrl),
     ]);
     const sweepFullBytes = hexToBytes(sweepRawHex);
     const depositFullBytes = hexToBytes(depositRawHex);
@@ -384,11 +438,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
 
     // 2. Fetch Merkle proof from mempool.space
     console.log("[Verify] Fetching Merkle proof...");
-    const merkleProof = await getMerkleProof(sweepTxid, network);
+    const merkleProof = await fetchMerkleProof(sweepTxid, verifyContext.esploraApiUrl);
 
     // 3. Fetch block header to get block hash
     console.log("[Verify] Fetching block header...");
-    const blockHeader = await getBlockHeaderByHeight(blockHeight, network);
+    const blockHeader = await fetchBlockHeaderByHeight(blockHeight, verifyContext.esploraApiUrl);
 
     // Convert txids and block hash to internal byte order (reversed)
     const sweepTxidInternal = reverseBytes(spvHexToBytes(sweepTxid));
