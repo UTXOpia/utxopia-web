@@ -15,6 +15,7 @@ import {
   sha256Hash,
   type SnsStealthAddress,
 } from "@utxopia/sdk";
+import { detectNetwork } from "@/lib/network-config";
 
 /** SPL Name Service instruction discriminators */
 const SNS_DISC_UPDATE = 1;
@@ -116,7 +117,8 @@ export function useSnsName(): UseSnsNameReturn {
     owner: PublicKey,
     stealthData: Uint8Array,
   ): Promise<"success" | "unavailable"> => {
-    const prepareResp = await fetch("/api/sns/register", {
+    const networkQuery = `?network=${encodeURIComponent(detectNetwork())}`;
+    const prepareResp = await fetch(`/api/sns/register${networkQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -137,7 +139,7 @@ export function useSnsName(): UseSnsNameReturn {
 
     const tx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
     const signed = await signAndSubmitSnsTransaction(tx, owner);
-    const submitResp = await fetch("/api/sns/register", {
+    const submitResp = await fetch(`/api/sns/register${networkQuery}`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({

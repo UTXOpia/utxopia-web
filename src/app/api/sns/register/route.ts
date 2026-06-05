@@ -23,9 +23,10 @@ import {
   createReverseInstruction,
   transferInstruction,
 } from "@bonfida/spl-name-service";
-import { getHeliusRpcUrl } from "@/lib/helius-server";
 import { getRelayerKeypair } from "@/lib/server/relayer";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { resolveSolanaRouteConfig } from "@/lib/server/solana-route-context";
+import type { NetworkConfig } from "@/lib/network-config";
 
 export const dynamic = "force-dynamic";
 
@@ -71,7 +72,7 @@ function normalizeSubdomain(name: string) {
   return subdomain;
 }
 
-async function buildSponsoredRegistrationTx(input: PrepareRequest) {
+async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig: NetworkConfig) {
   const relayer = getRelayerKeypair();
   if (!relayer) {
     return { relayerUnavailable: true as const };
@@ -96,7 +97,7 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest) {
     throw new Error("SNS not configured for this network");
   }
 
-  const connection = new Connection(getHeliusRpcUrl(), "confirmed");
+  const connection = new Connection(networkConfig.solana.rpcUrl, "confirmed");
   const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
   const subRegistrarProgramId = new PublicKey(config.snsSubRegistrarProgramId);
   const snsRegistrarProgramId = new PublicKey(config.snsRegistrarProgramId);
@@ -312,9 +313,12 @@ export async function POST(request: NextRequest) {
   }
 
   try {
+    const routeContext = resolveSolanaRouteConfig(request, "/api/sns/register");
+    if ("error" in routeContext) return jsonError(routeContext.error, routeContext.status);
+
     const body = await request.json() as PrepareRequest | SubmitRequest;
     if (body.action === "prepare") {
-      const result = await buildSponsoredRegistrationTx(body);
+      const result = await buildSponsoredRegistrationTx(body, routeContext.config);
       if ("relayerUnavailable" in result) {
         return NextResponse.json({ success: false, relayerUnavailable: true }, { status: 503 });
       }
@@ -324,7 +328,7 @@ export async function POST(request: NextRequest) {
     if (body.action === "submit") {
       const raw = Buffer.from(body.signedTransaction, "base64");
       if (raw.length > 32_000) return jsonError("Transaction too large", 400);
-      const connection = new Connection(getHeliusRpcUrl(), "confirmed");
+      const connection = new Connection(routeContext.config.solana.rpcUrl, "confirmed");
       const signature = await connection.sendRawTransaction(raw, {
         skipPreflight: false,
         preflightCommitment: "confirmed",
