@@ -1,30 +1,47 @@
 import { NextRequest, NextResponse } from "next/server";
-import { fetchAccountInfo } from "@/lib/helius-server";
-const getUTXOpiaSDK = () => import("@utxopia/sdk");
+import { detectNetworkFromRequest, getNetworkConfig, networkChain } from "@/lib/network-config";
 const getSolanaKit = () => import("@solana/kit");
 export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
 
-const getBtcLightClientId = async () => {
-  const { getConfig } = await getUTXOpiaSDK();
-  return getConfig().btcLightClientProgramId;
-};
-
 // Derive height index PDA using @solana/kit (checks canonical block at height)
-async function deriveHeightIndexPDA(blockHeight: number): Promise<string> {
+async function deriveHeightIndexPDA(blockHeight: number, btcLightClientId: string): Promise<string> {
   const heightBuffer = new Uint8Array(8);
   const view = new DataView(heightBuffer.buffer);
   view.setBigUint64(0, BigInt(blockHeight), true);
 
   const { getProgramDerivedAddress, address } = await getSolanaKit();
-  const btcLcId = await getBtcLightClientId();
   const [pda] = await getProgramDerivedAddress({
-    programAddress: address(btcLcId),
+    programAddress: address(btcLightClientId),
     seeds: [new TextEncoder().encode("height_index"), heightBuffer],
   });
 
   return pda;
+}
+
+async function fetchAccountInfoFromRpc(
+  rpcUrl: string,
+  accountAddress: string,
+): Promise<{ data: Uint8Array; lamports: bigint } | null> {
+  const { createSolanaRpc } = await getSolanaKit();
+  const rpc = createSolanaRpc(rpcUrl);
+  const result = await rpc.getAccountInfo(accountAddress as Parameters<typeof rpc.getAccountInfo>[0], {
+    encoding: "base64",
+  }).send();
+
+  if (!result.value) return null;
+
+  const data = typeof result.value.data === "string"
+    ? Uint8Array.from(atob(result.value.data), c => c.charCodeAt(0))
+    : result.value.data[0]
+      ? Uint8Array.from(atob(result.value.data[0]), c => c.charCodeAt(0))
+      : new Uint8Array();
+
+  return {
+    data,
+    lamports: result.value.lamports,
+  };
 }
 
 export async function GET(
@@ -54,9 +71,24 @@ export async function GET(
       );
     }
 
+    const network = detectNetworkFromRequest(request);
+    if (networkChain(network) !== "sol") {
+      return NextResponse.json(
+        { exists: false, error: "Header status is only available for Solana networks" },
+        { status: 400 }
+      );
+    }
+    const cfg = getNetworkConfig(network, { applyEnvOverrides: false });
+    if (!cfg.solana.btcLightClientId || !cfg.solana.rpcUrl) {
+      return NextResponse.json(
+        { exists: false, error: `Solana BTC light client is not configured for network=${network}` },
+        { status: 400 }
+      );
+    }
+
     // Derive PDA and check if header exists using @solana/kit
-    const headerPDA = await deriveHeightIndexPDA(blockHeight);
-    const accountInfo = await fetchAccountInfo(headerPDA, "devnet");
+    const headerPDA = await deriveHeightIndexPDA(blockHeight, cfg.solana.btcLightClientId);
+    const accountInfo = await fetchAccountInfoFromRpc(cfg.solana.rpcUrl, headerPDA);
 
     if (accountInfo) {
       return NextResponse.json({

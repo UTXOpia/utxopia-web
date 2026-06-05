@@ -1,17 +1,15 @@
 import { NextRequest, NextResponse } from "next/server";
-import { PublicKey } from "@solana/web3.js";
+import { Connection, PublicKey } from "@solana/web3.js";
 import {
   buildCommitmentTreeFromChain,
   getMerkleProofFromTree,
-  getConfig,
   initPoseidon,
   parseCommitmentTreeData,
   bytesToBigint,
   type CommitmentTreeIndex,
 } from "@utxopia/sdk";
-import { getHeliusConnection } from "@/lib/helius-server";
 import { getTreeProofFromBackend } from "@/lib/api/tree";
-import { detectNetworkFromRequest, getNetworkConfig, networkChain } from "@/lib/network-config";
+import { detectNetworkFromRequest, getNetworkConfig, networkChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
@@ -39,34 +37,65 @@ async function ensurePoseidonInit(): Promise<void> {
 
 const CACHE_TTL_MS = 30_000; // 30 seconds
 
-let cachedTree: CommitmentTreeIndex | null = null;
-let cachedOnChainRoot: string | null = null;
-let cachedNextIndex: number | null = null;
-let cacheTimestamp = 0;
-let cacheBuildPromise: Promise<void> | null = null;
+interface TreeCacheEntry {
+  tree: CommitmentTreeIndex | null;
+  onChainRoot: string | null;
+  nextIndex: number | null;
+  timestamp: number;
+  buildPromise: Promise<void> | null;
+}
 
-async function getTreeAndRoot(): Promise<{
+const treeCache = new Map<NetworkId, TreeCacheEntry>();
+
+function cacheForNetwork(network: NetworkId): TreeCacheEntry {
+  const existing = treeCache.get(network);
+  if (existing) return existing;
+  const entry: TreeCacheEntry = {
+    tree: null,
+    onChainRoot: null,
+    nextIndex: null,
+    timestamp: 0,
+    buildPromise: null,
+  };
+  treeCache.set(network, entry);
+  return entry;
+}
+
+async function deriveCommitmentTreePda(programId: string): Promise<string> {
+  const { getProgramDerivedAddress, address } = await import("@solana/kit");
+  const [pda] = await getProgramDerivedAddress({
+    programAddress: address(programId),
+    seeds: [new TextEncoder().encode("commitment_tree")],
+  });
+  return pda;
+}
+
+async function getTreeAndRootForNetwork(
+  network: NetworkId,
+  cfg: NetworkConfig,
+): Promise<{
   tree: CommitmentTreeIndex;
   onChainRoot: string;
 }> {
   const now = Date.now();
+  const cache = cacheForNetwork(network);
 
   // Return cached if fresh
-  if (cachedTree && cachedOnChainRoot && now - cacheTimestamp < CACHE_TTL_MS) {
-    return { tree: cachedTree, onChainRoot: cachedOnChainRoot };
+  if (cache.tree && cache.onChainRoot && now - cache.timestamp < CACHE_TTL_MS) {
+    return { tree: cache.tree, onChainRoot: cache.onChainRoot };
   }
 
   // Deduplicate concurrent builds
-  if (cacheBuildPromise) {
-    await cacheBuildPromise;
-    if (cachedTree && cachedOnChainRoot) {
-      return { tree: cachedTree, onChainRoot: cachedOnChainRoot };
+  if (cache.buildPromise) {
+    await cache.buildPromise;
+    if (cache.tree && cache.onChainRoot) {
+      return { tree: cache.tree, onChainRoot: cache.onChainRoot };
     }
   }
 
-  cacheBuildPromise = (async () => {
-    const connection = getHeliusConnection("devnet");
-    const commitmentTreePda = new PublicKey(getConfig().commitmentTreePda);
+  cache.buildPromise = (async () => {
+    const connection = new Connection(cfg.solana.rpcUrl, "confirmed");
+    const commitmentTreePda = new PublicKey(await deriveCommitmentTreePda(cfg.solana.utxopiaProgramId));
 
     // Fetch on-chain tree state (root + nextIndex) in one RPC call
     const treeAccountInfo = await connection.getAccountInfo(commitmentTreePda);
@@ -80,9 +109,9 @@ async function getTreeAndRoot(): Promise<{
       rootHex = bytesToBigint(treeState.currentRoot).toString(16).padStart(64, "0");
 
       // Skip rebuild if nextIndex hasn't changed
-      if (cachedTree && cachedNextIndex === maxLeafIndex && cachedOnChainRoot) {
-        cacheTimestamp = now;
-        cacheBuildPromise = null;
+      if (cache.tree && cache.nextIndex === maxLeafIndex && cache.onChainRoot) {
+        cache.timestamp = now;
+        cache.buildPromise = null;
         return;
       }
     } else {
@@ -111,26 +140,26 @@ async function getTreeAndRoot(): Promise<{
           }));
         },
       },
-      getConfig().utxopiaProgramId,
+      cfg.solana.utxopiaProgramId,
       maxLeafIndex !== undefined ? { maxLeafIndex } : undefined
     );
 
     console.log(`[Merkle Proof API] Tree built: ${tree.size()} leaves, root: ${rootHex.slice(0, 16)}...`);
 
-    cachedTree = tree;
-    cachedOnChainRoot = rootHex;
-    cachedNextIndex = maxLeafIndex ?? null;
-    cacheTimestamp = Date.now();
-    cacheBuildPromise = null;
+    cache.tree = tree;
+    cache.onChainRoot = rootHex;
+    cache.nextIndex = maxLeafIndex ?? null;
+    cache.timestamp = Date.now();
+    cache.buildPromise = null;
   })();
 
-  await cacheBuildPromise;
+  await cache.buildPromise;
 
-  if (!cachedTree || !cachedOnChainRoot) {
+  if (!cache.tree || !cache.onChainRoot) {
     throw new Error("Failed to build commitment tree");
   }
 
-  return { tree: cachedTree, onChainRoot: cachedOnChainRoot };
+  return { tree: cache.tree, onChainRoot: cache.onChainRoot };
 }
 
 // =============================================================================
@@ -229,7 +258,8 @@ export async function GET(request: NextRequest) {
     }
 
     const start = Date.now();
-    const { tree, onChainRoot } = await getTreeAndRoot();
+    const cfg = getNetworkConfig(network, { applyEnvOverrides: false });
+    const { tree, onChainRoot } = await getTreeAndRootForNetwork(network, cfg);
     const fetchMs = Date.now() - start;
 
     // Get proof

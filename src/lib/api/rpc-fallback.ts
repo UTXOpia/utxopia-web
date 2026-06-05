@@ -5,10 +5,8 @@
  * Reconstructs deposit/transfer data from on-chain sol_log_data events.
  */
 
-import { getNetworkConfig } from "../network-config";
+import type { NetworkConfig } from "../network-config";
 import { SOLANA_RPC_FALLBACK_URL } from "./constants";
-const UTXOPIA_PROGRAM_ID = getNetworkConfig().solana.utxopiaProgramId;
-const COMMITMENT_TREE_PDA = "CbaDvGVVQqskcu4cz6Fsu3i2q8eWG8GjeqpZiKgPiCaW";
 
 // Rent-exempt minimum for a 1-byte account (NullifierRecord)
 const RENT_EXEMPT_1_BYTE = 897840;
@@ -39,12 +37,20 @@ export interface RpcTxMeta {
   instructionDisc: number | null;
 }
 
-function getRpcUrl(): string {
-  return (
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL ||
-    process.env.SOLANA_RPC_URL ||
-    SOLANA_RPC_FALLBACK_URL
-  );
+function getRpcUrl(config?: NetworkConfig): string {
+  return config?.solana.rpcUrl
+    || process.env.NEXT_PUBLIC_SOLANA_RPC_URL
+    || process.env.SOLANA_RPC_URL
+    || SOLANA_RPC_FALLBACK_URL;
+}
+
+async function deriveCommitmentTreePda(programId: string): Promise<string> {
+  const { getProgramDerivedAddress, address } = await import("@solana/kit");
+  const [pda] = await getProgramDerivedAddress({
+    programAddress: address(programId),
+    seeds: [new TextEncoder().encode("commitment_tree")],
+  });
+  return pda;
 }
 
 function toHex(bytes: Uint8Array): string {
@@ -151,7 +157,7 @@ function extractNullifierPdas(result: RpcTransactionResult): string[] {
 }
 
 /** Extract the first UTXOpia instruction discriminator from a transaction */
-function extractInstructionDisc(result: RpcTransactionResult): number | null {
+function extractInstructionDisc(result: RpcTransactionResult, programId: string): number | null {
   try {
     const message = result.transaction?.message;
     const accountKeys: string[] = (message?.accountKeys ?? []).map(
@@ -160,7 +166,7 @@ function extractInstructionDisc(result: RpcTransactionResult): number | null {
     const instructions = message?.instructions ?? [];
     for (const ix of instructions) {
       const programIdx = ix.programIdIndex;
-      if (accountKeys[programIdx] === UTXOPIA_PROGRAM_ID && ix.data) {
+      if (accountKeys[programIdx] === programId && ix.data) {
         // Decode base58 instruction data, first byte is discriminator
         const decoded = decodeBase58(ix.data);
         if (decoded.length > 0) return decoded[0];
@@ -199,8 +205,12 @@ function decodeBase58(str: string): Uint8Array {
  */
 export async function fetchAnnouncementsFromRpc(
   announcementTypeFilter?: number,
+  config?: NetworkConfig,
 ): Promise<RpcTxMeta[]> {
-  const rpcUrl = getRpcUrl();
+  const rpcUrl = getRpcUrl(config);
+  const programId = config?.solana.utxopiaProgramId;
+  if (!programId) return [];
+  const commitmentTreePda = await deriveCommitmentTreePda(programId);
 
   // 1. Get recent signatures for the commitment tree PDA
   const sigsResp = await fetch(rpcUrl, {
@@ -210,7 +220,7 @@ export async function fetchAnnouncementsFromRpc(
       jsonrpc: "2.0",
       id: 1,
       method: "getSignaturesForAddress",
-      params: [COMMITMENT_TREE_PDA, { limit: 200, commitment: "confirmed" }],
+      params: [commitmentTreePda, { limit: 200, commitment: "confirmed" }],
     }),
     signal: AbortSignal.timeout(15000),
   });
@@ -265,7 +275,7 @@ export async function fetchAnnouncementsFromRpc(
       if (filtered.length === 0) continue;
 
       const nullifierPdas = extractNullifierPdas(txResult);
-      const instructionDisc = extractInstructionDisc(txResult);
+      const instructionDisc = extractInstructionDisc(txResult, programId);
 
       results.push({
         signature: sig.signature,

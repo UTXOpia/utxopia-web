@@ -116,8 +116,8 @@ function decodeLeU64(hex: string): number {
 }
 
 export async function GET(request: Request) {
+  const network = detectNetworkFromRequest(request);
   try {
-    const network = detectNetworkFromRequest(request);
     if (networkChain(network) === "sui") {
       const { fetchSuiExplorerTransactions } = await import("@/lib/sui/explorer");
       const transactions = (await fetchSuiExplorerTransactions(
@@ -302,7 +302,10 @@ export async function GET(request: Request) {
     console.error("[Explorer Deposits API] Backend unavailable, trying RPC fallback:", err);
 
     try {
-      const txMetas = await fetchAnnouncementsFromRpc(0); // type=0 = deposits
+      const txMetas = await fetchAnnouncementsFromRpc(
+        0,
+        getNetworkConfig(network, { applyEnvOverrides: false }),
+      ); // type=0 = deposits
       const deposits: ExplorerDeposit[] = [];
 
       // disc=11 is complete_deposit (real BTC)

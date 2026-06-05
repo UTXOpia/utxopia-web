@@ -14,10 +14,8 @@ const getSolanaKit = () => import("@solana/kit");
 
 import { getHeliusRpcUrl } from "@/lib/helius-server";
 
-const RPC_URL = getHeliusRpcUrl();
-
 import { getBackendUrl } from "@/lib/api/constants";
-import { detectNetworkFromRequest } from "@/lib/network-config";
+import { detectNetworkFromRequest, getNetworkConfig, networkChain } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
 interface TrackingEntry {
@@ -72,9 +70,9 @@ interface ProcessingEntry {
   block_time: number;
 }
 
-async function createServerRpc(): Promise<RpcClient> {
+async function createServerRpc(rpcUrl: string): Promise<RpcClient> {
   const { createSolanaRpc } = await getSolanaKit();
-  const rpc = createSolanaRpc(RPC_URL);
+  const rpc = createSolanaRpc(rpcUrl);
   return {
     async getProgramAccounts(programId, config) {
       const filters: unknown[] = [];
@@ -109,15 +107,20 @@ async function createServerRpc(): Promise<RpcClient> {
 
 export async function GET(request: Request) {
   try {
-    const { getConfig, fetchExplorerRedemptions } = await getUTXOpiaSDK();
+    const { fetchExplorerRedemptions } = await getUTXOpiaSDK();
     const network = detectNetworkFromRequest(request);
+    if (networkChain(network) !== "sol") {
+      return NextResponse.json({ redemptions: [], count: 0 });
+    }
+    const cfg = getNetworkConfig(network, { applyEnvOverrides: false });
+    const rpcUrl = cfg.solana.rpcUrl || getHeliusRpcUrl(network === "mainnet" ? "mainnet" : "devnet");
     const backendUrl = getBackendUrl(network);
 
     // Fetch all sources in parallel: PDA scan + consolidated backend + pool state + transfers
     const [redemptions, allResp, poolStateResp, transfersResp] = await Promise.all([
-      createServerRpc().then(rpc => fetchExplorerRedemptions(
+      createServerRpc(rpcUrl).then(rpc => fetchExplorerRedemptions(
         rpc,
-        getConfig().utxopiaProgramId,
+        cfg.solana.utxopiaProgramId,
       )).catch((e) => {
         console.warn("[Redemptions] PDA scan failed:", e.message);
         return [];
@@ -188,7 +191,7 @@ export async function GET(request: Request) {
       await Promise.all(
         uniqueSlots.map(async (slot) => {
           try {
-            const resp = await fetch(RPC_URL, {
+            const resp = await fetch(rpcUrl, {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
@@ -319,8 +322,10 @@ export async function GET(request: Request) {
 
     // Add requested redemptions that don't have PDA or completed entry
     // Determine status by request_id lookup only (no heuristic matching)
-    const POOL_ADDRESS = process.env.POOL_BTC_ADDRESS || "tb1pksj664hdqkzvw2tlfvqshnevxt2qdutk47p9z964dkcsxazmf0vsjas4n4";
-    const ESPLORA = process.env.ESPLORA_URL || "https://mempool.space/testnet4/api";
+    const POOL_ADDRESS = cfg.bitcoin.poolAddress || process.env.POOL_BTC_ADDRESS || "tb1pksj664hdqkzvw2tlfvqshnevxt2qdutk47p9z964dkcsxazmf0vsjas4n4";
+    const ESPLORA = cfg.bitcoin.explorerUrl
+      ? `${cfg.bitcoin.explorerUrl.replace(/\/$/, "")}/api`
+      : process.env.ESPLORA_URL || "https://mempool.space/testnet4/api";
     let poolTxCache: Array<{ txid: string; outputs: Array<{ script: string; value: number }> }> | null = null;
 
     async function findBtcTxByScript(btcScript: string): Promise<string | null> {
