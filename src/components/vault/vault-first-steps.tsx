@@ -28,6 +28,7 @@ interface VaultFirstStepsProps {
   hasBackup: boolean;
   hasFunds: boolean;
   depositHref?: string;
+  accent?: "privacy" | "sui";
   onBackupComplete?: () => void;
 }
 
@@ -36,6 +37,7 @@ export function VaultFirstSteps({
   hasBackup,
   hasFunds,
   depositHref = "/vault/deposit",
+  accent = "privacy",
   onBackupComplete,
 }: VaultFirstStepsProps) {
   const identity = useMemo(() => getBackupIdentityForKeys(keys), [keys]);
@@ -49,6 +51,25 @@ export function VaultFirstSteps({
 
   const doneCount = (hasFunds ? 1 : 0) + (hasBackup ? 1 : 0);
   const totalSteps = 2;
+  const tone = accent === "sui"
+    ? {
+        border: "border-sui/15",
+        bg: "bg-sui/5",
+        hoverBg: "hover:bg-sui/5",
+        dot: "bg-sui",
+        doneBg: "bg-sui/5",
+        icon: "text-sui",
+        button: "bg-sui text-background hover:bg-sui/90",
+      }
+    : {
+        border: "border-privacy/15",
+        bg: "bg-privacy/5",
+        hoverBg: "hover:bg-privacy/5",
+        dot: "bg-privacy",
+        doneBg: "bg-privacy/5",
+        icon: "text-privacy",
+        button: "bg-privacy text-background hover:bg-privacy/90",
+      };
 
   const handleDownloadBackup = () => {
     if (!identity) return;
@@ -72,13 +93,13 @@ export function VaultFirstSteps({
   };
 
   return (
-    <div className="mb-4 rounded-[12px] border border-privacy/15 bg-privacy/5">
+    <div className={cn("mb-4 rounded-[12px] border", tone.border, tone.bg)}>
       <button
         onClick={() => setIsExpanded((open) => !open)}
         aria-expanded={isExpanded}
-        className="flex w-full cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left transition-colors hover:bg-privacy/5"
+        className={cn("flex w-full cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left transition-colors", tone.hoverBg)}
       >
-        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-privacy" />
+        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
         <span className="text-caption font-semibold text-foreground">
           Set up your wallet
         </span>
@@ -97,19 +118,19 @@ export function VaultFirstSteps({
           <div
             className={cn(
               "flex items-start gap-2.5 rounded-[9px] px-2.5 py-2",
-              hasFunds ? "bg-privacy/5" : "bg-muted/30",
+              hasFunds ? tone.doneBg : "bg-muted/30",
             )}
           >
             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
               {hasFunds ? (
-                <CheckCircle2 className="h-4 w-4 text-privacy" />
+                <CheckCircle2 className={cn("h-4 w-4", tone.icon)} />
               ) : (
                 <Circle className="h-4 w-4 text-gray/45" />
               )}
             </div>
-            <PlusCircle className={cn("mt-0.5 h-4 w-4 shrink-0", hasFunds ? "text-privacy" : "text-gray/60")} />
+            <PlusCircle className={cn("mt-0.5 h-4 w-4 shrink-0", hasFunds ? tone.icon : "text-gray/60")} />
             <div className="min-w-0 flex-1">
-              <p className={cn("text-caption font-semibold", hasFunds ? "text-privacy" : "text-foreground")}>
+              <p className={cn("text-caption font-semibold", hasFunds ? tone.icon : "text-foreground")}>
                 Add funds
               </p>
               <p className="text-[11px] text-gray/60">
@@ -119,7 +140,7 @@ export function VaultFirstSteps({
             {!hasFunds && (
               <Link
                 href={depositHref}
-                className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] bg-privacy px-3 py-1.5 text-caption font-semibold text-background transition-colors hover:bg-privacy/90"
+                className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-caption font-semibold transition-colors", tone.button)}
               >
                 Add funds
               </Link>
@@ -130,20 +151,20 @@ export function VaultFirstSteps({
           <div
             className={cn(
               "rounded-[9px] px-2.5 py-2",
-              hasBackup ? "bg-privacy/5" : "bg-muted/30",
+              hasBackup ? tone.doneBg : "bg-muted/30",
             )}
           >
             <div className="flex items-start gap-2.5">
               <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
                 {hasBackup ? (
-                  <CheckCircle2 className="h-4 w-4 text-privacy" />
+                  <CheckCircle2 className={cn("h-4 w-4", tone.icon)} />
                 ) : (
                   <Circle className="h-4 w-4 text-gray/45" />
                 )}
               </div>
-              <ShieldCheck className={cn("mt-0.5 h-4 w-4 shrink-0", hasBackup ? "text-privacy" : "text-gray/60")} />
+              <ShieldCheck className={cn("mt-0.5 h-4 w-4 shrink-0", hasBackup ? tone.icon : "text-gray/60")} />
               <div className="min-w-0">
-                <p className={cn("text-caption font-semibold", hasBackup ? "text-privacy" : "text-foreground")}>
+                <p className={cn("text-caption font-semibold", hasBackup ? tone.icon : "text-foreground")}>
                   Back up private wallet
                 </p>
                 <p className="text-[11px] text-gray/60">
@@ -155,7 +176,7 @@ export function VaultFirstSteps({
               <div className="mt-2 flex flex-wrap items-center gap-2 pl-[30px]">
                 <button
                   onClick={handleDownloadBackup}
-                  className="inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] bg-privacy px-3 py-1.5 text-caption font-semibold text-background transition-colors hover:bg-privacy/90"
+                  className={cn("inline-flex cursor-pointer items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-caption font-semibold transition-colors", tone.button)}
                 >
                   {downloaded ? <Check className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
                   {downloaded ? "Backup downloaded" : "Download backup (.json)"}

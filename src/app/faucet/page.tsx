@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Droplets, Wallet, ExternalLink } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-react";
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { detectNetwork, getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { cn } from "@/lib/utils";
@@ -284,18 +284,28 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       </button>
 
       {result?.kind === "ok" && (
-        <div className="p-3 rounded-[10px] border border-success/30 bg-success/5 text-caption text-success space-y-1">
-          <div>
-            Deposit broadcast + confirmed{result.blocksMined != null ? ` (${result.blocksMined} block${result.blocksMined === 1 ? "" : "s"} mined)` : ""}.
+        <div className="space-y-3 rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold text-success">
+                Deposit confirmed{result.blocksMined != null ? ` (${result.blocksMined} block${result.blocksMined === 1 ? "" : "s"} mined)` : ""}
+              </p>
+              <p className="mt-0.5 text-success/75">
+                zkBTC is ready in your private vault.
+              </p>
+            </div>
           </div>
-          <div className="font-mono break-all">{result.txid || "(see backend log)"}</div>
+          <div className="rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono break-all text-success/80">
+            {result.txid || "(see backend log)"}
+          </div>
           {result.depositAddress && (
-            <div className="pt-1 text-success/80">
+            <div className="text-success/75">
               Pool address: <span className="font-mono break-all">{result.depositAddress}</span>
             </div>
           )}
           {result.opReturn && (
-            <div className="pt-1 text-success/80">
+            <div className="text-success/75">
               OP_RETURN: <span className="font-mono break-all">{result.opReturn}</span>
             </div>
           )}
@@ -303,17 +313,16 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
             <div className="text-warning pt-1 border-t border-success/10">{result.warning}</div>
           )}
           {isSui && result.opReturn && result.suiDeposit?.ok && (
-            <div className="mt-2 rounded-[8px] border border-success/25 bg-success/8 p-2 text-success">
-              Sui vault credited via <span className="font-mono">btc_deposit::complete_verified_deposit</span>.
+            <div className="rounded-[8px] border border-sui/25 bg-sui/8 p-2 text-sui">
+              Sui vault credited.
               {result.suiDeposit.txDigest && (
-                <div className="mt-1 font-mono break-all text-success/80">{result.suiDeposit.txDigest}</div>
+                <div className="mt-1 font-mono break-all text-sui/80">{result.suiDeposit.txDigest}</div>
               )}
             </div>
           )}
           {isSui && result.opReturn && !result.suiDeposit?.ok && (
             <div className="mt-2 rounded-[8px] border border-warning/25 bg-warning/8 p-2 text-warning">
-              BTC funding is done. Sui vault credit still needs the relayer to submit{" "}
-              <span className="font-mono">btc_deposit::complete_verified_deposit</span>.
+              BTC funding is done. Sui vault credit is still waiting on the relayer.
               {result.suiDeposit?.error && (
                 <div className="mt-1 font-mono break-all text-warning/80">{result.suiDeposit.error}</div>
               )}
@@ -348,7 +357,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
 
       <p className="text-caption text-gray">
         {isSui
-          ? "This creates the real regtest BTC deposit and credits the Sui vault when the local relayer key is configured."
+          ? "This creates a regtest BTC deposit and credits the private Sui vault when the local relayer is available."
           : (
             <>
               Share this page with a tester and ask them for their <span className="font-mono">utxo:</span>{" "}

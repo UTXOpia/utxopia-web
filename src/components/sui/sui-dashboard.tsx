@@ -312,6 +312,7 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
               hasBackup={hasRecoveryBackup}
               hasFunds={depositCount > 0 || totalUsd > 0}
               depositHref={hrefWithChain("/vault/deposit", networkId)}
+              accent="sui"
               onBackupComplete={() => setHasRecoveryBackup(true)}
             />
           </>
