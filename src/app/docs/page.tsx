@@ -46,7 +46,8 @@ import {
   useAllSectionIds,
 } from "@/components/docs/docs-sidebar";
 import { useActiveSection } from "@/hooks/use-active-section";
-import { detectNetwork, hrefWithChain } from "@/lib/network-config";
+import { hrefWithChain } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 /* ── Simple card wrapper ── */
 
@@ -382,7 +383,7 @@ const SECURITY_ITEMS = [
 /* ── Page ── */
 
 export default function DocsPage() {
-  const network = useMemo(() => detectNetwork(), []);
+  const { networkId: network } = useChainEnvironment();
   const sectionIds = useAllSectionIds();
   const activeSection = useActiveSection(sectionIds);
 

@@ -27,7 +27,7 @@ import { EmptyInbox } from "@/components/stealth-inbox";
 import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import type { InboxNote } from "@/stores/utxopia-store";
-import { detectNetwork, hrefWithChain } from "@/lib/network-config";
+import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
 function getToken(sym: string): SupportedToken {
@@ -71,7 +71,7 @@ function timeAgo(ts: number): string {
 function ActivityRow({ note }: { note: InboxNote }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const network = useMemo(() => detectNetwork(), []);
+  const { networkId: network } = useChainEnvironment();
   const tokenPrices = useTokenPrices();
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
@@ -350,7 +350,7 @@ export default function ActivityPage() {
       {/* Header — Back + Badges */}
       <div className="w-full mb-4 flex items-center justify-between relative z-10" style={{ maxWidth: "480px" }}>
         <Link
-          href={hrefWithChain("/vault", detectNetwork())}
+          href={hrefWithChain("/vault", networkId)}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />

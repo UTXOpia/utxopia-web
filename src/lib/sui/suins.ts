@@ -90,7 +90,7 @@ export async function resolveSuiNsUtxopiaRecord(
   }
 
   const client = new SuinsClient({
-    client: getSuiClient(),
+    client: getSuiClient(network),
     network: suinsNetworkFromAppNetwork(network),
   });
   const record = await client.getNameRecord(normalizedName).catch((error) => {

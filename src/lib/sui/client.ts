@@ -10,7 +10,7 @@ import {
 } from "@mysten/sui/zklogin";
 import { UTXOpiaSuiAdapter } from "@utxopia/sdk/sui";
 import { networkForChain } from "@/lib/chain-registry";
-import { detectNetwork, getNetworkConfig } from "@/lib/network-config";
+import { detectNetwork, getNetworkConfig, type NetworkId } from "@/lib/network-config";
 
 const ZKLOGIN_SESSION_KEY = "utxopia.sui.zklogin";
 const SUI_AUTH_STATE_KEY = "utxopia.sui.auth";
@@ -43,15 +43,15 @@ export interface SuiZkLoginCallback {
   error: string | null;
 }
 
-export function getSuiClient() {
-  const network = networkForChain(detectNetwork(), "sui");
+export function getSuiClient(networkId: NetworkId = networkForChain(detectNetwork(), "sui")) {
+  const network = networkForChain(networkId, "sui");
   const cfg = getNetworkConfig(network);
   if (!cfg.sui) throw new Error("Sui configuration is missing");
   return new SuiClient({ url: cfg.sui.rpcUrl });
 }
 
-export function getSuiAdapter() {
-  const network = networkForChain(detectNetwork(), "sui");
+export function getSuiAdapter(networkId: NetworkId = networkForChain(detectNetwork(), "sui")) {
+  const network = networkForChain(networkId, "sui");
   const cfg = getNetworkConfig(network);
   const sui = cfg.sui;
   if (!sui) throw new Error("Sui configuration is missing");
@@ -81,8 +81,8 @@ export function getSuiAdapter() {
   });
 }
 
-export async function createSuiZkLoginSession(): Promise<SuiZkLoginSession> {
-  const client = getSuiClient();
+export async function createSuiZkLoginSession(networkId?: NetworkId): Promise<SuiZkLoginSession> {
+  const client = getSuiClient(networkId);
   const systemState = await client.getLatestSuiSystemState();
   const maxEpoch = Number(systemState.epoch) + DEFAULT_EPOCH_WINDOW;
   const keypair = Ed25519Keypair.generate();

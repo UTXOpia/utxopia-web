@@ -25,7 +25,8 @@ import { SuiAuthPanel } from "@/components/sui/sui-auth-panel";
 import { SuiNsPanel } from "@/components/sui/suins-panel";
 import { isChainHybridNetwork, networkForChain } from "@/lib/chain-registry";
 import { makeSuiExplorerLinks } from "@/lib/chain-links";
-import { detectNetwork, getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import {
   clearSuiAuthState,
   getSuiAuthState,
@@ -68,8 +69,8 @@ const SUI_VAULT_TOKENS = [
 ] as const;
 
 export function SuiDashboard() {
-  const detected = detectNetwork();
-  const networkId = networkForChain(detected, "sui");
+  const { networkId: activeNetwork } = useChainEnvironment();
+  const networkId = networkForChain(activeNetwork, "sui");
   const cfg = getNetworkConfig(networkId, { applyEnvOverrides: false });
   const sui = cfg.sui;
 

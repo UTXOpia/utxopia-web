@@ -1,10 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-react";
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
-import { detectNetwork, getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { cn } from "@/lib/utils";
 
 /**
@@ -17,22 +18,13 @@ import { cn } from "@/lib/utils";
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
+  const { networkId: activeNetwork } = useChainEnvironment();
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  const network = useMemo(() => {
-    if (!mounted) return null;
-    try {
-      const currentNetwork = detectNetwork();
-      getNetworkConfig(currentNetwork);
-      return currentNetwork;
-    } catch {
-      return null;
-    }
-  }, [mounted]);
-
+  const network = mounted ? activeNetwork : null;
   const config = network ? getNetworkConfig(network, { applyEnvOverrides: false }) : null;
   const chain = config ? getChainAdapter(config) : null;
   const isHybrid = !!network && isHybridNetwork(network);

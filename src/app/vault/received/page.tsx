@@ -2,7 +2,8 @@
 
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { detectNetwork, hrefWithChain } from "@/lib/network-config";
+import { hrefWithChain } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 /**
  * Redirect to the unified Notes page (activity) with the claimable tab
@@ -10,10 +11,11 @@ import { detectNetwork, hrefWithChain } from "@/lib/network-config";
  */
 export default function ReceivedPage() {
   const router = useRouter();
+  const { networkId } = useChainEnvironment();
 
   useEffect(() => {
-    router.replace(hrefWithChain("/vault/activity?tab=claimable", detectNetwork()));
-  }, [router]);
+    router.replace(hrefWithChain("/vault/activity?tab=claimable", networkId));
+  }, [networkId, router]);
 
   // Show a brief loading state while redirecting
   return (

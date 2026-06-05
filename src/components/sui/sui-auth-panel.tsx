@@ -21,7 +21,8 @@ import {
   saveSuiAuthState,
   type SuiZkLoginSession,
 } from "@/lib/sui/client";
-import { detectNetwork } from "@/lib/network-config";
+import { networkForChain } from "@/lib/chain-registry";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores";
 import { cn } from "@/lib/utils";
 
@@ -49,6 +50,8 @@ export function SuiAuthPanel({
   const [session, setSession] = useState<SuiZkLoginSession | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [message, setMessage] = useState("");
+  const { networkId } = useChainEnvironment();
+  const suiNetwork = networkForChain(networkId, "sui");
   const {
     isSupported: passkeySupported,
     hasCredential: hasPasskeyCredential,
@@ -121,7 +124,7 @@ export function SuiAuthPanel({
           signature,
           account: accounts[0],
           chain: "sui",
-          network: detectNetwork(),
+          network: suiNetwork,
         });
       }
       const store = useUTXOpiaStore.getState();
@@ -143,7 +146,7 @@ export function SuiAuthPanel({
     setStatus("loading");
     setMessage("");
     try {
-      const nextSession = await createSuiZkLoginSession();
+      const nextSession = await createSuiZkLoginSession(suiNetwork);
       setSession(nextSession);
       window.location.href = buildGoogleZkLoginUrl(nextSession);
     } catch (error) {
