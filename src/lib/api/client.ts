@@ -19,6 +19,7 @@ import type {
 import { ApiError } from "./errors";
 import { API_ENDPOINTS, getBackendUrl } from "./constants";
 import { getEsploraApiUrl } from "@/lib/btc-network";
+import type { NetworkId } from "@/lib/network-config";
 
 /**
  * UTXOpia API Client (Minimal - Redemption Only)
@@ -70,14 +71,24 @@ class zkBTCApiClient {
     return this.request<WithdrawalStatusResponse>(API_ENDPOINTS.WITHDRAWAL_STATUS(requestId));
   }
 
+  async getWithdrawalStatusForNetwork(
+    requestId: string,
+    network: NetworkId,
+  ): Promise<WithdrawalStatusResponse> {
+    const endpoint = API_ENDPOINTS.WITHDRAWAL_STATUS(requestId);
+    const client = new zkBTCApiClient(getBackendUrl(network));
+    return client.request<WithdrawalStatusResponse>(endpoint);
+  }
+
   // ============ Block Header Status (Next.js API Route) ============
 
   /**
    * Check if a block header exists on-chain
    * Uses internal Next.js API route
    */
-  async getHeaderStatus(blockHeight: number): Promise<HeaderStatusResponse> {
-    const response = await fetch(`/api/header/status/${blockHeight}`);
+  async getHeaderStatus(blockHeight: number, network?: NetworkId): Promise<HeaderStatusResponse> {
+    const query = network ? `?network=${encodeURIComponent(network)}` : "";
+    const response = await fetch(`/api/header/status/${blockHeight}${query}`);
 
     if (!response.ok) {
       const error = await response.json().catch(() => ({

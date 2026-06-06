@@ -89,6 +89,32 @@ describe("zkBTCApiClient", () => {
       expect(url).toBe("https://custom-api.example.com/api/withdrawal/status/123");
     });
   });
+
+  describe("network routing", () => {
+    it("adds explicit network query params to header status checks", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ exists: true, height: 123 }),
+      } as any);
+
+      await zkBTCApi.getHeaderStatus(123, "devnet-regtest");
+
+      const url = (mockFetch.mock.calls[0] as any[])[0];
+      expect(url).toBe("/api/header/status/123?network=devnet-regtest");
+    });
+
+    it("uses the selected backend for withdrawal status checks", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ request_id: "abc", status: "pending" }),
+      } as any);
+
+      await zkBTCApi.getWithdrawalStatusForNetwork("abc", "sui-regtest");
+
+      const url = (mockFetch.mock.calls[0] as any[])[0];
+      expect(url).toBe("https://api-hybrid.utxopia.com/api/withdrawal/status/abc");
+    });
+  });
 });
 
 describe("getDepositStatusFromMempool", () => {

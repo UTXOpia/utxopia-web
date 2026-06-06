@@ -204,7 +204,7 @@ export function ManualVerify() {
 
     try {
       const header = verificationData.blockHeader;
-      const result = await zkBTCApi.getHeaderStatus(header.height);
+      const result = await zkBTCApi.getHeaderStatus(header.height, networkId);
 
       if (result.exists) {
         setHeaderSubmitted(true);
@@ -217,7 +217,7 @@ export function ManualVerify() {
     } finally {
       setHeaderSubmitting(false);
     }
-  }, [verificationData]);
+  }, [networkId, verificationData]);
 
   // Format data for display
   const getFormattedHeaderData = () => {
