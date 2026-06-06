@@ -55,7 +55,7 @@ export interface DepositStatusResponse {
   claimed: boolean;
   refund_available: boolean;
   refund_available_at?: number;
-  /** Deposit OP_RETURN payload hex: header(1) + poolTag(8) + ephemeralPub(32) + npk(32) */
+  /** Deposit OP_RETURN payload hex: header(1) + poolTag(8) + ephemeralPubkey(32) + notePublicKey(32) */
   op_return_hex?: string;
 }
 

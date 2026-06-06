@@ -67,8 +67,8 @@ export interface DepositStatusResponse {
   sweep_confirmations: number;
   solana_tx?: string;
   leaf_index?: number;
-  npk?: string;
-  ephemeral_pub?: string;
+  note_public_key?: string;
+  ephemeral_pubkey?: string;
   sweep_fee_sats?: number;
   minted_sats?: number;
   error?: string;
