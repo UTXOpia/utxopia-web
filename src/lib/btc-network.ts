@@ -93,8 +93,9 @@ export function getEsploraApiUrl(network?: NetworkId): string {
 }
 
 /** scure-btc-signer network — only knows "mainnet" | "testnet" */
-export function getBtcSignerNetwork(): "mainnet" | "testnet" {
-  return getConfig().bitcoinNetwork === "mainnet" ? "mainnet" : "testnet";
+export function getBtcSignerNetwork(network?: NetworkId): "mainnet" | "testnet" {
+  const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
+  return net === "mainnet" ? "mainnet" : "testnet";
 }
 
 // =============================================================================

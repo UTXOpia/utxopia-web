@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   getEsploraApiUrl,
+  getBtcSignerNetwork,
   getMempoolExplorerUrl,
   getSatsConnectNetwork,
   getUnisatChain,
@@ -24,5 +25,12 @@ describe("btc-network URL helpers", () => {
     expect(getUnisatChain("devnet-regtest")).toBe("BITCOIN_REGTEST");
     expect(getUnisatFallbackNetwork("mainnet")).toBe("livenet");
     expect(getUnisatFallbackNetwork("sui-regtest")).toBe("testnet");
+  });
+
+  it("maps active app networks to the BTC signer network", () => {
+    expect(getBtcSignerNetwork("mainnet")).toBe("mainnet");
+    expect(getBtcSignerNetwork("devnet")).toBe("testnet");
+    expect(getBtcSignerNetwork("devnet-regtest")).toBe("testnet");
+    expect(getBtcSignerNetwork("sui-regtest")).toBe("testnet");
   });
 });

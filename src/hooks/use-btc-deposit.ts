@@ -139,7 +139,7 @@ export function useBtcDeposit({
         opReturnPayload: depositPreview.opReturnPayload,
         changeAddress: btcWallet.address!,
         feeRate: 2,
-        network: getBtcSignerNetwork(),
+        network: getBtcSignerNetwork(networkId),
       });
 
       const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
@@ -184,7 +184,7 @@ export function useBtcDeposit({
     } finally {
       setWalletDepositing(false);
     }
-  }, [depositPreview, selectedUtxoKeys, btcWallet, onStatusChange, onError]);
+  }, [depositPreview, selectedUtxoKeys, btcWallet, networkId, onStatusChange, onError]);
 
   return {
     btcWallet,

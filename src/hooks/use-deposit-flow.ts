@@ -144,7 +144,7 @@ export function useDepositFlow() {
         opReturnPayload: depositPreview.opReturnPayload,
         changeAddress: btcWallet.address!,
         feeRate: 2,
-        network: getBtcSignerNetwork(),
+        network: getBtcSignerNetwork(networkId),
       });
 
       const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
