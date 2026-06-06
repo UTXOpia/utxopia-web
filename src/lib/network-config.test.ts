@@ -1,5 +1,11 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { detectNetwork, detectNetworkFromRequest, hrefWithChain, NETWORK_META } from "./network-config";
+import {
+  detectNetwork,
+  detectNetworkFromRequest,
+  getNetworkConfig,
+  hrefWithChain,
+  NETWORK_META,
+} from "./network-config";
 
 describe("network-config query routing", () => {
   const originalEnv = { ...process.env };
@@ -36,6 +42,28 @@ describe("network-config query routing", () => {
 
     expect(enabled).toContain("sui-regtest");
     expect(enabled).not.toContain("sui-testnet");
+  });
+
+  it("enabled networks have the backend and Bitcoin fields required by user flows", () => {
+    for (const meta of NETWORK_META.filter((item) => item.enabled)) {
+      const cfg = getNetworkConfig(meta.id, { applyEnvOverrides: false });
+
+      expect(cfg.backend.url, `${meta.id} backend.url`).toMatch(/^https?:\/\//);
+      expect(cfg.bitcoin.network, `${meta.id} bitcoin.network`).toBeTruthy();
+      expect(cfg.bitcoin.explorerUrl, `${meta.id} bitcoin.explorerUrl`).toMatch(/^https?:\/\//);
+
+      if (cfg.chain === "sui") {
+        expect(cfg.sui?.packageId, `${meta.id} sui.packageId`).toBeTruthy();
+        expect(cfg.sui?.commitmentTree?.objectId, `${meta.id} sui.commitmentTree`).toBeTruthy();
+        expect(cfg.sui?.btcDepositRegistry?.objectId, `${meta.id} sui.btcDepositRegistry`).toBeTruthy();
+        expect(cfg.sui?.utxoSet?.objectId, `${meta.id} sui.utxoSet`).toBeTruthy();
+      } else {
+        expect(cfg.solana.utxopiaProgramId, `${meta.id} solana.utxopiaProgramId`).toBeTruthy();
+        expect(cfg.tokens.zkbtcMint, `${meta.id} tokens.zkbtcMint`).toBeTruthy();
+        expect(cfg.bitcoin.poolAddress, `${meta.id} bitcoin.poolAddress`).toBeTruthy();
+        expect(cfg.bitcoin.groupPubkey, `${meta.id} bitcoin.groupPubkey`).toBeTruthy();
+      }
+    }
   });
 
   it("keeps exact network links canonical", () => {
