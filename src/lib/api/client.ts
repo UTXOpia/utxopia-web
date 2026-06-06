@@ -8,7 +8,7 @@
  * - Deposit status checked via mempool.space directly (no backend needed)
  *
  * Backend provides:
- * 1. GET /api/withdrawal/:id - Check withdrawal status
+ * 1. GET /api/withdrawal/status/:id - Check withdrawal status
  */
 
 import type {
@@ -114,6 +114,7 @@ function getMempoolApiUrl(): string {
   return getEsploraApiUrl();
 }
 const REQUIRED_CONFIRMATIONS = 2;
+const DEPOSIT_OP_RETURN_HEX_SIZE = 73 * 2;
 
 interface MempoolAddressInfo {
   address: string;
@@ -146,6 +147,23 @@ interface MempoolTransaction {
     scriptpubkey_address?: string;
     value: number;
   }>;
+}
+
+function extractCompactDepositOpReturn(scriptPubkey: string): string | undefined {
+  const script = scriptPubkey.toLowerCase();
+  if (!script.startsWith("6a")) return undefined;
+
+  // OP_RETURN OP_PUSHBYTES_73 <payload>
+  if (script.startsWith("6a49") && script.length === 4 + DEPOSIT_OP_RETURN_HEX_SIZE) {
+    return script.slice(4);
+  }
+
+  // OP_RETURN OP_PUSHDATA1 0x49 <payload>
+  if (script.startsWith("6a4c49") && script.length === 6 + DEPOSIT_OP_RETURN_HEX_SIZE) {
+    return script.slice(6);
+  }
+
+  return undefined;
 }
 
 /**
@@ -229,12 +247,12 @@ export async function getDepositStatusFromMempool(
     }
 
     // Extract compact deposit OP_RETURN data (scriptpubkey_type === "op_return").
-    // Format: 6a49<payload> where 6a=OP_RETURN, 49=OP_PUSHBYTES_73.
     let opReturnHex: string | undefined;
     for (const vout of depositTx.vout) {
-      if (vout.scriptpubkey_type === "op_return" && vout.scriptpubkey.length >= 150) {
-        // Strip prefix: 6a (OP_RETURN) + 49 (PUSHBYTES_73) = 4 hex chars
-        opReturnHex = vout.scriptpubkey.slice(4);
+      if (vout.scriptpubkey_type === "op_return") {
+        opReturnHex = extractCompactDepositOpReturn(vout.scriptpubkey);
+      }
+      if (opReturnHex) {
         break;
       }
     }

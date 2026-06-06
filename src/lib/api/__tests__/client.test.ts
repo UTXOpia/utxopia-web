@@ -216,6 +216,64 @@ describe("getDepositStatusFromMempool", () => {
     expect(result.escrow_status).toBe("passed");
   });
 
+  it("extracts compact deposit OP_RETURN from direct 73-byte push scripts", async () => {
+    const payloadHex = "11".repeat(73);
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          address: "tb1ptest",
+          chain_stats: { funded_txo_sum: 50000 },
+          mempool_stats: { funded_txo_sum: 0 },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{
+          txid: "with_op_return",
+          status: { confirmed: false },
+          vout: [
+            { scriptpubkey_address: "tb1ptest", value: 50000 },
+            { scriptpubkey_type: "op_return", scriptpubkey: `6a49${payloadHex}`, value: 0 },
+          ],
+        }],
+      } as any);
+
+    const result = await getDepositStatusFromMempool("tb1ptest");
+
+    expect(result.op_return_hex).toBe(payloadHex);
+  });
+
+  it("extracts compact deposit OP_RETURN from PUSHDATA1 scripts", async () => {
+    const payloadHex = "22".repeat(73);
+
+    mockFetch
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({
+          address: "tb1ptest",
+          chain_stats: { funded_txo_sum: 50000 },
+          mempool_stats: { funded_txo_sum: 0 },
+        }),
+      } as any)
+      .mockResolvedValueOnce({
+        ok: true,
+        json: async () => [{
+          txid: "with_pushdata_op_return",
+          status: { confirmed: false },
+          vout: [
+            { scriptpubkey_address: "tb1ptest", value: 50000 },
+            { scriptpubkey_type: "op_return", scriptpubkey: `6a4c49${payloadHex}`, value: 0 },
+          ],
+        }],
+      } as any);
+
+    const result = await getDepositStatusFromMempool("tb1ptest");
+
+    expect(result.op_return_hex).toBe(payloadHex);
+  });
+
   it("handles fetch errors gracefully", async () => {
     mockFetch.mockRejectedValueOnce(new Error("Network error"));
 
