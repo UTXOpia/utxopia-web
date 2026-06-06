@@ -11,6 +11,7 @@ import {
 } from "@utxopia/sdk";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { getBackendUrl } from "@/lib/api/constants";
+import type { NetworkId } from "@/lib/network-config";
 
 export interface ScannedSecretNote {
   amount: number;
@@ -29,6 +30,7 @@ export interface ScannedSecretNote {
  */
 export async function scanSecretPhrase(
   phrase: string,
+  network?: NetworkId,
 ): Promise<ScannedSecretNote[]> {
   if (phrase.trim().length < 8) {
     throw new Error("Secret phrase must be at least 8 characters");
@@ -41,7 +43,10 @@ export async function scanSecretPhrase(
   const keys = await deriveKeysFromSeedCircuit(masterKey);
 
   // Fetch all stealth announcements and scan with phrase-derived viewing key
-  const announcementsResp = await fetch("/api/announcements");
+  const announcementsUrl = network
+    ? `/api/announcements?network=${encodeURIComponent(network)}`
+    : "/api/announcements";
+  const announcementsResp = await fetch(announcementsUrl);
   if (!announcementsResp.ok) {
     throw new Error("Failed to fetch stealth announcements");
   }
@@ -60,8 +65,8 @@ export async function scanSecretPhrase(
   }
 
   // Fetch spent nullifier PDAs, match client-side (privacy: backend never learns which notes we own)
-  const backendUrl = getBackendUrl();
-  const spentPdas = await fetchSpentNullifierPDAs(backendUrl);
+  const backendUrl = getBackendUrl(network);
+  const spentPdas = await fetchSpentNullifierPDAs(backendUrl, network);
 
   const results: ScannedSecretNote[] = [];
   for (const note of scannedNotes) {
@@ -100,9 +105,10 @@ export async function scanSecretPhrase(
  */
 export async function refreshNullifierStatus(
   notes: ScannedSecretNote[],
+  network?: NetworkId,
 ): Promise<ScannedSecretNote[]> {
-  const backendUrl = getBackendUrl();
-  const spentPdas = await fetchSpentNullifierPDAs(backendUrl);
+  const backendUrl = getBackendUrl(network);
+  const spentPdas = await fetchSpentNullifierPDAs(backendUrl, network);
 
   return notes.map((n) => ({
     ...n,

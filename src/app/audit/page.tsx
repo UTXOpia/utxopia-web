@@ -16,13 +16,14 @@ import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { InfoTip } from "@/components/ui/info-tip";
 import { getBackendUrl } from "@/lib/api/constants";
-import { getNetworkConfig } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 const ZKBTC_TOKEN_ID = BigInt(0x7a627463);
 
 type Phase = "idle" | "decrypting" | "scanning" | "done" | "error";
 
 export default function AuditPage() {
+  const { networkId, config: networkConfig } = useChainEnvironment();
   const [keyJson, setKeyJson] = useState<string | null>(null);
   const [keyFileName, setKeyFileName] = useState<string | null>(null);
   const [password, setPassword] = useState("");
@@ -52,11 +53,10 @@ export default function AuditPage() {
       setDelegated(key);
       setPhase("scanning");
 
-      const cfg = getNetworkConfig();
       const client = new AnnouncementClient({
-        backendUrl: getBackendUrl(),
-        solanaRpcUrl: cfg.solana.rpcUrl,
-        programId: cfg.solana.utxopiaProgramId,
+        backendUrl: getBackendUrl(networkId),
+        solanaRpcUrl: networkConfig.solana.rpcUrl,
+        programId: networkConfig.solana.utxopiaProgramId,
       });
       const raw = await client.fetchAll();
       client.close();
@@ -76,7 +76,7 @@ export default function AuditPage() {
       setError(err instanceof Error ? err.message : String(err));
       setPhase("error");
     }
-  }, [keyJson, password, overrideFromSlot, overrideToSlot]);
+  }, [keyJson, password, overrideFromSlot, overrideToSlot, networkConfig, networkId]);
 
   const downloadCsv = useCallback(() => {
     if (!summary) return;

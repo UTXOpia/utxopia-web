@@ -545,7 +545,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
               isSpent: spentNullifiers.has(d.hashHex),
             }));
           } else {
-            const spentPdas = await fetchSpentNullifierPDAs(backendUrl);
+            const spentPdas = await fetchSpentNullifierPDAs(backendUrl, env.networkId);
             notesWithSpentStatus = nullifierData.map((d) => ({
               ...d.note,
               isSpent: spentPdas.has(nullifierHashToPDA(d.hashHex)),
