@@ -1,5 +1,6 @@
 import { describe, expect, it } from "bun:test";
 import {
+  getChainAddressUrl,
   getChainTransactionUrl,
   getSuiExplorerNetwork,
   getSuiObjectUrl,
@@ -33,6 +34,9 @@ describe("chain explorer links", () => {
 
     expect(getChainTransactionUrl(config, "digest", "sui-regtest")).toBe(
       "https://suiexplorer.com/txblock/digest?network=testnet",
+    );
+    expect(getChainAddressUrl(config, "0xobject", "sui-regtest")).toBe(
+      "https://suiexplorer.com/object/0xobject?network=testnet",
     );
   });
 
@@ -71,6 +75,9 @@ describe("chain explorer links", () => {
 
     expect(getChainTransactionUrl(config, "sig", "devnet-regtest")).toBe(
       "https://explorer.solana.com/tx/sig?cluster=devnet",
+    );
+    expect(getChainAddressUrl(config, "addr", "devnet-regtest")).toBe(
+      "https://explorer.solana.com/address/addr?cluster=devnet",
     );
   });
 });

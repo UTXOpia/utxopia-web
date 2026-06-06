@@ -9,27 +9,22 @@
 import { useState, useCallback, Fragment } from "react";
 import {
   CheckCircle2,
-  Clock,
   ExternalLink,
   Loader2,
-  Shield,
-  XCircle,
 } from "lucide-react";
 import { BitcoinIcon } from "@/components/bitcoin-wallet-selector";
-import { getSolanaExplorerAddressUrl } from "@/lib/solana-network";
 import { cn } from "@/lib/utils";
 import { CopyButton } from "@/components/ui/copy-button";
 import { useExplorer, toDepositRecord } from "@/hooks/use-explorer";
 import type { DepositRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
-import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import Image from "next/image";
 import { truncate, timeAgo } from "./helpers";
 import { Th, Td, SolanaLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
-import { SUPPORTED_TOKENS, formatTokenAmount, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
+import { getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
+import { getChainIcon, getChainLinkClass, getChainMutedLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 
 import { DEPOSIT_STATUS_CONFIG, DEPOSIT_STATUS_ORDER } from "@/lib/deposit-status";
 
@@ -50,8 +45,9 @@ function getDepositStatusDot(status: string | null): { variant: StatusDotVariant
 // =============================================================================
 
 function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; config: ShieldTypeConfig; isBtc: boolean }) {
-  const { networkId } = useChainEnvironment();
+  const { config: chainConfig, networkId } = useChainEnvironment();
   const btcExplorerUrl = getMempoolExplorerUrl(networkId);
+  const chainLinkClass = getChainLinkClass(chainConfig);
   const d = deposit;
   // For BTC deposits:
   //   depositAmountSats = original deposit to taproot
@@ -184,7 +180,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={d.commitment} label="Commitment" variant="default" iconSize="sm" />
                   {d.txSignature && (
-                    <a href={getSolanaExplorerTxUrl(d.txSignature, networkId)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5" title="View transaction">
+                    <a href={getChainTransactionUrl(chainConfig, d.txSignature, networkId)} target="_blank" rel="noopener noreferrer" className={cn("transition-colors p-0.5", chainLinkClass)} title="View transaction">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
@@ -207,8 +203,10 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
 
 /** Vertical timeline showing deposit lifecycle transactions */
 function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
-  const { networkId } = useChainEnvironment();
+  const { config: chainConfig, networkId } = useChainEnvironment();
   const btcExplorerUrl = getMempoolExplorerUrl(networkId);
+  const chainIcon = getChainIcon(chainConfig);
+  const mutedChainLinkClass = getChainMutedLinkClass(chainConfig);
   const stepOrder = DEPOSIT_STATUS_ORDER[d.status ?? ""] ?? 0;
   const isDirectVaultDeposit = !d.btcMeta?.sweepTxid;
 
@@ -232,17 +230,17 @@ function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
     {
       title: "SPV Verify",
       done: stepOrder >= 4,
-      icon: "sol" as const,
+      icon: "chain" as const,
       txId: d.txSignature || d.txSignature,
-      txType: "sol" as const,
+      txType: "chain" as const,
       badge: null,
     },
     {
       title: "Mint zkBTC",
       done: stepOrder >= 5,
-      icon: "sol" as const,
+      icon: "chain" as const,
       txId: d.txSignature,
-      txType: "sol" as const,
+      txType: "chain" as const,
       badge: d.btcMeta?.mintedSats ? `${d.btcMeta?.mintedSats.toLocaleString()} sats` : null,
     },
   ];
@@ -275,7 +273,7 @@ function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
               {step.icon === "btc" ? (
                 <BitcoinIcon className="w-3.5 h-3.5 text-btc/70" />
               ) : (
-                <img src="/tokens/sol.png" alt="SOL" className="w-3.5 h-3.5 rounded-full opacity-70" />
+                <img src={chainIcon} alt="" className="w-3.5 h-3.5 rounded-full opacity-70" />
               )}
               <span className={cn("text-[12px] font-medium", step.done ? "text-foreground" : "text-gray/50")}>
                 {step.title}
@@ -288,14 +286,14 @@ function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
             </div>
             {step.txId && step.done && (
               <div className="group flex items-center gap-1.5 mt-1">
-                <span className="text-[10px] text-gray/40">{step.txType === "btc" ? "Transaction ID" : "Signature"}</span>
+                <span className="text-[10px] text-gray/40">{step.txType === "btc" ? "Transaction ID" : "Chain tx"}</span>
                 <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                 <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                 <a
-                  href={step.txType === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId, networkId)}
+                  href={step.txType === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getChainTransactionUrl(chainConfig, step.txId, networkId)}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className={cn("transition-colors p-0.5", step.txType === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}
+                  className={cn("transition-colors p-0.5", step.txType === "btc" ? "text-btc/40 hover:text-btc" : mutedChainLinkClass)}
                 >
                   <ExternalLink className="w-2.5 h-2.5" />
                 </a>

@@ -24,11 +24,17 @@ import { formatAmount } from "@/lib/utils/formatting";
 import useSWR from "swr";
 import { getEsploraApiUrl, getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo, scriptToAddress } from "./helpers";
-import { getSolanaExplorerTxUrl, getSolanaExplorerAddressUrl } from "@/lib/solana-network";
-import { Th, Td, TypeBadge, StatusDot, FlowCell, SolanaLink, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import type { NetworkId } from "@/lib/network-config";
+import {
+  getChainAddressUrl,
+  getChainIcon,
+  getChainLinkClass,
+  getChainMutedLinkClass,
+  getChainTransactionUrl,
+} from "@/lib/chain-links";
 
 /** Format raw sats as trimmed BTC string */
 const fmtBtc = (sats: number) => formatAmount(sats, 8);
@@ -182,9 +188,12 @@ function getEffectiveStatus(r: RedemptionRecord): string {
 // =============================================================================
 
 function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
-  const { networkId } = useChainEnvironment();
+  const { config: chainConfig, networkId } = useChainEnvironment();
   const btcExplorerUrl = getMempoolExplorerUrl(networkId);
   const esploraApiUrl = getEsploraApiUrl(networkId);
+  const chainIcon = getChainIcon(chainConfig);
+  const chainLinkClass = getChainLinkClass(chainConfig);
+  const mutedChainLinkClass = getChainMutedLinkClass(chainConfig);
   const status = getEffectiveStatus(redemption);
   const stepOrder = WITHDRAWAL_STATUS_ORDER[status] ?? 0;
   const isFailed = stepOrder === -1;
@@ -230,7 +239,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
               <code className="text-caption font-mono text-foreground/70 truncate">{truncate(redemption.requestTxSignature, 6, 4)}</code>
               <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                 <CopyButton text={redemption.requestTxSignature} label="Tx" variant="default" iconSize="sm" />
-                <a href={getSolanaExplorerTxUrl(redemption.requestTxSignature, networkId)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5">
+                <a href={getChainTransactionUrl(chainConfig, redemption.requestTxSignature, networkId)} target="_blank" rel="noopener noreferrer" className={cn("transition-colors p-0.5", chainLinkClass)}>
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
@@ -286,10 +295,10 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
         {/* Vertical timeline */}
         <div className="space-y-0">
           {[
-            { key: "request", title: "Request Redemption", done: !isFailed && stepOrder >= 0, icon: "sol" as const, txId: redemption.requestTxSignature },
-            { key: "processing", title: "Mark Processing", done: !isFailed && stepOrder >= 1, icon: "sol" as const, txId: redemption.processingTxSignature },
+            { key: "request", title: "Request Redemption", done: !isFailed && stepOrder >= 0, icon: "chain" as const, txId: redemption.requestTxSignature },
+            { key: "processing", title: "Mark Processing", done: !isFailed && stepOrder >= 1, icon: "chain" as const, txId: redemption.processingTxSignature },
             { key: "btc_sent", title: "BTC Sent", done: !isFailed && stepOrder >= 3, icon: "btc" as const, txId: redemption.btcTxid },
-            { key: "complete", title: "Complete Redemption", done: !isFailed && stepOrder >= 4, icon: "sol" as const, txId: redemption.completeTxSignature },
+            { key: "complete", title: "Complete Redemption", done: !isFailed && stepOrder >= 4, icon: "chain" as const, txId: redemption.completeTxSignature },
           ].map((step, i, arr) => (
             <div key={step.key} className="flex gap-3">
               <div className="flex flex-col items-center w-5">
@@ -316,7 +325,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                   {step.icon === "btc" ? (
                     <BitcoinIcon className="w-3.5 h-3.5 text-btc/70" />
                   ) : (
-                    <Image src="/tokens/sol.png" alt="SOL" width={14} height={14} className="rounded-full opacity-70" />
+                    <Image src={chainIcon} alt="" width={14} height={14} className="rounded-full opacity-70" />
                   )}
                   <span className={cn("text-[12px] font-medium", step.done ? "text-foreground" : "text-gray/50")}>
                     {step.title}
@@ -328,10 +337,10 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                     <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                     <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                     <a
-                      href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId, networkId)}
+                      href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getChainTransactionUrl(chainConfig, step.txId, networkId)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className={cn("transition-colors p-0.5", step.icon === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}
+                      className={cn("transition-colors p-0.5", step.icon === "btc" ? "text-btc/40 hover:text-btc" : mutedChainLinkClass)}
                     >
                       <ExternalLink className="w-2.5 h-2.5" />
                     </a>
@@ -389,6 +398,7 @@ export function WithdrawalRow({
   expanded: boolean;
   onToggle: () => void;
 }) {
+  const { config } = useChainEnvironment();
   const r = redemption;
   const btcAddr = r.btcScript ? scriptToAddress(r.btcScript, network) : null;
 
@@ -450,8 +460,8 @@ export function WithdrawalRow({
                 : o >= 1 && r.processingTxSignature ? r.processingTxSignature
                 : r.requestTxSignature;
               return sig
-                ? getSolanaExplorerTxUrl(sig, network)
-                : getSolanaExplorerAddressUrl(r.pubkey, network);
+                ? getChainTransactionUrl(config, sig, network)
+                : getChainAddressUrl(config, r.pubkey, network);
             })()}
             target="_blank"
             rel="noopener noreferrer"

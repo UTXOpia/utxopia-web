@@ -1,6 +1,6 @@
 import { getChainAdapter, networkForChain } from "@/lib/chain-registry";
 import type { NetworkConfig, NetworkId } from "@/lib/network-config";
-import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import { getSolanaExplorerAddressUrl, getSolanaExplorerTxUrl } from "@/lib/solana-network";
 
 export type SuiExplorerNetwork = "mainnet" | "testnet" | "devnet";
 
@@ -37,6 +37,14 @@ export function getChainTransactionUrl(config: NetworkConfig, txId: string, netw
     return getSuiTransactionUrl(config.sui.explorerUrl, txId, networkId);
   }
   return getSolanaExplorerTxUrl(txId, networkId);
+}
+
+export function getChainAddressUrl(config: NetworkConfig, addressOrObjectId: string, networkId?: NetworkId): string {
+  const chain = getChainAdapter(config);
+  if (chain.id === "sui" && config.sui) {
+    return getSuiObjectUrl(config.sui.explorerUrl, addressOrObjectId, networkId);
+  }
+  return getSolanaExplorerAddressUrl(addressOrObjectId, networkId);
 }
 
 export function getChainIcon(config: NetworkConfig): string {
