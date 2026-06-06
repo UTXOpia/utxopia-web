@@ -26,8 +26,8 @@ export interface SuiUtxopiaAuthPreview {
   encodedStealthAddress: string;
   directDeposit: {
     btcAddress: string;
-    ephemeralPubHex: string;
-    npkHex: string;
+    ephemeralPubkeyHex: string;
+    notePublicKeyHex: string;
     opReturnHex: string;
   };
 }
@@ -68,8 +68,8 @@ export async function createSuiUtxopiaAuthPreviewFromSignature(
     encodedStealthAddress: setup.encodedStealthAddress,
     directDeposit: {
       btcAddress: directDeposit.btcAddress,
-      ephemeralPubHex: bytesToHex(directDeposit.ephemeralPub),
-      npkHex: bytesToHex(directDeposit.npk),
+      ephemeralPubkeyHex: bytesToHex(directDeposit.ephemeralPub),
+      notePublicKeyHex: bytesToHex(directDeposit.npk),
       opReturnHex: bytesToHex(directDeposit.opReturnPayload),
     },
   };

@@ -39,16 +39,16 @@ export function depositAddressNetworkForNetworkConfig(cfg: NetworkConfig): Depos
 }
 
 export function parseDepositOpReturnHex(opReturnHex: string): {
-  ephemeralPubHex: string;
-  npkHex: string;
+  ephemeralPubkeyHex: string;
+  notePublicKeyHex: string;
 } {
   const payload = hexToBytes(opReturnHex);
   if (payload.length !== DEPOSIT_OP_RETURN_SIZE || !isValidDepositHeader(payload[0])) {
     throw new Error("invalid deposit OP_RETURN payload");
   }
   return {
-    ephemeralPubHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE, 1 + DEPOSIT_POOL_TAG_SIZE + 32)),
-    npkHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE + 32, DEPOSIT_OP_RETURN_SIZE)),
+    ephemeralPubkeyHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE, 1 + DEPOSIT_POOL_TAG_SIZE + 32)),
+    notePublicKeyHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE + 32, DEPOSIT_OP_RETURN_SIZE)),
   };
 }
 

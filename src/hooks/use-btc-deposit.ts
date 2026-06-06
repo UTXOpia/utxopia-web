@@ -154,15 +154,15 @@ export function useBtcDeposit({
       });
 
       // Register with backend (fire-and-forget with retry)
-      const { ephemeralPubHex, npkHex } = parseDepositOpReturnHex(opReturnHex);
+      const { ephemeralPubkeyHex, notePublicKeyHex } = parseDepositOpReturnHex(opReturnHex);
       (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await registerDeposit(
               depositPreview.depositAddress,
-              npkHex,
+              notePublicKeyHex,
               depositPreview.depositAmountSats,
-              ephemeralPubHex,
+              ephemeralPubkeyHex,
               networkId,
             );
             if (res.deposit_id) useNotesStore.getState().updateNote(opReturnHex, { depositId: res.deposit_id });

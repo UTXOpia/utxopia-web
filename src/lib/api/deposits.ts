@@ -43,9 +43,9 @@ export type DepositStatus =
 
 export interface RegisterDepositRequest {
   taproot_address: string;
-  commitment: string;
+  note_public_key: string;
   amount_sats: number;
-  ephemeral_pub?: string;
+  ephemeral_pubkey?: string;
 }
 
 export interface RegisterDepositResponse {
@@ -189,22 +189,22 @@ export interface StealthDepositStatusUpdate {
  * Register a deposit for tracking
  *
  * @param taprootAddress - The Bitcoin taproot address
- * @param commitment - The SHA256(nullifier || secret) commitment (64 hex chars)
+ * @param notePublicKeyHex - Deposit note public key from the OP_RETURN payload
  * @param amountSats - Expected amount in satoshis
- * @param claimLink - Optional claim link for reference
+ * @param ephemeralPubkeyHex - Deposit ephemeral public key from the OP_RETURN payload
  */
 export async function registerDeposit(
   taprootAddress: string,
-  commitment: string,
+  notePublicKeyHex: string,
   amountSats: number,
-  ephemeralPub?: string,
+  ephemeralPubkeyHex?: string,
   network?: NetworkId,
 ): Promise<RegisterDepositResponse> {
   const body: RegisterDepositRequest = {
     taproot_address: taprootAddress,
-    commitment,
+    note_public_key: notePublicKeyHex,
     amount_sats: amountSats,
-    ephemeral_pub: ephemeralPub,
+    ephemeral_pubkey: ephemeralPubkeyHex,
   };
 
   const response = await fetch(withNetworkQuery("/api/deposits", network), {

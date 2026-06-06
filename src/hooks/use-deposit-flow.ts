@@ -160,15 +160,15 @@ export function useDepositFlow() {
       });
 
       // Register with backend tracker (retry up to 3 times)
-      const { ephemeralPubHex, npkHex } = parseDepositOpReturnHex(opReturnHex);
+      const { ephemeralPubkeyHex, notePublicKeyHex } = parseDepositOpReturnHex(opReturnHex);
       (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {
           try {
             const res = await registerDeposit(
               depositPreview.depositAddress,
-              npkHex,
+              notePublicKeyHex,
               depositPreview.depositAmountSats,
-              ephemeralPubHex,
+              ephemeralPubkeyHex,
               networkId,
             );
             if (res.deposit_id) {

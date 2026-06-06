@@ -80,6 +80,12 @@ describe("deposit network routing", () => {
     expect(mockFetch.mock.calls[0][0]).toBe("/api/deposits?network=sui-regtest");
     expect(mockFetch.mock.calls[1][0]).toBe("/api/deposits/deposit_1?network=devnet-regtest");
     expect(mockFetch.mock.calls[2][0]).toBe("/api/deposits?network=sui-regtest");
+    expect(JSON.parse((mockFetch.mock.calls[2][1] as RequestInit).body as string)).toEqual({
+      taproot_address: "bcrt1ptest",
+      note_public_key: "aa",
+      amount_sats: 10_000,
+      ephemeral_pubkey: "bb",
+    });
   });
 
   it("uses the selected network backend for deposit status WebSockets", () => {

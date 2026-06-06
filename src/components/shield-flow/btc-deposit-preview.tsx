@@ -100,8 +100,8 @@ export function BtcDepositPreview({
         </button>
         {btcDeposit.showOpReturn && (
           <div className="mt-2 pt-2 border-t border-privacy/10 space-y-1.5">
-            <div><p className="text-[10px] text-gray mb-0.5">Ephemeral Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.ephemeralPubHex}</code></div>
-            <div><p className="text-[10px] text-gray mb-0.5">Note Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.npkHex}</code></div>
+            <div><p className="text-[10px] text-gray mb-0.5">Ephemeral Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.ephemeralPubkeyHex}</code></div>
+            <div><p className="text-[10px] text-gray mb-0.5">Note Public Key</p><code className="block text-[9px] font-mono text-privacy/50 break-all leading-relaxed">{opReturnParts.notePublicKeyHex}</code></div>
           </div>
         )}
       </div>
