@@ -1,28 +1,17 @@
 import { PublicKey } from "@solana/web3.js";
-import { sha256 } from "@noble/hashes/sha2.js";
+import {
+  computeDepositPoolTag,
+  DEPOSIT_BITCOIN_NETWORK,
+  DEPOSIT_DESTINATION_CHAIN,
+  DEPOSIT_OP_RETURN_SIZE,
+  DEPOSIT_POOL_TAG_SIZE,
+  parseDepositOpReturn,
+  type DepositBitcoinNetwork,
+  type DepositOpReturnContext,
+} from "@utxopia/sdk";
 import type { NetworkConfig } from "@/lib/network-config";
 
 const TEXT_ENCODER = new TextEncoder();
-const DEPOSIT_OP_RETURN_SIZE = 73;
-const DEPOSIT_POOL_TAG_SIZE = 8;
-const DEPOSIT_DESTINATION_CHAIN = {
-  SOLANA: 1,
-  SUI: 2,
-} as const;
-const DEPOSIT_BITCOIN_NETWORK = {
-  MAINNET: 0,
-  TESTNET4: 2,
-  REGTEST: 3,
-} as const;
-
-type DepositBitcoinNetwork =
-  (typeof DEPOSIT_BITCOIN_NETWORK)[keyof typeof DEPOSIT_BITCOIN_NETWORK];
-
-export interface DepositOpReturnContext {
-  destinationChain: (typeof DEPOSIT_DESTINATION_CHAIN)[keyof typeof DEPOSIT_DESTINATION_CHAIN];
-  bitcoinNetwork: DepositBitcoinNetwork;
-  poolTag: Uint8Array;
-}
 
 export type DepositAddressNetwork = "mainnet" | "testnet" | "regtest";
 
@@ -43,12 +32,13 @@ export function parseDepositOpReturnHex(opReturnHex: string): {
   notePublicKeyHex: string;
 } {
   const payload = hexToBytes(opReturnHex);
-  if (payload.length !== DEPOSIT_OP_RETURN_SIZE || !isValidDepositHeader(payload[0])) {
+  const parsed = parseDepositOpReturn(payload);
+  if (!parsed) {
     throw new Error("invalid deposit OP_RETURN payload");
   }
   return {
-    ephemeralPubkeyHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE, 1 + DEPOSIT_POOL_TAG_SIZE + 32)),
-    notePublicKeyHex: bytesToHex(payload.slice(1 + DEPOSIT_POOL_TAG_SIZE + 32, DEPOSIT_OP_RETURN_SIZE)),
+    ephemeralPubkeyHex: bytesToHex(parsed.ephemeralPubkey),
+    notePublicKeyHex: bytesToHex(parsed.notePublicKey),
   };
 }
 
@@ -94,28 +84,6 @@ function bitcoinNetworkToDepositNetwork(network: string): DepositBitcoinNetwork 
   throw new Error(`unsupported deposit Bitcoin network: ${network}`);
 }
 
-function computeDepositPoolTag(parts: Uint8Array[]): Uint8Array {
-  const total = parts.reduce((sum, part) => sum + part.length, 0);
-  const bytes = new Uint8Array(total);
-  let offset = 0;
-  for (const part of parts) {
-    bytes.set(part, offset);
-    offset += part.length;
-  }
-  return sha256(bytes).slice(0, DEPOSIT_POOL_TAG_SIZE);
-}
-
-function isValidDepositHeader(header: number): boolean {
-  const version = header >> 6;
-  const destination = (header >> 4) & 0x03;
-  const network = header & 0x0f;
-  return version === 1
-    && (destination === DEPOSIT_DESTINATION_CHAIN.SOLANA || destination === DEPOSIT_DESTINATION_CHAIN.SUI)
-    && (network === DEPOSIT_BITCOIN_NETWORK.MAINNET
-      || network === DEPOSIT_BITCOIN_NETWORK.TESTNET4
-      || network === DEPOSIT_BITCOIN_NETWORK.REGTEST);
-}
-
 function suiAddressToBytes(value: string): Uint8Array {
   const hex = value.startsWith("0x") ? value.slice(2) : value;
   if (hex.length > 64) {
@@ -127,6 +95,9 @@ function suiAddressToBytes(value: string): Uint8Array {
 function hexToBytes(hex: string): Uint8Array {
   if (hex.length % 2 !== 0) {
     throw new Error("hex string must have even length");
+  }
+  if (!/^[0-9a-fA-F]*$/.test(hex)) {
+    throw new Error("hex string contains non-hex characters");
   }
   const bytes = new Uint8Array(hex.length / 2);
   for (let i = 0; i < hex.length; i += 2) {
