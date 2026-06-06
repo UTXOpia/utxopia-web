@@ -163,14 +163,16 @@ export function deriveTokenConfigPDA(
 // =============================================================================
 
 export function derivePoolVaultATA(
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  mint: PublicKey = getZkbtcMint(),
+  tokenProgramId: PublicKey = getToken2022ProgramId(),
 ): PublicKey {
   const [poolState] = derivePoolStatePDA(programId);
   return getAssociatedTokenAddressSync(
-    getZkbtcMint(),
+    mint,
     poolState,
     true,
-    getToken2022ProgramId()
+    tokenProgramId,
   );
 }
 

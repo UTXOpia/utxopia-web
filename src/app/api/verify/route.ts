@@ -35,11 +35,6 @@ import {
 } from "@utxopia/sdk";
 
 import {
-  getUTXOpiaProgramId,
-  getBtcLightClientProgramId,
-  getChadbufferProgramId,
-  getZkbtcMint,
-  getToken2022ProgramId,
   derivePoolStatePDA,
   deriveCommitmentTreePDA,
   deriveLightClientPDA,
@@ -48,6 +43,7 @@ import {
   deriveBlockHeaderPDA,
   deriveDepositReceiptPDA,
 } from "@/lib/solana/pdas";
+import { TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
 
 import { getRelayerKeypair } from "@/lib/server/relayer";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
@@ -257,7 +253,8 @@ async function fetchBlockHeaderByHeight(height: number, esploraApiUrl: string): 
 async function uploadDataToBuffer(
   connection: Connection,
   relayer: Keypair,
-  data: Uint8Array
+  data: Uint8Array,
+  chadbufferProgramId: PublicKey,
 ): Promise<{ bufferPubkey: PublicKey; bufferKeypair: Keypair }> {
   const bufferKeypair = Keypair.generate();
   const bufferSize = AUTHORITY_SIZE + data.length;
@@ -274,7 +271,7 @@ async function uploadDataToBuffer(
     newAccountPubkey: bufferKeypair.publicKey,
     lamports: rentExemption,
     space: bufferSize,
-    programId: getChadbufferProgramId(),
+    programId: chadbufferProgramId,
   });
 
   const initData = Buffer.alloc(1 + firstChunk.length);
@@ -282,7 +279,7 @@ async function uploadDataToBuffer(
   Buffer.from(firstChunk).copy(initData, 1);
 
   const initIx = new TransactionInstruction({
-    programId: getChadbufferProgramId(),
+    programId: chadbufferProgramId,
     keys: [
       { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
       { pubkey: bufferKeypair.publicKey, isSigner: true, isWritable: true },
@@ -316,7 +313,7 @@ async function uploadDataToBuffer(
     Buffer.from(chunk).copy(writeData, 4);
 
     const writeIx = new TransactionInstruction({
-      programId: getChadbufferProgramId(),
+      programId: chadbufferProgramId,
       keys: [
         { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
         { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
@@ -347,10 +344,11 @@ async function uploadDataToBuffer(
 async function closeBuffer(
   connection: Connection,
   relayer: Keypair,
-  bufferPubkey: PublicKey
+  bufferPubkey: PublicKey,
+  chadbufferProgramId: PublicKey,
 ): Promise<void> {
   const closeIx = new TransactionInstruction({
-    programId: getChadbufferProgramId(),
+    programId: chadbufferProgramId,
     keys: [
       { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
       { pubkey: bufferPubkey, isSigner: false, isWritable: true },
@@ -423,6 +421,11 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
       verifyContext.config.solana.rpcUrl,
       "confirmed"
     );
+    const utxopiaProgramId = new PublicKey(verifyContext.config.solana.utxopiaProgramId);
+    const btcLightClientProgramId = new PublicKey(verifyContext.config.solana.btcLightClientId);
+    const chadbufferProgramId = new PublicKey(verifyContext.config.solana.chadbufferId);
+    const zkbtcMint = new PublicKey(verifyContext.config.tokens.zkbtcMint);
+    const token2022ProgramId = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
     // 1. Fetch raw tx hex from mempool.space and strip SegWit witness data
     console.log(`[Verify] Fetching raw transactions on ${verifyContext.bitcoinNetwork} via ${verifyContext.esploraApiUrl}...`);
@@ -451,21 +454,21 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
 
     // 4. Upload raw txs to ChadBuffer accounts
     const [sweepBuffer, depositBuffer] = await Promise.all([
-      uploadDataToBuffer(connection, relayer, sweepRawBytes),
-      uploadDataToBuffer(connection, relayer, depositRawBytes),
+      uploadDataToBuffer(connection, relayer, sweepRawBytes, chadbufferProgramId),
+      uploadDataToBuffer(connection, relayer, depositRawBytes, chadbufferProgramId),
     ]);
 
     // 5. Derive all PDAs
-    const [poolStatePDA] = derivePoolStatePDA();
-    const [commitmentTreePDA] = deriveCommitmentTreePDA();
-    const [lightClientPDA] = deriveLightClientPDA();
-    const poolVaultATA = derivePoolVaultATA();
-    const [depositReceiptPDA] = deriveDepositReceiptPDA(depositTxidInternal);
+    const [poolStatePDA] = derivePoolStatePDA(utxopiaProgramId);
+    const [commitmentTreePDA] = deriveCommitmentTreePDA(utxopiaProgramId);
+    const [lightClientPDA] = deriveLightClientPDA(btcLightClientProgramId);
+    const poolVaultATA = derivePoolVaultATA(utxopiaProgramId, zkbtcMint, token2022ProgramId);
+    const [depositReceiptPDA] = deriveDepositReceiptPDA(depositTxidInternal, utxopiaProgramId);
 
     // Block header PDA: derive from block hash
-    const [blockHeaderPDA] = deriveBlockHeaderPDA(blockHashInternal);
+    const [blockHeaderPDA] = deriveBlockHeaderPDA(blockHashInternal, btcLightClientProgramId);
 
-    const [verifiedTxPDA] = deriveVerifiedTransactionPDA(blockHashInternal, sweepTxidInternal);
+    const [verifiedTxPDA] = deriveVerifiedTransactionPDA(blockHashInternal, sweepTxidInternal, btcLightClientProgramId);
 
     // 6. Build merkle proof data for verify_transaction
     const merkleSiblings = merkleProof.merkleProof.map((hash) =>
@@ -482,9 +485,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
       pathBits,
     });
 
-    const btcLcProgramId = getBtcLightClientProgramId();
     const verifyTxIx = new TransactionInstruction({
-      programId: btcLcProgramId,
+      programId: btcLightClientProgramId,
       keys: [
         { pubkey: verifiedTxPDA, isSigner: false, isWritable: true },
         { pubkey: lightClientPDA, isSigner: false, isWritable: false },
@@ -505,7 +507,6 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
       depositTxid: depositTxidInternal,
     });
 
-    const utxopiaProgramId = getUTXOpiaProgramId();
     const verifyDepositIx = new TransactionInstruction({
       programId: utxopiaProgramId,
       keys: [
@@ -516,9 +517,9 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
         { pubkey: sweepBuffer.bufferPubkey, isSigner: false, isWritable: false },
         { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: getZkbtcMint(), isSigner: false, isWritable: true },
+        { pubkey: zkbtcMint, isSigner: false, isWritable: true },
         { pubkey: poolVaultATA, isSigner: false, isWritable: true },
-        { pubkey: getToken2022ProgramId(), isSigner: false, isWritable: false },
+        { pubkey: token2022ProgramId, isSigner: false, isWritable: false },
         { pubkey: depositBuffer.bufferPubkey, isSigner: false, isWritable: false },
         { pubkey: depositReceiptPDA, isSigner: false, isWritable: true },
       ],
@@ -547,8 +548,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     // 9. Close buffers
     try {
       await Promise.all([
-        closeBuffer(connection, relayer, sweepBuffer.bufferPubkey),
-        closeBuffer(connection, relayer, depositBuffer.bufferPubkey),
+        closeBuffer(connection, relayer, sweepBuffer.bufferPubkey, chadbufferProgramId),
+        closeBuffer(connection, relayer, depositBuffer.bufferPubkey, chadbufferProgramId),
       ]);
     } catch (closeErr) {
       console.warn("[Verify] Failed to close buffer (non-critical):", closeErr);

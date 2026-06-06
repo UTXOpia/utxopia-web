@@ -31,6 +31,15 @@ describe("/api/verify network routing", () => {
     expect(result.config.solana.rpcUrl).toBe(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }).solana.rpcUrl);
   });
 
+  it("rejects Solana networks without deployed verifier IDs", () => {
+    expect(resolveVerifyConfig(
+      new Request("https://app.utxopia.test/api/verify?network=testnet") as any,
+    )).toEqual({
+      error: "/api/verify is not configured for network=testnet.",
+      status: 503,
+    });
+  });
+
   it("keeps testnet4 and mainnet Esplora URLs config-driven", () => {
     expect(getConfiguredEsploraApiUrl(getNetworkConfig("devnet", { applyEnvOverrides: false }))).toBe(
       "https://mempool.space/testnet4/api",

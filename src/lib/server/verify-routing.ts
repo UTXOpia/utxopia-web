@@ -22,6 +22,17 @@ export function resolveVerifyConfig(request: NextRequest): {
   }
 
   const config = getNetworkConfig(network, { applyEnvOverrides: false });
+  if (
+    !config.solana.utxopiaProgramId ||
+    !config.solana.btcLightClientId ||
+    !config.solana.chadbufferId ||
+    !config.tokens.zkbtcMint
+  ) {
+    return {
+      error: `/api/verify is not configured for network=${network}.`,
+      status: 503,
+    };
+  }
   return {
     config,
     esploraApiUrl: getConfiguredEsploraApiUrl(config),
