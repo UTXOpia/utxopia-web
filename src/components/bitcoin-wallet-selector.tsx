@@ -5,6 +5,7 @@ import type { BtcWalletType } from "@/stores/bitcoin-wallet-store";
 import { Spinner } from "@/components/ui/spinner";
 import { truncateMiddle } from "@/lib/utils/formatting";
 import { useIsMobileWithoutWallet } from "@/hooks/use-mobile-wallet-detect";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 interface BitcoinWalletSelectorProps {
   onConnect?: () => void;
@@ -19,11 +20,12 @@ export function BitcoinWalletSelector({
 }: BitcoinWalletSelectorProps) {
   const { connected, connecting, address, connect, disconnect, error } =
     useBitcoinWallet();
+  const { networkId } = useChainEnvironment();
   const isMobileNoWallet = useIsMobileWithoutWallet();
 
   const handleConnect = async (type: BtcWalletType) => {
     try {
-      await connect(type);
+      await connect(type, networkId);
       onConnect?.();
     } catch (err) {
       const message = err instanceof Error ? err.message : "Connection failed";

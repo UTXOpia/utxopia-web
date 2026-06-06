@@ -52,9 +52,9 @@ export interface BitcoinWalletState {
   walletType: BtcWalletType | null;
 
   // Actions
-  connect: (type: BtcWalletType) => Promise<void>;
+  connect: (type: BtcWalletType, network?: NetworkId) => Promise<void>;
   disconnect: () => void;
-  sendBtc: (toAddress: string, amountSats: number) => Promise<string>;
+  sendBtc: (toAddress: string, amountSats: number, network?: NetworkId) => Promise<string>;
   refreshBalance: (network?: NetworkId) => Promise<void>;
   clearError: () => void;
   _hydrate: () => void;
@@ -111,7 +111,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     }
   },
 
-  connect: async (type: BtcWalletType) => {
+  connect: async (type: BtcWalletType, network?: NetworkId) => {
     set({ connecting: true, error: null });
 
     try {
@@ -122,16 +122,16 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
 
         // Use switchChain for testnet4 support (switchNetwork only supports testnet3)
         if (window.unisat.switchChain) {
-          await window.unisat.switchChain(getUnisatChain());
+          await window.unisat.switchChain(getUnisatChain(network));
         } else {
-          await window.unisat.switchNetwork(getUnisatFallbackNetwork());
+          await window.unisat.switchNetwork(getUnisatFallbackNetwork(network));
         }
         const accounts = await window.unisat.requestAccounts();
         const address = accounts[0];
         if (!address) throw new Error("No accounts returned from UniSat");
 
         const publicKey = await window.unisat.getPublicKey();
-        const balance = await fetchBalance(address);
+        const balance = await fetchBalance(address, network);
 
         localStorage.setItem("btc_wallet_address", address);
         localStorage.setItem("btc_wallet_pubkey", publicKey);
@@ -151,7 +151,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
           payload: {
             purposes: [AddressPurpose.Payment, AddressPurpose.Ordinals],
             message: "Connect to UTXOpia for BTC deposits",
-            network: { type: getSatsConnectNetwork() },
+            network: { type: getSatsConnectNetwork(network) },
           },
           onFinish: async (response: GetAddressResponse) => {
             const paymentAddr = response.addresses.find(
@@ -163,7 +163,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
               localStorage.setItem("btc_wallet_pubkey", paymentAddr.publicKey);
               localStorage.setItem("btc_wallet_type", "sats-connect");
 
-              const balance = await fetchBalance(paymentAddr.address);
+              const balance = await fetchBalance(paymentAddr.address, network);
 
               set({
                 address: paymentAddr.address,
@@ -228,7 +228,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     }
   },
 
-  sendBtc: async (toAddress: string, amountSats: number): Promise<string> => {
+  sendBtc: async (toAddress: string, amountSats: number, network?: NetworkId): Promise<string> => {
     const { connected, address } = get();
     if (!connected || !address) {
       throw new Error("Wallet not connected");
@@ -237,7 +237,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     return new Promise((resolve, reject) => {
       sendBtcTransaction({
         payload: {
-          network: { type: getSatsConnectNetwork() },
+          network: { type: getSatsConnectNetwork(network) },
           recipients: [{ address: toAddress, amountSats: BigInt(amountSats) }],
           senderAddress: address,
         },
@@ -344,7 +344,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
       const txid = await new Promise<string>((resolve, reject) => {
         signTransaction({
           payload: {
-            network: { type: getSatsConnectNetwork() },
+            network: { type: getSatsConnectNetwork(network) },
             psbtBase64,
             message: "Sign UTXOpia deposit transaction",
             broadcast: true,

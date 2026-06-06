@@ -8,8 +8,8 @@ import { BitcoinNetworkType } from "sats-connect";
 import { detectNetwork, getNetworkConfig, type NetworkId } from "./network-config";
 
 /** sats-connect network enum for Xverse/Leather wallets */
-export function getSatsConnectNetwork(): BitcoinNetworkType {
-  const net = getConfig().bitcoinNetwork;
+export function getSatsConnectNetwork(network?: NetworkId): BitcoinNetworkType {
+  const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
   switch (net) {
     case "mainnet":
       return BitcoinNetworkType.Mainnet;
@@ -24,8 +24,8 @@ export function getSatsConnectNetwork(): BitcoinNetworkType {
 }
 
 /** UniSat wallet chain string for switchChain() */
-export function getUnisatChain(): string {
-  const net = getConfig().bitcoinNetwork;
+export function getUnisatChain(network?: NetworkId): string {
+  const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
   switch (net) {
     case "mainnet":
       return "BITCOIN_MAINNET";
@@ -43,8 +43,9 @@ export function getUnisatChain(): string {
 }
 
 /** UniSat fallback network string for switchNetwork() (only knows mainnet/testnet) */
-export function getUnisatFallbackNetwork(): string {
-  return getConfig().bitcoinNetwork === "mainnet" ? "livenet" : "testnet";
+export function getUnisatFallbackNetwork(network?: NetworkId): string {
+  const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
+  return net === "mainnet" ? "livenet" : "testnet";
 }
 
 /** BTC block explorer base URL (for <a href> links, no /api suffix).

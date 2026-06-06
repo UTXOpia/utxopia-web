@@ -36,6 +36,7 @@ import { useBtcDeposit } from "@/hooks/use-btc-deposit";
 import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview";
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -49,6 +50,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const wallet = useWallet();
   const { publicKey, sendTransaction } = wallet;
   const { connection } = useConnection();
+  const { networkId } = useChainEnvironment();
   const { setVisible: openWalletModal } = useWalletModal();
   const { keys, stealthAddress } = useUTXOpia();
 
@@ -360,7 +362,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
                   {showWalletPicker && (
                     <div className="absolute left-0 right-0 top-full mt-1.5 bg-card border border-gray/20 rounded-[12px] shadow-xl z-50 overflow-hidden">
                       <button
-                        onClick={() => { btcWallet.connect("sats-connect"); setShowWalletPicker(false); }}
+                        onClick={() => { btcWallet.connect("sats-connect", networkId); setShowWalletPicker(false); }}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-btc/5 transition-colors cursor-pointer border-b border-gray/10"
                       >
                         <div className="w-8 h-8 rounded-full bg-btc/10 flex items-center justify-center">
@@ -372,7 +374,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
                         </div>
                       </button>
                       <button
-                        onClick={() => { btcWallet.connect("unisat"); setShowWalletPicker(false); }}
+                        onClick={() => { btcWallet.connect("unisat", networkId); setShowWalletPicker(false); }}
                         className="w-full flex items-center gap-3 px-4 py-3 hover:bg-btc/5 transition-colors cursor-pointer"
                       >
                         <div className="w-8 h-8 rounded-full bg-btc/10 flex items-center justify-center">
