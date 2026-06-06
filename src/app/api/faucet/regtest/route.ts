@@ -582,7 +582,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   // 1. Send the BTC. For `utxo:` airdrops this is a full UTXOpia deposit tx:
-  // payment output to the pool/vault plus OP_RETURN(ephemeralPub || npk).
+  // payment output to the pool/vault plus compact OP_RETURN metadata.
   let txid: string;
   try {
     if (opReturnHex) {
