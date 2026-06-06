@@ -147,9 +147,9 @@ export const NETWORK_META: NetworkMeta[] = [
     tagline: "Sui testnet + Bitcoin testnet4",
     description: "Move-object version of the UTXOpia core proof paths: commitment insert, Sui Groth16 JoinSplit, redemption request, and relayer-gated redemption completion.",
     caveats: [
-      "BTC SPV verification is still being wired. Native Sui-side Ika dWallet signing is optional and waiting on testnet IKA access.",
+      "Hidden from the selector until backend URL, BTC pool address, and BTC light-client state are populated.",
     ],
-    enabled: true,
+    enabled: false,
   },
   {
     id: "sui-regtest",
@@ -303,7 +303,8 @@ export function detectNetwork(): NetworkId {
   if (env === "mainnet" || env === "mainnet-beta") return "mainnet";
   if (env === "testnet") return "testnet";
   if (env === "sui-regtest") return "sui-regtest";
-  if (env === "sui-testnet" || env === "sui") return "sui-testnet";
+  if (env === "sui-testnet") return "sui-testnet";
+  if (env === "sui") return defaultNetworkForChain("sui");
   if (env === "localnet") return "localnet";
   if (env === "devnet-regtest" || env === "hybrid") return "devnet-regtest";
   return "devnet";

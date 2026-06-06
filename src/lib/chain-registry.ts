@@ -27,7 +27,7 @@ export const CHAIN_ADAPTERS: Record<ChainId, ChainAdapter> = {
     query: "sui",
     displayName: "Sui",
     nativeToken: "SUI",
-    defaultNetwork: "sui-testnet",
+    defaultNetwork: "sui-regtest",
     hybridNetwork: "sui-regtest",
     networkIds: ["sui-testnet", "sui-regtest"],
   },
@@ -66,6 +66,9 @@ export function getNetworkConfigReadoutRows(config: NetworkConfig): Array<[strin
   if (config.sui) {
     return [
       ["Sui RPC", config.sui.rpcUrl, config.sui.rpcUrl],
+      ["Backend", config.backend.url, config.backend.url],
+      ["BTC network", config.bitcoin.network],
+      ["BTC explorer", config.bitcoin.explorerUrl, config.bitcoin.explorerUrl],
       ["Package", config.sui.packageId],
       ["Pool", config.sui.pool.objectId],
       ["VK registry", config.sui.verifyingKeyRegistry.objectId],

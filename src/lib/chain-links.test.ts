@@ -5,6 +5,7 @@ import {
   getSuiObjectUrl,
   getSuiTransactionUrl,
 } from "./chain-links";
+import { getNetworkConfigReadoutRows } from "./chain-registry";
 import { getNetworkConfig } from "./network-config";
 import {
   getSolanaCluster,
@@ -33,6 +34,16 @@ describe("chain explorer links", () => {
     expect(getChainTransactionUrl(config, "digest", "sui-regtest")).toBe(
       "https://suiexplorer.com/txblock/digest?network=testnet",
     );
+  });
+
+  it("includes backend and Bitcoin context in Sui network readout rows", () => {
+    const config = getNetworkConfig("sui-regtest", { applyEnvOverrides: false });
+    const labels = getNetworkConfigReadoutRows(config).map(([label]) => label);
+
+    expect(labels).toContain("Sui RPC");
+    expect(labels).toContain("Backend");
+    expect(labels).toContain("BTC network");
+    expect(labels).toContain("BTC explorer");
   });
 
   it("maps Solana app networks to the Solana Explorer cluster parameter", () => {
