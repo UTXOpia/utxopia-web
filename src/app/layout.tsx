@@ -26,7 +26,12 @@ const spaceGrotesk = Space_Grotesk({
   weight: ["400", "500", "600", "700"],
 });
 
+const metadataBase = new URL(
+  process.env.NEXT_PUBLIC_BASE_URL || process.env.NEXT_PUBLIC_SITE_URL || "https://utxopia.com",
+);
+
 export const metadata: Metadata = {
+  metadataBase,
   title: "UTXOpia | Private Bitcoin and Token Transfers",
   description: "Shield Bitcoin and supported chain assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments across Solana and Sui.",
   icons: {
