@@ -29,6 +29,15 @@
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"
+    },
+    "sns": {
+      "nameServiceProgramId": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",
+      "registrarProgramId": "snshBoEQ9jx4QoHBpZDQPYdNCtw7RMxJvYrKFEhwaPJ",
+      "subRegistrarProgramId": "31tT5CmpphAtRL3mstu962zeYH7C6TEkJWLB5nYxciBB",
+      "rootDomain": "5eoDkP6vCQBXqDV9YN2NdUs3nmML3dMRNmEYpiyVNBm2",
+      "parentDomain": "utxopia",
+      "reverseLookupClass": "7NbD1vprif6apthEZAqhRfYuhrqnuderB8qpnfXGCc8H",
+      "stealthDataVersion": 1
     }
   },
   "devnet-regtest": {
@@ -61,6 +70,15 @@
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"
+    },
+    "sns": {
+      "nameServiceProgramId": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",
+      "registrarProgramId": "snshBoEQ9jx4QoHBpZDQPYdNCtw7RMxJvYrKFEhwaPJ",
+      "subRegistrarProgramId": "31tT5CmpphAtRL3mstu962zeYH7C6TEkJWLB5nYxciBB",
+      "rootDomain": "5eoDkP6vCQBXqDV9YN2NdUs3nmML3dMRNmEYpiyVNBm2",
+      "parentDomain": "utxopia",
+      "reverseLookupClass": "7NbD1vprif6apthEZAqhRfYuhrqnuderB8qpnfXGCc8H",
+      "stealthDataVersion": 1
     }
   },
   "sui-testnet": {
@@ -208,6 +226,15 @@
     },
     "backend": {
       "url": ""
+    },
+    "sns": {
+      "nameServiceProgramId": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",
+      "registrarProgramId": "jCebN34bUfdeUYJT13J1yG16XWQpt5PDx6Mse9GUqhR",
+      "subRegistrarProgramId": "2KkyPzjaAYaz2ojQZ9P3xYakLd96B5UH6a2isLaZ4Cgs",
+      "rootDomain": "58PwtjSDuFHuUkYjH9BYod9SZaELfsvdrNMryy9iYNvo",
+      "parentDomain": "utxopia",
+      "reverseLookupClass": "33m47vH6Eav6jr5Ry86XjhRft2jRBLDnDgPSHoquXi2Z",
+      "stealthDataVersion": 1
     }
   },
   "localnet": {

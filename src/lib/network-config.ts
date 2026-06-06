@@ -63,6 +63,15 @@ export interface NetworkConfig {
   backend: {
     url: string;
   };
+  sns?: {
+    nameServiceProgramId: string;
+    registrarProgramId: string;
+    subRegistrarProgramId: string;
+    rootDomain: string;
+    parentDomain: string;
+    reverseLookupClass: string;
+    stealthDataVersion: number;
+  };
   sui?: {
     rpcUrl: string;
     explorerUrl: string;

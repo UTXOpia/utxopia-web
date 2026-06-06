@@ -62,8 +62,21 @@ describe("network-config query routing", () => {
         expect(cfg.tokens.zkbtcMint, `${meta.id} tokens.zkbtcMint`).toBeTruthy();
         expect(cfg.bitcoin.poolAddress, `${meta.id} bitcoin.poolAddress`).toBeTruthy();
         expect(cfg.bitcoin.groupPubkey, `${meta.id} bitcoin.groupPubkey`).toBeTruthy();
+        expect(cfg.sns?.nameServiceProgramId, `${meta.id} sns.nameServiceProgramId`).toBeTruthy();
+        expect(cfg.sns?.subRegistrarProgramId, `${meta.id} sns.subRegistrarProgramId`).toBeTruthy();
+        expect(cfg.sns?.parentDomain, `${meta.id} sns.parentDomain`).toBe("utxopia");
       }
     }
+  });
+
+  it("keeps SNS deployment config request-scoped by network", () => {
+    expect(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }).sns?.rootDomain).toBe(
+      "5eoDkP6vCQBXqDV9YN2NdUs3nmML3dMRNmEYpiyVNBm2",
+    );
+    expect(getNetworkConfig("mainnet", { applyEnvOverrides: false }).sns?.rootDomain).toBe(
+      "58PwtjSDuFHuUkYjH9BYod9SZaELfsvdrNMryy9iYNvo",
+    );
+    expect(getNetworkConfig("testnet", { applyEnvOverrides: false }).sns).toBeUndefined();
   });
 
   it("keeps exact network links canonical", () => {

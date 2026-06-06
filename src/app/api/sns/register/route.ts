@@ -15,7 +15,7 @@ import {
   createSyncNativeInstruction,
   getAssociatedTokenAddressSync,
 } from "@solana/spl-token";
-import { deriveParentDomainKey, getConfig, sha256Hash } from "@utxopia/sdk";
+import { sha256Hash } from "@utxopia/sdk";
 import {
   Numberu32,
   Numberu64,
@@ -85,30 +85,29 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
     throw new Error("Unsupported stealth data version");
   }
 
-  const config = getConfig();
+  const sns = networkConfig.sns;
   if (
-    !config.snsSubRegistrarProgramId ||
-    !config.snsNameServiceProgramId ||
-    !config.snsRegistrarProgramId ||
-    !config.snsRootDomain ||
-    !config.snsReverseLookupClass ||
-    !config.snsParentDomain
+    !sns?.subRegistrarProgramId ||
+    !sns.nameServiceProgramId ||
+    !sns.registrarProgramId ||
+    !sns.rootDomain ||
+    !sns.reverseLookupClass ||
+    !sns.parentDomain
   ) {
     throw new Error("SNS not configured for this network");
   }
 
   const connection = new Connection(networkConfig.solana.rpcUrl, "confirmed");
-  const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
-  const subRegistrarProgramId = new PublicKey(config.snsSubRegistrarProgramId);
-  const snsRegistrarProgramId = new PublicKey(config.snsRegistrarProgramId);
-  const rootDomain = new PublicKey(config.snsRootDomain);
-  const reverseLookupClass = new PublicKey(config.snsReverseLookupClass);
-  const parentKey = await deriveParentDomainKey(config.snsParentDomain);
-  const parentPubkey = new PublicKey(parentKey);
+  const nameServiceProgramId = new PublicKey(sns.nameServiceProgramId);
+  const subRegistrarProgramId = new PublicKey(sns.subRegistrarProgramId);
+  const snsRegistrarProgramId = new PublicKey(sns.registrarProgramId);
+  const rootDomain = new PublicKey(sns.rootDomain);
+  const reverseLookupClass = new PublicKey(sns.reverseLookupClass);
+  const parentPubkey = deriveParentDomainKey(sns.parentDomain, rootDomain, nameServiceProgramId);
   const parentInfo = await connection.getAccountInfo(parentPubkey);
   if (!parentInfo) {
     throw new Error(
-      `${config.snsParentDomain}.sol parent domain is not initialized on this network`,
+      `${sns.parentDomain}.sol parent domain is not initialized on this network`,
     );
   }
 
@@ -118,7 +117,7 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
     nameServiceProgramId,
   );
   if (await connection.getAccountInfo(subdomainKey)) {
-    throw new Error(`"${subdomain}.${config.snsParentDomain}.sol" is already registered`);
+    throw new Error(`"${subdomain}.${sns.parentDomain}.sol" is already registered`);
   }
 
   const reverseHash = sha256Hash(new TextEncoder().encode(HASH_PREFIX + subdomainKey.toBase58()));
@@ -303,6 +302,18 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
     relayer: relayer.publicKey.toBase58(),
     lastValidBlockHeight,
   };
+}
+
+function deriveParentDomainKey(
+  parentDomain: string,
+  rootDomain: PublicKey,
+  nameServiceProgramId: PublicKey,
+): PublicKey {
+  const hashedParent = sha256Hash(new TextEncoder().encode(HASH_PREFIX + parentDomain));
+  return PublicKey.findProgramAddressSync(
+    [hashedParent, new Uint8Array(32), rootDomain.toBytes()],
+    nameServiceProgramId,
+  )[0];
 }
 
 export async function POST(request: NextRequest) {
