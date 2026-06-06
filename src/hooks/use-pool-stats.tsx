@@ -8,7 +8,8 @@
  */
 
 import useSWR from "swr";
-import { detectNetwork, type NetworkId } from "@/lib/network-config";
+import type { NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { getTokenBySymbol } from "@/lib/supported-tokens";
 import { buildTokenIdMap } from "@/lib/token-map";
 
@@ -90,7 +91,8 @@ async function fetchPoolStats(network: NetworkId): Promise<PoolStats> {
 }
 
 export function usePoolStats(networkId?: NetworkId) {
-  const network = networkId ?? detectNetwork();
+  const env = useChainEnvironment();
+  const network = networkId ?? env.networkId;
   const { data: stats, error, isLoading, mutate } = useSWR<PoolStats>(
     ["pool-stats", network],
     () => fetchPoolStats(network),

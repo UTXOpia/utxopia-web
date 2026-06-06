@@ -1,10 +1,15 @@
+/** @happy-dom */
 /**
  * Pool stats data parsing tests
  *
  * Tests the pool state and vault data parsing logic without React hooks.
  * Verifies byte offsets match the on-chain PoolState layout.
  */
-import { describe, it, expect } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { renderHook, waitFor } from "@testing-library/react";
+import { SWRConfig } from "swr";
+import type { ReactNode } from "react";
+import { usePoolStats } from "../use-pool-stats";
 
 // PoolState layout constants (from contracts/programs/utxopia/src/state/pool.rs)
 const POOL_STATE_DISC = 0x01;
@@ -97,5 +102,36 @@ describe("Pool stats data parsing", () => {
     const balance = parseVaultBalance(data);
     const btc = Number(balance) / 1e8;
     expect(btc).toBeCloseTo(1.5, 8);
+  });
+});
+
+const mockFetch = mock(() => Promise.resolve({} as Response));
+global.fetch = mockFetch as any;
+
+const wrapper = ({ children }: { children: ReactNode }) => (
+  <SWRConfig value={{ provider: () => new Map() }}>{children}</SWRConfig>
+);
+
+describe("usePoolStats", () => {
+  beforeEach(() => {
+    mockFetch.mockReset();
+    localStorage.clear();
+    document.cookie = "utxopia.network=; Path=/; Max-Age=0";
+  });
+
+  it("uses the active chain environment when no network is passed", async () => {
+    localStorage.setItem("utxopia.network", "sui-regtest");
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ onChain: null }),
+    } as any);
+
+    renderHook(() => usePoolStats(), { wrapper });
+
+    await waitFor(() => {
+      expect(mockFetch).toHaveBeenCalled();
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/pool/stats?network=sui-regtest");
   });
 });
