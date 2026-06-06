@@ -55,7 +55,7 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
           </div>
           {/* Nullifier */}
           {getTxNullifierPdas(tx).length > 0 && getTxNullifierPdas(tx).map((pda, i) => (
-            <NullifierRow key={pda} pda={pda} index={i} />
+            <NullifierRow key={pda} pda={pda} index={i} network={network} />
           ))}
         </div>
 
@@ -93,7 +93,7 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
           </div>
           {/* Change outputs */}
           {getTxCommitmentOutputs(tx).map((out, i) => (
-            <CommitmentRow key={out.leafIndex} commitment={out.commitment!} leafIndex={out.leafIndex!} txSignature={tx.txSignature} index={i + 2} />
+            <CommitmentRow key={out.leafIndex} commitment={out.commitment!} leafIndex={out.leafIndex!} txSignature={tx.txSignature} index={i + 2} network={network} />
           ))}
         </div>
       </div>

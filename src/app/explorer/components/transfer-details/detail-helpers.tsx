@@ -12,6 +12,7 @@ import { getSolanaExplorerTxUrl, getSolanaExplorerAddressUrl } from "@/lib/solan
 import { truncate } from "../helpers";
 import type { ExplorerTransaction } from "@/hooks/use-explorer";
 import type { SupportedToken } from "@/lib/supported-tokens";
+import type { NetworkId } from "@/lib/network-config";
 
 export type TransferTx = ExplorerTransaction;
 
@@ -49,7 +50,7 @@ export function getTxNullifierPdas(tx: TransferTx): string[] {
 
 // --- Shared detail sub-components ---
 
-export function NullifierInputsList({ tx }: { tx: TransferTx }) {
+export function NullifierInputsList({ tx, network }: { tx: TransferTx; network?: NetworkId }) {
   return (
     <div className="p-4 space-y-2.5">
       <div className="flex items-center gap-2 mb-3">
@@ -58,7 +59,7 @@ export function NullifierInputsList({ tx }: { tx: TransferTx }) {
         <span className="text-caption text-green-400/60 font-medium">{getTxInputCount(tx)}</span>
       </div>
       {getTxNullifierPdas(tx).length > 0 ? getTxNullifierPdas(tx).map((pda, i) => (
-        <NullifierRow key={pda} pda={pda} index={i} />
+        <NullifierRow key={pda} pda={pda} index={i} network={network} />
       )) : (
         <div className="flex items-center justify-center gap-2 px-3 py-3 rounded-[8px] bg-gray/4 border border-gray/8">
           <Shield className="w-3.5 h-3.5 text-gray/30" />
@@ -69,7 +70,7 @@ export function NullifierInputsList({ tx }: { tx: TransferTx }) {
   );
 }
 
-export function NullifierRow({ pda, index }: { pda: string; index: number }) {
+export function NullifierRow({ pda, index, network }: { pda: string; index: number; network?: NetworkId }) {
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">
       <span className="text-[10px] text-gray/50 shrink-0">Nullifier</span>
@@ -77,7 +78,7 @@ export function NullifierRow({ pda, index }: { pda: string; index: number }) {
       <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
         <CopyButton text={pda} label="Nullifier" variant="default" iconSize="sm" />
         <a
-          href={getSolanaExplorerAddressUrl(pda)}
+          href={getSolanaExplorerAddressUrl(pda, network)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sol hover:text-sol/80 transition-colors p-0.5"
@@ -89,7 +90,7 @@ export function NullifierRow({ pda, index }: { pda: string; index: number }) {
   );
 }
 
-export function CommitmentRow({ commitment, leafIndex, txSignature, index }: { commitment: string; leafIndex: number; txSignature: string; index: number }) {
+export function CommitmentRow({ commitment, leafIndex, txSignature, index, network }: { commitment: string; leafIndex: number; txSignature: string; index: number; network?: NetworkId }) {
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">
       <span className="text-[10px] text-gray/50 shrink-0">Commitment</span>
@@ -98,7 +99,7 @@ export function CommitmentRow({ commitment, leafIndex, txSignature, index }: { c
       <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
         <CopyButton text={commitment} label="Commitment" variant="default" iconSize="sm" />
         <a
-          href={getSolanaExplorerTxUrl(txSignature)}
+          href={getSolanaExplorerTxUrl(txSignature, network)}
           target="_blank"
           rel="noopener noreferrer"
           className="text-sol hover:text-sol/80 transition-colors p-0.5"

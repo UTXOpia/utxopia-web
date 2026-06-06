@@ -407,7 +407,7 @@ export function ManualVerify() {
                   <span className="text-caption text-success">Header on Solana</span>
                   {headerTxSig && (
                     <a
-                      href={getSolanaExplorerTxUrl(headerTxSig)}
+                      href={getSolanaExplorerTxUrl(headerTxSig, networkId)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-[10px] font-mono text-privacy ml-auto hover:underline"

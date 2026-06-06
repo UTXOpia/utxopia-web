@@ -105,7 +105,7 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
           <div className="flex justify-between items-center text-body2">
             <span className="text-gray">Solana TX</span>
             <a
-              href={getSolanaExplorerTxUrl(withdrawal.solanaSignature)}
+              href={getSolanaExplorerTxUrl(withdrawal.solanaSignature, networkId)}
               target="_blank"
               rel="noopener noreferrer"
               className="font-mono text-purple text-xs hover:underline flex items-center gap-1"

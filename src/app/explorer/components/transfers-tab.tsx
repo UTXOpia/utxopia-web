@@ -22,6 +22,7 @@ import { resolveTokenSymbolSync } from "@/lib/token-map";
 import { TransferDetails } from "./transfer-details";
 import { useBtcTipHeight, confirmationsFromHeight } from "@/hooks/use-btc-tip-height";
 import type { NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 // =============================================================================
 // Transfer Row — single unified table row + expandable detail
@@ -214,6 +215,7 @@ export function TransferRow({
 
 export function TransfersTab() {
   const { transactions, isLoading, error, refresh } = useExplorer();
+  const { networkId } = useChainEnvironment();
   const transfers = transactions.filter(t => t.type !== "shield");
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -256,6 +258,7 @@ export function TransfersTab() {
                 tx={tx}
                 expanded={expanded.has(tx.txSignature)}
                 onToggle={() => toggle(tx.txSignature)}
+                network={networkId}
                 redemption={undefined}
               />
             ))}

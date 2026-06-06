@@ -36,7 +36,7 @@ export function getChainTransactionUrl(config: NetworkConfig, txId: string, netw
   if (chain.id === "sui" && config.sui) {
     return getSuiTransactionUrl(config.sui.explorerUrl, txId, networkId);
   }
-  return getSolanaExplorerTxUrl(txId);
+  return getSolanaExplorerTxUrl(txId, networkId);
 }
 
 export function getChainIcon(config: NetworkConfig): string {

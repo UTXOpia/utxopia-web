@@ -16,6 +16,6 @@ export function TransferDetails({ tx, redemption, network }: { tx: TransferTx; r
   const kind = getTransferKind(tx);
   if (kind === "shield") return <ShieldDetails tx={tx} network={network} />;
   if (kind === "withdraw") return <RedeemDetails tx={tx} redemption={redemption} network={network} />;
-  if (kind === "unshield") return <UnshieldDetails tx={tx} />;
-  return <StandardTransferDetails tx={tx} />;
+  if (kind === "unshield") return <UnshieldDetails tx={tx} network={network} />;
+  return <StandardTransferDetails tx={tx} network={network} />;
 }

@@ -230,7 +230,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
               <code className="text-caption font-mono text-foreground/70 truncate">{truncate(redemption.requestTxSignature, 6, 4)}</code>
               <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                 <CopyButton text={redemption.requestTxSignature} label="Tx" variant="default" iconSize="sm" />
-                <a href={getSolanaExplorerTxUrl(redemption.requestTxSignature)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5">
+                <a href={getSolanaExplorerTxUrl(redemption.requestTxSignature, networkId)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5">
                   <ExternalLink className="w-3 h-3" />
                 </a>
               </div>
@@ -328,7 +328,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
                     <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                     <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                     <a
-                      href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
+                      href={step.icon === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId, networkId)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className={cn("transition-colors p-0.5", step.icon === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}
@@ -380,10 +380,12 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
 
 export function WithdrawalRow({
   redemption,
+  network,
   expanded,
   onToggle,
 }: {
   redemption: RedemptionRecord;
+  network?: NetworkId;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -448,8 +450,8 @@ export function WithdrawalRow({
                 : o >= 1 && r.processingTxSignature ? r.processingTxSignature
                 : r.requestTxSignature;
               return sig
-                ? getSolanaExplorerTxUrl(sig)
-                : getSolanaExplorerAddressUrl(r.pubkey);
+                ? getSolanaExplorerTxUrl(sig, network)
+                : getSolanaExplorerAddressUrl(r.pubkey, network);
             })()}
             target="_blank"
             rel="noopener noreferrer"
@@ -531,6 +533,7 @@ export function WithdrawalsTab() {
                 <WithdrawalRow
                   key={rowKey}
                   redemption={r}
+                  network={networkId}
                   expanded={expanded.has(rowKey)}
                   onToggle={() => toggle(rowKey)}
                 />

@@ -184,7 +184,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                   <CopyButton text={d.commitment} label="Commitment" variant="default" iconSize="sm" />
                   {d.txSignature && (
-                    <a href={getSolanaExplorerTxUrl(d.txSignature)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5" title="View transaction">
+                    <a href={getSolanaExplorerTxUrl(d.txSignature, networkId)} target="_blank" rel="noopener noreferrer" className="text-sol hover:text-sol/80 transition-colors p-0.5" title="View transaction">
                       <ExternalLink className="w-3 h-3" />
                     </a>
                   )}
@@ -292,7 +292,7 @@ function DepositTimeline({ deposit: d }: { deposit: DepositRecord }) {
                 <code className="text-[10px] font-mono text-gray/60 truncate max-w-[280px]">{step.txId}</code>
                 <CopyButton text={step.txId} label={step.title} variant="default" iconSize="sm" />
                 <a
-                  href={step.txType === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId)}
+                  href={step.txType === "btc" ? `${btcExplorerUrl}/tx/${step.txId}` : getSolanaExplorerTxUrl(step.txId, networkId)}
                   target="_blank"
                   rel="noopener noreferrer"
                   className={cn("transition-colors p-0.5", step.txType === "btc" ? "text-btc/40 hover:text-btc" : "text-purple-400/40 hover:text-purple-400")}

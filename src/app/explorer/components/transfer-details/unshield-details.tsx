@@ -15,8 +15,9 @@ import {
   CommitmentRow,
   UnshieldAmountDisplay,
 } from "./detail-helpers";
+import type { NetworkId } from "@/lib/network-config";
 
-export function UnshieldDetails({ tx }: { tx: TransferTx }) {
+export function UnshieldDetails({ tx, network }: { tx: TransferTx; network?: NetworkId }) {
   const tokenSym = tx.tokenSymbol ?? (tx.tokenId ? resolveTokenSymbolSync(tx.tokenId) : null);
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
   const unshieldOutputs = getTxUnshieldOutputs(tx);
@@ -25,7 +26,7 @@ export function UnshieldDetails({ tx }: { tx: TransferTx }) {
     <div className="mx-4 my-3 rounded-[10px] bg-linear-to-b from-gray/6 to-transparent border border-gray/10 overflow-hidden">
       <div className="grid grid-cols-2 divide-x divide-gray/10">
         {/* INPUT — nullifiers only */}
-        <NullifierInputsList tx={tx} />
+        <NullifierInputsList tx={tx} network={network} />
 
         {/* OUTPUTS — each rendered separately */}
         <div className="p-4 space-y-2.5">
@@ -56,7 +57,7 @@ export function UnshieldDetails({ tx }: { tx: TransferTx }) {
                   <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                     <CopyButton text={out.recipient} label="Address" variant="default" iconSize="sm" />
                     <a
-                      href={getSolanaExplorerAddressUrl(out.recipient)}
+                      href={getSolanaExplorerAddressUrl(out.recipient, network)}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="text-sol hover:text-sol/80 transition-colors p-0.5"
@@ -75,7 +76,7 @@ export function UnshieldDetails({ tx }: { tx: TransferTx }) {
           ))}
           {/* Commitment change outputs */}
           {commitmentOutputs.map((out, i) => (
-            <CommitmentRow key={out.leafIndex} commitment={out.commitment!} leafIndex={out.leafIndex!} txSignature={tx.txSignature} index={unshieldOutputs.length + i + 1} />
+            <CommitmentRow key={out.leafIndex} commitment={out.commitment!} leafIndex={out.leafIndex!} txSignature={tx.txSignature} index={unshieldOutputs.length + i + 1} network={network} />
           ))}
         </div>
       </div>

@@ -3,6 +3,7 @@
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 function AnimatedCheckmark() {
   return (
@@ -55,7 +56,8 @@ export function SuccessCard({
   message,
   txSignature,
 }: SuccessCardProps) {
-  const explorerUrl = txSignature ? getSolanaExplorerTxUrl(txSignature) : null;
+  const { networkId } = useChainEnvironment();
+  const explorerUrl = txSignature ? getSolanaExplorerTxUrl(txSignature, networkId) : null;
 
   return (
     <motion.div

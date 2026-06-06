@@ -43,7 +43,7 @@ export function ShieldSuccess({
       </p>
       {txSig && (
         <a
-          href={getSolanaExplorerTxUrl(txSig)}
+          href={getSolanaExplorerTxUrl(txSig, networkId)}
           target="_blank"
           rel="noreferrer"
           className="inline-flex items-center gap-1.5 text-caption text-sol hover:text-sol/80 transition-colors"
