@@ -44,6 +44,18 @@ describe("zkBTCApiClient", () => {
       expect(result.btc_txid).toBeNull();
     });
 
+    it("uses the same-origin withdrawal proxy by default", async () => {
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ request_id: "123", status: "pending" }),
+      } as any);
+
+      await zkBTCApi.getWithdrawalStatus("123");
+
+      const url = (mockFetch.mock.calls[0] as any[])[0];
+      expect(url).toBe("/api/withdrawal/status/123");
+    });
+
     it("throws on 404 not found", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: false,
@@ -103,7 +115,7 @@ describe("zkBTCApiClient", () => {
       expect(url).toBe("/api/header/status/123?network=devnet-regtest");
     });
 
-    it("uses the selected backend for withdrawal status checks", async () => {
+    it("passes the selected network through withdrawal status checks", async () => {
       mockFetch.mockResolvedValueOnce({
         ok: true,
         json: async () => ({ request_id: "abc", status: "pending" }),
@@ -112,7 +124,7 @@ describe("zkBTCApiClient", () => {
       await zkBTCApi.getWithdrawalStatusForNetwork("abc", "sui-regtest");
 
       const url = (mockFetch.mock.calls[0] as any[])[0];
-      expect(url).toBe("https://api-hybrid.utxopia.com/api/withdrawal/status/abc");
+      expect(url).toBe("/api/withdrawal/status/abc?network=sui-regtest");
     });
   });
 });

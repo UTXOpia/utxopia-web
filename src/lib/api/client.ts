@@ -17,7 +17,7 @@ import type {
   HeaderStatusResponse,
 } from "./types";
 import { ApiError } from "./errors";
-import { API_ENDPOINTS, getBackendUrl } from "./constants";
+import { API_ENDPOINTS } from "./constants";
 import { getEsploraApiUrl } from "@/lib/btc-network";
 import type { NetworkId } from "@/lib/network-config";
 
@@ -33,7 +33,7 @@ class zkBTCApiClient {
   private baseUrl: string;
 
   constructor(baseUrl?: string) {
-    this.baseUrl = baseUrl || getBackendUrl();
+    this.baseUrl = baseUrl || "";
   }
 
   private async request<T>(
@@ -75,9 +75,8 @@ class zkBTCApiClient {
     requestId: string,
     network: NetworkId,
   ): Promise<WithdrawalStatusResponse> {
-    const endpoint = API_ENDPOINTS.WITHDRAWAL_STATUS(requestId);
-    const client = new zkBTCApiClient(getBackendUrl(network));
-    return client.request<WithdrawalStatusResponse>(endpoint);
+    const endpoint = `${API_ENDPOINTS.WITHDRAWAL_STATUS(requestId)}?network=${encodeURIComponent(network)}`;
+    return this.request<WithdrawalStatusResponse>(endpoint);
   }
 
   // ============ Block Header Status (Next.js API Route) ============
