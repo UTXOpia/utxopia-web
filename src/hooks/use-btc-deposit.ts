@@ -88,7 +88,7 @@ export function useBtcDeposit({
       const network = depositAddressNetworkForNetworkConfig(networkConfig);
       const [deposit, utxos] = await Promise.all([
         client.prepareDeposit({ recipient: resolvedMeta, network, opReturnContext }),
-        btcWallet.getPaymentUtxos(),
+        btcWallet.getPaymentUtxos(networkId),
       ]);
 
       if (utxos.length === 0) throw new Error("No confirmed UTXOs available in wallet");
@@ -142,7 +142,7 @@ export function useBtcDeposit({
         network: getBtcSignerNetwork(),
       });
 
-      const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64);
+      const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
 
       const opReturnHex = depositPreview.opReturnHex;
       useNotesStore.getState().saveNote({
@@ -176,7 +176,7 @@ export function useBtcDeposit({
 
       setWalletDepositResult({ txid, depositAddress: depositPreview.depositAddress, opReturnHex });
       setDepositPreview(null);
-      btcWallet.refreshBalance();
+      btcWallet.refreshBalance(networkId);
       onStatusChange("done");
     } catch (err) {
       onError(err instanceof Error ? err.message : "Wallet deposit failed");

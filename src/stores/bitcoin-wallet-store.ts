@@ -14,6 +14,7 @@ import {
   getUnisatFallbackNetwork,
   getEsploraApiUrl,
 } from "@/lib/btc-network";
+import type { NetworkId } from "@/lib/network-config";
 
 export type BtcWalletType = "sats-connect" | "unisat";
 
@@ -54,21 +55,21 @@ export interface BitcoinWalletState {
   connect: (type: BtcWalletType) => Promise<void>;
   disconnect: () => void;
   sendBtc: (toAddress: string, amountSats: number) => Promise<string>;
-  refreshBalance: () => Promise<void>;
+  refreshBalance: (network?: NetworkId) => Promise<void>;
   clearError: () => void;
   _hydrate: () => void;
 
   /** Fetch confirmed UTXOs for the connected payment address */
-  getPaymentUtxos: () => Promise<WalletUtxo[]>;
+  getPaymentUtxos: (network?: NetworkId) => Promise<WalletUtxo[]>;
 
   /** Sign a PSBT via the connected wallet, then broadcast via mempool.space */
-  signAndBroadcastPsbt: (psbtBase64: string) => Promise<{ txid: string }>;
+  signAndBroadcastPsbt: (psbtBase64: string, network?: NetworkId) => Promise<{ txid: string }>;
 }
 
-async function fetchBalance(addr: string): Promise<number | null> {
+async function fetchBalance(addr: string, network?: NetworkId): Promise<number | null> {
   try {
     const response = await fetch(
-      `${getEsploraApiUrl()}/address/${addr}`
+      `${getEsploraApiUrl(network)}/address/${addr}`
     );
     if (response.ok) {
       const data = await response.json();
@@ -219,10 +220,10 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     });
   },
 
-  refreshBalance: async () => {
+  refreshBalance: async (network?: NetworkId) => {
     const { address } = get();
     if (address) {
-      const balance = await fetchBalance(address);
+      const balance = await fetchBalance(address, network);
       if (balance !== null) set({ balance });
     }
   },
@@ -246,13 +247,13 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     });
   },
 
-  getPaymentUtxos: async (): Promise<WalletUtxo[]> => {
+  getPaymentUtxos: async (network?: NetworkId): Promise<WalletUtxo[]> => {
     const { address } = get();
     if (!address) throw new Error("Wallet not connected");
 
     // Fetch UTXOs from mempool.space
     const res = await fetch(
-      `${getEsploraApiUrl()}/address/${address}/utxo`
+      `${getEsploraApiUrl(network)}/address/${address}/utxo`
     );
     if (!res.ok) throw new Error(`Failed to fetch UTXOs: ${res.statusText}`);
 
@@ -271,7 +272,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
     await Promise.all(
       [...txidSet].map(async (txid) => {
         const txRes = await fetch(
-          `${getEsploraApiUrl()}/tx/${txid}`
+          `${getEsploraApiUrl(network)}/tx/${txid}`
         );
         if (txRes.ok) txCache.set(txid, await txRes.json());
       })
@@ -291,7 +292,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
       .filter((u) => u.scriptPubkeyHex.length > 0);
   },
 
-  signAndBroadcastPsbt: async (psbtBase64: string): Promise<{ txid: string }> => {
+  signAndBroadcastPsbt: async (psbtBase64: string, network?: NetworkId): Promise<{ txid: string }> => {
     const { connected, address, walletType } = get();
     if (!connected || !address) throw new Error("Wallet not connected");
 
@@ -325,7 +326,7 @@ export const useBitcoinWalletStore = create<BitcoinWalletState>((set, get) => ({
         .join("");
 
       // Broadcast via mempool.space
-      const broadcastRes = await fetch(`${getEsploraApiUrl()}/tx`, {
+      const broadcastRes = await fetch(`${getEsploraApiUrl(network)}/tx`, {
         method: "POST",
         headers: { "Content-Type": "text/plain" },
         body: rawTxHex,

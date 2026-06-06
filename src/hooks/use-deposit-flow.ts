@@ -87,7 +87,7 @@ export function useDepositFlow() {
       const network = depositAddressNetworkForNetworkConfig(networkConfig);
       const [deposit, utxos] = await Promise.all([
         client.prepareDeposit({ recipient: resolvedMeta, network, opReturnContext }),
-        btcWallet.getPaymentUtxos(),
+        btcWallet.getPaymentUtxos(networkId),
       ]);
 
       if (utxos.length === 0) {
@@ -147,7 +147,7 @@ export function useDepositFlow() {
         network: getBtcSignerNetwork(),
       });
 
-      const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64);
+      const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
 
       // Save to local notes store
       const opReturnHex = depositPreview.opReturnHex;
@@ -192,7 +192,7 @@ export function useDepositFlow() {
         opReturnHex: depositPreview.opReturnHex,
       });
       setDepositPreview(null);
-      btcWallet.refreshBalance();
+      btcWallet.refreshBalance(networkId);
     } catch (err) {
       console.error("Wallet deposit error:", err);
       setError(err instanceof Error ? err.message : "Wallet deposit failed");
