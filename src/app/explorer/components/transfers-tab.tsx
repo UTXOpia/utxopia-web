@@ -15,7 +15,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { useExplorer, type ExplorerTransaction, type RedemptionRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, SolanaLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { SUPPORTED_TOKENS, formatTokenAmount, getTokenBySymbol } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -184,7 +184,7 @@ export function TransferRow({
         </Td>
         <Td>
           {tx.txSignature ? (
-            <SolanaLink signature={tx.txSignature} />
+            <ChainTxLink signature={tx.txSignature} />
           ) : tx.btcMeta?.depositTxid ? (
             <a
               href={`${getMempoolExplorerUrl(network)}/tx/${tx.btcMeta.depositTxid}`}

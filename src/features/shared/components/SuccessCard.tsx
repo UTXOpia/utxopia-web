@@ -2,8 +2,9 @@
 
 import { motion } from "framer-motion";
 import { ExternalLink } from "lucide-react";
-import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
+import { cn } from "@/lib/utils";
 
 function AnimatedCheckmark() {
   return (
@@ -56,8 +57,8 @@ export function SuccessCard({
   message,
   txSignature,
 }: SuccessCardProps) {
-  const { networkId } = useChainEnvironment();
-  const explorerUrl = txSignature ? getSolanaExplorerTxUrl(txSignature, networkId) : null;
+  const { config, networkId } = useChainEnvironment();
+  const explorerUrl = txSignature ? getChainTransactionUrl(config, txSignature, networkId) : null;
 
   return (
     <motion.div
@@ -99,7 +100,7 @@ export function SuccessCard({
             href={explorerUrl}
             target="_blank"
             rel="noopener noreferrer"
-            className="text-caption font-mono text-privacy hover:underline break-all flex items-center gap-1"
+            className={cn("text-caption font-mono hover:underline break-all flex items-center gap-1", getChainLinkClass(config))}
           >
             {txSignature!.slice(0, 20)}...{txSignature!.slice(-20)}
             <ExternalLink className="w-3 h-3 shrink-0" />

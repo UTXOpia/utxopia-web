@@ -8,11 +8,13 @@ import {
   Wallet,
 } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
-import { getSolanaExplorerTxUrl, getSolanaExplorerAddressUrl } from "@/lib/solana-network";
 import { truncate } from "../helpers";
 import type { ExplorerTransaction } from "@/hooks/use-explorer";
 import type { SupportedToken } from "@/lib/supported-tokens";
 import type { NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainAddressUrl, getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
+import { cn } from "@/lib/utils";
 
 export type TransferTx = ExplorerTransaction;
 
@@ -71,6 +73,7 @@ export function NullifierInputsList({ tx, network }: { tx: TransferTx; network?:
 }
 
 export function NullifierRow({ pda, index, network }: { pda: string; index: number; network?: NetworkId }) {
+  const { config } = useChainEnvironment();
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">
       <span className="text-[10px] text-gray/50 shrink-0">Nullifier</span>
@@ -78,10 +81,10 @@ export function NullifierRow({ pda, index, network }: { pda: string; index: numb
       <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
         <CopyButton text={pda} label="Nullifier" variant="default" iconSize="sm" />
         <a
-          href={getSolanaExplorerAddressUrl(pda, network)}
+          href={getChainAddressUrl(config, pda, network)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sol hover:text-sol/80 transition-colors p-0.5"
+          className={cn("transition-colors p-0.5", getChainLinkClass(config))}
         >
           <ExternalLink className="w-3 h-3" />
         </a>
@@ -91,6 +94,7 @@ export function NullifierRow({ pda, index, network }: { pda: string; index: numb
 }
 
 export function CommitmentRow({ commitment, leafIndex, txSignature, index, network }: { commitment: string; leafIndex: number; txSignature: string; index: number; network?: NetworkId }) {
+  const { config } = useChainEnvironment();
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">
       <span className="text-[10px] text-gray/50 shrink-0">Commitment</span>
@@ -99,10 +103,10 @@ export function CommitmentRow({ commitment, leafIndex, txSignature, index, netwo
       <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
         <CopyButton text={commitment} label="Commitment" variant="default" iconSize="sm" />
         <a
-          href={getSolanaExplorerTxUrl(txSignature, network)}
+          href={getChainTransactionUrl(config, txSignature, network)}
           target="_blank"
           rel="noopener noreferrer"
-          className="text-sol hover:text-sol/80 transition-colors p-0.5"
+          className={cn("transition-colors p-0.5", getChainLinkClass(config))}
           title="View transaction"
         >
           <ExternalLink className="w-3 h-3" />

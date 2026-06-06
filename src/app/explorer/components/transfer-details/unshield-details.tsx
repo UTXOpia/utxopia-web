@@ -3,10 +3,12 @@ import {
   Wallet,
 } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
-import { getSolanaExplorerAddressUrl } from "@/lib/solana-network";
 import { truncate } from "../helpers";
 import { SUPPORTED_TOKENS, getTokenBySymbol } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainAddressUrl, getChainLinkClass } from "@/lib/chain-links";
+import { cn } from "@/lib/utils";
 import {
   type TransferTx,
   getTxUnshieldOutputs,
@@ -18,6 +20,7 @@ import {
 import type { NetworkId } from "@/lib/network-config";
 
 export function UnshieldDetails({ tx, network }: { tx: TransferTx; network?: NetworkId }) {
+  const { config } = useChainEnvironment();
   const tokenSym = tx.tokenSymbol ?? (tx.tokenId ? resolveTokenSymbolSync(tx.tokenId) : null);
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
   const unshieldOutputs = getTxUnshieldOutputs(tx);
@@ -57,10 +60,10 @@ export function UnshieldDetails({ tx, network }: { tx: TransferTx; network?: Net
                   <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
                     <CopyButton text={out.recipient} label="Address" variant="default" iconSize="sm" />
                     <a
-                      href={getSolanaExplorerAddressUrl(out.recipient, network)}
+                      href={getChainAddressUrl(config, out.recipient, network)}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="text-sol hover:text-sol/80 transition-colors p-0.5"
+                      className={cn("transition-colors p-0.5", getChainLinkClass(config))}
                     >
                       <ExternalLink className="w-3 h-3" />
                     </a>

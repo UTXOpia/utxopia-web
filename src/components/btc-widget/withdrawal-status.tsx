@@ -4,9 +4,9 @@ import { Clock, CheckCircle2, Loader2, AlertCircle, ExternalLink, Bitcoin } from
 import { cn } from "@/lib/utils";
 import { formatBtc, truncateMiddle } from "@/lib/utils/formatting";
 import { useUTXOpiaStore, type ActiveWithdrawal, type WithdrawalStatus } from "@/stores/utxopia-store";
-import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 
 const STATUS_CONFIG: Record<WithdrawalStatus, {
   label: string;
@@ -50,7 +50,7 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
   const config = STATUS_CONFIG[withdrawal.status];
   const Icon = config.icon;
   const isAnimating = withdrawal.status === "processing" || withdrawal.status === "broadcasting";
-  const { networkId } = useChainEnvironment();
+  const { config: chainConfig, networkId } = useChainEnvironment();
   const explorerUrl = getMempoolExplorerUrl(networkId);
 
   return (
@@ -103,12 +103,12 @@ function WithdrawalCard({ withdrawal }: { withdrawal: ActiveWithdrawal }) {
 
         {withdrawal.solanaSignature && (
           <div className="flex justify-between items-center text-body2">
-            <span className="text-gray">Solana TX</span>
+            <span className="text-gray">Chain TX</span>
             <a
-              href={getSolanaExplorerTxUrl(withdrawal.solanaSignature, networkId)}
+              href={getChainTransactionUrl(chainConfig, withdrawal.solanaSignature, networkId)}
               target="_blank"
               rel="noopener noreferrer"
-              className="font-mono text-purple text-xs hover:underline flex items-center gap-1"
+              className={cn("font-mono text-xs hover:underline flex items-center gap-1", getChainLinkClass(chainConfig))}
             >
               {truncateMiddle(withdrawal.solanaSignature, 8)}
               <ExternalLink className="w-3 h-3" />

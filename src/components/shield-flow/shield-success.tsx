@@ -3,7 +3,7 @@
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import type { WalletDepositResult } from "@/hooks/use-btc-deposit";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
-import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 import { cn } from "@/lib/utils";
 import type { SHIELD_TOKENS } from "@/lib/supported-tokens";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -26,7 +26,7 @@ export function ShieldSuccess({
   onReset,
 }: ShieldSuccessProps) {
   const isBtc = selectedToken.isBtcNative;
-  const { networkId } = useChainEnvironment();
+  const { config, networkId } = useChainEnvironment();
 
   return (
     <div className={cn("space-y-4 text-center py-6", className)}>
@@ -43,10 +43,10 @@ export function ShieldSuccess({
       </p>
       {txSig && (
         <a
-          href={getSolanaExplorerTxUrl(txSig, networkId)}
+          href={getChainTransactionUrl(config, txSig, networkId)}
           target="_blank"
           rel="noreferrer"
-          className="inline-flex items-center gap-1.5 text-caption text-sol hover:text-sol/80 transition-colors"
+          className={cn("inline-flex items-center gap-1.5 text-caption transition-colors", getChainLinkClass(config))}
         >
           View transaction <ExternalLink className="w-3 h-3" />
         </a>

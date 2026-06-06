@@ -20,7 +20,7 @@ import type { DepositRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, SolanaLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -437,7 +437,7 @@ export function DepositRow({
         </Td>
         <Td>
           {d.txSignature ? (
-            <SolanaLink signature={d.txSignature} />
+            <ChainTxLink signature={d.txSignature} />
           ) : d.btcMeta?.depositTxid ? (
             <a href={`${btcExplorerUrl}/tx/${d.btcMeta?.depositTxid}`} target="_blank" rel="noopener noreferrer" className="text-btc/60 hover:text-btc transition-colors p-0.5" title="View BTC tx">
               <ExternalLink className="w-3 h-3" />

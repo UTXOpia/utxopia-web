@@ -293,8 +293,6 @@ export function ChainTxLink({ signature }: { signature: string }) {
   );
 }
 
-export const SolanaLink = ChainTxLink;
-
 // --- States ---
 
 export function LoadingState() {
