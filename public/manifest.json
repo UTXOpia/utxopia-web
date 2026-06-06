@@ -1,7 +1,7 @@
 {
   "name": "UTXOpia",
   "short_name": "UTXOpia",
-  "description": "Private bridge + shielded DeFi for Bitcoin on Solana.",
+  "description": "Private Bitcoin and token transfers across Solana and Sui.",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#000000",

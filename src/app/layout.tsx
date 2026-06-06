@@ -27,8 +27,8 @@ const spaceGrotesk = Space_Grotesk({
 });
 
 export const metadata: Metadata = {
-  title: "UTXOpia | Privacy for Every Token on Solana",
-  description: "Shield any Solana token with zero-knowledge proofs. Private transfers, stealth addresses, and ZK commitments. Powered by Zeus Network.",
+  title: "UTXOpia | Private Bitcoin and Token Transfers",
+  description: "Shield Bitcoin and supported chain assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments across Solana and Sui.",
   icons: {
     icon: [
       { url: "/brand/logo-32.png", sizes: "32x32", type: "image/png" },
@@ -38,15 +38,15 @@ export const metadata: Metadata = {
     apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
-    title: "UTXOpia | Privacy for Every Token on Solana",
-    description: "Shielded DeFi for every token on Solana.",
+    title: "UTXOpia | Private Bitcoin and Token Transfers",
+    description: "Shielded transfers for Bitcoin and supported assets across Solana and Sui.",
     images: [{ url: "/brand/banner.png", width: 1200, height: 630, alt: "UTXOpia" }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "UTXOpia",
-    description: "Shielded DeFi for every token on Solana.",
+    description: "Private Bitcoin and token transfers across Solana and Sui.",
     images: ["/brand/banner.png"],
   },
   manifest: "/manifest.json",

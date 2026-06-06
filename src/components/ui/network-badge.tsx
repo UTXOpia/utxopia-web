@@ -2,8 +2,16 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Beaker } from "lucide-react";
-import { detectNetwork, hrefWithChain, NETWORK_CHANGE_EVENT, NETWORK_META } from "@/lib/network-config";
+import { Network } from "lucide-react";
+import {
+  detectNetwork,
+  hrefWithChain,
+  NETWORK_CHANGE_EVENT,
+  NETWORK_META,
+  networkChain,
+  type NetworkId,
+} from "@/lib/network-config";
+import { cn } from "@/lib/utils";
 
 function subscribe(onChange: () => void) {
   if (typeof window === "undefined") return () => {};
@@ -15,13 +23,27 @@ function subscribe(onChange: () => void) {
   };
 }
 
+export function getNetworkBadgePresentation(active: NetworkId) {
+  const meta = NETWORK_META.find((m) => m.id === active);
+  const chain = networkChain(active);
+  const chainLabel = chain === "sui" ? "Sui" : "Solana";
+  const networkLabel = meta?.label ?? active;
+  const shortNetwork = networkLabel.split(" (")[0];
+  const label = shortNetwork.toLowerCase().includes(chainLabel.toLowerCase())
+    ? shortNetwork
+    : `${chainLabel} ${shortNetwork}`;
+
+  return {
+    chain,
+    label,
+    title: `Active network: ${label}. ${meta?.tagline ?? active}. Click to change.`,
+  };
+}
+
 /**
- * Header badge that surfaces the active network whenever it isn't the
- * production default ("devnet"). Click → /settings.
- *
- * Hidden on devnet so production users see no extra chrome; on hybrid
- * (and any future test stack) the chip makes it obvious which backend
- * the app is talking to.
+ * Header badge that always surfaces the active chain and network. UTXOpia has
+ * no hidden-production default yet; devnet/testnet4 and regtest users need the
+ * same visible context as Sui users before signing financial actions.
  */
 export function NetworkBadge() {
   const active = useSyncExternalStore(
@@ -30,21 +52,22 @@ export function NetworkBadge() {
     () => "devnet" as const,
   );
 
-  if (active === "devnet") return null;
-
-  const meta = NETWORK_META.find((m) => m.id === active);
-  const label = meta?.label ?? active;
-  // Compact label: take the part before the parens, e.g. "Hybrid (devnet+regtest)" → "Hybrid"
-  const short = label.split(" (")[0];
+  const badge = getNetworkBadgePresentation(active);
+  const isSui = badge.chain === "sui";
 
   return (
     <Link
       href={hrefWithChain("/settings", active)}
-      title={`Active network: ${label}. Click to change.`}
-      className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-amber-500/10 text-amber-600 dark:text-amber-400 text-[10px] font-medium uppercase tracking-wide hover:bg-amber-500/20 transition-colors"
+      title={badge.title}
+      className={cn(
+        "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
+        isSui
+          ? "border-sui/20 bg-sui/10 text-sui hover:bg-sui/15 hover:border-sui/30"
+          : "border-privacy/20 bg-privacy/10 text-privacy hover:bg-privacy/15 hover:border-privacy/30",
+      )}
     >
-      <Beaker className="h-2.5 w-2.5" />
-      {short}
+      <Network className="h-3 w-3" />
+      {badge.label}
     </Link>
   );
 }
