@@ -188,7 +188,7 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
   const status = getEffectiveStatus(redemption);
   const stepOrder = WITHDRAWAL_STATUS_ORDER[status] ?? 0;
   const isFailed = stepOrder === -1;
-  const btcAddr = redemption.btcScript ? scriptToAddress(redemption.btcScript) : null;
+  const btcAddr = redemption.btcScript ? scriptToAddress(redemption.btcScript, networkId) : null;
 
   const amount = Number(redemption.amountSats);
   const bps = redemption.serviceFeeBps ?? 0;
@@ -390,7 +390,7 @@ export function WithdrawalRow({
   onToggle: () => void;
 }) {
   const r = redemption;
-  const btcAddr = r.btcScript ? scriptToAddress(r.btcScript) : null;
+  const btcAddr = r.btcScript ? scriptToAddress(r.btcScript, network) : null;
 
   return (
     <Fragment>

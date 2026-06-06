@@ -103,9 +103,9 @@ export function getBtcSignerNetwork(network?: NetworkId): "mainnet" | "testnet" 
 // =============================================================================
 
 /** Get the bech32 HRP for the current Bitcoin network */
-function getBech32Hrp(): string {
+function getBech32Hrp(network?: NetworkId): string {
   try {
-    const net = getConfig().bitcoinNetwork;
+    const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
     if (net === "mainnet") return "bc";
     if (net === "regtest") return "bcrt";
     return "tb"; // testnet, testnet4, signet
@@ -115,7 +115,7 @@ function getBech32Hrp(): string {
 }
 
 /** Decode a hex scriptPubKey to a bech32/bech32m address */
-export function scriptToAddress(hexScript: string): string | null {
+export function scriptToAddress(hexScript: string, network?: NetworkId): string | null {
   try {
     const bytes = new Uint8Array(hexScript.match(/.{2}/g)!.map(b => parseInt(b, 16)));
     if (bytes.length < 4) return null;
@@ -129,7 +129,7 @@ export function scriptToAddress(hexScript: string): string | null {
     let acc = 0, bits = 0;
     for (const b of program) { acc = (acc << 8) | b; bits += 8; while (bits >= 5) { bits -= 5; data5.push((acc >> bits) & 31); } }
     if (bits > 0) data5.push((acc << (5 - bits)) & 31);
-    const hrp = getBech32Hrp();
+    const hrp = getBech32Hrp(network);
     const useBech32m = version > 0;
     function polymod(values: number[]): number {
       const GEN = [0x3b6a57b2, 0x26508e6d, 0x1ea119fa, 0x3d4233dd, 0x2a1462b3];

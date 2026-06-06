@@ -6,6 +6,7 @@ import {
   getSatsConnectNetwork,
   getUnisatChain,
   getUnisatFallbackNetwork,
+  scriptToAddress,
 } from "./btc-network";
 
 describe("btc-network URL helpers", () => {
@@ -32,5 +33,14 @@ describe("btc-network URL helpers", () => {
     expect(getBtcSignerNetwork("devnet")).toBe("testnet");
     expect(getBtcSignerNetwork("devnet-regtest")).toBe("testnet");
     expect(getBtcSignerNetwork("sui-regtest")).toBe("testnet");
+  });
+
+  it("decodes witness scripts with the selected Bitcoin network HRP", () => {
+    const p2trScript = `5120${"11".repeat(32)}`;
+
+    expect(scriptToAddress(p2trScript, "devnet")).toMatch(/^tb1p/);
+    expect(scriptToAddress(p2trScript, "devnet-regtest")).toMatch(/^bcrt1p/);
+    expect(scriptToAddress(p2trScript, "sui-regtest")).toMatch(/^bcrt1p/);
+    expect(scriptToAddress(p2trScript, "mainnet")).toMatch(/^bc1p/);
   });
 });
