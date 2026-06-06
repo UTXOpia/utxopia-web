@@ -2,7 +2,8 @@
 
 import useSWR from "swr";
 import type { IndexerLeaf } from "@utxopia/sdk";
-import { detectNetwork, type NetworkId } from "@/lib/network-config";
+import type { NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 
 // =============================================================================
 // Types
@@ -167,9 +168,12 @@ function decodeLeU64(hex: string): number {
   }
 }
 
-async function fetchAnnouncements(): Promise<AnnouncementRow[]> {
+async function fetchAnnouncements(network?: NetworkId): Promise<AnnouncementRow[]> {
   try {
-    const resp = await fetch("/api/announcements");
+    const url = network
+      ? `/api/announcements?network=${encodeURIComponent(network)}`
+      : "/api/announcements";
+    const resp = await fetch(url);
     if (!resp.ok) return [];
     const data: AnnouncementsResponse = await resp.json();
     return data.announcements ?? [];
@@ -214,7 +218,8 @@ const SWR_OPTIONS = {
  * Types: shield | transfer | unshield | withdraw
  */
 export function useExplorer(networkId?: NetworkId) {
-  const network = networkId ?? detectNetwork();
+  const env = useChainEnvironment();
+  const network = networkId ?? env.networkId;
   const { data, error, isLoading, mutate } = useSWR<ExplorerTransaction[]>(
     ["explorer-unified", network],
     async () => {
