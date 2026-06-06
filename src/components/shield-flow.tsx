@@ -20,7 +20,7 @@ import {
   TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { UTXOpiaClient } from "@utxopia/sdk";
-import { getUTXOpiaProgramId, getZkbtcMint, derivePoolStatePDA, deriveCommitmentTreePDA, deriveTokenConfigPDA } from "@/lib/solana/pdas";
+import { derivePoolStatePDA, deriveCommitmentTreePDA, deriveTokenConfigPDA } from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -50,7 +50,8 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const wallet = useWallet();
   const { publicKey, sendTransaction } = wallet;
   const { connection } = useConnection();
-  const { networkId } = useChainEnvironment();
+  const chainEnv = useChainEnvironment();
+  const { networkId } = chainEnv;
   const { setVisible: openWalletModal } = useWalletModal();
   const { keys, stealthAddress } = useUTXOpia();
 
@@ -131,17 +132,17 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         ? NATIVE_MINT
         : selectedToken.mint
           ? new PublicKey(selectedToken.mint)
-          : getZkbtcMint();
+          : new PublicKey(chainEnv.config.tokens.zkbtcMint);
 
       const client = UTXOpiaClient.instance();
       const mintAddr = mintPubkey.toBase58();
       const shieldOutput = await client.prepareShieldOutput({ amount: amountRaw, mintAddress: mintAddr });
       const { npkBytes } = shieldOutput;
 
-      const programId = getUTXOpiaProgramId();
-      const [tokenConfigPda] = deriveTokenConfigPDA(mintPubkey);
-      const [poolStatePda] = derivePoolStatePDA();
-      const [commitmentTreePda] = deriveCommitmentTreePDA();
+      const programId = new PublicKey(chainEnv.config.solana.utxopiaProgramId);
+      const [tokenConfigPda] = deriveTokenConfigPDA(mintPubkey, programId);
+      const [poolStatePda] = derivePoolStatePDA(programId);
+      const [commitmentTreePda] = deriveCommitmentTreePDA(programId);
 
       const tx = new Transaction();
       let userTokenAccount: PublicKey;
@@ -269,7 +270,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       setError(err instanceof Error ? err.message : "Add funds failed");
       setStatus("error");
     }
-  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction]);
+  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction, chainEnv.config]);
 
   const canSubmit = !!amount && parseFloat(amount) > 0 && !!resolvedMeta && !!publicKey && !!keys;
 
