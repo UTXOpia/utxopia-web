@@ -9,6 +9,8 @@ interface SnsNameTipProps {
   value: string;
   error?: string | null;
   isRegistering: boolean;
+  suggestion?: string | null;
+  onClaimSuggestion?: () => void;
   onOpen: () => void;
   onChange: (value: string) => void;
   onRegister: () => void;
@@ -21,6 +23,8 @@ export function SnsNameTip({
   value,
   error,
   isRegistering,
+  suggestion,
+  onClaimSuggestion,
   onOpen,
   onChange,
   onRegister,
@@ -77,6 +81,49 @@ export function SnsNameTip({
             Cancel
           </button>
         </div>
+      </div>
+    );
+  }
+
+  if (suggestion && onClaimSuggestion) {
+    return (
+      <div className="mb-5 rounded-[12px] border border-btc/15 bg-btc/5 px-3 py-2.5">
+        <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <p className="text-[11px] font-medium text-btc">Name your wallet</p>
+            <p className="text-xs leading-5 text-gray/70">
+              Share <span className="font-mono text-btc/80">{suggestion}.{parentDomain}.sol</span> instead
+              of your full private address. Registers publicly on-chain.
+            </p>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <button
+              type="button"
+              onClick={onClaimSuggestion}
+              disabled={isRegistering}
+              className={cn(
+                "inline-flex items-center justify-center gap-1.5 rounded-[8px] bg-btc px-3 py-2",
+                "text-xs font-semibold text-background transition-colors hover:bg-btc/80",
+                "disabled:cursor-not-allowed disabled:bg-gray/30 disabled:text-gray",
+              )}
+            >
+              {isRegistering ? (
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              ) : (
+                <Globe className="h-3.5 w-3.5" />
+              )}
+              Claim {suggestion}
+            </button>
+            <button
+              type="button"
+              onClick={onOpen}
+              className="rounded-[8px] border border-btc/20 px-3 py-2 text-xs text-btc transition-colors hover:bg-btc/10"
+            >
+              Choose name
+            </button>
+          </div>
+        </div>
+        {error && <p className="mt-2 text-caption text-red-400">{error}</p>}
       </div>
     );
   }

@@ -18,7 +18,7 @@
  * - View-only mode (viewing key import)
  */
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Key,
@@ -158,13 +158,21 @@ export default function VaultPage() {
   const hasVaultValue =
     depositCount > 0 ||
     Object.values(balancesByToken).some((balance) => balance > 0n);
+  // Shown right after wallet creation (no funds gate) so the name prompt
+  // is part of onboarding, with a deterministic one-tap suggestion.
   const showSnsTip =
     !!keys &&
     !isViewOnly &&
     canRegisterSnsName &&
     !hasRegisteredSnsName &&
-    !isLoadingSnsName &&
-    hasVaultValue;
+    !isLoadingSnsName;
+  const snsSuggestion = useMemo(() => {
+    const tail = (stealthAddressEncoded ?? "")
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(-4)
+      .toLowerCase();
+    return tail.length === 4 ? `capy-${tail}` : null;
+  }, [stealthAddressEncoded]);
 
   const handleRegisterSnsName = async () => {
     if (!snsNameInput) return;
@@ -177,6 +185,20 @@ export default function VaultPage() {
       });
       setShowSnsInput(false);
       setSnsNameInput("");
+    } catch {
+      // useSnsName owns the user-facing error state for Solana registration.
+    }
+  };
+
+  const handleClaimSnsSuggestion = async () => {
+    if (!snsSuggestion) return;
+    try {
+      await claimPrivateReceiveName({
+        chain: "solana",
+        name: snsSuggestion,
+        networkId,
+        solanaClaim: registerSnsSubdomain,
+      });
     } catch {
       // useSnsName owns the user-facing error state for Solana registration.
     }
@@ -376,7 +398,9 @@ export default function VaultPage() {
                   value={snsNameInput}
                   error={snsError}
                   isRegistering={isRegisteringSns}
-                  onOpen={() => setShowSnsInput(true)}
+                  suggestion={snsSuggestion}
+                  onClaimSuggestion={handleClaimSnsSuggestion}
+                  onOpen={() => { setSnsNameInput(snsSuggestion ?? ""); setShowSnsInput(true); }}
                   onChange={setSnsNameInput}
                   onRegister={handleRegisterSnsName}
                   onCancel={() => {

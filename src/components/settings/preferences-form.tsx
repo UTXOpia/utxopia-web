@@ -8,7 +8,9 @@ import { useSnsName } from "@/hooks/use-sns-name";
 import { cn } from "@/lib/utils";
 import { NetworkSelector } from "@/components/settings/network-selector";
 import { InfoTip } from "@/components/ui/info-tip";
-import { SnsComplianceFlags } from "@utxopia/sdk";
+import { getConfig, SnsComplianceFlags } from "@utxopia/sdk";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 
 /**
  * Settings — grouped into three semantic sections (Network · Identity ·
@@ -32,6 +34,7 @@ export function PreferencesForm() {
         label="Identity"
         hint="What senders see when they enter your .utxopia.sol name."
       >
+        <SnsNameRow />
         <AuditorDisclosableRow />
         <AuditorPubkeyRow />
       </Section>
@@ -172,6 +175,142 @@ function Toggle({
 /* -------------------------------------------------------------------------- */
 /*  Identity rows                                                             */
 /* -------------------------------------------------------------------------- */
+
+/**
+ * Receive name — shows the registered .utxopia.sol name and lets the user
+ * register or change it. Changing registers a new subdomain on-chain.
+ */
+function SnsNameRow() {
+  const sns = useSnsName();
+  const { networkId } = useChainEnvironment();
+  const parentDomain = getConfig().snsParentDomain || "utxopia";
+  const [editing, setEditing] = useState(false);
+  const [value, setValue] = useState("");
+  const disabled = !sns.canRegister || sns.isLoading;
+  const fullName = sns.hasRegisteredSnsName
+    ? `${sns.registeredSnsName}.${parentDomain}.sol`
+    : null;
+
+  async function handleSave() {
+    const name = value.trim().toLowerCase();
+    if (!name || name === sns.registeredSnsName) return;
+    try {
+      await claimPrivateReceiveName({
+        chain: "solana",
+        name,
+        networkId,
+        solanaClaim: sns.registerSnsSubdomain,
+      });
+      setEditing(false);
+      setValue("");
+    } catch {
+      // useSnsName owns the user-facing error state.
+    }
+  }
+
+  return (
+    <div className={cn("py-4 px-1", disabled && "opacity-60")}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center gap-2 min-w-0 flex-wrap">
+          <span className="text-sm font-medium text-foreground">
+            Receive name
+          </span>
+          {!sns.canRegister && (
+            <span className="text-[10px] uppercase tracking-wide text-gray bg-muted/40 px-1.5 py-0.5 rounded">
+              Wallet required
+            </span>
+          )}
+          {sns.isRegistering && (
+            <Loader2 className="w-3 h-3 animate-spin text-gray" />
+          )}
+          <InfoTip label="About Receive name">
+            A public on-chain name that resolves to your private receive
+            address, so senders can type{" "}
+            <span className="font-mono">name.{parentDomain}.sol</span>{" "}
+            instead of a long address. Registering a new name replaces the
+            one senders should use; it does not expose your balances or
+            history.
+          </InfoTip>
+        </div>
+        {!editing && (
+          <div className="flex items-center gap-2 min-w-0">
+            {fullName && (
+              <span className="text-[12px] font-mono text-privacy truncate">
+                {fullName}
+              </span>
+            )}
+            <button
+              type="button"
+              onClick={() => {
+                setValue(sns.registeredSnsName ?? "");
+                setEditing(true);
+              }}
+              disabled={disabled}
+              className={cn(
+                "shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-md transition-all",
+                disabled
+                  ? "bg-muted/40 text-gray cursor-not-allowed"
+                  : "bg-muted/40 text-gray-light hover:text-foreground hover:bg-muted/60",
+              )}
+            >
+              {fullName ? "Change" : "Register"}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {editing && (
+        <div className="mt-2 flex items-center gap-2">
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => setValue(e.target.value.toLowerCase())}
+            disabled={sns.isRegistering}
+            placeholder="yourname"
+            className={cn(
+              "flex-1 min-w-0 px-3 py-1.5 rounded-md bg-muted/40 border border-gray/10",
+              "text-[12px] font-mono outline-none",
+              "focus:border-privacy/40 focus:bg-muted/60 transition-colors",
+            )}
+          />
+          <span className="text-[12px] text-gray shrink-0">.{parentDomain}.sol</span>
+          <button
+            type="button"
+            onClick={() => {
+              setEditing(false);
+              setValue("");
+            }}
+            disabled={sns.isRegistering}
+            className="text-[11px] text-gray hover:text-foreground transition-colors px-2"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={
+              sns.isRegistering ||
+              !value.trim() ||
+              value.trim() === sns.registeredSnsName
+            }
+            className={cn(
+              "shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-md transition-all",
+              value.trim() && value.trim() !== sns.registeredSnsName && !sns.isRegistering
+                ? "bg-privacy text-background hover:opacity-90"
+                : "bg-muted/40 text-gray cursor-not-allowed",
+            )}
+          >
+            {sns.isRegistering ? "Registering..." : fullName ? "Change name" : "Register name"}
+          </button>
+        </div>
+      )}
+
+      {sns.error && (
+        <p className="text-xs text-error mt-2 font-mono break-all">{sns.error}</p>
+      )}
+    </div>
+  );
+}
 
 /**
  * AUDITOR_DISCLOSABLE flag — surfaces on the user's .utxopia.sol record
