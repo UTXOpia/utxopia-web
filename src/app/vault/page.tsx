@@ -228,17 +228,17 @@ export default function VaultPage() {
                   {hasRegisteredSnsName ? (
                     <button
                       onClick={() => { copySns(`${registeredSnsName}.${parentDomain}.sol`); notifyCopied(`.${parentDomain}.sol name`); }}
-                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-green-500/10 hover:bg-green-500/15 transition-colors group cursor-pointer min-w-0"
+                      className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-privacy/10 hover:bg-privacy/15 transition-colors group cursor-pointer min-w-0"
                       title={`Copy .${parentDomain}.sol name`}
                     >
-                      <Globe className="w-3.5 h-3.5 text-green-400 shrink-0" />
-                      <span className="text-body2-semibold text-green-400 truncate">
+                      <Globe className="w-3.5 h-3.5 text-privacy shrink-0" />
+                      <span className="text-body2-semibold text-privacy truncate">
                         {registeredSnsName}.{parentDomain}.sol
                       </span>
                       {snsCopied ? (
                         <Check className="w-3 h-3 text-green-400 shrink-0" />
                       ) : (
-                        <Copy className="w-3 h-3 text-green-400/40 group-hover:text-green-400 transition-colors shrink-0" />
+                        <Copy className="w-3 h-3 text-privacy/40 group-hover:text-privacy transition-colors shrink-0" />
                       )}
                     </button>
                   ) : (
