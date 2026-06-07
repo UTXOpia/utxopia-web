@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Fingerprint, Wallet, X, Shield, Eye } from "lucide-react";
+import { Fingerprint, Wallet, X, Eye } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AuthState {
@@ -64,7 +64,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
           {/* Header */}
           <div className="pt-8 pb-2 px-6 text-center">
             <div className="inline-flex p-3 rounded-full bg-privacy/10 border border-privacy/20 mb-4">
-              <Shield className="w-6 h-6 text-privacy" />
+              <img src="/brand/logo-transparent-96.png" alt="UTXOpia" className="w-7 h-7 object-contain" />
             </div>
             <Dialog.Title className="text-[20px] font-bold text-foreground mb-1">
               Sign In

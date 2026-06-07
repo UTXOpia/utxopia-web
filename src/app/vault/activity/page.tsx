@@ -8,7 +8,6 @@ import {
   ArrowLeft,
   History,
   LockKeyhole,
-  Shield,
   ExternalLink,
   Copy,
   Check,
@@ -247,7 +246,7 @@ function ActivityFeed() {
 
       {notes.length === 0 && !isLoading && (
         <div className="text-center py-6">
-          <Shield className="w-8 h-8 text-gray/20 mx-auto mb-2" />
+          <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-30 mx-auto mb-2" />
           <p className="text-sm text-gray/50">No activity yet</p>
           <p className="text-xs text-gray/30 mt-1">Deposits and transfers will appear here</p>
         </div>

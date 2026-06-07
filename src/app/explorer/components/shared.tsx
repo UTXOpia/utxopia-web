@@ -16,7 +16,6 @@ import {
   ExternalLink,
   Loader2,
   Search,
-  Shield,
   RefreshCw,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -226,7 +225,7 @@ export function StatusDot({ variant, label }: { variant: StatusDotVariant; label
 
 function FlowIcon({ icon, label }: { icon: string | "shield"; label: string }) {
   if (icon === "shield") {
-    return <Shield className="w-4 h-4 text-green-400/70" />;
+    return <img src="/brand/logo-transparent-48.png" alt={label} className="w-4 h-4 object-contain" />;
   }
   return <img src={icon} alt={label} className="w-4 h-4 rounded-full" />;
 }
@@ -319,7 +318,7 @@ export function EmptyState({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="p-4 rounded-full bg-privacy/5 border border-privacy/10 mb-4">
-        <Shield className="w-8 h-8 text-privacy/40" />
+        <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-50" />
       </div>
       <p className="text-body2 text-gray-light mb-1">No {label} yet</p>
       <p className="text-caption text-gray/50 max-w-[280px]">

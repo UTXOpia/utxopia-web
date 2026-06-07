@@ -2,7 +2,7 @@
 
 import { Suspense, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Key, Shield } from "lucide-react";
+import { ArrowLeft, Key } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -73,7 +73,7 @@ function ClaimRedirect() {
       >
         <div className="flex items-center gap-3 mb-4">
           <div className="p-2 rounded-[10px] bg-privacy/10">
-            <Shield className="w-5 h-5 text-privacy" />
+            <img src="/brand/logo-transparent-64.png" alt="" className="w-5 h-5 object-contain" />
           </div>
           <div>
             <h1 className="text-heading6 text-foreground">Claim zkBTC</h1>
