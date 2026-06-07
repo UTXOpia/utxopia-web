@@ -21,7 +21,6 @@
 import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import {
-  Shield,
   Key,
   Copy,
   Check,
@@ -30,7 +29,9 @@ import {
   Globe,
   RefreshCw,
   Eye,
+  Wallet,
 } from "lucide-react";
+import Image from "next/image";
 import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
@@ -242,7 +243,9 @@ export default function VaultPage() {
                   )}
                 </>
               ) : (
-                <span className="text-body2-semibold text-foreground">Wallet</span>
+                <span className="flex items-center p-1.5 text-foreground" aria-label="Wallet" title="Wallet">
+                  <Wallet className="w-4 h-4" />
+                </span>
               )}
             </div>
             <div className="flex items-center gap-1 shrink-0">
@@ -322,7 +325,13 @@ export default function VaultPage() {
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
               <div className="w-16 h-16 rounded-2xl bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-4">
-                <Shield className="w-7 h-7 text-privacy" />
+                <Image
+                  src="/brand/logo-transparent-96.png"
+                  alt="UTXOpia"
+                  width={36}
+                  height={36}
+                  className="w-9 h-9 object-contain"
+                />
               </div>
               <h1 className="text-[22px] font-bold text-foreground mb-1">Private wallet</h1>
               <p className="text-caption text-gray/60 mb-6">
@@ -334,7 +343,7 @@ export default function VaultPage() {
                   "inline-flex items-center gap-2 px-7 py-3 rounded-full",
                   "bg-privacy hover:bg-privacy/80",
                   "text-body2 text-background font-semibold transition-all duration-200 cursor-pointer",
-                  "hover:shadow-[0_0_24px_rgba(20,241,149,0.25)]",
+                  "hover:shadow-[0_0_24px_rgba(247,147,26,0.25)]",
                   "active:scale-95"
                 )}
               >
@@ -344,6 +353,13 @@ export default function VaultPage() {
             </div>
           ) : (
             <>
+              <VaultBalance
+                balancesByToken={balancesByToken}
+                isLoading={isLoadingInbox}
+                tokenPrices={tokenPrices}
+                onRefresh={refreshInbox}
+              />
+
               {!isViewOnly && (
                 <VaultFirstSteps
                   keys={keys}
@@ -352,13 +368,6 @@ export default function VaultPage() {
                   onBackupComplete={() => setHasRecoveryBackup(true)}
                 />
               )}
-
-              <VaultBalance
-                balancesByToken={balancesByToken}
-                isLoading={isLoadingInbox}
-                tokenPrices={tokenPrices}
-                onRefresh={refreshInbox}
-              />
 
               {showSnsTip && (
                 <SnsNameTip

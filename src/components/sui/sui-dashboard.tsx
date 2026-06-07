@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import Image from "next/image";
 import * as Dialog from "@radix-ui/react-dialog";
 import { motion } from "framer-motion";
 import {
   ArrowRight,
+  ArrowUpFromLine,
   ChevronDown,
   Copy,
   Droplets,
@@ -18,7 +20,6 @@ import {
   RefreshCw,
   Send,
   Settings,
-  Shield,
   X,
 } from "lucide-react";
 import { SuiAuthPanel } from "@/components/sui/sui-auth-panel";
@@ -243,6 +244,7 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
                   <VaultAction href={hrefWithChain("/faucet", networkId)} icon={<Droplets className="h-5 w-5" />} label="Faucet" />
                 )}
                 <VaultAction href={hrefWithChain("/send", networkId)} icon={<Send className="h-5 w-5" />} label="Send" />
+                <VaultAction href={hrefWithChain("/vault/withdraw", networkId)} icon={<ArrowUpFromLine className="h-5 w-5" />} label="Cash out" />
               </div>
 
               {depositCount > 0 && (
@@ -289,7 +291,13 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
           ) : (
             <div className="flex flex-col items-center py-10">
               <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-sui/20 bg-sui/10">
-                <Shield className="h-7 w-7 text-sui" />
+                <Image
+                  src="/brand/logo-transparent-96.png"
+                  alt="UTXOpia"
+                  width={36}
+                  height={36}
+                  className="h-9 w-9 object-contain"
+                />
               </div>
               <h1 className="mb-1 text-[22px] font-bold text-foreground">Private wallet</h1>
               <p className="mb-6 text-caption text-gray/60">
@@ -409,7 +417,13 @@ function SuiAuthModal({ open, onOpenChange }: { open: boolean; onOpenChange: (op
 
           <div className="mb-4 text-center">
             <div className="mb-3 inline-flex rounded-full border border-sui/20 bg-sui/10 p-3">
-              <Shield className="h-6 w-6 text-sui" />
+              <Image
+                src="/brand/logo-transparent-96.png"
+                alt="UTXOpia"
+                width={28}
+                height={28}
+                className="h-7 w-7 object-contain"
+              />
             </div>
             <Dialog.Title className="text-[20px] font-bold text-foreground">
               Sign In

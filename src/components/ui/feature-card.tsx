@@ -38,7 +38,7 @@ const colorConfig: Record<FeatureCardColor, {
     iconText: "text-privacy",
     hoverBorder: "hover:border-privacy/40",
     hoverBg: "hover:bg-privacy/5",
-    glowShadow: "hover:shadow-[0_0_20px_rgba(20,241,149,0.15)]",
+    glowShadow: "hover:shadow-[0_0_20px_rgba(247,147,26,0.15)]",
   },
   sol: {
     iconBg: "bg-sol/10",

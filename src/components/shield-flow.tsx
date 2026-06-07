@@ -455,7 +455,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
               "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",
               "text-body2 font-semibold transition-all cursor-pointer",
               canSubmitBtc && !buildingPreview
-                ? "btn-privacy shadow-[0_0_20px_rgba(20,241,149,0.15)] hover:shadow-[0_0_30px_rgba(20,241,149,0.25)]"
+                ? "btn-privacy shadow-[0_0_20px_rgba(247,147,26,0.15)] hover:shadow-[0_0_30px_rgba(247,147,26,0.25)]"
                 : "bg-gray/20 text-gray/50 cursor-not-allowed"
             )}
           >
@@ -609,7 +609,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",
           "text-body2 font-semibold transition-all cursor-pointer",
           canSubmit && status !== "processing"
-            ? "btn-privacy shadow-[0_0_20px_rgba(20,241,149,0.15)] hover:shadow-[0_0_30px_rgba(20,241,149,0.25)]"
+            ? "btn-privacy shadow-[0_0_20px_rgba(247,147,26,0.15)] hover:shadow-[0_0_30px_rgba(247,147,26,0.25)]"
             : "bg-gray/20 text-gray/50 cursor-not-allowed"
         )}
       >

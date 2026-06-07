@@ -18,22 +18,22 @@
 /* Pulse glow */
 @keyframes pulse-glow-anim {
   0%, 100% {
-    box-shadow: 0 0 4px rgba(247, 147, 26, 0.2), 0 0 8px rgba(20, 241, 149, 0.15);
+    box-shadow: 0 0 4px rgba(247, 147, 26, 0.2), 0 0 8px rgba(247, 147, 26, 0.15);
   }
   50% {
-    box-shadow: 0 0 8px rgba(247, 147, 26, 0.3), 0 0 12px rgba(20, 241, 149, 0.2);
+    box-shadow: 0 0 8px rgba(247, 147, 26, 0.3), 0 0 12px rgba(247, 147, 26, 0.2);
   }
 }
 
 /* Neon border pulse */
 @keyframes neon-pulse {
   0%, 100% {
-    border-color: rgba(20, 241, 149, 0.2);
-    box-shadow: 0 0 4px rgba(20, 241, 149, 0.15);
+    border-color: rgba(247, 147, 26, 0.2);
+    box-shadow: 0 0 4px rgba(247, 147, 26, 0.15);
   }
   50% {
-    border-color: rgba(20, 241, 149, 0.5);
-    box-shadow: 0 0 8px rgba(20, 241, 149, 0.25), 0 0 12px rgba(20, 241, 149, 0.1);
+    border-color: rgba(247, 147, 26, 0.5);
+    box-shadow: 0 0 8px rgba(247, 147, 26, 0.25), 0 0 12px rgba(247, 147, 26, 0.1);
   }
 }
 

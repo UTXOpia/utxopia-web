@@ -17,7 +17,14 @@
   --destructive-foreground: #ededed;
   --border: #8b8a9e33;
   --input: #16161b;
-  --ring: #ffabfe;
+
+  /* Chain-context accent — resolves to the active chain's color so accent and
+     focus read as network context, not decoration (PRODUCT.md principle 3).
+     Defaults to Sui blue; overridden per chain via [data-chain] below. */
+  --chain: #6fbcf0;
+  --chain-deep: #2c7be5;
+  --chain-bg: #6fbcf01a;
+  --ring: var(--chain);
   --radius: 0.75rem;
 
   /* Brand colors */
@@ -40,13 +47,26 @@
 
   /* Privacy colors */
   --privacy-purple: #9945ff;
-  --privacy-teal: #14f195;
-  --privacy-bg: #14f1951a;
+  --privacy-accent: #f7931a;
+  --privacy-bg: #f7931a1a;
 
   /* Sui colors */
   --sui-blue: #6fbcf0;
   --sui-blue-deep: #2c7be5;
   --sui-blue-bg: #6fbcf01a;
+}
+
+/* Active-chain accent overrides. ChainThemeSync sets data-chain on <html>. */
+[data-chain="sui"] {
+  --chain: var(--sui-blue);
+  --chain-deep: var(--sui-blue-deep);
+  --chain-bg: var(--sui-blue-bg);
+}
+
+[data-chain="solana"] {
+  --chain: #9945ff;
+  --chain-deep: #8b3de8;
+  --chain-bg: #9945ff1a;
 }
 
 @theme inline {
@@ -82,12 +102,17 @@
   --color-btc-dark: #e8850f;
 
   /* Privacy/Solana colors */
-  --color-privacy: #14f195;
+  --color-privacy: #f7931a;
   --color-sol: #9945ff;
   --color-sol-dark: #8b3de8;
   --color-purple: #ffabfe;
   --color-sui: #6fbcf0;
   --color-sui-dark: #2c7be5;
+
+  /* Chain-context accent (resolves per active chain via [data-chain]) */
+  --color-chain: var(--chain);
+  --color-chain-deep: var(--chain-deep);
+  --color-chain-bg: var(--chain-bg);
 
   /* Status colors */
   --color-success: #4ade80;

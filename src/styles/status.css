@@ -47,9 +47,9 @@
   align-items: center;
   gap: 12px;
   padding: 12px 16px;
-  color: #14f195;
-  background: linear-gradient(135deg, rgba(20, 241, 149, 0.1) 0%, rgba(153, 69, 255, 0.1) 100%);
-  border: 1px solid rgba(20, 241, 149, 0.25);
+  color: #f7931a;
+  background: linear-gradient(135deg, rgba(247, 147, 26, 0.1) 0%, rgba(153, 69, 255, 0.1) 100%);
+  border: 1px solid rgba(247, 147, 26, 0.25);
   border-radius: 12px;
   font-size: 14px;
 }

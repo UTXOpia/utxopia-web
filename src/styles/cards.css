@@ -17,13 +17,13 @@
 .spotlight-card {
   backdrop-filter: blur(40px);
   background: rgba(15, 15, 18, 0.75);
-  border: 1px solid rgba(20, 241, 149, 0.08);
+  border: 1px solid rgba(247, 147, 26, 0.08);
   transition: border-color 0.3s ease, box-shadow 0.3s ease;
 }
 
 .spotlight-card:hover {
-  border-color: rgba(20, 241, 149, 0.15);
-  box-shadow: 0 0 20px rgba(20, 241, 149, 0.04), 0 8px 32px rgba(0, 0, 0, 0.3);
+  border-color: rgba(247, 147, 26, 0.15);
+  box-shadow: 0 0 20px rgba(247, 147, 26, 0.04), 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 /* Gradient border card */
@@ -36,9 +36,9 @@
 }
 
 .gradient-border-card:hover {
-  background: linear-gradient(to bottom, rgba(20, 241, 149, 0.3), rgba(153, 69, 255, 0.15));
+  background: linear-gradient(to bottom, rgba(247, 147, 26, 0.3), rgba(153, 69, 255, 0.15));
   transform: translateY(-4px);
-  box-shadow: 0 0 16px rgba(20, 241, 149, 0.08);
+  box-shadow: 0 0 16px rgba(247, 147, 26, 0.08);
 }
 
 .gradient-border-card > .card-inner {
@@ -53,7 +53,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(135deg, rgba(20, 241, 149, 0.05), transparent);
+  background: linear-gradient(135deg, rgba(247, 147, 26, 0.05), transparent);
   opacity: 0;
   transition: opacity 0.5s ease;
 }
@@ -218,7 +218,7 @@
   height: 200%;
   background: radial-gradient(
     ellipse at center,
-    rgba(20, 241, 149, 0.05) 0%,
+    rgba(247, 147, 26, 0.05) 0%,
     rgba(153, 69, 255, 0.03) 40%,
     transparent 70%
   );
@@ -233,6 +233,6 @@
     rgba(247, 147, 26, 0.15) 0%,
     rgba(255, 171, 254, 0.1) 35%,
     rgba(153, 69, 255, 0.1) 65%,
-    rgba(20, 241, 149, 0.15) 100%
+    rgba(247, 147, 26, 0.15) 100%
   );
 }

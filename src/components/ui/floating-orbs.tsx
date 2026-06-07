@@ -13,7 +13,7 @@ export function FloatingOrbs({ className = "" }: { className?: string }) {
       <motion.div
         className="absolute w-[500px] h-[500px] rounded-full opacity-10"
         style={{
-          background: "radial-gradient(circle, rgba(20,241,149,0.3) 0%, transparent 70%)",
+          background: "radial-gradient(circle, rgba(247,147,26,0.3) 0%, transparent 70%)",
           filter: "blur(80px)",
           top: "-10%",
           left: "10%",

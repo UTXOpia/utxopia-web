@@ -20,7 +20,7 @@ export function GradientBorderCard({
   children,
   className = "",
   innerClassName = "",
-  hoverGlow = "rgba(20, 241, 149, 0.15)",
+  hoverGlow = "rgba(247, 147, 26, 0.15)",
   step,
 }: GradientBorderCardProps) {
   const ref = useRef<HTMLDivElement>(null);

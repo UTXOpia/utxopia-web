@@ -107,10 +107,10 @@
 
 /* Privacy green */
 .btn-privacy {
-  background: linear-gradient(135deg, #14f195 0%, #10b981 50%, #14f195 100%);
+  background: linear-gradient(135deg, #f7931a 0%, #e8850f 50%, #f7931a 100%);
   box-shadow:
-    0px 4px 8px 0px rgba(20, 241, 149, 0.25),
-    0px 2px 4px 0px rgba(20, 241, 149, 0.15) inset;
+    0px 4px 8px 0px rgba(247, 147, 26, 0.25),
+    0px 2px 4px 0px rgba(247, 147, 26, 0.15) inset;
   color: var(--background);
   border-radius: 12px;
   padding: 12px 16px;
@@ -126,7 +126,7 @@
 
 .btn-privacy:hover:not(:disabled) {
   box-shadow:
-    0px 6px 12px 0px rgba(20, 241, 149, 0.35),
+    0px 6px 12px 0px rgba(247, 147, 26, 0.35),
     0px 2px 6px 0px rgba(255, 255, 255, 0.2) inset;
   transform: translateY(-1px);
 }
@@ -173,7 +173,7 @@
   inset: 0;
   padding: 2px;
   border-radius: inherit;
-  background: conic-gradient(from var(--border-angle, 0deg), #14f195, #f7931a, #9945ff, #14f195);
+  background: conic-gradient(from var(--border-angle, 0deg), #f7931a, #ffa940, #9945ff, #f7931a);
   -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
   -webkit-mask-composite: xor;
   mask-composite: exclude;

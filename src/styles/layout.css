@@ -13,7 +13,7 @@
   height: 100%;
   background:
     radial-gradient(ellipse at 20% 20%, rgba(247, 147, 26, 0.04) 0%, transparent 50%),
-    radial-gradient(ellipse at 80% 80%, rgba(20, 241, 149, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(247, 147, 26, 0.04) 0%, transparent 50%),
     radial-gradient(ellipse at 50% 50%, rgba(153, 69, 255, 0.03) 0%, transparent 60%);
   pointer-events: none;
   z-index: 0;
@@ -61,7 +61,7 @@
 .cyber-corners::after {
   bottom: -1px;
   right: -1px;
-  border-color: transparent rgba(20, 241, 149, 0.3) rgba(20, 241, 149, 0.3) transparent;
+  border-color: transparent rgba(247, 147, 26, 0.3) rgba(247, 147, 26, 0.3) transparent;
 }
 
 /* Floating pill navigation */
@@ -76,7 +76,7 @@
 
 .nav-pill:hover {
   transform: scale(1.01);
-  border-color: rgba(20, 241, 149, 0.15);
+  border-color: rgba(247, 147, 26, 0.15);
 }
 
 /* Wave divider */
@@ -89,7 +89,7 @@
   content: "";
   position: absolute;
   inset: 0;
-  background: linear-gradient(90deg, rgba(20, 241, 149, 0.06), rgba(247, 147, 26, 0.04) 50%, rgba(153, 69, 255, 0.05));
+  background: linear-gradient(90deg, rgba(247, 147, 26, 0.06), rgba(247, 147, 26, 0.04) 50%, rgba(153, 69, 255, 0.05));
   clip-path: polygon(0% 60%, 15% 40%, 30% 55%, 50% 30%, 70% 50%, 85% 35%, 100% 45%, 100% 100%, 0% 100%);
 }
 
@@ -106,7 +106,7 @@
   width: 90%;
   height: 80%;
   background:
-    radial-gradient(ellipse at 30% 30%, rgba(20, 241, 149, 0.08) 0%, transparent 50%),
+    radial-gradient(ellipse at 30% 30%, rgba(247, 147, 26, 0.08) 0%, transparent 50%),
     radial-gradient(ellipse at 70% 60%, rgba(247, 147, 26, 0.04) 0%, transparent 40%),
     radial-gradient(ellipse at 50% 80%, rgba(153, 69, 255, 0.04) 0%, transparent 40%);
   pointer-events: none;
@@ -120,7 +120,7 @@
   inset: 0;
   z-index: 1;
   pointer-events: none;
-  background: radial-gradient(circle 600px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(20, 241, 149, 0.03), transparent 70%);
+  background: radial-gradient(circle 600px at var(--mouse-x, 50%) var(--mouse-y, 50%), rgba(247, 147, 26, 0.03), transparent 70%);
   transition: background 0.15s ease;
 }
 

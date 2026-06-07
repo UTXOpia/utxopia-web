@@ -357,7 +357,7 @@ const SHIELD_TYPE_CONFIG: Record<string, ShieldTypeConfig> = {
   usdt: buildShieldConfig(usdtToken),
   spl: {
     from: { label: "SPL", logo: "/tokens/sol.png", color: "text-gray/70 bg-gray/6 border-gray/10" },
-    to: { label: "Shielded", logo: "/tokens/sol.png", color: "text-privacy/80 bg-privacy/6 border-privacy/10" },
+    to: { label: "Shielded", logo: "/brand/logo-transparent-64.png", color: "text-privacy/80 bg-privacy/6 border-privacy/10" },
     decimals: 0, unit: "", showRaw: true,
   },
 };

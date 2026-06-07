@@ -24,7 +24,7 @@ export const ConfirmationProgress = memo(function ConfirmationProgress({
         className="h-2 rounded-full relative"
         style={{
           background: isComplete
-            ? "linear-gradient(90deg, #14f195, #4ade80)"
+            ? "linear-gradient(90deg, #4ade80, #22c55e)"
             : "linear-gradient(90deg, #f7931a, #ffa940)",
         }}
         initial={{ width: 0 }}

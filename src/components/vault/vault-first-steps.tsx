@@ -41,8 +41,9 @@ export function VaultFirstSteps({
   onBackupComplete,
 }: VaultFirstStepsProps) {
   const identity = useMemo(() => getBackupIdentityForKeys(keys), [keys]);
-  // Backup is required before sending, so stay expanded until it's done.
-  const [isExpanded, setIsExpanded] = useState(!hasBackup);
+  // Collapsed by default; the header row still shows progress and the
+  // pending-backup dot, and sending stays gated until backup is done.
+  const [isExpanded, setIsExpanded] = useState(false);
   const [hasSavedBackup, setHasSavedBackup] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
   const { copied, copy } = useCopyToClipboard();

@@ -31,7 +31,7 @@ export function EmptyInbox({ hasKeys, onUnlock, onRefresh, isLoading }: EmptyInb
             "inline-flex items-center gap-2 px-6 py-3 rounded-[12px]",
             "bg-privacy hover:bg-privacy/80",
             "text-body2 text-background font-medium transition-all duration-200 cursor-pointer",
-            "hover:shadow-[0_0_24px_rgba(20,241,149,0.2)]"
+            "hover:shadow-[0_0_24px_rgba(247,147,26,0.2)]"
           )}
         >
           <Key className="w-4 h-4" />
