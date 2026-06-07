@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import {
   Check,
@@ -22,6 +22,10 @@ import {
 } from "@/lib/vault-backup";
 import { notifyCopied } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
+
+// Once a vault has held funds, "Add funds" stays done even if the balance
+// is later spent to zero, so the checklist only nudges first-run users.
+const FUNDED_STATUS_PREFIX = "utxo:funded:";
 
 interface VaultFirstStepsProps {
   keys: UTXOpiaKeys | null;
@@ -46,11 +50,24 @@ export function VaultFirstSteps({
   const [isExpanded, setIsExpanded] = useState(false);
   const [hasSavedBackup, setHasSavedBackup] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [everFunded, setEverFunded] = useState(false);
   const { copied, copy } = useCopyToClipboard();
 
-  if (hasFunds && hasBackup) return null;
+  useEffect(() => {
+    if (!identity) return;
+    if (hasFunds) {
+      localStorage.setItem(FUNDED_STATUS_PREFIX + identity, "1");
+      setEverFunded(true);
+    } else {
+      setEverFunded(localStorage.getItem(FUNDED_STATUS_PREFIX + identity) === "1");
+    }
+  }, [hasFunds, identity]);
 
-  const doneCount = (hasFunds ? 1 : 0) + (hasBackup ? 1 : 0);
+  const fundsDone = hasFunds || everFunded;
+
+  if (fundsDone && hasBackup) return null;
+
+  const doneCount = (fundsDone ? 1 : 0) + (hasBackup ? 1 : 0);
   const totalSteps = 2;
   const tone = accent === "sui"
     ? {
@@ -119,26 +136,26 @@ export function VaultFirstSteps({
           <div
             className={cn(
               "flex items-start gap-2.5 rounded-[9px] px-2.5 py-2",
-              hasFunds ? tone.doneBg : "bg-muted/30",
+              fundsDone ? tone.doneBg : "bg-muted/30",
             )}
           >
             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
-              {hasFunds ? (
+              {fundsDone ? (
                 <CheckCircle2 className={cn("h-4 w-4", tone.icon)} />
               ) : (
                 <Circle className="h-4 w-4 text-gray/45" />
               )}
             </div>
-            <PlusCircle className={cn("mt-0.5 h-4 w-4 shrink-0", hasFunds ? tone.icon : "text-gray/60")} />
+            <PlusCircle className={cn("mt-0.5 h-4 w-4 shrink-0", fundsDone ? tone.icon : "text-gray/60")} />
             <div className="min-w-0 flex-1">
-              <p className={cn("text-caption font-semibold", hasFunds ? tone.icon : "text-foreground")}>
+              <p className={cn("text-caption font-semibold", fundsDone ? tone.icon : "text-foreground")}>
                 Add funds
               </p>
               <p className="text-[11px] text-gray/60">
                 Deposit to your own private address by default.
               </p>
             </div>
-            {!hasFunds && (
+            {!fundsDone && (
               <Link
                 href={depositHref}
                 className={cn("inline-flex shrink-0 items-center gap-1.5 rounded-[8px] px-3 py-1.5 text-caption font-semibold transition-colors", tone.button)}
