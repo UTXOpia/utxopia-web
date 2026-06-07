@@ -226,6 +226,8 @@ function createSuiAdapter(cfg: NetworkConfig): UTXOpiaSuiAdapter {
     redemptionCapObjectId: sui.redemptionCap.objectId,
     redemptionCapVersion: sui.redemptionCap.version,
     redemptionCapDigest: sui.redemptionCap.digest,
+    tokenRegistryObjectId: sui.tokenRegistry?.objectId,
+    tokenRegistryInitialSharedVersion: sui.tokenRegistry?.initialSharedVersion,
   });
 }
 
