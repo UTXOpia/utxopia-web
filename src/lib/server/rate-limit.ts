@@ -5,6 +5,8 @@
  * replenished at `refillRate` tokens per `windowMs`.
  */
 
+import { NextResponse } from "next/server";
+
 interface Bucket {
   tokens: number;
   lastRefill: number;
@@ -76,9 +78,34 @@ export function checkRateLimit(
  * Helper to get client IP from Next.js request headers.
  */
 export function getClientIp(headers: Headers): string {
-  return (
-    headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    headers.get("x-real-ip") ||
-    "unknown"
+  // Use the RIGHT-most x-forwarded-for hop (appended by the trusted edge); the
+  // left-most entries are client-supplied and spoofable, so keying rate limits on
+  // them lets an attacker rotate the header for unlimited fresh buckets.
+  const xff = headers.get("x-forwarded-for");
+  if (xff) {
+    const parts = xff.split(",").map((p) => p.trim()).filter(Boolean);
+    if (parts.length > 0) return parts[parts.length - 1];
+  }
+  return headers.get("x-real-ip")?.trim() || "unknown";
+}
+
+/**
+ * Standard 429 response for the common `{ success, error }` API shape.
+ * Returns `null` when the request is allowed, or a JSON 429 with a `Retry-After`
+ * header derived from `rl.retryAfterMs` (falling back to `fallbackMs`).
+ */
+export function tooManyRequests(
+  rl: { limited: boolean; retryAfterMs?: number },
+  fallbackMs = 6000
+): NextResponse | null {
+  if (!rl.limited) return null;
+  return NextResponse.json(
+    { success: false, error: "Too many requests" },
+    {
+      status: 429,
+      headers: {
+        "Retry-After": String(Math.ceil((rl.retryAfterMs ?? fallbackMs) / 1000)),
+      },
+    }
   );
 }

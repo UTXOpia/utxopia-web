@@ -78,7 +78,62 @@ export function getSuiAdapter(networkId: NetworkId = networkForChain(detectNetwo
     redemptionCapObjectId: sui.redemptionCap.objectId,
     redemptionCapVersion: sui.redemptionCap.version,
     redemptionCapDigest: sui.redemptionCap.digest,
+    tokenRegistryObjectId: sui.tokenRegistry?.objectId,
+    tokenRegistryInitialSharedVersion: sui.tokenRegistry?.initialSharedVersion,
   });
+}
+
+/**
+ * Minimal browser Sui-wallet surface for signing + executing a PTB. The shim
+ * stays loose so any classic Sui-wallet provider injected at `window.suiWallet`
+ * can fulfil the shield signature (one signature, no approve step).
+ */
+export interface SuiTxWallet {
+  signAndExecuteTransactionBlock?: (input: {
+    transactionBlock: unknown;
+    options?: { showEffects?: boolean };
+  }) => Promise<{ digest?: string; effects?: { status?: { status?: string; error?: string } } }>;
+  signAndExecuteTransaction?: (input: {
+    transaction: unknown;
+    options?: { showEffects?: boolean };
+  }) => Promise<{ digest?: string; effects?: { status?: { status?: string; error?: string } } }>;
+}
+
+export function getBrowserSuiWallet(): SuiTxWallet | null {
+  if (typeof window === "undefined") return null;
+  return (window as unknown as { suiWallet?: SuiTxWallet }).suiWallet ?? null;
+}
+
+/**
+ * Sign + execute an unsigned-kind PTB through the connected browser Sui wallet.
+ * The wallet sponsors gas and provides the sender, so the shield is a single
+ * user signature. Returns the transaction digest.
+ */
+export async function signAndExecuteSuiTransaction(
+  wallet: SuiTxWallet,
+  transaction: unknown,
+): Promise<string> {
+  const signer =
+    wallet.signAndExecuteTransactionBlock?.bind(wallet) ??
+    (wallet.signAndExecuteTransaction
+      ? (input: { transactionBlock: unknown; options?: { showEffects?: boolean } }) =>
+          wallet.signAndExecuteTransaction!({
+            transaction: input.transactionBlock,
+            options: input.options,
+          })
+      : null);
+  if (!signer) {
+    throw new Error("The connected Sui wallet cannot sign transactions. Use a Sui wallet that supports transaction signing.");
+  }
+  const result = await signer({ transactionBlock: transaction, options: { showEffects: true } });
+  const status = result.effects?.status?.status;
+  if (status && status !== "success") {
+    throw new Error(result.effects?.status?.error ?? "Sui transaction failed");
+  }
+  if (!result.digest) {
+    throw new Error("Sui wallet did not return a transaction digest");
+  }
+  return result.digest;
 }
 
 export async function createSuiZkLoginSession(networkId?: NetworkId): Promise<SuiZkLoginSession> {

@@ -7,7 +7,7 @@ import {
   type NetworkId,
 } from "@/lib/network-config";
 import { networkForChain } from "@/lib/chain-registry";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp, tooManyRequests } from "@/lib/server/rate-limit";
 import { executeSuiTransactionKind } from "@/lib/server/sui-relayer";
 
 export const dynamic = "force-dynamic";
@@ -24,17 +24,16 @@ interface SuiRelayRequest {
   stealthData: string[];
   redeemAmounts?: string[];
   btcScripts?: string[];
+  // Unshield-specific (generic Coin<T> release)
+  coinType?: string;
+  unshieldAmounts?: string[];
+  recipientAddresses?: string[];
 }
 
 export async function POST(request: NextRequest) {
-  const ip = getClientIp(request.headers);
-  const rl = checkRateLimit(ip, "sui-relay", { maxTokens: 10, windowMs: 60_000 });
-  if (rl.limited) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 6000) / 1000)) } },
-    );
-  }
+  const rl = checkRateLimit(getClientIp(request.headers), "sui-relay", { maxTokens: 10, windowMs: 60_000 });
+  const limited = tooManyRequests(rl);
+  if (limited) return limited;
 
   try {
     const network = request.nextUrl.searchParams.get("network") as NetworkId | null
@@ -42,13 +41,9 @@ export async function POST(request: NextRequest) {
     const suiNetwork = networkForChain(network, "sui");
     const cfg = getNetworkConfig(suiNetwork);
     const body = await request.json() as SuiRelayRequest;
-
-    if (body.mode === "unshield") {
-      return NextResponse.json({
-        success: false,
-        error: "Sui public unshield is not enabled; use private transfer or BTC withdraw",
-      }, { status: 400 });
-    }
+    // coinType may arrive via query string (it is outside the typed relay payload).
+    const coinTypeParam = request.nextUrl.searchParams.get("coinType");
+    if (coinTypeParam && !body.coinType) body.coinType = coinTypeParam;
 
     validateCommon(body);
     const adapter = createSuiAdapter(cfg);
@@ -60,6 +55,48 @@ export async function POST(request: NextRequest) {
     const stealthData = body.stealthData.map((value, i) => validateHex(value, `stealthData[${i}]`, undefined));
     const publicInputs = concatBytes([merkleRoot, boundParamsHash, ...nullifiers, ...commitments]);
     const vkHash = getVkHash(cfg, body.nInputs, body.nOutputs);
+
+    if (body.mode === "unshield") {
+      if (!body.coinType) throw new Error("Unshield requires coinType");
+      const amounts = (body.unshieldAmounts ?? []).map((amount) => BigInt(amount));
+      const recipients = body.recipientAddresses ?? [];
+      const nPublicOutputs = recipients.length;
+      if (nPublicOutputs === 0 || amounts.length !== nPublicOutputs) {
+        throw new Error("Unshield requires matching recipientAddresses[] and unshieldAmounts[]");
+      }
+      const unshieldTx = await adapter.buildUnshieldTransaction({
+        coinType: body.coinType,
+        nInputs: body.nInputs,
+        nOutputs: body.nOutputs,
+        nPublicOutputs,
+        vkHash,
+        publicInputs,
+        proofPoints,
+        nullifiers,
+        commitmentsOut: commitments,
+        stealthData,
+        amounts,
+        recipients,
+      });
+      const unshieldResult = await executeSuiTransactionKind({
+        rpcUrl: cfg.sui!.rpcUrl,
+        bytes: unshieldTx.bytes,
+      });
+      const unshieldStatus = unshieldResult.effects?.status.status;
+      if (unshieldStatus !== "success") {
+        return NextResponse.json({
+          success: false,
+          error: unshieldResult.effects?.status.error ?? "Sui transaction failed",
+          digest: unshieldResult.digest,
+        }, { status: 500 });
+      }
+      return NextResponse.json({
+        success: true,
+        signature: unshieldResult.digest,
+        digest: unshieldResult.digest,
+        chain: "sui",
+      });
+    }
 
     const redemptionInput: Parameters<UTXOpiaSuiAdapter["buildRedemptionTransaction"]>[0] = {
       nInputs: body.nInputs,
@@ -89,6 +126,7 @@ export async function POST(request: NextRequest) {
         proofPoints,
         nullifiers,
         commitmentsOut: commitments,
+        stealthData,
       });
 
     const result = await executeSuiTransactionKind({
@@ -132,13 +170,27 @@ function validateCommon(body: SuiRelayRequest): void {
   if (body.commitmentsOut.length !== body.nOutputs) {
     throw new Error(`Expected ${body.nOutputs} commitments, got ${body.commitmentsOut.length}`);
   }
-  const expectedStealthCount = body.mode === "transfer" ? body.nOutputs : body.nOutputs - 1;
+  const nPublicOutputs = body.mode === "transfer"
+    ? 0
+    : body.mode === "unshield"
+      ? (body.recipientAddresses?.length ?? 1)
+      : 1;
+  const expectedStealthCount = body.nOutputs - nPublicOutputs;
   if (body.stealthData.length !== expectedStealthCount) {
     throw new Error(`Expected ${expectedStealthCount} stealth data entries, got ${body.stealthData.length}`);
   }
   body.stealthData.forEach((value, i) => {
     validateHex(value, `stealthData[${i}]`, 72);
   });
+  if (body.mode === "unshield") {
+    if (!body.coinType) throw new Error("Unshield requires coinType");
+    if (!body.recipientAddresses?.length || !body.unshieldAmounts?.length) {
+      throw new Error("Unshield requires recipientAddresses[] and unshieldAmounts[]");
+    }
+    if (body.recipientAddresses.length !== body.unshieldAmounts.length) {
+      throw new Error("Unshield arrays must have equal length");
+    }
+  }
   if (body.mode === "redeem") {
     if (!body.redeemAmounts?.length || !body.btcScripts?.length) {
       throw new Error("Redeem requires redeemAmounts[] and btcScripts[]");

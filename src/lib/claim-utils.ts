@@ -1,5 +1,6 @@
 "use client";
 
+import { toHex64 } from "@/lib/utils/hex";
 import {
   initPoseidon,
   deriveMasterKey,
@@ -73,7 +74,7 @@ export async function scanSecretPhrase(
     const commitmentHex = Buffer.from(note.commitment).toString("hex").padStart(64, "0");
     const leafIndexBigint = BigInt(note.leafIndex);
     const nullifierValue = computeJoinSplitNullifierSync(keys.nullifyingKey, leafIndexBigint);
-    const nullifierHex = nullifierValue.toString(16).padStart(64, "0");
+    const nullifierHex = toHex64(nullifierValue);
 
     results.push({
       amount: Number(note.amount),

@@ -88,6 +88,10 @@ export interface NetworkConfig {
     redemptionQueue: SuiSharedObjectRef;
     redemptionCap: SuiObjectRef;
     verifyingKeyRegistry: SuiSharedObjectRef;
+    /** Admin-curated generic `Coin<T>` registry — required for SPL shield/unshield. */
+    tokenRegistry?: SuiSharedObjectRef;
+    /** Per-coin display metadata, keyed by fully-qualified Move coin type. */
+    coinMetadata?: Record<string, { symbol: string; name: string; logo?: string; priceKey?: string }>;
     vk?: Record<string, {
       nInputs: number;
       nOutputs: number;

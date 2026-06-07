@@ -31,7 +31,6 @@ const getUTXOpiaSDK = () => import("@utxopia/sdk");
 import {
   buildVerifyTransactionInstructionData,
   buildCompleteDepositInstructionData,
-  AUTHORITY_SIZE,
 } from "@utxopia/sdk";
 
 import {
@@ -46,7 +45,8 @@ import {
 import { TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
 
 import { getRelayerKeypair } from "@/lib/server/relayer";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp, tooManyRequests } from "@/lib/server/rate-limit";
+import { uploadDataToBuffer, closeBuffer } from "@/lib/server/chadbuffer";
 
 import {
   type BlockHeader,
@@ -83,16 +83,6 @@ interface VerifyErrorResponse {
 }
 
 type VerifyResponse = VerifySuccessResponse | VerifyErrorResponse;
-
-// =============================================================================
-// ChadBuffer constants
-// =============================================================================
-
-const CHADBUFFER_INIT = 0;
-const CHADBUFFER_WRITE = 2;
-const CHADBUFFER_CLOSE = 3;
-const MAX_CHUNK_SIZE = 950;
-const FIRST_CHUNK_SIZE = 800;
 
 // =============================================================================
 // Helpers
@@ -247,142 +237,15 @@ async function fetchBlockHeaderByHeight(height: number, esploraApiUrl: string): 
   };
 }
 
-/**
- * Upload data to ChadBuffer (reusable for any data, not just proofs)
- */
-async function uploadDataToBuffer(
-  connection: Connection,
-  relayer: Keypair,
-  data: Uint8Array,
-  chadbufferProgramId: PublicKey,
-): Promise<{ bufferPubkey: PublicKey; bufferKeypair: Keypair }> {
-  const bufferKeypair = Keypair.generate();
-  const bufferSize = AUTHORITY_SIZE + data.length;
-  const rentExemption = await connection.getMinimumBalanceForRentExemption(bufferSize);
-
-  console.log(`[Verify] Creating buffer for ${data.length} bytes...`);
-
-  // TX 1: Create account + init with first chunk
-  const firstChunkSize = Math.min(FIRST_CHUNK_SIZE, data.length);
-  const firstChunk = data.slice(0, firstChunkSize);
-
-  const createAccountIx = SystemProgram.createAccount({
-    fromPubkey: relayer.publicKey,
-    newAccountPubkey: bufferKeypair.publicKey,
-    lamports: rentExemption,
-    space: bufferSize,
-    programId: chadbufferProgramId,
-  });
-
-  const initData = Buffer.alloc(1 + firstChunk.length);
-  initData[0] = CHADBUFFER_INIT;
-  Buffer.from(firstChunk).copy(initData, 1);
-
-  const initIx = new TransactionInstruction({
-    programId: chadbufferProgramId,
-    keys: [
-      { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bufferKeypair.publicKey, isSigner: true, isWritable: true },
-    ],
-    data: initData,
-  });
-
-  const { blockhash: blockhash1 } = await connection.getLatestBlockhash();
-  const tx1 = new Transaction();
-  tx1.add(createAccountIx, initIx);
-  tx1.feePayer = relayer.publicKey;
-  tx1.recentBlockhash = blockhash1;
-
-  await sendAndConfirmTransaction(connection, tx1, [relayer, bufferKeypair], {
-    commitment: "confirmed",
-  });
-
-  // TX 2+: Write remaining chunks
-  let dataOffset = firstChunkSize;
-
-  while (dataOffset < data.length) {
-    const chunkSize = Math.min(MAX_CHUNK_SIZE, data.length - dataOffset);
-    const chunk = data.slice(dataOffset, dataOffset + chunkSize);
-    const bufferOffset = AUTHORITY_SIZE + dataOffset;
-
-    const writeData = Buffer.alloc(4 + chunk.length);
-    writeData[0] = CHADBUFFER_WRITE;
-    writeData[1] = bufferOffset & 0xff;
-    writeData[2] = (bufferOffset >> 8) & 0xff;
-    writeData[3] = (bufferOffset >> 16) & 0xff;
-    Buffer.from(chunk).copy(writeData, 4);
-
-    const writeIx = new TransactionInstruction({
-      programId: chadbufferProgramId,
-      keys: [
-        { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-        { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
-      ],
-      data: writeData,
-    });
-
-    const { blockhash } = await connection.getLatestBlockhash();
-    const writeTx = new Transaction();
-    writeTx.add(writeIx);
-    writeTx.feePayer = relayer.publicKey;
-    writeTx.recentBlockhash = blockhash;
-
-    await sendAndConfirmTransaction(connection, writeTx, [relayer], {
-      commitment: "confirmed",
-    });
-
-    dataOffset += chunkSize;
-  }
-
-  console.log(`[Verify] Buffer upload complete (${data.length} bytes)`);
-  return { bufferPubkey: bufferKeypair.publicKey, bufferKeypair };
-}
-
-/**
- * Close a ChadBuffer to reclaim rent
- */
-async function closeBuffer(
-  connection: Connection,
-  relayer: Keypair,
-  bufferPubkey: PublicKey,
-  chadbufferProgramId: PublicKey,
-): Promise<void> {
-  const closeIx = new TransactionInstruction({
-    programId: chadbufferProgramId,
-    keys: [
-      { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bufferPubkey, isSigner: false, isWritable: true },
-    ],
-    data: Buffer.from([CHADBUFFER_CLOSE]),
-  });
-
-  const { blockhash } = await connection.getLatestBlockhash();
-  const closeTx = new Transaction();
-  closeTx.add(closeIx);
-  closeTx.feePayer = relayer.publicKey;
-  closeTx.recentBlockhash = blockhash;
-
-  await sendAndConfirmTransaction(connection, closeTx, [relayer], {
-    commitment: "confirmed",
-  });
-
-  console.log("[Verify] Buffer closed, rent reclaimed");
-}
-
 // =============================================================================
 // Main Handler
 // =============================================================================
 
 export async function POST(request: NextRequest): Promise<NextResponse<VerifyResponse>> {
   // Rate limit: 5 verify requests per minute per IP (each costs SOL)
-  const ip = getClientIp(request.headers);
-  const rl = checkRateLimit(ip, "verify", { maxTokens: 5, windowMs: 60_000 });
-  if (rl.limited) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests" } as VerifyResponse,
-      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 12000) / 1000)) } }
-    );
-  }
+  const rl = checkRateLimit(getClientIp(request.headers), "verify", { maxTokens: 5, windowMs: 60_000 });
+  const limited = tooManyRequests(rl, 12000);
+  if (limited) return limited as NextResponse<VerifyResponse>;
 
   const startTime = Date.now();
   const { hexToBytes } = await getUTXOpiaSDK();
@@ -403,6 +266,23 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     if (!sweepTxid || !depositTxid || !blockHeight) {
       return NextResponse.json(
         { success: false, error: "Missing required fields (sweepTxid, depositTxid, blockHeight)" },
+        { status: 400 }
+      );
+    }
+
+    // Validate before any network/chain interaction: txids must be 64 hex chars
+    // and blockHeight a sane positive integer. Prevents path injection into the
+    // Esplora URLs and relayer spend on malformed input.
+    const TXID_RE = /^[0-9a-fA-F]{64}$/;
+    if (!TXID_RE.test(sweepTxid) || !TXID_RE.test(depositTxid)) {
+      return NextResponse.json(
+        { success: false, error: "sweepTxid and depositTxid must be 64 hex characters" },
+        { status: 400 }
+      );
+    }
+    if (!Number.isInteger(blockHeight) || blockHeight <= 0 || blockHeight > 10_000_000) {
+      return NextResponse.json(
+        { success: false, error: "blockHeight must be a positive integer" },
         { status: 400 }
       );
     }
@@ -454,10 +334,24 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
 
     // 4. Upload raw txs to ChadBuffer accounts
     const [sweepBuffer, depositBuffer] = await Promise.all([
-      uploadDataToBuffer(connection, relayer, sweepRawBytes, chadbufferProgramId),
-      uploadDataToBuffer(connection, relayer, depositRawBytes, chadbufferProgramId),
+      uploadDataToBuffer(connection, relayer, sweepRawBytes, chadbufferProgramId, "Verify"),
+      uploadDataToBuffer(connection, relayer, depositRawBytes, chadbufferProgramId, "Verify"),
     ]);
 
+    // Reclaim buffer rent on BOTH success and failure (the SPV/complete tx below
+    // can reject after the buffers are funded).
+    const closeBuffers = async () => {
+      try {
+        await Promise.all([
+          closeBuffer(connection, relayer, sweepBuffer.bufferPubkey, chadbufferProgramId, "Verify"),
+          closeBuffer(connection, relayer, depositBuffer.bufferPubkey, chadbufferProgramId, "Verify"),
+        ]);
+      } catch (closeErr) {
+        console.warn("[Verify] Failed to close buffer (non-critical):", closeErr);
+      }
+    };
+
+    try {
     // 5. Derive all PDAs
     const [poolStatePDA] = derivePoolStatePDA(utxopiaProgramId);
     const [commitmentTreePDA] = deriveCommitmentTreePDA(utxopiaProgramId);
@@ -546,14 +440,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     console.log(`[Verify] Transaction confirmed: ${signature}`);
 
     // 9. Close buffers
-    try {
-      await Promise.all([
-        closeBuffer(connection, relayer, sweepBuffer.bufferPubkey, chadbufferProgramId),
-        closeBuffer(connection, relayer, depositBuffer.bufferPubkey, chadbufferProgramId),
-      ]);
-    } catch (closeErr) {
-      console.warn("[Verify] Failed to close buffer (non-critical):", closeErr);
-    }
+    await closeBuffers();
 
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`[Verify] Complete in ${duration}s`);
@@ -562,6 +449,10 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
       success: true,
       signature,
     });
+    } catch (innerErr) {
+      await closeBuffers();
+      throw innerErr;
+    }
   } catch (error) {
     console.error("[Verify] Error:", error);
     return NextResponse.json(

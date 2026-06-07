@@ -1,5 +1,6 @@
 "use client";
 
+import { toHex64 } from "@/lib/utils/hex";
 import {
   EventClient,
   UTXOpiaClient,
@@ -71,7 +72,7 @@ export function getTokenScanTargets(
   const tokensToScan: TokenScanTarget[] = [];
   const seenTokenIds = new Set<string>();
   const pushTokenToScan = (symbol: string, tokenId: bigint) => {
-    const key = tokenId.toString(16).padStart(64, "0");
+    const key = toHex64(tokenId);
     if (seenTokenIds.has(key)) return;
     seenTokenIds.add(key);
     tokensToScan.push({ symbol, tokenId });
@@ -152,7 +153,7 @@ async function fetchSuiInboxEvents(config: NetworkConfig): Promise<InboxSource> 
         commitment,
         leafIndex,
         blockTime: Math.floor(Number(event.timestampMs ?? 0) / 1000),
-        tokenIdHex: SUI_ZKBTC_TOKEN_ID.toString(16).padStart(64, "0"),
+        tokenIdHex: toHex64(SUI_ZKBTC_TOKEN_ID),
       });
     } else if (type === "NullifierSpent") {
       const nullifier = bytesField(payload.nullifier);

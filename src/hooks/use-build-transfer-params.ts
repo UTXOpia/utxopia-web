@@ -7,6 +7,7 @@
  * Extracted from pay-flow.tsx to prevent logic drift between flows.
  */
 
+import { toHex64 } from "@/lib/utils/hex";
 import { PublicKey } from "@solana/web3.js";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { JoinSplitProofInputs, UTXOpiaKeys, StealthMetaAddress, ScannedNote } from "@utxopia/sdk";
@@ -26,6 +27,8 @@ export interface TransferUserInputs {
   /** Relayer stealth meta (for fee output) */
   relayerMeta?: StealthMetaAddress;
   relayerFee: number;
+  /** Chain id folded into bound params (Solana 103, Sui 784). */
+  boundChainId: bigint;
   /** Mode-specific recipient */
   recipient: {
     stealthMeta?: StealthMetaAddress; // stealth mode
@@ -69,7 +72,7 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
 
   await initPoseidon();
 
-  const { mode, amountSats, selectedNotes, keys, selfMeta, relayerMeta, relayerFee, recipient } = inputs;
+  const { mode, amountSats, selectedNotes, keys, selfMeta, relayerMeta, relayerFee, recipient, boundChainId } = inputs;
 
   // 1. Fetch merkle proofs and prepare claim inputs for each note
   const utxopiaClient = UTXOpiaClient.isInitialized
@@ -99,8 +102,8 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
 
       const merkle = {
         success: true,
-        root: merkleProofs[i].root.toString(16).padStart(64, "0"),
-        siblings: merkleProofs[i].pathElements.map((e) => e.toString(16).padStart(64, "0")),
+        root: toHex64(merkleProofs[i].root),
+        siblings: merkleProofs[i].pathElements.map((e) => toHex64(e)),
         indices: merkleProofs[i].pathIndices,
       };
 
@@ -215,14 +218,14 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   let unshieldRecipientAddress: Uint8Array | undefined;
 
   if (mode === "btc") {
-    const redeemParams = createRedeemBoundParams(recipient.btcScriptPubKey!, stealthDataHash);
+    const redeemParams = createRedeemBoundParams(recipient.btcScriptPubKey!, stealthDataHash, boundChainId);
     boundParamsHash = computeBoundParamsHash(redeemParams);
   } else if (mode === "public") {
     unshieldRecipientAddress = new PublicKey(recipient.solanaAddress!).toBytes();
-    const unshieldParams = createUnshieldBoundParams(unshieldRecipientAddress, stealthDataHash);
+    const unshieldParams = createUnshieldBoundParams(unshieldRecipientAddress, stealthDataHash, boundChainId);
     boundParamsHash = computeBoundParamsHash(unshieldParams);
   } else {
-    const transferParams = createTransferBoundParams(stealthDataHash);
+    const transferParams = createTransferBoundParams(stealthDataHash, boundChainId);
     boundParamsHash = computeBoundParamsHash(transferParams);
   }
 

@@ -7,6 +7,7 @@
  * This module is server-only (runs in Next.js API routes).
  */
 
+import { toHex64 } from "@/lib/utils/hex";
 import {
   CommitmentTreeIndex,
   getConfig,
@@ -139,7 +140,7 @@ export function getTreeStatus(): {
 } {
   const index = getServerCommitmentIndex();
   return {
-    root: index.getRoot().toString(16).padStart(64, "0"),
+    root: toHex64(index.getRoot()),
     nextIndex: index.size(),
     size: index.size(),
   };
@@ -322,7 +323,7 @@ export async function syncFromOnChain(): Promise<{
   // Save to disk
   saveServerCommitmentIndex();
 
-  const root = serverIndex.getRoot().toString(16).padStart(64, "0");
+  const root = toHex64(serverIndex.getRoot());
 
   return { synced, skipped, root };
 }

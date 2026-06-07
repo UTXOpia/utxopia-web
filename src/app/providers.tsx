@@ -6,6 +6,7 @@ import { WalletModalProvider } from "@solana/wallet-adapter-react-ui";
 import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Toaster } from "sonner";
 import { StoreHydration } from "@/stores";
+import { ChainThemeSync } from "@/components/chain-theme-sync";
 import { HELIUS_RPC_DEVNET } from "@/lib/helius";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
@@ -43,6 +44,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <UiModeProvider>
               {/* Hydrate Zustand stores (Bitcoin wallet, Poseidon) */}
               <StoreHydration />
+              {/* Reflect active chain onto <html data-chain> for accent tokens */}
+              <ChainThemeSync />
               {children}
               <Toaster
                 position="top-right"

@@ -37,6 +37,8 @@ import {
   deriveKeysFromSeedCircuit,
   createStealthMetaAddress,
   isAuditorDisclosable,
+  SOLANA_BOUND_CHAIN_ID,
+  SUI_BOUND_CHAIN_ID,
   type SnsStealthAddress,
   type StealthMetaAddress,
 } from "@utxopia/sdk";
@@ -173,6 +175,7 @@ export function SendForm() {
   const tokenPrices = useTokenPrices();
   const chainEnv = useChainEnvironment();
   const activeChainId = getChainAdapter(chainEnv.config).id;
+  const boundChainId = activeChainId === "sui" ? SUI_BOUND_CHAIN_ID : SOLANA_BOUND_CHAIN_ID;
   const activeChainLabel = activeChainId === "sui" ? "Sui" : "Solana";
   const detection = useMemo(
     () => detectRecipient(state.recipient, { chain: activeChainId }),
@@ -404,6 +407,7 @@ export function SendForm() {
           ? decodeStealthMetaAddress(relayerMeta.stealthMeta)
           : undefined,
         relayerFee: effectiveRelayerFee,
+        boundChainId,
         recipient: recipientArg,
       });
 
@@ -490,6 +494,7 @@ export function SendForm() {
           ? decodeStealthMetaAddress(relayerMeta.stealthMeta)
           : undefined,
         relayerFee: effectiveRelayerFee,
+        boundChainId,
         recipient: { stealthMeta: noteMeta },
       });
 

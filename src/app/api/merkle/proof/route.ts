@@ -1,3 +1,4 @@
+import { toHex64 } from "@/lib/utils/hex";
 import { NextRequest, NextResponse } from "next/server";
 import { Connection, PublicKey } from "@solana/web3.js";
 import {
@@ -107,7 +108,7 @@ async function getTreeAndRootForNetwork(
     if (treeAccountInfo) {
       const treeState = parseCommitmentTreeData(new Uint8Array(treeAccountInfo.data));
       maxLeafIndex = Number(treeState.nextIndex);
-      rootHex = bytesToBigint(treeState.currentRoot).toString(16).padStart(64, "0");
+      rootHex = toHex64(bytesToBigint(treeState.currentRoot));
 
       // Skip rebuild if nextIndex hasn't changed
       if (cache.tree && cache.nextIndex === maxLeafIndex && cache.onChainRoot) {
@@ -194,7 +195,7 @@ export async function GET(request: NextRequest) {
         commitmentHex = commitment;
       } else {
         // Decimal — convert to hex
-        commitmentHex = BigInt(commitment).toString(16).padStart(64, "0");
+        commitmentHex = toHex64(BigInt(commitment));
       }
     } catch {
       return NextResponse.json(
@@ -273,7 +274,7 @@ export async function GET(request: NextRequest) {
           success: false,
           error: "Commitment not found in on-chain tree",
           treeSize: tree.size(),
-          lookingFor: commitmentBigInt.toString(16).padStart(64, "0"),
+          lookingFor: toHex64(commitmentBigInt),
           firstTreeCommitments: treeData.commitments.slice(0, 5).map(([hex]) => hex),
         },
         { status: 404 }
@@ -287,8 +288,8 @@ export async function GET(request: NextRequest) {
       commitment,
       leafIndex: proof.leafIndex.toString(),
       root: onChainRoot,
-      computedRoot: proof.root.toString(16).padStart(64, "0"),
-      siblings: proof.siblings.map((s) => s.toString(16).padStart(64, "0")),
+      computedRoot: toHex64(proof.root),
+      siblings: proof.siblings.map((s) => toHex64(s)),
       indices: proof.indices,
       source: "on-chain",
     });

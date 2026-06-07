@@ -1,3 +1,4 @@
+import { toHex64 } from "@/lib/utils/hex";
 import { SuiClient } from "@mysten/sui/client";
 import { CommitmentTreeIndex, getMerkleProofFromTree, initPoseidon } from "@utxopia/sdk";
 import type { NetworkConfig } from "@/lib/network-config";
@@ -101,14 +102,14 @@ export async function fetchSuiMerkleProof(
   const proof = getMerkleProofFromTree(tree, BigInt(`0x${normalized}`));
   if (!proof) return null;
 
-  const root = proof.root.toString(16).padStart(64, "0");
+  const root = toHex64(proof.root);
   return {
     success: true,
     commitment: normalized,
     leafIndex: String(proof.leafIndex),
     root,
     computedRoot: root,
-    siblings: proof.siblings.map((sibling) => sibling.toString(16).padStart(64, "0")),
+    siblings: proof.siblings.map((sibling) => toHex64(sibling)),
     indices: proof.indices,
     source: "sui-events",
   };

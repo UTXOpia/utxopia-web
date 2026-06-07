@@ -4,6 +4,7 @@ import { useMemo, type ReactNode } from "react";
 import { Bitcoin, PlusCircle, Wallet } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { ShieldFlow } from "@/components/shield-flow";
+import { SuiShieldFlow } from "@/components/shield-flow/sui-shield-flow";
 import { SuiAuthPanel } from "@/components/sui/sui-auth-panel";
 import { ChainDepositPage, type ChainDepositAction } from "@/components/vault/chain-deposit-page";
 import { useSuiAuthState } from "@/hooks/sui/use-sui-auth-state";
@@ -83,14 +84,11 @@ function SuiDepositPage({ networkId }: ChainDepositRouteProps) {
       disabled: !isHybrid,
       tone: "warning",
     },
-    {
-      icon: <Wallet className="h-5 w-5" />,
-      title: "Native SUI deposit",
-      description: "Sui coin shielding needs the Sui transaction signer flow before it should be exposed here.",
-      disabled: true,
-      tone: "default",
-    },
   ], [faucetHref, isHybrid]);
+
+  // PTB shielding needs a wallet that can sign transactions; zkLogin/passkey
+  // unlock the private address but cannot sign a Coin<T> shield PTB.
+  const shieldWalletAddress = suiAuth?.method === "wallet" ? suiAuth.address : null;
 
   return (
     <ChainDepositPage
@@ -114,6 +112,26 @@ function SuiDepositPage({ networkId }: ChainDepositRouteProps) {
         addressButtonClassName: "border-sui/15 text-sui hover:bg-sui/10",
         addressCodeClassName: "text-sui",
       }}
-    />
+    >
+      {shieldWalletAddress ? (
+        <div className="rounded-[14px] border border-sui/15 bg-sui/5 p-4">
+          <div className="mb-3 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Wallet className="h-4 w-4 text-sui" />
+            Shield a token
+          </div>
+          <SuiShieldFlow walletAddress={shieldWalletAddress} />
+        </div>
+      ) : (
+        <div className="rounded-[14px] border border-sui/15 bg-sui/5 p-4">
+          <div className="mb-1 flex items-center gap-2 text-sm font-semibold text-foreground">
+            <Wallet className="h-4 w-4 text-sui" />
+            Shield a token
+          </div>
+          <p className="text-xs leading-5 text-gray">
+            Connect a Sui wallet (above) to shield a supported Coin into your private balance in one signature.
+          </p>
+        </div>
+      )}
+    </ChainDepositPage>
   );
 }

@@ -1,3 +1,13 @@
+/* Visible keyboard focus, applied consistently across every interactive surface.
+   Uses the chain-context ring token so focus reads as state, not decoration
+   (PRODUCT.md: visible focus states; WCAG 2.4.7). Pointer clicks stay clean
+   because :focus-visible only triggers for keyboard/AT navigation. */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
 /* Reduced motion: disable all animations */
 @media (prefers-reduced-motion: reduce) {
   *,

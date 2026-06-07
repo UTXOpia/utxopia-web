@@ -8,6 +8,7 @@
  * @module token-map
  */
 
+import { toHex64 } from "@/lib/utils/hex";
 import { SUPPORTED_TOKENS } from "./supported-tokens";
 
 // ---------------------------------------------------------------------------
@@ -63,7 +64,7 @@ export async function buildTokenIdMap(): Promise<Map<string, string>> {
       try {
         const mintBytes = new PublicKey(mintAddress).toBytes();
         const tokenId = computeTokenId(mintBytes);
-        const hex = tokenId.toString(16).padStart(64, "0");
+        const hex = toHex64(tokenId);
         if (!map.has(hex)) map.set(hex, token.symbol);
       } catch (err) { console.error("[TokenMap] tokenId computation failed for:", token.symbol, err); }
     }

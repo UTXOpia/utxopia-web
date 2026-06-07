@@ -31,6 +31,8 @@ interface ChainDepositPageProps {
   privateAddress: string | null;
   privateAddressDescription: string;
   actions: ChainDepositAction[];
+  /** Extra content rendered below the actions once the private address exists. */
+  children?: ReactNode;
   theme?: {
     unlockCardClassName?: string;
     unlockIconClassName?: string;
@@ -54,6 +56,7 @@ export function ChainDepositPage({
   privateAddress,
   privateAddressDescription,
   actions,
+  children,
   theme,
 }: ChainDepositPageProps) {
   return (
@@ -113,6 +116,7 @@ export function ChainDepositPage({
                 />
               ))}
             </div>
+            {children}
           </>
         )}
       </div>

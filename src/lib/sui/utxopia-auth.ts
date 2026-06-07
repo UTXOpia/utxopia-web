@@ -43,7 +43,7 @@ export async function createSuiUtxopiaAuthPreviewFromSignature(
   signature: Uint8Array,
   options: AuthSignatureKeyDerivationOptions = {},
 ): Promise<SuiUtxopiaAuthPreview> {
-  const setup = setupKeysFromAuthSignature(signature, {
+  const setup = await setupKeysFromAuthSignature(signature, {
     chain: "sui",
     network: "sui-regtest",
     ...options,

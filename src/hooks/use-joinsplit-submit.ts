@@ -5,6 +5,7 @@
  * Used by PaymentWizard for all 3 flows.
  */
 
+import { toHex64 } from "@/lib/utils/hex";
 import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
@@ -49,13 +50,13 @@ export function useJoinSplitSubmit() {
       const nInputs = params.proofInputs.nInputs;
       const nOutputs = params.proofInputs.nOutputs;
 
-      const merkleRootHex = BigInt(publicSignals[0]).toString(16).padStart(64, "0");
-      const boundParamsHashHex = BigInt(publicSignals[1]).toString(16).padStart(64, "0");
+      const merkleRootHex = toHex64(BigInt(publicSignals[0]));
+      const boundParamsHashHex = toHex64(BigInt(publicSignals[1]));
       const nullifierHexes = publicSignals.slice(2, 2 + nInputs).map(
-        (s: string) => BigInt(s).toString(16).padStart(64, "0"),
+        (s: string) => toHex64(BigInt(s)),
       );
       const commitmentHexes = publicSignals.slice(2 + nInputs, 2 + nInputs + nOutputs).map(
-        (s: string) => BigInt(s).toString(16).padStart(64, "0"),
+        (s: string) => toHex64(BigInt(s)),
       );
 
       const relayClient = UTXOpiaClient.isInitialized

@@ -27,26 +27,39 @@ import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient
 
 const KEYS_STORAGE_PREFIX = "utxo:keys:";
 
-async function deriveStorageKey(walletPubkey: string): Promise<CryptoKey> {
+// Derive the AES-GCM storage key from a REAL per-user secret (a wallet signature,
+// the auth signature, or the passkey seed) plus the public owner id for domain
+// separation. Without the secret, localStorage ciphertext is not decryptable by
+// anyone who merely reads the browser profile.
+async function deriveStorageKey(owner: string, secret: Uint8Array): Promise<CryptoKey> {
   const enc = new TextEncoder();
-  // ":aegis-storage-key" and "aegis-v4:" are LOAD-BEARING KDF inputs — frozen
-  // from the project's pre-rename era. Changing either breaks the AES-GCM
-  // key that decrypts every existing user's persisted spending/viewing keys.
-  // The project name is "UTXOpia", but these strings stay as-is.
-  const keyMaterial = await crypto.subtle.importKey(
-    "raw",
-    enc.encode(walletPubkey + ":aegis-storage-key"),
-    "PBKDF2",
-    false,
-    ["deriveKey"],
-  );
+  const ownerBytes = enc.encode(":utxopia-storage-key:v5:" + owner);
+  const material = new Uint8Array(secret.length + ownerBytes.length);
+  material.set(secret, 0);
+  material.set(ownerBytes, secret.length);
+  const keyMaterial = await crypto.subtle.importKey("raw", material, "PBKDF2", false, ["deriveKey"]);
   return crypto.subtle.deriveKey(
-    { name: "PBKDF2", salt: enc.encode("aegis-v4:" + walletPubkey), iterations: 600_000, hash: "SHA-256" },
+    { name: "PBKDF2", salt: enc.encode("utxopia-storage-salt:v5:" + owner), iterations: 600_000, hash: "SHA-256" },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
     ["encrypt", "decrypt"],
   );
+}
+
+// In-memory per-session cache: derived once at auth (unlock), reused for the rest
+// of the session. A fresh page load has an empty cache, so persisted keys can only
+// be decrypted after the user re-authenticates once (the "once per session" model).
+let sessionStorageKey: { owner: string; key: CryptoKey } | null = null;
+
+async function unlockStorageKey(owner: string, secret: Uint8Array): Promise<CryptoKey> {
+  const key = await deriveStorageKey(owner, secret);
+  sessionStorageKey = { owner, key };
+  return key;
+}
+
+function cachedStorageKey(owner: string): CryptoKey | null {
+  return sessionStorageKey && sessionStorageKey.owner === owner ? sessionStorageKey.key : null;
 }
 
 async function encryptData(key: CryptoKey, plaintext: string): Promise<string> {
@@ -74,12 +87,13 @@ async function decryptData(key: CryptoKey, encrypted: string): Promise<string> {
   return new TextDecoder().decode(plaintext);
 }
 
-async function persistKeys(walletPubkey: string): Promise<void> {
+// Persist at auth time: `secret` unlocks (derives + caches) the session storage key.
+async function persistKeys(walletPubkey: string, secret: Uint8Array): Promise<void> {
   try {
     const client = UTXOpiaClient.instance();
     const data = client.serializeKeys();
     if (!data) return;
-    const storageKey = await deriveStorageKey(walletPubkey);
+    const storageKey = await unlockStorageKey(walletPubkey, secret);
     const encrypted = await encryptData(storageKey, JSON.stringify(data));
     localStorage.setItem(KEYS_STORAGE_PREFIX + walletPubkey, encrypted);
   } catch {
@@ -87,12 +101,15 @@ async function persistKeys(walletPubkey: string): Promise<void> {
   }
 }
 
+// Decrypt only with the in-session unlocked key. Returns null on a fresh session
+// (no cached key) so hydration cannot transparently decrypt without re-auth.
 async function loadKeys(walletPubkey: string, solanaPublicKey: Uint8Array): Promise<UTXOpiaKeys | null> {
   try {
     const raw = localStorage.getItem(KEYS_STORAGE_PREFIX + walletPubkey);
     if (!raw) return null;
+    const storageKey = cachedStorageKey(walletPubkey);
+    if (!storageKey) return null;
 
-    const storageKey = await deriveStorageKey(walletPubkey);
     const decrypted = await decryptData(storageKey, raw);
     const data = JSON.parse(decrypted);
 
@@ -246,8 +263,11 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           signMessage: wallet.signMessage,
         });
 
-      // Persist to localStorage for session hydration
-      persistKeys(wallet.publicKey.toBase58());
+      // Persist encrypted under a wallet-signature secret (unlocks the session).
+      const unlockSecret = await wallet.signMessage(
+        new TextEncoder().encode("utxopia:storage-unlock:v1"),
+      );
+      await persistKeys(wallet.publicKey.toBase58(), unlockSecret);
 
       set({
         keys: derivedKeys,
@@ -291,8 +311,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     // Since loadKeys already deserialized, we re-read raw from localStorage
     try {
       const raw = localStorage.getItem(KEYS_STORAGE_PREFIX + pubkeyStr);
-      if (raw) {
-        const storageKey = await deriveStorageKey(pubkeyStr);
+      const storageKey = cachedStorageKey(pubkeyStr);
+      if (raw && storageKey) {
         const decrypted = await decryptData(storageKey, raw);
         const data = JSON.parse(decrypted);
         client.restoreKeys(data, walletPubkey.toBytes());
@@ -318,7 +338,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
         await client.loginWithAuthSignature(signature, { account, chain, network });
 
-      persistKeys(`${chain}:${account}`);
+      await persistKeys(`${chain}:${account}`, signature);
 
       set({
         keys: derivedKeys,
@@ -343,11 +363,11 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
         await client.loginWithSeed(seed);
 
-      // Persist with "passkey:" prefix
+      // Persist with "passkey:" prefix, encrypted under the passkey seed secret.
       const credentialId = typeof window !== "undefined"
         ? localStorage.getItem("utxo:passkey_credential_id") || "default"
         : "default";
-      persistKeys("passkey:" + credentialId);
+      await persistKeys("passkey:" + credentialId, seed);
 
       set({
         keys: derivedKeys,
@@ -380,8 +400,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       const client = UTXOpiaClient.instance();
       try {
         const raw = localStorage.getItem(KEYS_STORAGE_PREFIX + storageId);
-        if (raw) {
-          const storageKey = await deriveStorageKey(storageId);
+        const storageKey = cachedStorageKey(storageId);
+        if (raw && storageKey) {
           const decrypted = await decryptData(storageKey, raw);
           const data = JSON.parse(decrypted);
           client.restoreKeys(data, new Uint8Array(32));

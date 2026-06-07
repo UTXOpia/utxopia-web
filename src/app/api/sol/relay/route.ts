@@ -44,7 +44,8 @@ import {
 } from "@/lib/solana/pdas";
 
 import { getRelayerKeypair as getRelayerKeypairShared } from "@/lib/server/relayer";
-import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { checkRateLimit, getClientIp, tooManyRequests } from "@/lib/server/rate-limit";
+import { uploadDataToBuffer, closeBuffer } from "@/lib/server/chadbuffer";
 import {
   detectNetworkFromRequest,
   getNetworkConfig,
@@ -58,11 +59,6 @@ export const dynamic = "force-dynamic";
 // =============================================================================
 
 const RELAYER_FEE_SATS = parseInt(process.env.RELAYER_FEE_SATS || "2000", 10);
-
-const CHADBUFFER = { INIT: 0, WRITE: 2, CLOSE: 3 } as const;
-const AUTHORITY_SIZE = 32;
-const MAX_CHUNK_SIZE = 950;
-const FIRST_CHUNK_SIZE = 800;
 
 // =============================================================================
 // Types
@@ -143,119 +139,14 @@ function deriveRedemptionRequestPDA(
 }
 
 // =============================================================================
-// ChadBuffer Operations
-// =============================================================================
-
-async function uploadProofToBuffer(
-  connection: Connection,
-  relayer: Keypair,
-  proof: Uint8Array,
-  chadbufferProgramId: PublicKey,
-): Promise<{ bufferPubkey: PublicKey; bufferKeypair: Keypair }> {
-  const bufferKeypair = Keypair.generate();
-  const bufferSize = AUTHORITY_SIZE + proof.length;
-  const rentExemption = await connection.getMinimumBalanceForRentExemption(bufferSize);
-
-  const firstChunkSize = Math.min(FIRST_CHUNK_SIZE, proof.length);
-  const firstChunk = proof.slice(0, firstChunkSize);
-
-  const createAccountIx = SystemProgram.createAccount({
-    fromPubkey: relayer.publicKey,
-    newAccountPubkey: bufferKeypair.publicKey,
-    lamports: rentExemption,
-    space: bufferSize,
-    programId: chadbufferProgramId,
-  });
-
-  const initData = Buffer.alloc(1 + firstChunk.length);
-  initData[0] = CHADBUFFER.INIT;
-  Buffer.from(firstChunk).copy(initData, 1);
-
-  const initIx = new TransactionInstruction({
-    programId: chadbufferProgramId,
-    keys: [
-      { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bufferKeypair.publicKey, isSigner: true, isWritable: true },
-    ],
-    data: initData,
-  });
-
-  const { blockhash } = await connection.getLatestBlockhash();
-  const tx = new Transaction().add(createAccountIx, initIx);
-  tx.feePayer = relayer.publicKey;
-  tx.recentBlockhash = blockhash;
-  await sendAndConfirmTransaction(connection, tx, [relayer, bufferKeypair], { commitment: "confirmed" });
-
-  let dataOffset = firstChunkSize;
-  while (dataOffset < proof.length) {
-    const chunkSize = Math.min(MAX_CHUNK_SIZE, proof.length - dataOffset);
-    const chunk = proof.slice(dataOffset, dataOffset + chunkSize);
-    const bufferOffset = AUTHORITY_SIZE + dataOffset;
-
-    const writeData = Buffer.alloc(4 + chunk.length);
-    writeData[0] = CHADBUFFER.WRITE;
-    writeData[1] = bufferOffset & 0xff;
-    writeData[2] = (bufferOffset >> 8) & 0xff;
-    writeData[3] = (bufferOffset >> 16) & 0xff;
-    Buffer.from(chunk).copy(writeData, 4);
-
-    const writeIx = new TransactionInstruction({
-      programId: chadbufferProgramId,
-      keys: [
-        { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-        { pubkey: bufferKeypair.publicKey, isSigner: false, isWritable: true },
-      ],
-      data: writeData,
-    });
-
-    const { blockhash: wbh } = await connection.getLatestBlockhash();
-    const writeTx = new Transaction().add(writeIx);
-    writeTx.feePayer = relayer.publicKey;
-    writeTx.recentBlockhash = wbh;
-    await sendAndConfirmTransaction(connection, writeTx, [relayer], { commitment: "confirmed" });
-    dataOffset += chunkSize;
-  }
-
-  console.log(`[Relay] Uploaded proof to buffer (${proof.length} bytes)`);
-  return { bufferPubkey: bufferKeypair.publicKey, bufferKeypair };
-}
-
-async function closeBuffer(
-  connection: Connection,
-  relayer: Keypair,
-  bufferPubkey: PublicKey,
-  chadbufferProgramId: PublicKey,
-): Promise<void> {
-  const closeIx = new TransactionInstruction({
-    programId: chadbufferProgramId,
-    keys: [
-      { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
-      { pubkey: bufferPubkey, isSigner: false, isWritable: true },
-    ],
-    data: Buffer.from([CHADBUFFER.CLOSE]),
-  });
-  const { blockhash } = await connection.getLatestBlockhash();
-  const closeTx = new Transaction().add(closeIx);
-  closeTx.feePayer = relayer.publicKey;
-  closeTx.recentBlockhash = blockhash;
-  await sendAndConfirmTransaction(connection, closeTx, [relayer], { commitment: "confirmed" });
-  console.log("[Relay] Buffer closed, rent reclaimed");
-}
-
-// =============================================================================
 // Main Handler
 // =============================================================================
 
 export async function POST(request: NextRequest) {
   // Rate limit: 10 relay requests per minute per IP
-  const ip = getClientIp(request.headers);
-  const rl = checkRateLimit(ip, "relay", { maxTokens: 10, windowMs: 60_000 });
-  if (rl.limited) {
-    return NextResponse.json(
-      { success: false, error: "Too many requests" },
-      { status: 429, headers: { "Retry-After": String(Math.ceil((rl.retryAfterMs ?? 6000) / 1000)) } }
-    );
-  }
+  const rl = checkRateLimit(getClientIp(request.headers), "relay", { maxTokens: 10, windowMs: 60_000 });
+  const limited = tooManyRequests(rl);
+  if (limited) return limited;
 
   const startTime = Date.now();
 
@@ -350,7 +241,7 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Upload proof to ChadBuffer ─────────────────────────────────────
-    const { bufferPubkey } = await uploadProofToBuffer(connection, relayer, proofBytes, chadbufferProgramId);
+    const { bufferPubkey } = await uploadDataToBuffer(connection, relayer, proofBytes, chadbufferProgramId, "Relay");
 
     // ── Build instruction data + accounts (per mode) ───────────────────
     let ixData: Uint8Array;
@@ -535,7 +426,7 @@ export async function POST(request: NextRequest) {
 
     // Close buffer and reclaim rent
     try {
-      await closeBuffer(connection, relayer, bufferPubkey, chadbufferProgramId);
+      await closeBuffer(connection, relayer, bufferPubkey, chadbufferProgramId, "Relay");
     } catch (closeErr) {
       console.warn("[Relay] Failed to close buffer (non-critical):", closeErr);
     }

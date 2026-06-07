@@ -44,6 +44,7 @@ import {
 } from "@/lib/network-config";
 import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
 import { getBackendUrl } from "@/lib/api/constants";
+import { getClientIp } from "@/lib/server/rate-limit";
 import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
 import {
   createNonInteractiveDeposit,
@@ -270,11 +271,6 @@ function isEnoent(e: unknown): e is NodeJS.ErrnoException {
 function isValidRegtestAddress(addr: string): boolean {
   // bech32: bcrt1q… (P2WPKH/P2WSH) or bcrt1p… (P2TR). Length 42–62 covers all variants.
   return /^bcrt1[a-z0-9]{38,90}$/.test(addr);
-}
-
-function getClientIp(req: NextRequest): string {
-  const forwarded = req.headers.get("x-forwarded-for")?.split(",")[0]?.trim();
-  return forwarded || req.headers.get("x-real-ip") || "unknown";
 }
 
 function satsToBtcDecimal(sats: number): string {
@@ -521,7 +517,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  const clientIp = getClientIp(req);
+  const clientIp = getClientIp(req.headers);
   const quotaKeys = [
     limitKey("recipient", requestedAddress),
     limitKey("ip", clientIp),
