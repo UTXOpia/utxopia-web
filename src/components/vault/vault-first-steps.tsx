@@ -110,18 +110,26 @@ export function VaultFirstSteps({
     onBackupComplete?.();
   };
 
+  // Funds without a backup are unrecoverable if keys are lost — escalate
+  // the collapsed row to a warning instead of a neutral brand chip.
+  const fundsAtRisk = fundsDone && !hasBackup;
+
   return (
-    <div className={cn("mb-4 rounded-[12px] border", tone.border, tone.bg)}>
+    <div className={cn("mb-4 rounded-[12px] border", fundsAtRisk ? "border-warning/25 bg-warning/5" : [tone.border, tone.bg])}>
       <button
         onClick={() => setIsExpanded((open) => !open)}
         aria-expanded={isExpanded}
-        className={cn("flex w-full cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left transition-colors", tone.hoverBg)}
+        className={cn("flex w-full cursor-pointer items-center gap-2.5 rounded-[12px] px-3 py-2.5 text-left transition-colors", fundsAtRisk ? "hover:bg-warning/5" : tone.hoverBg)}
       >
-        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", tone.dot)} />
+        <span className={cn("h-1.5 w-1.5 shrink-0 rounded-full", fundsAtRisk ? "bg-warning" : tone.dot)} />
         <span className="text-caption font-semibold text-foreground">
           Set up your wallet
         </span>
-        <span className="text-caption text-gray">{doneCount} of {totalSteps} done</span>
+        {fundsAtRisk ? (
+          <span className="text-caption font-semibold text-warning">Back up required</span>
+        ) : (
+          <span className="text-caption text-gray">{doneCount} of {totalSteps} done</span>
+        )}
         <ChevronDown
           className={cn(
             "ml-auto h-3.5 w-3.5 shrink-0 text-gray transition-transform",
