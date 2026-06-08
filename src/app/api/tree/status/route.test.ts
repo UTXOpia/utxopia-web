@@ -1,14 +1,11 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { fetchSuiExplorerStats } from "@/test-support/sui-explorer-mock";
 
-const fetchSuiExplorerStats = mock(async () => ({
+fetchSuiExplorerStats.mockImplementation(async () => ({
   totalShielded: 1_000n,
   depositCount: 1,
   totalCommitments: 7,
   volume: 1_000n,
-}));
-
-mock.module("@/lib/sui/explorer", () => ({
-  fetchSuiExplorerStats,
 }));
 
 const { GET } = await import("./route");
