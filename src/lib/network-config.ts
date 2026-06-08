@@ -250,6 +250,15 @@ export function chainQueryForNetwork(network: NetworkId): ChainQuery {
   return networkChain(network);
 }
 
+/** Map a Sui fullnode RPC URL to the network name SuiJsonRpcClient expects (v2
+ *  requires it). Derived from the URL so adding a mainnet entry needs no change. */
+export function suiNetworkName(rpcUrl: string): "mainnet" | "testnet" | "devnet" | "localnet" {
+  if (rpcUrl.includes("mainnet")) return "mainnet";
+  if (rpcUrl.includes("devnet")) return "devnet";
+  if (rpcUrl.includes("127.0.0.1") || rpcUrl.includes("localhost")) return "localnet";
+  return "testnet";
+}
+
 export function hrefWithChain(href: string, network: NetworkId): string {
   const chain = chainQueryForNetwork(network);
   if (href.startsWith("http://") || href.startsWith("https://") || href.startsWith("#")) {

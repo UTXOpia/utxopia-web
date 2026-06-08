@@ -2,7 +2,7 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { SuinsClient, SuinsTransaction } from "@mysten/suins";
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Secp256k1Keypair } from "@mysten/sui/keypairs/secp256k1";
 import { Secp256r1Keypair } from "@mysten/sui/keypairs/secp256r1";
@@ -111,7 +111,7 @@ function isPromiseLike(value: unknown): value is Promise<unknown> {
   );
 }
 
-function adaptCoreClientForSuins(client: SuiClient) {
+function adaptCoreClientForSuins(client: SuiJsonRpcClient) {
   const core = client.core as unknown as SuinsCoreClient;
   const getObject = core.getObject.bind(core);
 
@@ -152,7 +152,7 @@ async function main() {
   const address = normalizeAddress(signer.getPublicKey().toSuiAddress());
   if (!ADDRESS_RE.test(address)) throw new Error(`Invalid signer address: ${address}`);
 
-  const client = new SuiClient({ url: rpcUrl });
+  const client = new SuiJsonRpcClient({ url: rpcUrl, network });
   adaptCoreClientForSuins(client);
   const suins = new SuinsClient({ client, network });
 

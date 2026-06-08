@@ -2,7 +2,7 @@ import { existsSync, readFileSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { ALLOWED_METADATA, SuinsClient, SuinsTransaction } from "@mysten/suins";
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { Transaction } from "@mysten/sui/transactions";
 
@@ -85,7 +85,7 @@ function isMissingSuiNsRecordError(error: unknown) {
   return message.includes("does not exist") || message.includes("not found");
 }
 
-async function executeSponsorTransaction(client: SuiClient, signer: Ed25519Keypair, tx: Transaction) {
+async function executeSponsorTransaction(client: SuiJsonRpcClient, signer: Ed25519Keypair, tx: Transaction) {
   tx.setSender(signer.toSuiAddress());
   tx.setGasBudget(BigInt(process.env.UTXOPIA_SUINS_GAS_BUDGET ?? DEFAULT_GAS_BUDGET.toString()));
   const result = await client.signAndExecuteTransaction({
@@ -115,7 +115,7 @@ async function main() {
     process.env.UTXOPIA_SUI_RPC_URL ||
     process.env.NEXT_PUBLIC_SUI_RPC_URL ||
     "https://fullnode.testnet.sui.io:443";
-  const client = new SuiClient({ url: rpcUrl });
+  const client = new SuiJsonRpcClient({ url: rpcUrl, network: suinsNetworkFromAppNetwork(input.network) });
   const suinsClient = new SuinsClient({ client, network: suinsNetworkFromAppNetwork(input.network) });
   const existing = await suinsClient.getNameRecord(normalizedName).catch((error) => {
     if (isMissingSuiNsRecordError(error)) return null;
