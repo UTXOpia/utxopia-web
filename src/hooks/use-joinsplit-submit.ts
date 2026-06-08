@@ -15,6 +15,21 @@ import { getChainAdapter } from "@/lib/chain-registry";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
+/** Proof generation is pure local compute, so a timeout + retry is always safe
+ *  (no on-chain submission has happened yet). Generous bound to avoid false
+ *  timeouts on slow mobile devices while still escaping a hung WASM prover. */
+const PROOF_TIMEOUT_MS = 120_000;
+
+function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(message)), ms);
+    promise.then(
+      (value) => { clearTimeout(timer); resolve(value); },
+      (err) => { clearTimeout(timer); reject(err); },
+    );
+  });
+}
+
 export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
@@ -40,7 +55,11 @@ export function useJoinSplitSubmit() {
       // Generate ZK proof
       setStatus("processing");
       setStatusMessage("Processing...");
-      const { proof: proofData, proofBytes } = await prover.generateProof(params.proofInputs);
+      const { proof: proofData, proofBytes } = await withTimeout(
+        prover.generateProof(params.proofInputs),
+        PROOF_TIMEOUT_MS,
+        "Proof generation timed out. This can happen on slower devices or with large transfers — please try again.",
+      );
 
       // Extract public signals
       setStatus("submitting");
