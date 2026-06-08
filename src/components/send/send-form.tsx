@@ -17,6 +17,7 @@ import { useUTXOpia } from "@/hooks/use-utxopia";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { useNoteAutoSelector } from "@/hooks/use-note-auto-selector";
 import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
+import { useElapsedSeconds } from "@/hooks/use-elapsed-seconds";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useRelayerConfig } from "@/hooks/use-relayer-config";
 import { buildTransferParams } from "@/hooks/use-build-transfer-params";
@@ -173,6 +174,7 @@ export function SendForm() {
   const ctx = useUTXOpia();
   const { lookupSnsName } = useSnsName();
   const submitter = useJoinSplitSubmit();
+  const provingElapsed = useElapsedSeconds(submitter.status === "processing");
   const { publicKey } = useWallet();
   const router = useRouter();
   const tokenPrices = useTokenPrices();
@@ -639,6 +641,9 @@ export function SendForm() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
           {submitter.statusMessage || "Submitting…"}
+          {submitter.status === "processing" && provingElapsed >= 3 && (
+            <span className="tabular-nums text-muted-foreground/70">{provingElapsed}s</span>
+          )}
         </div>
       )}
 

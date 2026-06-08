@@ -6,6 +6,7 @@ import { AlertCircle, CheckCircle2, ChevronDown, ExternalLink, Loader2, Send } f
 import { cn } from "@/lib/utils";
 import { useSuiShield, type SuiShieldToken } from "@/hooks/sui/use-sui-shield";
 import { useSuiUnshield } from "@/hooks/sui/use-sui-unshield";
+import { useElapsedSeconds } from "@/hooks/use-elapsed-seconds";
 import { useUTXOpiaStore } from "@/stores";
 import { networkForChain } from "@/lib/chain-registry";
 import { makeSuiExplorerLinks } from "@/lib/chain-links";
@@ -42,6 +43,7 @@ export function SuiUnshieldFlow({ className }: SuiUnshieldFlowProps) {
   // Reuse the shield hook only for the registered-token list (symbol → coinType).
   const { tokens, loadingTokens } = useSuiShield(null);
   const { status, statusMessage, txDigest, error, submit, reset } = useSuiUnshield();
+  const provingElapsed = useElapsedSeconds(status === "processing");
 
   const [selected, setSelected] = useState<SuiShieldToken | null>(null);
   const [dropdownOpen, setDropdownOpen] = useState(false);
@@ -261,6 +263,9 @@ export function SuiUnshieldFlow({ className }: SuiUnshieldFlowProps) {
           <>
             <Loader2 className="h-4 w-4 animate-spin" />
             {statusMessage || "Processing..."}
+            {status === "processing" && provingElapsed >= 3 && (
+              <span className="tabular-nums opacity-70">{provingElapsed}s</span>
+            )}
           </>
         ) : (
           <>
