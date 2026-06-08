@@ -165,7 +165,7 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
   );
 }
 
-export function SendForm() {
+export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } = {}) {
   const [state, dispatch] = useReducer(reducer, initial);
   const [linkOpen, setLinkOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -595,20 +595,24 @@ export function SendForm() {
         </button>
       )}
 
-      <div className="text-center text-xs text-muted-foreground">— or —</div>
+      {showClaimLink && (
+        <>
+          <div className="text-center text-xs text-muted-foreground">— or —</div>
 
-      <button
-        type="button"
-        onClick={() => setLinkOpen(true)}
-        disabled={requiresBackup}
-        className={cn(
-          "w-full px-4 py-3 rounded-lg bg-muted/40 border border-gray/15 text-sm font-medium flex items-center justify-center gap-2 hover:border-privacy/30",
-          "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray/15",
-        )}
-      >
-        <LinkIcon className="w-4 h-4" />
-        Send via claim link
-      </button>
+          <button
+            type="button"
+            onClick={() => setLinkOpen(true)}
+            disabled={requiresBackup}
+            className={cn(
+              "w-full px-4 py-3 rounded-lg bg-muted/40 border border-gray/15 text-sm font-medium flex items-center justify-center gap-2 hover:border-privacy/30",
+              "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray/15",
+            )}
+          >
+            <LinkIcon className="w-4 h-4" />
+            Send via claim link
+          </button>
+        </>
+      )}
 
       <ReviewModal
         open={state.reviewOpen}

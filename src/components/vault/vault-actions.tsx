@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ChevronRight, Droplets, PlusCircle, Send } from "lucide-react";
+import { ArrowUpFromLine, ChevronRight, Droplets, PlusCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { isChainHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
@@ -24,6 +24,7 @@ export function VaultActions({
       ? [{ icon: <Droplets className="w-5 h-5" />, label: "Faucet", href: "/faucet", color: "text-warning" }]
       : []),
     { icon: <Send className="w-5 h-5" />, label: "Send", href: "/send", color: "text-purple-400" },
+    { icon: <ArrowUpFromLine className="w-5 h-5" />, label: "Cash out", href: "/vault/withdraw", color: "text-chain" },
   ].filter((action) => !isViewOnly || action.label === "Send");
 
   return (

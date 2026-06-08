@@ -226,7 +226,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         });
 
         if (tokenAccounts.value.length === 0) {
-          throw new Error(`No ${selectedToken.symbol} token account found. Create one first.`);
+          throw new Error(`You don't hold any ${selectedToken.symbol} in this wallet to add.`);
         }
         userTokenAccount = tokenAccounts.value[0].pubkey;
 
