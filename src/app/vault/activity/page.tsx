@@ -28,6 +28,7 @@ import { useTokenPrices } from "@/hooks/use-token-prices";
 import type { InboxNote } from "@/stores/utxopia-store";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { Tooltip } from "@/components/ui/tooltip";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -166,11 +167,15 @@ function ActivityRow({ note }: { note: InboxNote }) {
                 <span className="text-gray/60">{formatFullDate(note.createdAt)}</span>
               </div>
               <div className="flex justify-between">
-                <span className="text-gray/40">Leaf Index</span>
+                <Tooltip content="This note's position in the on-chain Merkle tree of shielded commitments. It lets you prove the note exists without revealing which one is yours.">
+                  <span className="text-gray/40">Leaf Index</span>
+                </Tooltip>
                 <span className="text-gray/60 font-mono">#{note.leafIndex}</span>
               </div>
               <div className="flex items-center justify-between gap-2">
-                <span className="text-gray/40 shrink-0">Commitment</span>
+                <Tooltip content="The public, encrypted fingerprint of this note stored on-chain. It hides the amount and owner — only you can spend it.">
+                  <span className="text-gray/40 shrink-0">Commitment</span>
+                </Tooltip>
                 <div className="flex items-center gap-1 min-w-0">
                   <code className="text-[10px] font-mono text-foreground/60 truncate">
                     {note.commitmentHex.slice(0, 10)}...{note.commitmentHex.slice(-6)}
