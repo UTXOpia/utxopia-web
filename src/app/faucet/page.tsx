@@ -18,7 +18,7 @@ import { cn } from "@/lib/utils";
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
-  const [faucetToken, setFaucetToken] = useState<"BTC" | "USDC" | "USDT">("BTC");
+  const [faucetToken, setFaucetToken] = useState<"BTC" | "USDC" | "USDT" | "SUI">("BTC");
   const { networkId: activeNetwork } = useChainEnvironment();
 
   useEffect(() => {
@@ -31,6 +31,12 @@ export default function FaucetPage() {
   const isHybrid = !!network && isHybridNetwork(network);
   const chainHref = (href: string) => network ? hrefWithChain(href, network) : href;
   const isSui = chain?.id === "sui";
+  // Solana mints SPL test tokens (custom faucet); Sui just links to the official
+  // testnet faucet. Guard against a token left over from switching chains.
+  const tokenOptions: readonly ("BTC" | "USDC" | "USDT" | "SUI")[] = isSui
+    ? ["BTC", "SUI"]
+    : ["BTC", "USDC", "USDT"];
+  const activeToken = tokenOptions.includes(faucetToken) ? faucetToken : "BTC";
 
   if (!mounted) {
     return (
@@ -68,27 +74,29 @@ export default function FaucetPage() {
           </div>
           <div>
             <h1 className="text-heading6 text-foreground">
-              {faucetToken === "BTC" ? "Regtest zkBTC airdrop" : `Test ${faucetToken} airdrop`}
+              {activeToken === "BTC" ? "Regtest zkBTC airdrop" : activeToken === "SUI" ? "Get test SUI" : `Test ${activeToken} airdrop`}
             </h1>
             <p className="text-caption text-gray">
-              {faucetToken === "BTC"
+              {activeToken === "BTC"
                 ? isSui
                   ? "Create a local BTC regtest deposit for your Sui vault."
                   : "Deposit 0.001 regtest BTC into a UTXOpia stealth address."
-                : `Send test ${faucetToken} to your wallet, then deposit it to your private vault.`}
+                : activeToken === "SUI"
+                  ? "Claim test SUI from the official faucet, then deposit it to your private vault."
+                  : `Send test ${activeToken} to your wallet, then deposit it to your private vault.`}
             </p>
           </div>
         </div>
 
-        {isHybrid && !isSui && (
+        {isHybrid && tokenOptions.length > 1 && (
           <div className="mb-4 flex gap-1.5 rounded-[12px] bg-muted p-1">
-            {(["BTC", "USDC", "USDT"] as const).map((t) => (
+            {tokenOptions.map((t) => (
               <button
                 key={t}
                 onClick={() => setFaucetToken(t)}
                 className={cn(
                   "flex-1 rounded-[9px] py-2 text-body2 font-semibold transition-colors cursor-pointer",
-                  faucetToken === t
+                  activeToken === t
                     ? "bg-background text-foreground shadow-sm"
                     : "text-gray hover:text-gray-light",
                 )}
@@ -101,10 +109,12 @@ export default function FaucetPage() {
 
         {!isHybrid ? (
           <NotAvailableNotice network={network ?? "unknown"} />
-        ) : faucetToken === "BTC" ? (
-          <FaucetForm isSui={isSui} network={network} />
+        ) : activeToken === "SUI" ? (
+          <SuiFaucetLink network={network} />
+        ) : activeToken === "USDC" || activeToken === "USDT" ? (
+          <SplFaucetForm token={activeToken} network={network} />
         ) : (
-          <SplFaucetForm token={faucetToken} network={network} />
+          <FaucetForm isSui={isSui} network={network} />
         )}
       </div>
     </main>
@@ -146,6 +156,35 @@ UTXOPIA_NETWORK=sui-regtest ./scripts/sync-env.sh`}
           instead.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** Sui faucet = a link to the official testnet faucet (product decision: no
+ *  custom Sui mint). User claims test SUI there, then deposits/shields it here. */
+function SuiFaucetLink({ network }: { network: NetworkId }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[12px] border border-sui/25 bg-sui/5 p-4 text-body2 text-gray-light">
+        UTXOpia doesn&apos;t mint SUI — claim test SUI from the official Sui faucet, then come
+        back and deposit it to go private.
+      </div>
+      <a
+        href="https://faucet.sui.io/?network=testnet"
+        target="_blank"
+        rel="noreferrer"
+        className="btn-primary w-full"
+      >
+        <Droplets className="w-5 h-5" />
+        Open the official Sui faucet
+        <ExternalLink className="w-4 h-4" />
+      </a>
+      <Link
+        href={hrefWithChain("/vault/deposit", network)}
+        className="inline-flex items-center gap-1.5 text-caption font-medium text-sui hover:text-sui/80"
+      >
+        Already have SUI? Deposit it <ExternalLink className="w-3 h-3" />
+      </Link>
     </div>
   );
 }
