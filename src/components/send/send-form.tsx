@@ -408,6 +408,12 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         );
       }
 
+      // Withdrawing to the Bitcoin chain (redeem) only makes sense for the
+      // BTC-pegged zkBTC. Private send and wallet cash-out work for any token.
+      if (effectiveToken !== "zkBTC" && mode === "btc") {
+        throw new Error("Withdrawing to Bitcoin is only available for zkBTC.");
+      }
+
       const params = await buildTransferParams({
         mode,
         amountSats: BigInt(amountSats),
@@ -419,6 +425,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           : undefined,
         relayerFee: effectiveRelayerFee,
         boundChainId,
+        tokenMint: selectedPayToken.mint || undefined,
         recipient: recipientArg,
       });
 
@@ -507,6 +514,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           : undefined,
         relayerFee: effectiveRelayerFee,
         boundChainId,
+        tokenMint: PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken)?.mint || undefined,
         recipient: { stealthMeta: noteMeta },
       });
 

@@ -34,7 +34,6 @@ import {
 const getUTXOpiaSDK = () => import("@utxopia/sdk");
 
 import {
-  getToken2022ProgramId,
   derivePoolStatePDA,
   deriveCommitmentTreePDA,
   deriveNullifierPDA,
@@ -203,7 +202,6 @@ export async function POST(request: NextRequest) {
     const programId = new PublicKey(cfg.solana.utxopiaProgramId);
     const chadbufferProgramId = new PublicKey(cfg.solana.chadbufferId);
     const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
-    const token2022ProgramId = getToken2022ProgramId();
 
     // ── Parse common hex fields ────────────────────────────────────────
     const proofBytes = validateHexField(hexToBytes, proof, "proof", 256);
@@ -249,18 +247,30 @@ export async function POST(request: NextRequest) {
 
     if (mode === "unshield") {
       // ── UNSHIELD (disc=14, multi-output) ─────────────────────────────
-      const { unshieldAmounts, recipientAddresses, recipientTokenAccounts } = body;
-      if (!unshieldAmounts?.length || !recipientAddresses?.length || !recipientTokenAccounts?.length) {
-        return NextResponse.json({ success: false, error: "Unshield requires: unshieldAmounts[], recipientAddresses[], recipientTokenAccounts[]" }, { status: 400 });
+      const { unshieldAmounts, recipientAddresses } = body;
+      if (!unshieldAmounts?.length || !recipientAddresses?.length) {
+        return NextResponse.json({ success: false, error: "Unshield requires: unshieldAmounts[], recipientAddresses[]" }, { status: 400 });
       }
       const nPublicOutputs = unshieldAmounts.length;
-      if (recipientAddresses.length !== nPublicOutputs || recipientTokenAccounts.length !== nPublicOutputs) {
+      if (recipientAddresses.length !== nPublicOutputs) {
         return NextResponse.json({ success: false, error: "Unshield arrays must have equal length" }, { status: 400 });
       }
 
+      // Token being cashed out — defaults to zkBTC (byte-identical to before).
+      // Any registered SPL token works: derive its program (the mint's owner),
+      // pool vault, token config and recipient ATAs from the mint rather than
+      // hardcoding zkBTC / Token-2022.
+      const unshieldMintStr = request.nextUrl.searchParams.get("unshieldMint") || cfg.tokens.zkbtcMint;
+      const unshieldMint = new PublicKey(unshieldMintStr);
+      const mintInfo = await connection.getAccountInfo(unshieldMint);
+      if (!mintInfo) {
+        return NextResponse.json({ success: false, error: "Unshield token mint not found" }, { status: 400 });
+      }
+      const tokenProgramId = mintInfo.owner;
+
       const recipientPubkeys = recipientAddresses.map(a => new PublicKey(a));
-      const recipientTokenPubkeys = recipientTokenAccounts.map(a => new PublicKey(a));
-      const poolVault = getAssociatedTokenAddressSync(zkbtcMint, poolState, true, token2022ProgramId);
+      const recipientTokenPubkeys = recipientPubkeys.map(r => getAssociatedTokenAddressSync(unshieldMint, r, false, tokenProgramId));
+      const poolVault = getAssociatedTokenAddressSync(unshieldMint, poolState, true, tokenProgramId);
 
       ixData = buildUnshieldInstructionData({
         nInputs, nOutputs,
@@ -275,7 +285,7 @@ export async function POST(request: NextRequest) {
       });
 
       // Accounts: pool_state, tree, vk, user, system, token_config, vault, token_program, recipients..., nullifiers...
-      const [tokenConfigPDA] = deriveTokenConfigPDA(zkbtcMint, programId);
+      const [tokenConfigPDA] = deriveTokenConfigPDA(unshieldMint, programId);
       keys.push(
         { pubkey: poolState, isSigner: false, isWritable: true },
         { pubkey: commitmentTree, isSigner: false, isWritable: true },
@@ -284,7 +294,7 @@ export async function POST(request: NextRequest) {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
         { pubkey: tokenConfigPDA, isSigner: false, isWritable: true },
         { pubkey: poolVault, isSigner: false, isWritable: true },
-        { pubkey: token2022ProgramId, isSigner: false, isWritable: false },
+        { pubkey: tokenProgramId, isSigner: false, isWritable: false },
       );
       for (const rta of recipientTokenPubkeys) keys.push({ pubkey: rta, isSigner: false, isWritable: true });
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
@@ -298,8 +308,8 @@ export async function POST(request: NextRequest) {
             relayer.publicKey,
             recipientTokenPubkeys[k],
             recipientPubkeys[k],
-            zkbtcMint,
-            token2022ProgramId,
+            unshieldMint,
+            tokenProgramId,
           );
           const ataTx = new Transaction().add(createAtaIx);
           const { blockhash: ataBlockhash } = await connection.getLatestBlockhash();

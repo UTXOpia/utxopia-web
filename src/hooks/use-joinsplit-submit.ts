@@ -9,7 +9,6 @@ import { toHex64 } from "@/lib/utils/hex";
 import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
-import { TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
@@ -101,18 +100,18 @@ export function useJoinSplitSubmit() {
           requestNonces: [requestNonce.toString()],
         }, relayUrl);
       } else if (params.relayMode === "unshield") {
-        const { getAssociatedTokenAddressSync } = await import("@solana/spl-token");
         const { PublicKey } = await import("@solana/web3.js");
         const recipientPubkey = new PublicKey(params.unshieldRecipientAddress!);
-        const zkbtcMint = new PublicKey(chainEnv.config.tokens.zkbtcMint);
-        const TOKEN_2022_PID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
-        const recipientTokenAccount = getAssociatedTokenAddressSync(
-          zkbtcMint, recipientPubkey, false, TOKEN_2022_PID,
-        );
         const treeStealthData = params.stealthDataArrays.slice(0, -1);
 
         // Compute unshield amount from proof outputs (last output is unshield)
         const unshieldAmount = Number(params.proofInputs.outputs[params.proofInputs.outputs.length - 1].value);
+
+        // Pass the token mint via the URL (mirrors Sui's coinType): the relay
+        // derives the token program, pool vault, token config and recipient ATA
+        // from it, so any SPL token can be cashed out. Defaults to zkBTC, which
+        // derives the same accounts as before — byte-identical for zkBTC.
+        const unshieldMint = params.unshieldMint || chainEnv.config.tokens.zkbtcMint;
 
         relayResult = await relayClient.submitToRelay({
           ...commonFields,
@@ -120,8 +119,7 @@ export function useJoinSplitSubmit() {
           stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
           unshieldAmounts: [unshieldAmount.toString()],
           recipientAddresses: [recipientPubkey.toBase58()],
-          recipientTokenAccounts: [recipientTokenAccount.toBase58()],
-        }, relayUrl);
+        }, `${relayUrl}&unshieldMint=${encodeURIComponent(unshieldMint)}`);
       } else {
         // Transfer mode: opportunistically attach sender memos so the sender
         // retains an encrypted, AAD-bound record of their own outgoing
