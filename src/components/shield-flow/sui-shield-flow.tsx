@@ -241,7 +241,7 @@ export function SuiShieldFlow({ walletAddress, className }: SuiShieldFlowProps) 
         className={cn(
           "flex w-full items-center justify-center gap-2 rounded-[12px] py-3.5 text-body2 font-semibold transition-all cursor-pointer",
           canSubmit && status !== "processing"
-            ? "bg-sui text-background hover:opacity-90"
+            ? "bg-foreground text-background hover:bg-white"
             : "cursor-not-allowed bg-gray/20 text-gray/50",
         )}
       >

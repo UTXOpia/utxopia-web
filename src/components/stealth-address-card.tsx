@@ -58,7 +58,7 @@ export function StealthAddressCard({ onUnlock }: { onUnlock?: () => void }) {
           disabled={isLoading}
           className={cn(
             "w-full inline-flex items-center justify-center gap-2 py-2 px-4 rounded-lg transition-colors",
-            "bg-privacy hover:bg-privacy/80 text-background font-medium",
+            "bg-foreground hover:bg-white text-background font-medium",
             "disabled:opacity-50 disabled:cursor-not-allowed"
           )}
         >

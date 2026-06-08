@@ -86,7 +86,7 @@ export function VaultFirstSteps({
         dot: "bg-privacy",
         doneBg: "bg-privacy/5",
         icon: "text-privacy",
-        button: "bg-privacy text-background hover:bg-privacy/90",
+        button: "bg-foreground text-background hover:bg-white",
       };
 
   const handleDownloadBackup = () => {

@@ -163,7 +163,7 @@ export function OnboardingModal({ forceShow, onComplete }: OnboardingModalProps)
               className={cn(
                 "flex-1 py-3 px-4 rounded-[12px]",
                 "text-body2 text-background",
-                "bg-privacy hover:bg-privacy/80 transition-colors",
+                "bg-foreground hover:bg-white transition-colors",
                 "flex items-center justify-center gap-2"
               )}
             >

@@ -571,7 +571,7 @@ export function SendForm() {
           onClick={() => dispatch({ type: "open_review" })}
           disabled={requiresBackup}
           className={cn(
-            "w-full px-4 py-3 rounded-lg bg-privacy text-background text-sm font-medium flex items-center justify-center gap-2",
+            "w-full px-4 py-3 rounded-lg bg-foreground text-background text-sm font-medium flex items-center justify-center gap-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
           )}
         >

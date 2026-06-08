@@ -17,6 +17,7 @@ import {
   Loader2,
   Search,
   RefreshCw,
+  Shield,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -223,11 +224,11 @@ export function StatusDot({ variant, label }: { variant: StatusDotVariant; label
 
 // --- Flow Cell ---
 
-function FlowIcon({ icon, label }: { icon: string | "shield"; label: string }) {
+export function FlowIcon({ icon, label, className }: { icon: string | "shield"; label: string; className?: string }) {
   if (icon === "shield") {
-    return <img src="/brand/logo-transparent-48.png" alt={label} className="w-4 h-4 object-contain" />;
+    return <Shield className={cn("w-4 h-4 text-privacy shrink-0", className)} aria-label={label} />;
   }
-  return <img src={icon} alt={label} className="w-4 h-4 rounded-full" />;
+  return <img src={icon} alt={label} className={cn("w-4 h-4 rounded-full", className)} />;
 }
 
 export function FlowCell({
@@ -318,7 +319,7 @@ export function EmptyState({ label }: { label: string }) {
   return (
     <div className="flex flex-col items-center justify-center py-16 text-center">
       <div className="p-4 rounded-full bg-privacy/5 border border-privacy/10 mb-4">
-        <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-50" />
+        <Shield className="w-8 h-8 text-privacy/60" strokeWidth={1.5} aria-hidden />
       </div>
       <p className="text-body2 text-gray-light mb-1">No {label} yet</p>
       <p className="text-caption text-gray/50 max-w-[280px]">

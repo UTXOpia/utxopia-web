@@ -19,7 +19,7 @@ interface ConfirmDialogProps {
 const variantStyles = {
   default: {
     icon: "text-privacy bg-privacy/10",
-    confirm: "bg-privacy hover:bg-privacy/80 text-background",
+    confirm: "bg-foreground hover:bg-white text-background",
   },
   warning: {
     icon: "text-warning bg-warning/10",

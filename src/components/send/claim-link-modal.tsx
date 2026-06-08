@@ -89,7 +89,7 @@ export function ClaimLinkModal({
                 type="button"
                 disabled={busy || !amount || amount === "0"}
                 onClick={handleGenerate}
-                className="w-full px-4 py-2.5 rounded-lg bg-privacy text-background text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                className="w-full px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
                 {busy && <Loader2 className="w-4 h-4 animate-spin" />}
                 Generate claim link

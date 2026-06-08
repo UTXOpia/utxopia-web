@@ -290,13 +290,13 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
             </div>
           ) : (
             <div className="flex flex-col items-center py-10">
-              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl border border-sui/20 bg-sui/10">
+              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl border border-sui/20 bg-sui/10">
                 <Image
-                  src="/brand/logo-transparent-96.png"
+                  src="/brand/logo-transparent-128.png"
                   alt="UTXOpia"
-                  width={36}
-                  height={36}
-                  className="h-9 w-9 object-contain"
+                  width={56}
+                  height={56}
+                  className="h-14 w-14 object-contain"
                 />
               </div>
               <h1 className="mb-1 text-[22px] font-bold text-foreground">Private wallet</h1>
@@ -306,7 +306,7 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
               <button
                 type="button"
                 onClick={() => setAuthOpen(true)}
-                className="inline-flex items-center gap-2 rounded-full bg-sui px-7 py-3 text-body2 font-semibold text-background transition-opacity hover:opacity-90 active:scale-95"
+                className="inline-flex items-center gap-2 rounded-full bg-foreground px-7 py-3 text-body2 font-semibold text-background transition-colors hover:bg-white active:scale-95"
               >
                 <Key className="h-4 w-4" />
                 Create private wallet
@@ -481,7 +481,7 @@ function SuiTokenRows({
         </p>
         <Link
           href={hrefWithChain("/vault/deposit", networkId)}
-          className="inline-flex items-center gap-2 rounded-full bg-sui px-5 py-2.5 text-sm font-medium text-background transition-opacity hover:opacity-90 active:scale-[0.98]"
+          className="inline-flex items-center gap-2 rounded-full bg-foreground px-5 py-2.5 text-sm font-medium text-background transition-colors hover:bg-white active:scale-[0.98]"
         >
           Add your first funds
           <ArrowRight className="h-3.5 w-3.5" />

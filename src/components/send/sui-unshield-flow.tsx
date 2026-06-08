@@ -243,7 +243,7 @@ export function SuiUnshieldFlow({ className }: SuiUnshieldFlowProps) {
         disabled={!canSubmit || busy}
         className={cn(
           "flex w-full items-center justify-center gap-2 rounded-[12px] py-3.5 text-body2 font-semibold transition-all cursor-pointer",
-          canSubmit && !busy ? "bg-sui text-background hover:opacity-90" : "cursor-not-allowed bg-gray/20 text-gray/50",
+          canSubmit && !busy ? "bg-foreground text-background hover:bg-white" : "cursor-not-allowed bg-gray/20 text-gray/50",
         )}
       >
         {busy ? (

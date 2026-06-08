@@ -107,7 +107,7 @@ function VaultTokenEmptyState({ networkId }: { networkId: NetworkId }) {
       </p>
       <Link
         href={hrefWithChain("/vault/deposit", networkId)}
-        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-privacy hover:bg-privacy/85 text-background text-sm font-medium transition-all duration-200 cursor-pointer active:scale-[0.98]"
+        className="inline-flex items-center gap-2 px-5 py-2.5 rounded-full bg-foreground hover:bg-white text-background text-sm font-medium transition-all duration-200 cursor-pointer active:scale-[0.98]"
       >
         Add your first funds
         <ArrowRight className="w-3.5 h-3.5" />

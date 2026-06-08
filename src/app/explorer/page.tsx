@@ -300,6 +300,6 @@ function getExplorerTone(network: NetworkId) {
     mutedText: isSui ? "text-sui/70" : "text-privacy/70",
     text: isSui ? "text-sui" : "text-privacy",
     noteBorder: isSui ? "border-sui/15" : "border-privacy/15",
-    dot: isSui ? "bg-sui" : "bg-yellow-400",
+    dot: "bg-chain",
   };
 }

@@ -20,7 +20,7 @@ import type { DepositRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, FlowIcon, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -82,12 +82,12 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
           <div className={cn("px-3 py-2.5 rounded-[8px] space-y-2", isBtc ? "bg-btc/4 border border-btc/10" : "bg-green-500/4 border border-green-500/10")}>
             {/* Token → Shielded conversion */}
             <div className="flex items-center gap-2 flex-wrap">
-              <img src={config.from.logo} alt={config.from.label} className="w-3.5 h-3.5 rounded-full shrink-0" />
+              <FlowIcon icon={config.from.logo} label={config.from.label} className="w-3.5 h-3.5" />
               <span className="text-body2 text-foreground font-mono font-semibold">
                 {fmtAmount(displayGross)} <span className="text-[10px] text-gray font-normal">{config.unit}</span>
               </span>
               <span className="text-[10px] text-gray/40">→</span>
-              <img src={config.to.logo} alt={config.to.label} className="w-3.5 h-3.5 rounded-full shrink-0" />
+              <FlowIcon icon={config.to.logo} label={config.to.label} className="w-3.5 h-3.5" />
               <span className="text-body2 text-foreground font-mono font-semibold">
                 {fmtAmount(shieldedAmount)} <span className="text-[10px] text-gray font-normal">{config.to.label}</span>
               </span>
@@ -357,7 +357,7 @@ const SHIELD_TYPE_CONFIG: Record<string, ShieldTypeConfig> = {
   usdt: buildShieldConfig(usdtToken),
   spl: {
     from: { label: "SPL", logo: "/tokens/sol.png", color: "text-gray/70 bg-gray/6 border-gray/10" },
-    to: { label: "Shielded", logo: "/brand/logo-transparent-64.png", color: "text-privacy/80 bg-privacy/6 border-privacy/10" },
+    to: { label: "Shielded", logo: "shield", color: "text-privacy/80 bg-privacy/6 border-privacy/10" },
     decimals: 0, unit: "", showRaw: true,
   },
 };

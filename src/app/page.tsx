@@ -23,7 +23,7 @@ import { cn } from "@/lib/utils";
 
 const PrivacyViz = () => (
   <div className="flex-1 w-full rounded-xl border border-privacy/10 bg-muted/20 flex flex-col items-center justify-center gap-3 p-6 overflow-hidden relative">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(247,147,26,0.04),transparent)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03),transparent)]" />
     <div className="w-full space-y-2.5 z-10">
       {[
         { fromStart: "0xa3", fromMid: "f7e2", fromEnd: "c21b", toStart: "0x91", toMid: "d2b8", toEnd: "e8f4", amt: "0.0042", delay: 0 },
@@ -54,7 +54,7 @@ const PrivacyViz = () => (
 
 const BackedViz = () => (
   <div className="flex-1 w-full rounded-xl border border-privacy/10 bg-muted/20 flex flex-col items-center justify-center gap-4 p-6 relative overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(247,147,26,0.04),transparent)]" />
+    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03),transparent)]" />
     <div className="flex items-center gap-6 z-10">
       <div className="flex flex-col items-center gap-2">
         <div className="w-14 h-14 rounded-2xl border border-privacy/25 bg-background/40 flex items-center justify-center">
@@ -203,8 +203,8 @@ const FeatureCard = memo(function FeatureCard({
 FeatureCard.displayName = "FeatureCard";
 
 const FEATURE_CARDS = [
-  { icon: EyeOff, title: "ZK Private", description: "Amounts & addresses hidden by zero-knowledge proofs", iconColor: "text-privacy", hoverGlow: "rgba(247, 147, 26, 0.12)", step: "01", visualization: PrivacyViz },
-  { icon: Layers, title: "Cross-Chain Shielding", description: "Bitcoin and supported native tokens shielded into one pool", iconColor: "text-privacy", hoverGlow: "rgba(247, 147, 26, 0.12)", step: "02", visualization: BackedViz },
+  { icon: EyeOff, title: "ZK Private", description: "Amounts & addresses hidden by zero-knowledge proofs", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "01", visualization: PrivacyViz },
+  { icon: Layers, title: "Cross-Chain Shielding", description: "Bitcoin and supported native tokens shielded into one pool", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "02", visualization: BackedViz },
   { icon: Zap, title: "Instant", description: "Auto-confirmed deposits, sub-second settlement", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
   { icon: ShieldCheck, title: "Audit-Ready", description: "Selective disclosure on demand. Your viewing keys, your control.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
 ];
@@ -280,7 +280,7 @@ export default function Home() {
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                   <Link
                     href={chainHref("/vault")}
-                    className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-2.5 text-base shadow-[0_0_20px_rgba(247,147,26,0.2)] hover:shadow-[0_0_35px_rgba(247,147,26,0.4)] transition-shadow"
+                    className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-2.5 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                   >
                     <Rocket className="w-5 h-5" />
                     Launch App
@@ -452,7 +452,7 @@ export default function Home() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                       <Link
                         href={chainHref("/vault")}
-                        className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-3 text-base shadow-[0_0_20px_rgba(247,147,26,0.2)] hover:shadow-[0_0_35px_rgba(247,147,26,0.4)] transition-shadow"
+                        className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-3 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                       >
                         <Rocket className="w-5 h-5" />
                         Launch App

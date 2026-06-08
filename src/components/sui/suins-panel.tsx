@@ -163,7 +163,7 @@ export function SuiNsPanel({
           type="button"
           onClick={claimSubname}
           disabled={!canClaim || claimState === "loading"}
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-sui px-3 text-xs font-semibold text-background transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-[10px] bg-foreground px-3 text-xs font-semibold text-background transition-colors hover:bg-white disabled:cursor-not-allowed disabled:opacity-50"
         >
           {claimState === "loading" ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Gift className="h-3.5 w-3.5" />}
           Claim free name

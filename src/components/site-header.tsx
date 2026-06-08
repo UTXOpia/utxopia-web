@@ -29,15 +29,15 @@ export function SiteHeader() {
           {/* Logo — capybara mark, transparent, floats naturally */}
           <Link href={chainHref("/")} className="flex items-center gap-2.5 group shrink-0">
             <motion.div
-              className="relative w-8 h-8 flex items-center justify-center transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(208,173,92,0.4)]"
+              className="relative w-10 h-10 flex items-center justify-center transition-all duration-300 group-hover:drop-shadow-[0_0_8px_rgba(208,173,92,0.4)]"
               whileHover={{ scale: 1.08 }}
               transition={{ type: "spring", stiffness: 400, damping: 20 }}
             >
               <Image
                 src="/brand/logo-transparent-128.png"
                 alt="UTXOpia"
-                width={32}
-                height={32}
+                width={40}
+                height={40}
                 priority
                 className="h-full w-full object-contain"
               />
@@ -72,7 +72,7 @@ export function SiteHeader() {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
                   href={chainHref("/faucet")}
-                  className="inline-flex items-center gap-1.5 text-xs font-semibold border border-warning/15 px-3.5 py-2.5 rounded-full transition-all text-warning bg-warning/10 hover:bg-warning/15 hover:border-warning/30"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium border border-warning/10 px-3.5 py-2.5 rounded-full transition-all text-warning/75 bg-warning/[0.06] hover:bg-warning/10 hover:border-warning/20 hover:text-warning"
                 >
                   <Droplets className="w-3 h-3" />
                   Faucet
@@ -89,7 +89,7 @@ export function SiteHeader() {
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link
                 href={chainHref("/vault")}
-                className="inline-flex items-center gap-1.5 text-xs font-semibold border border-privacy/10 px-4 py-2.5 rounded-full transition-all text-privacy bg-privacy/10 hover:bg-privacy/10 hover:border-privacy/30 hover:shadow-[0_0_15px_rgba(247,147,26,0.15)]"
+                className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all bg-foreground text-background hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
               >
                 <Wallet className="w-3 h-3" />
                 Wallet

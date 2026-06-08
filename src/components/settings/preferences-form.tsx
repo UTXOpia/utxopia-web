@@ -296,7 +296,7 @@ function SnsNameRow() {
             className={cn(
               "shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-md transition-all",
               value.trim() && value.trim() !== sns.registeredSnsName && !sns.isRegistering
-                ? "bg-privacy text-background hover:opacity-90"
+                ? "bg-foreground text-background hover:bg-white"
                 : "bg-muted/40 text-gray cursor-not-allowed",
             )}
           >
@@ -452,7 +452,7 @@ function AuditorPubkeyRow() {
             className={cn(
               "shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-md transition-all",
               dirty && !disabled
-                ? "bg-privacy text-background hover:opacity-90"
+                ? "bg-foreground text-background hover:bg-white"
                 : "bg-muted/40 text-gray cursor-not-allowed",
             )}
           >

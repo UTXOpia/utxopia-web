@@ -5,8 +5,8 @@
   --foreground: #f1f0f3;
   --card: #202027;
   --card-foreground: #f1f0f3;
-  --primary: #f7931a;
-  --primary-foreground: #0a0a0a;
+  --primary: #f1f0f3;
+  --primary-foreground: #0f0f12;
   --secondary: #2c2c36;
   --secondary-foreground: #f1f0f3;
   --muted: #16161b;
@@ -45,10 +45,11 @@
   --btc-orange-bg: #f7931a1a;
   --btc-orange-bg-hover: #f7931a33;
 
-  /* Privacy colors */
+  /* Privacy colors — privacy accent follows the active chain so shielded
+     surfaces read as network context, not a standalone brand orange */
   --privacy-purple: #9945ff;
-  --privacy-accent: #f7931a;
-  --privacy-bg: #f7931a1a;
+  --privacy-accent: var(--chain);
+  --privacy-bg: var(--chain-bg);
 
   /* Sui colors */
   --sui-blue: #6fbcf0;
@@ -64,7 +65,8 @@
 }
 
 [data-chain="solana"] {
-  --chain: #9945ff;
+  /* Lightened from brand #9945ff so chain-colored text passes AA on the dark bg */
+  --chain: #a674ff;
   --chain-deep: #8b3de8;
   --chain-bg: #9945ff1a;
 }
@@ -102,7 +104,7 @@
   --color-btc-dark: #e8850f;
 
   /* Privacy/Solana colors */
-  --color-privacy: #f7931a;
+  --color-privacy: var(--chain);
   --color-sol: #9945ff;
   --color-sol-dark: #8b3de8;
   --color-purple: #ffabfe;

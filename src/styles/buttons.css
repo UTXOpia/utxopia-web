@@ -105,12 +105,10 @@
   cursor: not-allowed;
 }
 
-/* Privacy green */
+/* Privacy — quiet ink primary */
 .btn-privacy {
-  background: linear-gradient(135deg, #f7931a 0%, #e8850f 50%, #f7931a 100%);
-  box-shadow:
-    0px 4px 8px 0px rgba(247, 147, 26, 0.25),
-    0px 2px 4px 0px rgba(247, 147, 26, 0.15) inset;
+  background: var(--foreground);
+  box-shadow: 0px 4px 12px 0px rgba(0, 0, 0, 0.35);
   color: var(--background);
   border-radius: 12px;
   padding: 12px 16px;
@@ -125,9 +123,8 @@
 }
 
 .btn-privacy:hover:not(:disabled) {
-  box-shadow:
-    0px 6px 12px 0px rgba(247, 147, 26, 0.35),
-    0px 2px 6px 0px rgba(255, 255, 255, 0.2) inset;
+  background: #ffffff;
+  box-shadow: 0px 6px 16px 0px rgba(0, 0, 0, 0.45);
   transform: translateY(-1px);
 }
 

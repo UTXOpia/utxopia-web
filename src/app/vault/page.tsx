@@ -143,6 +143,16 @@ export default function VaultPage() {
     setHasRecoveryBackup(hasBackupForKeys(keys));
   }, [keys]);
 
+  // Must run before the Sui early return so the hook order is stable
+  // when the active chain changes between renders.
+  const snsSuggestion = useMemo(() => {
+    const tail = (stealthAddressEncoded ?? "")
+      .replace(/[^a-z0-9]/gi, "")
+      .slice(-4)
+      .toLowerCase();
+    return tail.length === 4 ? `capy-${tail}` : null;
+  }, [stealthAddressEncoded]);
+
   if (getChainAdapter(networkConfig).id === "sui") {
     return (
       <main className="min-h-screen bg-background flex flex-col">
@@ -166,13 +176,6 @@ export default function VaultPage() {
     canRegisterSnsName &&
     !hasRegisteredSnsName &&
     !isLoadingSnsName;
-  const snsSuggestion = useMemo(() => {
-    const tail = (stealthAddressEncoded ?? "")
-      .replace(/[^a-z0-9]/gi, "")
-      .slice(-4)
-      .toLowerCase();
-    return tail.length === 4 ? `capy-${tail}` : null;
-  }, [stealthAddressEncoded]);
 
   const handleRegisterSnsName = async () => {
     if (!snsNameInput) return;
@@ -323,8 +326,8 @@ export default function VaultPage() {
               disabled={isRegisteringSns}
               className={cn(
                 "w-full flex items-center justify-center gap-2 mb-4 px-3 py-1.5 rounded-[8px]",
-                "bg-yellow-500/10 border border-yellow-500/30 hover:bg-yellow-500/20",
-                "text-caption text-yellow-400 transition-colors cursor-pointer",
+                "bg-warning/10 border border-warning/30 hover:bg-warning/20",
+                "text-caption text-warning transition-colors cursor-pointer",
                 "disabled:opacity-50 disabled:cursor-not-allowed"
               )}
             >
@@ -346,13 +349,13 @@ export default function VaultPage() {
           {!keys && !isViewOnly ? (
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
-              <div className="w-16 h-16 rounded-2xl bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-4">
+              <div className="w-20 h-20 rounded-2xl bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-4">
                 <Image
-                  src="/brand/logo-transparent-96.png"
+                  src="/brand/logo-transparent-128.png"
                   alt="UTXOpia"
-                  width={36}
-                  height={36}
-                  className="w-9 h-9 object-contain"
+                  width={56}
+                  height={56}
+                  className="w-14 h-14 object-contain"
                 />
               </div>
               <h1 className="text-[22px] font-bold text-foreground mb-1">Private wallet</h1>
@@ -363,9 +366,9 @@ export default function VaultPage() {
                 onClick={() => setAuthModalOpen(true)}
                 className={cn(
                   "inline-flex items-center gap-2 px-7 py-3 rounded-full",
-                  "bg-privacy hover:bg-privacy/80",
+                  "bg-foreground hover:bg-white",
                   "text-body2 text-background font-semibold transition-all duration-200 cursor-pointer",
-                  "hover:shadow-[0_0_24px_rgba(247,147,26,0.25)]",
+                  "hover:shadow-[0_0_24px_rgba(255,255,255,0.12)]",
                   "active:scale-95"
                 )}
               >
