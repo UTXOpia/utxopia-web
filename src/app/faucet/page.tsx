@@ -18,6 +18,7 @@ import { cn } from "@/lib/utils";
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
+  const [faucetToken, setFaucetToken] = useState<"BTC" | "USDC" | "USDT">("BTC");
   const { networkId: activeNetwork } = useChainEnvironment();
 
   useEffect(() => {
@@ -66,16 +67,45 @@ export default function FaucetPage() {
             <Droplets className="w-5 h-5 text-warning" />
           </div>
           <div>
-            <h1 className="text-heading6 text-foreground">Regtest zkBTC airdrop</h1>
+            <h1 className="text-heading6 text-foreground">
+              {faucetToken === "BTC" ? "Regtest zkBTC airdrop" : `Test ${faucetToken} airdrop`}
+            </h1>
             <p className="text-caption text-gray">
-              {isSui
-                ? "Create a local BTC regtest deposit for your Sui vault."
-                : "Deposit 0.001 regtest BTC into a UTXOpia stealth address."}
+              {faucetToken === "BTC"
+                ? isSui
+                  ? "Create a local BTC regtest deposit for your Sui vault."
+                  : "Deposit 0.001 regtest BTC into a UTXOpia stealth address."
+                : `Send test ${faucetToken} to your wallet, then deposit it to your private vault.`}
             </p>
           </div>
         </div>
 
-        {isHybrid ? <FaucetForm isSui={isSui} network={network} /> : <NotAvailableNotice network={network ?? "unknown"} />}
+        {isHybrid && !isSui && (
+          <div className="mb-4 flex gap-1.5 rounded-[12px] bg-muted p-1">
+            {(["BTC", "USDC", "USDT"] as const).map((t) => (
+              <button
+                key={t}
+                onClick={() => setFaucetToken(t)}
+                className={cn(
+                  "flex-1 rounded-[9px] py-2 text-body2 font-semibold transition-colors cursor-pointer",
+                  faucetToken === t
+                    ? "bg-background text-foreground shadow-sm"
+                    : "text-gray hover:text-gray-light",
+                )}
+              >
+                {t}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isHybrid ? (
+          <NotAvailableNotice network={network ?? "unknown"} />
+        ) : faucetToken === "BTC" ? (
+          <FaucetForm isSui={isSui} network={network} />
+        ) : (
+          <SplFaucetForm token={faucetToken} network={network} />
+        )}
       </div>
     </main>
   );
@@ -116,6 +146,124 @@ UTXOPIA_NETWORK=sui-regtest ./scripts/sync-env.sh`}
           instead.
         </p>
       </div>
+    </div>
+  );
+}
+
+/** USDC/USDT faucet: mint test tokens to the user's public wallet (Solana only),
+ *  so they can then deposit/shield them. Calls the native backend SPL faucet via
+ *  the /api/faucet/spl proxy. */
+function SplFaucetForm({ token, network }: { token: "USDC" | "USDT"; network: NetworkId }) {
+  const [address, setAddress] = useState("");
+  const [amount, setAmount] = useState(100);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<
+    | { kind: "ok"; signature: string; ata?: string }
+    | { kind: "err"; message: string }
+    | null
+  >(null);
+
+  useEffect(() => { setResult(null); }, [address, amount]);
+
+  const trimmed = address.trim();
+  const validAddress = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(trimmed);
+  const invalid = trimmed.length > 0 && !validAddress;
+
+  async function handleDrip() {
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/faucet/spl?network=${encodeURIComponent(network)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: trimmed, token, amount }),
+      });
+      const body = (await res.json()) as { ok: boolean; signature?: string; ata?: string; error?: string };
+      if (!res.ok || !body.ok) setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
+      else setResult({ kind: "ok", signature: body.signature ?? "", ata: body.ata });
+    } catch (e) {
+      setResult({ kind: "err", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const disabled = !validAddress || submitting || amount <= 0;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">Your Solana wallet address</label>
+        <div className="relative">
+          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
+          <input
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Paste your Solana wallet (base58)"
+            spellCheck={false}
+            className={cn(
+              "w-full p-3 pl-10 bg-muted border rounded-[12px]",
+              "text-body2 font-mono text-foreground placeholder:text-gray",
+              "outline-none transition-colors",
+              invalid ? "border-red-500/40 focus:border-red-500/60" : "border-gray/15 focus:border-warning/40",
+            )}
+          />
+        </div>
+        <p className={cn("text-caption mt-1 pl-2", invalid ? "text-red-400" : "text-gray")}>
+          {invalid ? "Enter a valid Solana address." : `Test ${token} is sent here; then deposit it to go private.`}
+        </p>
+      </div>
+
+      <div>
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">Amount ({token})</label>
+        <input
+          type="number"
+          min={1}
+          max={1000}
+          step={10}
+          value={amount}
+          onChange={(e) => setAmount(Number(e.target.value) || 0)}
+          className={cn(
+            "w-full p-3 bg-muted border border-gray/15 rounded-[12px]",
+            "text-body2 font-mono text-foreground",
+            "outline-none focus:border-warning/40 transition-colors",
+          )}
+        />
+      </div>
+
+      <button onClick={handleDrip} disabled={disabled} className="btn-primary w-full">
+        <Droplets className="w-5 h-5" />
+        {submitting ? "Sending…" : `Send test ${token}`}
+      </button>
+
+      {result?.kind === "ok" && (
+        <div className="space-y-3 rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold text-success">{amount} {token} sent to your wallet</p>
+              <p className="mt-0.5 text-success/75">Now deposit it to move it into your private vault.</p>
+            </div>
+          </div>
+          {result.signature && (
+            <div className="rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono break-all text-success/80">
+              {result.signature}
+            </div>
+          )}
+          <Link
+            href={hrefWithChain("/vault/deposit", network)}
+            className="inline-flex items-center gap-1.5 font-medium text-success hover:text-success/80"
+          >
+            Deposit {token} now <ExternalLink className="w-3 h-3" />
+          </Link>
+        </div>
+      )}
+      {result?.kind === "err" && (
+        <div className="rounded-[10px] border border-red-500/30 bg-red-500/5 p-3 text-caption text-red-400">
+          {result.message}
+        </div>
+      )}
     </div>
   );
 }
