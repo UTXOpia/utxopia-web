@@ -248,7 +248,7 @@ export default function Home() {
             <ScrollReveal delay={0.1}>
               <h1 className="hero-title text-foreground">
                 Private. <span className="text-privacy">Audit-ready.</span>{" "}
-                <span className={chain.id === "sui" ? "text-sui" : "text-sol"}>{chainName}.</span>
+                <span className="text-foreground">{chainName}.</span>
               </h1>
             </ScrollReveal>
 
