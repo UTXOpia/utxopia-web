@@ -25,6 +25,7 @@ import { useUTXOpia } from "@/hooks/use-utxopia";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StealthRecipientInput } from "@/components/ui/stealth-recipient-input";
+import { TextShimmer } from "@/components/ui/text-shimmer";
 import type { StealthMetaAddress } from "@utxopia/sdk";
 import { SHIELD_TOKENS } from "@/lib/supported-tokens";
 
@@ -414,7 +415,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
             <span className="text-caption text-gray/50">
               {btcWallet.connected && btcWallet.balance !== null
                 ? `Balance: ${(btcWallet.balance / 1e8).toFixed(8)} BTC`
-                : btcWallet.connected ? "Balance: loading..." : ""}
+                : btcWallet.connected ? <TextShimmer>Balance: loading…</TextShimmer> : ""}
             </span>
           </div>
           <div className="flex items-center gap-2 p-3 bg-muted border border-gray/15 rounded-[12px] focus-within:border-btc/30 transition-colors">
@@ -566,7 +567,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
               : splBalance !== null
                 ? `Balance: ${(splBalance / (10 ** selectedToken.decimals)).toLocaleString(undefined, { maximumFractionDigits: selectedToken.decimals })} ${selectedToken.symbol}`
                 : publicKey
-                  ? `Balance: loading...`
+                  ? <TextShimmer>Balance: loading…</TextShimmer>
                   : ""
             }
           </span>
