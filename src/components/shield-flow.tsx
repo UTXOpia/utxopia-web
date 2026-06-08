@@ -219,10 +219,23 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           createCloseAccountInstruction(wsolAta, publicKey, publicKey, [], SPL_TOKEN_PROGRAM_ID),
         );
       } else {
-        // SPL token shielding (zkBTC, USDC, etc.)
+        // SPL token shielding (zkBTC, USDC, etc.). The pool accepts both classic
+        // SPL Token and Token-2022 (on-chain validate_any_token_program_key), so
+        // detect the mint's actual program rather than assuming Token-2022 — a
+        // mint account is owned by its token program.
+        const mintInfo = await connection.getAccountInfo(mintPubkey);
+        if (!mintInfo) {
+          throw new Error(`${selectedToken.symbol} mint not found on this network.`);
+        }
+        const classicTokenProgram = new PublicKey(SPL_TOKEN_PROGRAM_ID);
+        if (!mintInfo.owner.equals(TOKEN_2022_PROGRAM_ID) && !mintInfo.owner.equals(classicTokenProgram)) {
+          throw new Error(`${selectedToken.symbol} uses an unsupported token program.`);
+        }
+        const tokenProgramId = mintInfo.owner;
+
         const tokenAccounts = await connection.getTokenAccountsByOwner(publicKey, {
           mint: mintPubkey,
-          programId: TOKEN_2022_PROGRAM_ID,
+          programId: tokenProgramId,
         });
 
         if (tokenAccounts.value.length === 0) {
@@ -256,7 +269,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
             { pubkey: tokenConfigPda, isSigner: false, isWritable: true },
             { pubkey: vaultPubkey, isSigner: false, isWritable: true },
             { pubkey: commitmentTreePda, isSigner: false, isWritable: true },
-            { pubkey: TOKEN_2022_PROGRAM_ID, isSigner: false, isWritable: false },
+            { pubkey: tokenProgramId, isSigner: false, isWritable: false },
           ],
         }));
       }
