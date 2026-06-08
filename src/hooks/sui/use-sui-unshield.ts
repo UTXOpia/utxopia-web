@@ -13,6 +13,7 @@ import { useCallback, useState } from "react";
 import { toHex64 } from "@/lib/utils/hex";
 import { useProver } from "@/hooks/use-prover";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { networkForChain } from "@/lib/chain-registry";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { UTXOpiaKeys, StealthMetaAddress } from "@utxopia/sdk";
@@ -183,7 +184,11 @@ export function useSuiUnshield() {
         if (!prover.isInitialized) await prover.initialize();
         setStatus("processing");
         setStatusMessage("Processing...");
-        const { proof, proofBytes } = await prover.generateProof(proofInputs);
+        const { proof, proofBytes } = await withTimeout(
+          prover.generateProof(proofInputs),
+          PROOF_TIMEOUT_MS,
+          "Proof generation timed out. This can happen on slower devices or with large transfers — please try again.",
+        );
 
         setStatus("submitting");
         setStatusMessage("Submitting transaction...");

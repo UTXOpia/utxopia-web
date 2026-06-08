@@ -12,23 +12,9 @@ import type { TransferParams } from "@/hooks/use-build-transfer-params";
 import { TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
+import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
-
-/** Proof generation is pure local compute, so a timeout + retry is always safe
- *  (no on-chain submission has happened yet). Generous bound to avoid false
- *  timeouts on slow mobile devices while still escaping a hung WASM prover. */
-const PROOF_TIMEOUT_MS = 120_000;
-
-function withTimeout<T>(promise: Promise<T>, ms: number, message: string): Promise<T> {
-  return new Promise<T>((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), ms);
-    promise.then(
-      (value) => { clearTimeout(timer); resolve(value); },
-      (err) => { clearTimeout(timer); reject(err); },
-    );
-  });
-}
 
 export function useJoinSplitSubmit() {
   const prover = useProver();
