@@ -3,6 +3,7 @@
 import { CheckCircle2, ExternalLink } from "lucide-react";
 import type { WalletDepositResult } from "@/hooks/use-btc-deposit";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
+import { DepositStatusTracker } from "@/components/shield-flow/deposit-status-tracker";
 import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 import { cn } from "@/lib/utils";
 import type { SHIELD_TOKENS } from "@/lib/supported-tokens";
@@ -41,6 +42,9 @@ export function ShieldSuccess({
           ? "Your BTC deposit was broadcast. It will appear in your private balance after confirmation."
           : `Your ${selectedToken.symbol} is now in your private balance.`}
       </p>
+      {isBtc && walletDepositResult?.opReturnHex && (
+        <DepositStatusTracker opReturnHex={walletDepositResult.opReturnHex} className="pt-1" />
+      )}
       {txSig && (
         <a
           href={getChainTransactionUrl(config, txSig, networkId)}
