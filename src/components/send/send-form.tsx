@@ -312,6 +312,9 @@ export function SendForm() {
   const onSend = useCallback(async () => {
     setError(null);
     setSubmitting(true);
+    // Close the review modal as submission begins: surfaces the in-flight /
+    // error state in the form, and prevents a second hold-to-confirm.
+    dispatch({ type: "close_review" });
     try {
       if (!ctx.keys || !ctx.stealthAddress) {
         throw new Error(
@@ -417,7 +420,8 @@ export function SendForm() {
         recipient: recipientArg,
       });
 
-      await submitter.submit(params, BigInt(amountSats));
+      const ok = await submitter.submit(params, BigInt(amountSats));
+      if (!ok) return; // submitter.status === "error"; error + retry shown below
       scheduleInboxRefresh();
 
       dispatch({ type: "reset" });
@@ -504,7 +508,10 @@ export function SendForm() {
         recipient: { stealthMeta: noteMeta },
       });
 
-      await submitter.submit(params, BigInt(sats));
+      const ok = await submitter.submit(params, BigInt(sats));
+      if (!ok) {
+        throw new Error(submitter.error ?? "Could not lock funds for the claim link. Please try again.");
+      }
       scheduleInboxRefresh();
 
       const origin =
@@ -632,6 +639,22 @@ export function SendForm() {
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
           {submitter.statusMessage || "Submitting…"}
+        </div>
+      )}
+
+      {submitter.status === "error" && submitter.error && (
+        <div className="flex flex-col items-start gap-2 px-3 py-2.5 rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-500">
+          <span className="break-words">{submitter.error}</span>
+          <button
+            type="button"
+            onClick={() => {
+              submitter.reset();
+              dispatch({ type: "open_review" });
+            }}
+            className="font-medium text-red-400 underline underline-offset-2 hover:text-red-300"
+          >
+            Try again
+          </button>
         </div>
       )}
     </div>

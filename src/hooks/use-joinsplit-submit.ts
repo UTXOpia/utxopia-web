@@ -210,11 +210,13 @@ export function useJoinSplitSubmit() {
         const count = parseInt(localStorage.getItem("utxopia-tx-count") || "0", 10);
         localStorage.setItem("utxopia-tx-count", String(count + 1));
       } catch {};
+      return true;
     } catch (err) {
       console.error("[Submit] Error:", err);
       setError(err instanceof Error ? err.message : "Transaction failed");
       setStatus("error");
       setStatusMessage("");
+      return false;
     }
   }, [prover, chainEnv]);
 
