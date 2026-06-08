@@ -58,6 +58,9 @@ type State = {
   reviewOpen: boolean;
 };
 
+/** Upper bound on name resolution before we stop spinning and show not_found. */
+const NAME_RESOLVE_TIMEOUT_MS = 12_000;
+
 const initial: State = {
   recipient: "",
   sourceToken: "zkBTC",
@@ -215,34 +218,37 @@ export function SendForm() {
     }
     setSnsState({ kind: "resolving" });
     let cancelled = false;
+    // Never leave the spinner running forever: if the name server is slow or
+    // unreachable, fall back to not_found so Send stays blocked but the user
+    // gets an actionable state instead of an indefinite "Resolving…".
+    const timeout = setTimeout(() => {
+      if (!cancelled) setSnsState({ kind: "not_found" });
+    }, NAME_RESOLVE_TIMEOUT_MS);
+    const settle = (next: NameState) => {
+      if (cancelled) return;
+      clearTimeout(timeout);
+      setSnsState(next);
+    };
     if (detection.type === "stealth_sns") {
       let sub: string;
       try {
         sub = normalizePrivateNameHandle(input, "solana");
       } catch {
+        clearTimeout(timeout);
         setSnsState({ kind: "not_found" });
         return;
       }
       void lookupSnsName(sub)
-        .then((r) => {
-          if (cancelled) return;
-          setSnsState(r ? { kind: "found", resolved: r } : { kind: "not_found" });
-        })
-        .catch(() => {
-          if (!cancelled) setSnsState({ kind: "not_found" });
-        });
+        .then((r) => settle(r ? { kind: "found", resolved: r } : { kind: "not_found" }))
+        .catch(() => settle({ kind: "not_found" }));
     } else {
       void resolveSuiNsUtxopiaRecord(input, chainEnv.networkId)
-        .then((r) => {
-          if (cancelled) return;
-          setSnsState(r?.metadata ? { kind: "found", resolved: r.metadata } : { kind: "not_found" });
-        })
-        .catch(() => {
-          if (!cancelled) setSnsState({ kind: "not_found" });
-        });
+        .then((r) => settle(r?.metadata ? { kind: "found", resolved: r.metadata } : { kind: "not_found" }))
+        .catch(() => settle({ kind: "not_found" }));
     }
     return () => {
       cancelled = true;
+      clearTimeout(timeout);
     };
   }, [detection.type, state.recipient, lookupSnsName, chainEnv.networkId]);
 
