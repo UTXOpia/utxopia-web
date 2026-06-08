@@ -1,7 +1,7 @@
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { SuinsClient } from "@mysten/suins";
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 
 type UtxopiaSuiState = {
   network?: string;
@@ -23,7 +23,7 @@ const rpcUrl = process.env.UTXOPIA_SUI_RPC_URL ?? state.rpcUrl ?? "https://fulln
 const network = state.network === "mainnet" ? "mainnet" : "testnet";
 const parentName = process.env.UTXOPIA_SUINS_PARENT_NAME ?? state.suins?.parentName ?? "utxopia.sui";
 
-const client = new SuiClient({ url: rpcUrl });
+const client = new SuiJsonRpcClient({ url: rpcUrl, network });
 const suins = new SuinsClient({ client, network });
 
 try {

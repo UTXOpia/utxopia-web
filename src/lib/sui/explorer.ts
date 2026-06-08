@@ -1,9 +1,9 @@
 import { toHex64 } from "@/lib/utils/hex";
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { CommitmentTreeIndex, getMerkleProofFromTree, initPoseidon } from "@utxopia/sdk";
-import type { NetworkConfig } from "@/lib/network-config";
+import { suiNetworkName, type NetworkConfig } from "@/lib/network-config";
 
-type SuiEvent = Awaited<ReturnType<SuiClient["queryEvents"]>>["data"][number];
+type SuiEvent = Awaited<ReturnType<SuiJsonRpcClient["queryEvents"]>>["data"][number];
 
 interface ExplorerTx {
   txSignature: string;
@@ -118,7 +118,10 @@ export async function fetchSuiMerkleProof(
 async function fetchSuiExplorerEvents(config: NetworkConfig): Promise<SuiEvent[]> {
   if (!config.sui) return [];
 
-  const client = new SuiClient({ url: config.sui.rpcUrl });
+  const client = new SuiJsonRpcClient({
+    url: config.sui.rpcUrl,
+    network: suiNetworkName(config.sui.rpcUrl),
+  });
   const events: SuiEvent[] = [];
   let cursor: { txDigest: string; eventSeq: string } | null = null;
 

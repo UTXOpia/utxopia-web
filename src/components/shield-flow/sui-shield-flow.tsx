@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Image from "next/image";
 import { AlertCircle, CheckCircle2, ChevronDown, ExternalLink, Loader2, Shield } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -57,12 +57,12 @@ export function SuiShieldFlow({ walletAddress, className }: SuiShieldFlowProps) 
     });
   }, [selected, decimals]);
 
-  const onMax = useCallback(() => {
+  const onMax = () => {
     if (!selected) return;
     setAmount((Number(selected.walletBalance) / 10 ** decimals).toString());
-  }, [selected, decimals]);
+  };
 
-  const handleShield = useCallback(async () => {
+  const handleShield = async () => {
     if (!selected || !amount || !resolvedMeta) return;
     setFormError(null);
     const amountRaw = BigInt(Math.floor(parseFloat(amount) * 10 ** decimals));
@@ -75,7 +75,7 @@ export function SuiShieldFlow({ walletAddress, className }: SuiShieldFlowProps) 
       return;
     }
     await shield(selected, amountRaw);
-  }, [selected, amount, resolvedMeta, decimals, shield]);
+  };
 
   if (status === "done" && selected) {
     const explorer = makeSuiExplorerLinks(

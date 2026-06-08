@@ -9,7 +9,7 @@ import {
 import { getChainAdapter } from "@/lib/chain-registry";
 import { getBackendUrl, getSolanaRpcUrl } from "@/lib/api/constants";
 import { getChainEnvironment, type ChainEnvironment } from "@/lib/chain-environment";
-import type { NetworkConfig } from "@/lib/network-config";
+import { suiNetworkName, type NetworkConfig } from "@/lib/network-config";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
 
 export interface InboxSource {
@@ -110,9 +110,12 @@ export function getTokenScanTargets(
 async function fetchSuiInboxEvents(config: NetworkConfig): Promise<InboxSource> {
   if (!config.sui) return { announcements: [], spentNullifiers: new Set() };
 
-  const { SuiClient } = await import("@mysten/sui/client");
-  type SuiEvent = Awaited<ReturnType<InstanceType<typeof SuiClient>["queryEvents"]>>["data"][number];
-  const client = new SuiClient({ url: config.sui.rpcUrl });
+  const { SuiJsonRpcClient } = await import("@mysten/sui/jsonRpc");
+  type SuiEvent = Awaited<ReturnType<InstanceType<typeof SuiJsonRpcClient>["queryEvents"]>>["data"][number];
+  const client = new SuiJsonRpcClient({
+    url: config.sui.rpcUrl,
+    network: suiNetworkName(config.sui.rpcUrl),
+  });
   const events: SuiEvent[] = [];
   let cursor: { txDigest: string; eventSeq: string } | null = null;
 

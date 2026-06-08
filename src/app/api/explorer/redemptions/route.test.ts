@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it } from "bun:test";
+import { fetchSuiExplorerTransactions } from "@/test-support/sui-explorer-mock";
 
-const fetchSuiExplorerTransactions = mock(async () => [
+const TRANSACTIONS = [
   {
     txSignature: "sui-request-digest",
     type: "withdraw",
@@ -49,11 +50,9 @@ const fetchSuiExplorerTransactions = mock(async () => [
     inputs: [],
     outputs: [],
   },
-]);
+];
 
-mock.module("@/lib/sui/explorer", () => ({
-  fetchSuiExplorerTransactions,
-}));
+fetchSuiExplorerTransactions.mockImplementation(async () => TRANSACTIONS);
 
 const { GET } = await import("./route");
 

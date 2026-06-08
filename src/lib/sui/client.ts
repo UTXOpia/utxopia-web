@@ -1,6 +1,6 @@
 "use client";
 
-import { SuiClient } from "@mysten/sui/client";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
 import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import {
   generateNonce,
@@ -10,7 +10,12 @@ import {
 } from "@mysten/sui/zklogin";
 import { UTXOpiaSuiAdapter } from "@utxopia/sdk/sui";
 import { networkForChain } from "@/lib/chain-registry";
-import { detectNetwork, getNetworkConfig, type NetworkId } from "@/lib/network-config";
+import {
+  detectNetwork,
+  getNetworkConfig,
+  suiNetworkName,
+  type NetworkId,
+} from "@/lib/network-config";
 
 const ZKLOGIN_SESSION_KEY = "utxopia.sui.zklogin";
 const SUI_AUTH_STATE_KEY = "utxopia.sui.auth";
@@ -47,7 +52,10 @@ export function getSuiClient(networkId: NetworkId = networkForChain(detectNetwor
   const network = networkForChain(networkId, "sui");
   const cfg = getNetworkConfig(network);
   if (!cfg.sui) throw new Error("Sui configuration is missing");
-  return new SuiClient({ url: cfg.sui.rpcUrl });
+  return new SuiJsonRpcClient({
+    url: cfg.sui.rpcUrl,
+    network: suiNetworkName(cfg.sui.rpcUrl),
+  });
 }
 
 export function getSuiAdapter(networkId: NetworkId = networkForChain(detectNetwork(), "sui")) {
@@ -246,7 +254,7 @@ export async function consumeSuiZkLoginCallback(): Promise<SuiZkLoginCallback> {
   if (!jwt) return { jwt: null, address: null, salt: null, error };
 
   const salt = await fetchZkLoginSalt(jwt);
-  const address = salt ? jwtToAddress(jwt, salt) : null;
+  const address = salt ? jwtToAddress(jwt, salt, false) : null;
   if (address) saveSuiAuthState({ method: "zklogin", address });
   window.history.replaceState(null, "", window.location.pathname + window.location.search);
   return { jwt, address, salt, error };
