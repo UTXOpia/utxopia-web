@@ -157,7 +157,10 @@ export function SuiUnshieldFlow({ className }: SuiUnshieldFlowProps) {
 
   const busy = status === "preparing" || status === "processing" || status === "submitting";
   const shownError = formError || error;
-  const canSubmit = !!selected && !!amount && parseFloat(amount) > 0 && !!recipient && !!keys && !!selfMeta;
+  const recipientTrimmed = recipient.trim();
+  const recipientInvalid = recipientTrimmed.length > 0 && !SUI_ADDRESS_RE.test(recipientTrimmed);
+  const canSubmit =
+    !!selected && !!amount && parseFloat(amount) > 0 && SUI_ADDRESS_RE.test(recipientTrimmed) && !!keys && !!selfMeta;
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -226,9 +229,17 @@ export function SuiUnshieldFlow({ className }: SuiUnshieldFlowProps) {
           onChange={(e) => setRecipient(e.target.value)}
           placeholder="0x..."
           spellCheck={false}
-          className="w-full rounded-[12px] border border-gray/15 bg-muted p-3 font-mono text-sm text-foreground placeholder:text-gray/30 outline-none transition-colors focus:border-sui/30"
+          aria-invalid={recipientInvalid}
+          className={cn(
+            "w-full rounded-[12px] border bg-muted p-3 font-mono text-sm text-foreground placeholder:text-gray/30 outline-none transition-colors",
+            recipientInvalid ? "border-red-500/40 focus:border-red-500/60" : "border-gray/15 focus:border-sui/30",
+          )}
         />
-        <p className="text-[10px] text-gray/50">Funds leave your private balance and arrive at this public Sui address. The relayer sponsors gas.</p>
+        {recipientInvalid ? (
+          <p className="text-[10px] text-red-400">Enter a valid Sui address (0x followed by up to 64 hex characters).</p>
+        ) : (
+          <p className="text-[10px] text-gray/50">Funds leave your private balance and arrive at this public Sui address. The relayer sponsors gas.</p>
+        )}
       </div>
 
       {shownError && !busy && (
