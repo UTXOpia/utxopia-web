@@ -35,7 +35,6 @@ export const NAV_ITEMS: NavItem[] = [
       { id: "eddsa-signatures", label: "EdDSA Signatures" },
       { id: "stealth-key-agreement", label: "Stealth Key Agreement" },
       { id: "sender-memo", label: "Sender Memo Channel" },
-      { id: "proof-of-innocence", label: "Proof of Innocence" },
     ],
   },
   { id: "key-model", label: "Key Model" },
@@ -45,7 +44,6 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { id: "auditor-toolkit", label: "Auditor Toolkit" },
       { id: "sender-memo-channel", label: "Sender Memos" },
-      { id: "proof-of-innocence-flow", label: "Proof of Innocence" },
       { id: "selective-disclosure-proofs", label: "Selective Disclosure" },
       { id: "compliance-toggle", label: "Compliance Toggle" },
     ],

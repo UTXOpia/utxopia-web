@@ -3,6 +3,7 @@
 import Link from "next/link";
 import Image from "next/image";
 import { motion } from "framer-motion";
+import { Github } from "lucide-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
@@ -42,8 +43,19 @@ export function SiteFooter() {
           ZK Privacy for Every Token on {chainName}
         </div>
 
-        <div className="text-caption text-gray/60">
-          Privacy-preserving bridge infrastructure
+        <div className="flex items-center gap-4">
+          <span className="text-caption text-gray/60">
+            Privacy-preserving bridge infrastructure
+          </span>
+          <a
+            href="https://github.com/UTXOpia"
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="GitHub"
+            className="p-2 rounded-full text-gray hover:text-foreground hover:bg-muted/50 transition-colors"
+          >
+            <Github className="w-4 h-4" />
+          </a>
         </div>
       </motion.div>
     </footer>
