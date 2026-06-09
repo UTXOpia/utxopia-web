@@ -290,18 +290,23 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
             </div>
           ) : (
             <div className="flex flex-col items-center py-10">
-              <div className="mb-4 flex h-20 w-20 items-center justify-center rounded-2xl border border-sui/20 bg-sui/10">
+              <div className="relative mb-5 flex items-center justify-center">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 -m-6 rounded-full bg-[radial-gradient(circle,var(--color-sui)_0%,transparent_70%)] opacity-[0.18] blur-xl"
+                />
                 <Image
-                  src="/brand/logo-transparent-128.png"
+                  src="/brand/logo-transparent-256.png"
                   alt="UTXOpia"
-                  width={56}
-                  height={56}
-                  className="h-14 w-14 object-contain"
+                  width={104}
+                  height={104}
+                  priority
+                  className="relative h-[104px] w-[104px] object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
                 />
               </div>
-              <h1 className="mb-1 text-[22px] font-bold text-foreground">Private wallet</h1>
-              <p className="mb-6 text-caption text-gray/60">
-                Unlock your private wallet to view zkBTC and zkSUI balances.
+              <h1 className="mb-1.5 text-[22px] font-bold text-foreground">Your private vault</h1>
+              <p className="mb-6 max-w-[34ch] text-balance text-center text-caption text-gray-light/70">
+                Unlock your private vault to view zkBTC and zkSUI balances.
               </p>
               <button
                 type="button"

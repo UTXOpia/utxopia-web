@@ -349,17 +349,22 @@ export default function VaultPage() {
           {!keys && !isViewOnly ? (
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
-              <div className="w-20 h-20 rounded-2xl bg-privacy/10 border border-privacy/20 flex items-center justify-center mb-4">
+              <div className="relative mb-5 flex items-center justify-center">
+                <div
+                  aria-hidden
+                  className="absolute inset-0 -m-6 rounded-full bg-[radial-gradient(circle,var(--color-privacy)_0%,transparent_70%)] opacity-[0.18] blur-xl"
+                />
                 <Image
-                  src="/brand/logo-transparent-128.png"
+                  src="/brand/logo-transparent-256.png"
                   alt="UTXOpia"
-                  width={56}
-                  height={56}
-                  className="w-14 h-14 object-contain"
+                  width={104}
+                  height={104}
+                  priority
+                  className="relative w-[104px] h-[104px] object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
                 />
               </div>
-              <h1 className="text-[22px] font-bold text-foreground mb-1">Private wallet</h1>
-              <p className="text-caption text-gray/60 mb-6">
+              <h1 className="text-[22px] font-bold text-foreground mb-1.5">Your private vault</h1>
+              <p className="text-caption text-gray-light/70 max-w-[34ch] text-center text-balance mb-6">
                 Hold and send funds without exposing balances or recipients.
               </p>
               <button
