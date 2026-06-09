@@ -36,8 +36,20 @@ function getDepositStatusDot(status: string | null): { variant: StatusDotVariant
   const resolved = status ?? "claimed";
   if (resolved === "ready" || resolved === "claimed") return { variant: "confirmed", label: "Confirmed" };
   if (resolved === "failed") return { variant: "failed", label: "Failed" };
+  if (resolved === "stalled") return { variant: "stalled", label: "Retrying" };
   if (resolved === "pending") return { variant: "pending", label: "Pending" };
   return { variant: "processing", label: DEPOSIT_STATUS_CONFIG[resolved]?.label ?? "Processing" };
+}
+
+// Subtext so a slow-but-healthy deposit reads as progress, not failure.
+function getDepositStatusSubtext(d: DepositRecord): string | null {
+  const status = d.status ?? "";
+  const confs = d.btcMeta?.confirmations ?? null;
+  if ((status === "confirming" || status === "sweeping") && confs != null) {
+    return `${confs} confirmation${confs === 1 ? "" : "s"}`;
+  }
+  if (status === "stalled") return "retrying";
+  return null;
 }
 
 // =============================================================================
@@ -396,8 +408,11 @@ export function DepositRow({
         onClick={() => canExpand && onToggle()}
       >
         <Td>
-          <div className="flex items-center gap-1.5">
+          <div className="flex flex-col gap-0.5">
             <StatusDot {...getDepositStatusDot(d.status)} />
+            {getDepositStatusSubtext(d) && (
+              <span className="text-[11px] text-gray">{getDepositStatusSubtext(d)}</span>
+            )}
           </div>
         </Td>
         <Td>

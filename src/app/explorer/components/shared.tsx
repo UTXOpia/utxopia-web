@@ -204,13 +204,14 @@ export function TypeBadge({ kind }: { kind: "shield" | "transfer" | "unshield" |
 
 // --- Status Dot ---
 
-export type StatusDotVariant = "confirmed" | "processing" | "pending" | "failed";
+export type StatusDotVariant = "confirmed" | "processing" | "pending" | "failed" | "stalled";
 
 export function StatusDot({ variant, label }: { variant: StatusDotVariant; label?: string }) {
   const config = {
     confirmed: { dot: "bg-green-400", text: "text-green-400", defaultLabel: "Confirmed" },
     processing: { dot: "bg-gray/50 animate-pulse", text: "text-gray-light", defaultLabel: "Processing" },
     pending: { dot: "bg-gray/40", text: "text-gray", defaultLabel: "Pending" },
+    stalled: { dot: "bg-amber-400 animate-pulse", text: "text-amber-400", defaultLabel: "Retrying" },
     failed: { dot: "bg-red-400", text: "text-red-400", defaultLabel: "Failed" },
   }[variant];
 
