@@ -191,14 +191,19 @@ async function fetchSuiInboxEvents(config: NetworkConfig): Promise<InboxSource> 
       const leafIndex = numberField(payload.leaf_index);
       const tokenId = bigintField(payload.token_id);
       if (amount == null || !ephemeralPub || !commitment || leafIndex == null) continue;
+      // Transfer outputs announce the whole 72-byte stealth blob (ephemeral
+      // pub || encrypted amount || padding) with amount=0 and token_id=0 —
+      // the token stays private; scanners trial-match registered token ids
+      // against the commitment.
+      const isStealthBlob = ephemeralPub.length >= 40;
       announcements.push({
         announcementType: numberField(payload.announcement_type) ?? 0,
-        ephemeralPub,
-        encryptedAmount: u64Le(amount),
+        ephemeralPub: isStealthBlob ? ephemeralPub.slice(0, 32) : ephemeralPub,
+        encryptedAmount: isStealthBlob ? ephemeralPub.slice(32, 40) : u64Le(amount),
         commitment,
         leafIndex,
         blockTime: Math.floor(Number(event.timestampMs ?? 0) / 1000),
-        tokenIdHex: toHex64(tokenId ?? SUI_ZKBTC_TOKEN_ID),
+        tokenIdHex: tokenId === 0n ? undefined : toHex64(tokenId ?? SUI_ZKBTC_TOKEN_ID),
       });
     } else if (type === "NullifierSpent") {
       const nullifier = bytesField(payload.nullifier);
