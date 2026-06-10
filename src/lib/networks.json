@@ -114,31 +114,46 @@
     },
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
-      "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0x49e668da6c468cd0a2313e03fe9bc260999adc2486e980cec9172104de6923db",
+      "explorerUrl": "https://suiscan.xyz/testnet",
+      "packageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
       "pool": {
-        "objectId": "0xc9d55e6fc6f04c88adae116b7ba413122af7236a662ffb8990e630bf31fdd0e8",
-        "initialSharedVersion": "889180411"
+        "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
+        "initialSharedVersion": "897528279"
+      },
+      "commitmentTree": {
+        "objectId": "0x32918f2fc13e4a08dc6f8d5b95d0cef1a7399c2d996d2e32c16146bb1f425572",
+        "initialSharedVersion": "897528280"
+      },
+      "btcDepositRegistry": {
+        "objectId": "0x093560e98ad79298ebb2a90b2550b3a2228f5a481b859b5167ca0c535891b24c",
+        "initialSharedVersion": "897528281"
+      },
+      "utxoSet": {
+        "objectId": "0xdf8113ae6a8074ec7df179a6f75835df3f07e717966b3f6a30af6386a6ec7c3a",
+        "initialSharedVersion": "897528282"
       },
       "nullifierRegistry": {
-        "objectId": "0xc16d66f3b66524d315787cf23abdd7c664677e7daca516631d0f6f965851b40d",
-        "initialSharedVersion": "889180415"
+        "objectId": "0x0aadc94b834613d549a0609ac01a5f2b90c81928692854940d2ac8645dc38c8a",
+        "initialSharedVersion": "897528283"
       },
       "redemptionQueue": {
-        "objectId": "0xc118ac30a727aabc9642825ebf4260381b9652716c689c23fad2cbe89deb09eb",
-        "initialSharedVersion": "889180416"
+        "objectId": "0x2196260cd5a95dcf32021677115165f3ca0fd7d723d701150d214a34eec09daa",
+        "initialSharedVersion": "897528284"
       },
       "redemptionCap": {
-        "objectId": "0x52a4b2b6bcda8e160f29fc3e53273d830f6365aa27dcf6ae1e3ac96f71bd2918",
-        "version": "889180416",
-        "digest": "RkJmzSDEUUpTC2sGy4g8hDAXMBwmB5FpLuzEKNmTced"
+        "objectId": "0x1ab0668d2ffd632a1f574b685b1a04b58472f480a41eb40391da4d666f2d8990",
+        "version": "897528284",
+        "digest": "HWZJubcPuGEDpZEFsPJ1mqYRMUMyxqDVnWgrjK57y41k"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x09f2c39f7ea6df54ffea3fce228759e6efe4474ee866bc551d085ba4d771c379",
-        "initialSharedVersion": "889180417"
+        "objectId": "0x13ecb8f9697fc517c74ea5624cd70a39ef1714922160fe05978b1460102812d2",
+        "initialSharedVersion": "897528285"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
+      },
+      "signing": {
+        "btcWithdrawal": "ika"
       },
       "ika": {
         "network": "testnet",
@@ -154,8 +169,8 @@
           "objectId": "0x4d157b7415a298c56ec2cb1dcab449525fa74aec17ddba376a83a7600f2062fc",
           "initialSharedVersion": "510819272"
         },
-        "dWalletId": "",
-        "dWalletCapObjectId": "",
+        "dWalletId": "0x7f0b719d886f7c20003842f58d5c5d06c65eb49a22d5b9a48902da57b154b002",
+        "dWalletCapObjectId": "0xea3894048ad18ce501c1f1d266f158595a4bc8ae308eef023f0806099cb5150b",
         "networkEncryptionKeyId": "0xe7c79a60931299e110297554fc02e0a0e095e96778775092c97f07a1bd1337cc"
       },
       "vk": {
@@ -163,21 +178,44 @@
           "nInputs": 1,
           "nOutputs": 1,
           "nPublic": 4,
-          "vkHash": "7d8d5d6933a079982af47e3ddf98908aa2f29ccd321fc8d43986a6a5186cf2f2",
-          "registerTxDigest": "9YvLWhTJ29NDhVSvyeN46UPsNgNnqgFzhDzFuihFTRQ2"
+          "vkHash": "745d536fb3a86424ee9560cb7b630bb0eb3d3c3af06c85bcda1eb7bcc5b1a07a",
+          "registerTxDigest": "HhWDW4pDxzSHVtVMUTmDfqb4DENybD9YrLzeTR3C4t7j"
+        },
+        "joinsplit_1x2": {
+          "nInputs": 1,
+          "nOutputs": 2,
+          "nPublic": 5,
+          "vkHash": "f782d4bc2f696417688cdec3cb4f822d6961892192e13e8842505bd8d119fa6d",
+          "registerTxDigest": "69Zoy57x5qwequyy3Q6NbwuXJzPKDMJRh3aJgPyAYWFM"
+        },
+        "joinsplit_2x1": {
+          "nInputs": 2,
+          "nOutputs": 1,
+          "nPublic": 5,
+          "vkHash": "3af6cdad3c1f4de9e088975a1ac5b20e0445d7f3fea0a5038f300102cf98fd98",
+          "registerTxDigest": "612cjb246yLud9Wii4PJEsdFym3daWrackZVLbkn2jX7"
+        },
+        "joinsplit_2x2": {
+          "nInputs": 2,
+          "nOutputs": 2,
+          "nPublic": 6,
+          "vkHash": "6fffc4962028d0ac69f4d7877badc9f5adea4b83e6224ebb8db22657e847e7b8",
+          "registerTxDigest": "4unn3E8h52pPsehTT1BeDLfHTAVkK8P1FHA77Uv3Setf"
         }
       },
-      "commitmentTree": {
-        "objectId": "0x38542096faea30a72598d30e61c2346833ce33b42d6a935ecd4989eb0d62e28a",
-        "initialSharedVersion": "889180412"
+      "lightClient": {
+        "objectId": "0x9a897a46941c34a8a7a2b50e6b49f216bdf8a3700f903f7b39fef46910ac0434",
+        "initialSharedVersion": "897528296"
       },
-      "btcDepositRegistry": {
-        "objectId": "0x5c487c506dd9420ca5f49763a5491dbf28767fd2d61c79d97e0f75c3bfdc65c5",
-        "initialSharedVersion": "889180413"
+      "tokenRegistry": {
+        "objectId": "0x72d486165530990e9486c5bb4bc59a817fef76f5c11cffd6979c28bcc654610a",
+        "initialSharedVersion": "897572546"
       },
-      "utxoSet": {
-        "objectId": "0x867669a0d9d7a2b46540fa810b179d790c8661e72838a625152847aae1991ce8",
-        "initialSharedVersion": "889180414"
+      "coinMetadata": {
+        "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
+          "symbol": "UTXT",
+          "name": "UTXOpia Test"
+        }
       }
     }
   },
@@ -300,40 +338,40 @@
     },
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
-      "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0xa5a0ff39f17b1eec14742c58a605257af9cbc677c5541cd63f103c6a09796cd8",
+      "explorerUrl": "https://suiscan.xyz/testnet",
+      "packageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
       "pool": {
-        "objectId": "0x9917b0c7c82a6ecbb2b12014877f9cc421054b3b82553188e29ee3b384d7e613",
-        "initialSharedVersion": "891602242"
+        "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
+        "initialSharedVersion": "897528279"
       },
       "commitmentTree": {
-        "objectId": "0x98619698986de7311fec411f2986fd94c8fee7a0537bb3084345f6bc24905bc5",
-        "initialSharedVersion": "891602243"
+        "objectId": "0x32918f2fc13e4a08dc6f8d5b95d0cef1a7399c2d996d2e32c16146bb1f425572",
+        "initialSharedVersion": "897528280"
       },
       "btcDepositRegistry": {
-        "objectId": "0x7ef3e13bd0890f537badb4a52d71819d5d5d9e30957d987423171fc6806b8f76",
-        "initialSharedVersion": "891602244"
+        "objectId": "0x093560e98ad79298ebb2a90b2550b3a2228f5a481b859b5167ca0c535891b24c",
+        "initialSharedVersion": "897528281"
       },
       "utxoSet": {
-        "objectId": "0xb98d85b07c3fa4ed4750b0ab6349cfad2246d992047fe9c757c1dcdda86aa3b1",
-        "initialSharedVersion": "891602245"
+        "objectId": "0xdf8113ae6a8074ec7df179a6f75835df3f07e717966b3f6a30af6386a6ec7c3a",
+        "initialSharedVersion": "897528282"
       },
       "nullifierRegistry": {
-        "objectId": "0xacae7bc3ab3219f0815bcce5431b2da92c4d788b82811fb2c21dc023a32afd81",
-        "initialSharedVersion": "891602246"
+        "objectId": "0x0aadc94b834613d549a0609ac01a5f2b90c81928692854940d2ac8645dc38c8a",
+        "initialSharedVersion": "897528283"
       },
       "redemptionQueue": {
-        "objectId": "0xe772e8346d220bdbfc133b7e610d6da3ad8e4407800b35355a193ac6bc7e3386",
-        "initialSharedVersion": "891602247"
+        "objectId": "0x2196260cd5a95dcf32021677115165f3ca0fd7d723d701150d214a34eec09daa",
+        "initialSharedVersion": "897528284"
       },
       "redemptionCap": {
-        "objectId": "0x0f070cd14efaa94fd87186ebe6b8533f76f13446703c07f9a5bd86561c0625cf",
-        "version": "891602247",
-        "digest": "AdPwpM6ELsciuW92m6QbQona2ZTPzFDsXsgwMNSm7hDz"
+        "objectId": "0x1ab0668d2ffd632a1f574b685b1a04b58472f480a41eb40391da4d666f2d8990",
+        "version": "897528284",
+        "digest": "HWZJubcPuGEDpZEFsPJ1mqYRMUMyxqDVnWgrjK57y41k"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x3afabfd5c5864a7ab28ff7c4da0d4023bbfe711dd7114568e7a4bcb75e82015f",
-        "initialSharedVersion": "891602248"
+        "objectId": "0x13ecb8f9697fc517c74ea5624cd70a39ef1714922160fe05978b1460102812d2",
+        "initialSharedVersion": "897528285"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -364,8 +402,43 @@
           "nInputs": 1,
           "nOutputs": 1,
           "nPublic": 4,
-          "vkHash": "7d8d5d6933a079982af47e3ddf98908aa2f29ccd321fc8d43986a6a5186cf2f2",
-          "registerTxDigest": "2bhBzV1JtVUkubp8kkrbGdbhdfFEyLmQzg8Ac91rtaka"
+          "vkHash": "745d536fb3a86424ee9560cb7b630bb0eb3d3c3af06c85bcda1eb7bcc5b1a07a",
+          "registerTxDigest": "HhWDW4pDxzSHVtVMUTmDfqb4DENybD9YrLzeTR3C4t7j"
+        },
+        "joinsplit_1x2": {
+          "nInputs": 1,
+          "nOutputs": 2,
+          "nPublic": 5,
+          "vkHash": "f782d4bc2f696417688cdec3cb4f822d6961892192e13e8842505bd8d119fa6d",
+          "registerTxDigest": "69Zoy57x5qwequyy3Q6NbwuXJzPKDMJRh3aJgPyAYWFM"
+        },
+        "joinsplit_2x1": {
+          "nInputs": 2,
+          "nOutputs": 1,
+          "nPublic": 5,
+          "vkHash": "3af6cdad3c1f4de9e088975a1ac5b20e0445d7f3fea0a5038f300102cf98fd98",
+          "registerTxDigest": "612cjb246yLud9Wii4PJEsdFym3daWrackZVLbkn2jX7"
+        },
+        "joinsplit_2x2": {
+          "nInputs": 2,
+          "nOutputs": 2,
+          "nPublic": 6,
+          "vkHash": "6fffc4962028d0ac69f4d7877badc9f5adea4b83e6224ebb8db22657e847e7b8",
+          "registerTxDigest": "4unn3E8h52pPsehTT1BeDLfHTAVkK8P1FHA77Uv3Setf"
+        }
+      },
+      "lightClient": {
+        "objectId": "0x9a897a46941c34a8a7a2b50e6b49f216bdf8a3700f903f7b39fef46910ac0434",
+        "initialSharedVersion": "897528296"
+      },
+      "tokenRegistry": {
+        "objectId": "0x72d486165530990e9486c5bb4bc59a817fef76f5c11cffd6979c28bcc654610a",
+        "initialSharedVersion": "897572546"
+      },
+      "coinMetadata": {
+        "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
+          "symbol": "UTXT",
+          "name": "UTXOpia Test"
         }
       }
     }
