@@ -63,8 +63,8 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
 
           {/* Header */}
           <div className="pt-8 pb-2 px-6 text-center">
-            <div className="inline-flex p-3 rounded-full bg-privacy/10 border border-privacy/20 mb-4">
-              <img src="/brand/logo-transparent-96.png" alt="UTXOpia" className="w-7 h-7 object-contain" />
+            <div className="inline-flex mb-4">
+              <img src="/brand/logo-transparent-96.png" alt="UTXOpia" className="w-20 h-20 object-contain" />
             </div>
             <Dialog.Title className="text-[20px] font-bold text-foreground mb-1">
               Sign In
