@@ -521,6 +521,9 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
               amount: n.amount,
               leafIndex: n.leafIndex,
               ephemeralPub: n.ephemeralPub ?? new Uint8Array(32),
+              // Preserve the spend-time stealth public key; without it the claim
+              // path can't prove ownership (Stealth key mismatch) on a re-scan.
+              stealthPub: n.stealthPub,
               blockTime: n.createdAt > 1_000_000_000_000
                 ? Math.floor(n.createdAt / 1000)
                 : (n.createdAt > 0 ? n.createdAt : 0),

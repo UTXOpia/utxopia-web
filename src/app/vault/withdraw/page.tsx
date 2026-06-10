@@ -2,8 +2,7 @@
 
 import { ArrowUpFromLine } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
-import { SuiUnshieldFlow } from "@/components/send/sui-unshield-flow";
-import { SendForm } from "@/components/send/send-form";
+import { CashOutFlow } from "@/components/send/send-flow";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
@@ -22,11 +21,11 @@ export default function WithdrawPage() {
       title="Cash out"
       description={
         isSui
-          ? "Release a supported Coin from your private balance to a public Sui address."
+          ? "Release a supported Coin to a public Sui address — or send privately to a name or stealth address."
           : "Send to a Bitcoin address or Solana wallet to move funds out of your private balance."
       }
     >
-      {isSui ? <SuiUnshieldFlow /> : <SendForm showClaimLink={false} />}
+      <CashOutFlow />
     </FlowPageLayout>
   );
 }

@@ -1,12 +1,14 @@
 "use client";
 
 /**
- * useSuiUnshield — Sui generic `Coin<T>` unshield (private balance → public address).
+ * useSuiTransfer — Sui generic `Coin<T>` private transfer (shielded → shielded).
  *
- * Builds JoinSplit proof inputs for a single public output bound to a Sui
- * recipient address, generates the proof with the existing prover, and submits
- * to the Sui relay (`mode: "unshield"`), which sponsors gas and releases the
- * Coin<T> on-chain. Mirrors the transfer/redeem wiring but Sui-address bound.
+ * Builds JoinSplit proof inputs for a stealth output bound to a recipient's
+ * stealth meta-address (plus a change note), generates the proof with the
+ * existing prover, and submits to the Sui relay (`mode: "transfer"`), which
+ * sponsors gas and inserts the new commitments into the tree. Mirrors
+ * useSuiUnshield, but every output is a tree (stealth) output — no public
+ * recipient — so the amount and recipient stay hidden on-chain.
  */
 
 import { useCallback, useState } from "react";
@@ -19,47 +21,33 @@ import { networkForChain } from "@/lib/chain-registry";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { UTXOpiaKeys, StealthMetaAddress } from "@utxopia/sdk";
 
-export type SuiUnshieldStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
+export type SuiTransferStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
-export interface SuiUnshieldInput {
+export interface SuiTransferInput {
   /** Fully-qualified Move coin type, e.g. `0x2::sui::SUI`. */
   coinType: string;
-  /** Amount to release publicly (native units). */
+  /** Amount to send privately (native units). */
   amount: bigint;
-  /** Recipient Sui address (0x-prefixed 32-byte hex). */
-  recipient: string;
+  /** Recipient stealth meta-address (resolved from a name or pasted `utxo:`). */
+  recipientMeta: StealthMetaAddress;
   /** Notes to spend (must belong to this coin type's token). */
   selectedNotes: InboxNote[];
   keys: UTXOpiaKeys;
   selfMeta: StealthMetaAddress;
 }
 
-/** 0x-prefixed 32-byte Sui address → raw 32-byte big-endian. */
-function suiAddressToBytes(address: string): Uint8Array {
-  const hex = address.startsWith("0x") ? address.slice(2) : address;
-  if (!/^[0-9a-fA-F]+$/.test(hex) || hex.length > 64) {
-    throw new Error("Invalid Sui recipient address");
-  }
-  const padded = hex.padStart(64, "0");
-  const bytes = new Uint8Array(32);
-  for (let i = 0; i < 32; i += 1) {
-    bytes[i] = parseInt(padded.slice(i * 2, i * 2 + 2), 16);
-  }
-  return bytes;
-}
-
-export function useSuiUnshield() {
+export function useSuiTransfer() {
   const prover = useProver();
   const { networkId } = useChainEnvironment();
   const suiNetwork = networkForChain(networkId, "sui");
 
-  const [status, setStatus] = useState<SuiUnshieldStatus>("idle");
+  const [status, setStatus] = useState<SuiTransferStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [txDigest, setTxDigest] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const submit = useCallback(
-    async (input: SuiUnshieldInput) => {
+    async (input: SuiTransferInput) => {
       setStatus("preparing");
       setStatusMessage("Preparing transaction...");
       setError(null);
@@ -73,8 +61,9 @@ export function useSuiUnshield() {
           computeJoinSplitCommitmentSync,
           createStealthDepositWithKeys,
           computeBoundParamsHash,
-          createSuiUnshieldBoundParams,
+          createTransferBoundParams,
           computeStealthDataHash,
+          SUI_BOUND_CHAIN_ID,
           UTXOpiaClient,
           bytesToHex,
         } = await import("@utxopia/sdk");
@@ -83,7 +72,6 @@ export function useSuiUnshield() {
         await initPoseidon();
 
         const tokenId = deriveSuiTokenId(canonicalSuiCoinType(input.coinType));
-        const recipientBytes = suiAddressToBytes(input.recipient);
 
         const utxopia = UTXOpiaClient.isInitialized ? UTXOpiaClient.instance() : await UTXOpiaClient.init();
         const merkleProofs = await utxopia.fetchMerkleProofs(input.selectedNotes.map((n) => n.commitmentHex));
@@ -114,49 +102,38 @@ export function useSuiUnshield() {
           }),
         );
 
-        // Outputs: [public unshield, change?]. The public output's npk is the
-        // reduced recipient address; tree outputs use stealth keys.
-        const { reduceToField } = await import("@utxopia/sdk");
-        const recipientNpk = reduceToField(recipientBytes);
-        const sendAmounts: bigint[] = [input.amount];
-        const recipientNpks: bigint[] = [recipientNpk];
-        const stealthResults: Array<Awaited<ReturnType<typeof createStealthDepositWithKeys>>> = [
-          {
-            ephemeralPub: new Uint8Array(32),
-            encryptedAmount: new Uint8Array(8),
-            commitment: new Uint8Array(32),
-            stealthPubKeyX: recipientNpk,
-            npkBytes: new Uint8Array(32),
-          },
-        ];
-
         const totalInput = inputsData.reduce((sum, d) => sum + d.note.amount, 0n);
         if (input.amount > totalInput) {
           throw new Error(`Insufficient shielded balance: have ${totalInput}, need ${input.amount}`);
         }
+
+        // Outputs: [recipient, change?]. Every output is a stealth tree output.
+        const sendAmounts: bigint[] = [input.amount];
+        const stealthResults: Array<Awaited<ReturnType<typeof createStealthDepositWithKeys>>> = [
+          await createStealthDepositWithKeys(input.recipientMeta, input.amount, tokenId),
+        ];
+
         const changeAmount = totalInput - input.amount;
         if (changeAmount > 0n) {
           const change = await createStealthDepositWithKeys(input.selfMeta, changeAmount, tokenId);
-          // Insert change before the public output (tree outputs come first).
-          sendAmounts.splice(0, 0, changeAmount);
-          recipientNpks.splice(0, 0, change.stealthPubKeyX);
-          stealthResults.splice(0, 0, change);
+          sendAmounts.push(changeAmount);
+          stealthResults.push(change);
         }
 
+        const recipientNpks = stealthResults.map((r) => r.stealthPubKeyX);
         const outCommitments = recipientNpks.map((npk, i) =>
           computeJoinSplitCommitmentSync(npk, tokenId, sendAmounts[i]),
         );
 
-        // Tree outputs = all but the trailing public output.
-        const treeStealthResults = stealthResults.slice(0, -1);
-        const stealthArraysForHash = treeStealthResults.map((r) => {
+        // Transfer: all outputs are tree outputs, so every stealth array is hashed.
+        const stealthArrays = stealthResults.map((r) => {
           const sd = new Uint8Array(72);
           sd.set(r.ephemeralPub, 0);
           sd.set(r.encryptedAmount, 32);
           return sd;
         });
-        const stealthDataHash = computeStealthDataHash(stealthArraysForHash);
-        const boundParams = createSuiUnshieldBoundParams(recipientBytes, stealthDataHash);
+        const stealthDataHash = computeStealthDataHash(stealthArrays);
+        const boundParams = createTransferBoundParams(stealthDataHash, SUI_BOUND_CHAIN_ID);
         const boundParamsHash = computeBoundParamsHash(boundParams);
 
         const merkleRoot = inputsData[0].claimInputs.merkleRoot;
@@ -201,13 +178,10 @@ export function useSuiUnshield() {
         const nullifierHexes = publicSignals.slice(2, 2 + nIn).map((s: string) => toHex64(BigInt(s)));
         const commitmentHexes = publicSignals.slice(2 + nIn, 2 + nIn + nOut).map((s: string) => toHex64(BigInt(s)));
 
-        const treeStealthData = stealthArraysForHash;
-        // coinType travels in the query string — it is not part of the typed relay payload.
-        const relayUrl = `/api/sui/relay?network=${encodeURIComponent(suiNetwork)}&coinType=${encodeURIComponent(input.coinType)}`;
-
+        const relayUrl = `/api/sui/relay?network=${encodeURIComponent(suiNetwork)}`;
         const result = await utxopia.submitToRelay(
           {
-            mode: "unshield",
+            mode: "transfer",
             nInputs: nIn,
             nOutputs: nOut,
             proof: bytesToHex(proofBytes),
@@ -215,19 +189,17 @@ export function useSuiUnshield() {
             boundParamsHash: boundParamsHashHex,
             nullifiers: nullifierHexes,
             commitmentsOut: commitmentHexes,
-            stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
-            unshieldAmounts: [input.amount.toString()],
-            recipientAddresses: [input.recipient],
+            stealthData: stealthArrays.map((sd) => bytesToHex(sd)),
           },
           relayUrl,
         );
 
-        if (!result.success) throw new Error(result.error || "Unshield failed");
+        if (!result.success) throw new Error(result.error || "Transfer failed");
         setTxDigest(result.signature ?? null);
         setStatus("success");
         setStatusMessage("");
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Unshield failed");
+        setError(err instanceof Error ? err.message : "Transfer failed");
         setStatus("error");
         setStatusMessage("");
       }

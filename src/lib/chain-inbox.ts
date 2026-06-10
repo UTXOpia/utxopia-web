@@ -6,6 +6,8 @@ import {
   UTXOpiaClient,
   type OnChainStealthAnnouncement,
 } from "@utxopia/sdk";
+import { deriveSuiTokenId } from "@utxopia/sdk/sui";
+import { canonicalSuiCoinType } from "@/lib/sui/coin-type";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { getBackendUrl, getSolanaRpcUrl } from "@/lib/api/constants";
 import { getChainEnvironment, type ChainEnvironment } from "@/lib/chain-environment";
@@ -80,6 +82,27 @@ export function getTokenScanTargets(
 
   if (chain.id === "sui") {
     pushTokenToScan("zkBTC", SUI_ZKBTC_TOKEN_ID);
+    // Registered generic Coin<T> types: derive their token ids so their notes
+    // are scannable, and keep a tokenId→symbol map so announcement-sourced ids
+    // below get the right display symbol (not a blanket "zkBTC").
+    const idToSymbol = new Map<string, string>();
+    idToSymbol.set(toHex64(SUI_ZKBTC_TOKEN_ID), "zkBTC");
+    const coinMeta = env.config.sui?.coinMetadata ?? {};
+    for (const [coinType, meta] of Object.entries(coinMeta)) {
+      const tokenId = deriveSuiTokenId(canonicalSuiCoinType(coinType));
+      const symbol = meta.symbol ?? coinType.split("::").at(-1) ?? coinType;
+      idToSymbol.set(toHex64(tokenId), symbol);
+      pushTokenToScan(symbol, tokenId);
+    }
+    for (const ann of announcements) {
+      if (!ann.tokenIdHex) continue;
+      try {
+        const tokenId = BigInt(`0x${ann.tokenIdHex}`);
+        pushTokenToScan(idToSymbol.get(toHex64(tokenId)) ?? "zkBTC", tokenId);
+      } catch {
+        // Ignore malformed on-chain token ids.
+      }
+    }
     return tokensToScan;
   }
 
@@ -157,6 +180,25 @@ async function fetchSuiInboxEvents(config: NetworkConfig): Promise<InboxSource> 
         leafIndex,
         blockTime: Math.floor(Number(event.timestampMs ?? 0) / 1000),
         tokenIdHex: toHex64(SUI_ZKBTC_TOKEN_ID),
+      });
+    } else if (type === "StealthAnnounced") {
+      // Generic Coin<T> shield + transact outputs (non-BTC). The on-chain event
+      // carries the cleartext amount (mirrors BtcDepositVerified's u64Le packing)
+      // plus the token_id, so any registered token's notes are scannable.
+      const amount = bigintField(payload.amount);
+      const ephemeralPub = bytesField(payload.ephemeral_pub);
+      const commitment = bytesField(payload.commitment);
+      const leafIndex = numberField(payload.leaf_index);
+      const tokenId = bigintField(payload.token_id);
+      if (amount == null || !ephemeralPub || !commitment || leafIndex == null) continue;
+      announcements.push({
+        announcementType: numberField(payload.announcement_type) ?? 0,
+        ephemeralPub,
+        encryptedAmount: u64Le(amount),
+        commitment,
+        leafIndex,
+        blockTime: Math.floor(Number(event.timestampMs ?? 0) / 1000),
+        tokenIdHex: toHex64(tokenId ?? SUI_ZKBTC_TOKEN_ID),
       });
     } else if (type === "NullifierSpent") {
       const nullifier = bytesField(payload.nullifier);
