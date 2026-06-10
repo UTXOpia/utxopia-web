@@ -115,7 +115,7 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiscan.xyz/testnet",
-      "packageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
+      "packageId": "0x719b02e476df24cea6e5f9ff85e97727bcb5235dbe713996807485f697491b3e",
       "pool": {
         "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
         "initialSharedVersion": "897528279"
@@ -339,7 +339,7 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiscan.xyz/testnet",
-      "packageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
+      "packageId": "0x719b02e476df24cea6e5f9ff85e97727bcb5235dbe713996807485f697491b3e",
       "pool": {
         "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
         "initialSharedVersion": "897528279"
