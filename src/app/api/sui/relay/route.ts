@@ -47,13 +47,19 @@ export async function POST(request: NextRequest) {
 
     validateCommon(body);
     const adapter = createSuiAdapter(cfg);
-    const proofPoints = hexToBytes(body.proof);
+    // The SDK serializes proofs as 256-byte uncompressed big-endian (Solana
+    // format); Sui's verifier wants arkworks compressed serialization.
+    const proofPoints = arkworksCompressProof(hexToBytes(body.proof));
     const merkleRoot = hexToBytes(body.merkleRoot);
     const boundParamsHash = hexToBytes(body.boundParamsHash);
     const nullifiers = body.nullifiers.map((value, i) => validateHex(value, `nullifiers[${i}]`, 32));
     const commitments = body.commitmentsOut.map((value, i) => validateHex(value, `commitmentsOut[${i}]`, 32));
     const stealthData = body.stealthData.map((value, i) => validateHex(value, `stealthData[${i}]`, undefined));
-    const publicInputs = concatBytes([merkleRoot, boundParamsHash, ...nullifiers, ...commitments]);
+    // The Move verifier consumes arkworks little-endian public inputs (the
+    // contract reverses each 32-byte chunk back to BE for its asserts);
+    // nullifiers_in/commitments_out args stay big-endian.
+    const toLe = (bytes: Uint8Array) => Uint8Array.from(bytes).reverse();
+    const publicInputs = concatBytes([toLe(merkleRoot), toLe(boundParamsHash), ...nullifiers.map(toLe), ...commitments.map(toLe)]);
     const vkHash = getVkHash(cfg, body.nInputs, body.nOutputs);
 
     if (body.mode === "unshield") {
@@ -238,6 +244,49 @@ function getVkHash(cfg: NetworkConfig, nInputs: number, nOutputs: number): Uint8
     throw new Error(`Sui verifying key hash missing for ${key}`);
   }
   return validateHex(hash, `vk.${key}`, 32);
+}
+
+// BN254 base field modulus
+const BN254_FQ = 21888242871839275222246405745257275088696311157297823662689037894645226208583n;
+
+/**
+ * Convert a 256-byte uncompressed big-endian Groth16 proof
+ * (A.x|A.y | B.x_im|B.x_re|B.y_im|B.y_re | C.x|C.y) to the 128-byte arkworks
+ * compressed form Sui's verifier expects (x little-endian, y-sign/infinity
+ * flags in the top bits of the final byte; Fq2 ordered c0|c1, sign compared
+ * lexicographically on (c1, c0)). Validated byte-identical against
+ * sui-groth16-exporter's ark-serialize output.
+ */
+function arkworksCompressProof(proof: Uint8Array): Uint8Array {
+  if (proof.length !== 256) throw new Error(`Expected 256-byte proof, got ${proof.length}`);
+  const toBig = (b: Uint8Array) => { let v = 0n; for (const x of b) v = (v << 8n) | BigInt(x); return v; };
+  const leBytes = (v: bigint, n: number) => {
+    const out = new Uint8Array(n);
+    for (let i = 0; i < n; i++) { out[i] = Number(v & 0xffn); v >>= 8n; }
+    return out;
+  };
+  const g1 = (xBE: Uint8Array, yBE: Uint8Array) => {
+    const x = toBig(xBE), y = toBig(yBE);
+    const out = leBytes(x, 32);
+    if (x === 0n && y === 0n) { out[31] |= 0x40; return out; }
+    if (y > BN254_FQ - y) out[31] |= 0x80;
+    return out;
+  };
+  const g2 = (xImBE: Uint8Array, xReBE: Uint8Array, yImBE: Uint8Array, yReBE: Uint8Array) => {
+    const xc0 = toBig(xReBE), xc1 = toBig(xImBE), yc0 = toBig(yReBE), yc1 = toBig(yImBE);
+    const out = new Uint8Array(64);
+    out.set(leBytes(xc0, 32), 0);
+    out.set(leBytes(xc1, 32), 32);
+    if (xc0 === 0n && xc1 === 0n && yc0 === 0n && yc1 === 0n) { out[63] |= 0x40; return out; }
+    const negative = yc1 !== 0n ? yc1 > BN254_FQ - yc1 : yc0 > BN254_FQ - yc0;
+    if (negative) out[63] |= 0x80;
+    return out;
+  };
+  const result = new Uint8Array(128);
+  result.set(g1(proof.slice(0, 32), proof.slice(32, 64)), 0);
+  result.set(g2(proof.slice(64, 96), proof.slice(96, 128), proof.slice(128, 160), proof.slice(160, 192)), 32);
+  result.set(g1(proof.slice(192, 224), proof.slice(224, 256)), 96);
+  return result;
 }
 
 function validateHex(value: string | undefined, name: string, expectedBytes?: number): Uint8Array {

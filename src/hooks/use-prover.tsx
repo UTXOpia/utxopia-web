@@ -22,6 +22,18 @@ if (cdnUrl) {
   setCircuitPath(`${cdnUrl}/circuits/groth16`);
 }
 
+/**
+ * Load snarkjs's official browser build (build/browser.esm.js, resolved by
+ * webpack via the package's `browser` export condition) and hand it to the
+ * SDK prover through globalThis. The SDK can't do this import itself: its
+ * Node-oriented dynamic import is deliberately opaque to bundlers.
+ */
+async function ensureBrowserSnarkjs(): Promise<void> {
+  const g = globalThis as Record<string, unknown>;
+  if (g.snarkjs) return;
+  g.snarkjs = await import("snarkjs");
+}
+
 interface ProverState {
   isInitialized: boolean;
   isGenerating: boolean;
@@ -43,6 +55,7 @@ export function useProver(): ProverState {
   const initialize = useCallback(async () => {
     try {
       setProgress("Preparing privacy engine...");
+      await ensureBrowserSnarkjs();
       await initProver();
       setIsInitialized(true);
       setProgress(null);
@@ -58,6 +71,7 @@ export function useProver(): ProverState {
       setError(null);
       setProgress("Generating privacy proof...");
       try {
+        await ensureBrowserSnarkjs();
         const proof = await generateJoinSplitProof(inputs);
         const bytes = proofToBytes(proof);
         setProgress(null);
