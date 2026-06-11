@@ -45,6 +45,9 @@ export function SiteHeader() {
             <span className="text-sm font-semibold tracking-tight text-foreground group-hover:text-privacy transition-colors">
               UTXOpia
             </span>
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full border border-privacy/30 bg-privacy/10 text-[9px] font-mono uppercase tracking-[0.15em] text-privacy/90 leading-none select-none">
+              Alpha
+            </span>
           </Link>
 
           {/* Desktop links */}

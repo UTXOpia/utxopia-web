@@ -245,6 +245,17 @@ export default function Home() {
         {/* ═══════════════ HERO ═══════════════ */}
         <section className="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-28 pb-12 relative">
           <div className="max-w-4xl mx-auto text-center relative z-10">
+            <ScrollReveal delay={0.05}>
+              <div className="mb-5 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-privacy/25 bg-privacy/5 backdrop-blur-sm">
+                <span className="w-1.5 h-1.5 rounded-full bg-privacy animate-pulse" />
+                <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-privacy/90">
+                  Public Alpha
+                </span>
+                <span className="text-[11px] text-gray/70">
+                  testnet only · test funds, not real BTC
+                </span>
+              </div>
+            </ScrollReveal>
             <ScrollReveal delay={0.1}>
               <h1 className="hero-title text-foreground">
                 Private. <span className="text-privacy">Audit-ready.</span>{" "}

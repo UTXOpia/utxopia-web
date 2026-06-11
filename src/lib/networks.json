@@ -331,14 +331,14 @@
       "programId": "",
       "grpcEndpoint": "",
       "dwallet": "",
-      "dwalletXOnlyPubkey": "087643deba0089445e4598ddb8ddab804fb0c4a5219d31ae90d58893f307bb9a"
+      "dwalletXOnlyPubkey": "32697b924eeb4c76758383f7ac60e6b87bfd57b8cb2b7a82e7caaf262f2f9908"
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"
     },
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
-      "explorerUrl": "https://suiscan.xyz/testnet",
+      "explorerUrl": "https://suiexplorer.com",
       "packageId": "0x719b02e476df24cea6e5f9ff85e97727bcb5235dbe713996807485f697491b3e",
       "pool": {
         "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
@@ -393,8 +393,8 @@
           "objectId": "0x4d157b7415a298c56ec2cb1dcab449525fa74aec17ddba376a83a7600f2062fc",
           "initialSharedVersion": "510819272"
         },
-        "dWalletId": "0x7f0b719d886f7c20003842f58d5c5d06c65eb49a22d5b9a48902da57b154b002",
-        "dWalletCapObjectId": "0xea3894048ad18ce501c1f1d266f158595a4bc8ae308eef023f0806099cb5150b",
+        "dWalletId": "0xe926ed3b44e53110cc9366ba88ff5cf99c43113a5820364e9b8b76cb601cc112",
+        "dWalletCapObjectId": "0xb3ec73fa4ceb518159894faedceb53886c4d2cf4d437a8517a0199df8753280f",
         "networkEncryptionKeyId": "0xe7c79a60931299e110297554fc02e0a0e095e96778775092c97f07a1bd1337cc"
       },
       "vk": {
@@ -432,8 +432,8 @@
         "initialSharedVersion": "897528296"
       },
       "tokenRegistry": {
-        "objectId": "0x72d486165530990e9486c5bb4bc59a817fef76f5c11cffd6979c28bcc654610a",
-        "initialSharedVersion": "897572546"
+        "objectId": "0x54604c716da196578244c7869f59eda88d5500e8c6a3b1a7f7952fcd0979361d",
+        "initialSharedVersion": "349181734"
       },
       "coinMetadata": {
         "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {

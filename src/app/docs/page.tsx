@@ -266,9 +266,9 @@ function getProtocolSteps(chain: Chain) {
     {
       id: "spv-verification", num: "02", icon: GitBranch, title: "BTC Verification",
       desc: isSui
-        ? "Bitcoin deposits are confirmed before the pool credits a note. Today the relayer validates that the funding transaction reached the required confirmations; a native Move SPV light client — which verifies the BTC header chain and Merkle inclusion entirely on Sui — is the production target so this step becomes fully trustless."
+        ? "Bitcoin deposits are verified on-chain by a native Move SPV light client that tracks the BTC header chain. A single transaction block runs btc_light_client::verify_tx_inclusion and feeds the result straight into btc_deposit::complete_deposit — Merkle inclusion and confirmation depth are checked entirely on Sui, no oracle or trusted relayer."
         : "Bitcoin deposits require a special step: the backend submits an SPV Merkle inclusion proof to the on-chain BTC light client. The Solana program independently validates the Bitcoin transaction was confirmed in a real block — trustless cross-chain verification without any oracle.",
-      detail: isSui ? "Move SPV (planned) · 6+ confirmations" : "On-chain header chain · 6+ confirmations",
+      detail: isSui ? "Move SPV light client · 6+ confirmations" : "On-chain header chain · 6+ confirmations",
     },
     {
       id: "shielded-commitment", num: "03", icon: TreePine, title: "Commitment Creation",
@@ -290,9 +290,9 @@ function getProtocolSteps(chain: Chain) {
     {
       id: "unshield-withdraw", num: "06", icon: Network, title: "Unshield or Withdraw",
       desc: isSui
-        ? `Exit the privacy pool in two ways: unshield coins back to your ${wallet} (public unshield is still being wired up on Sui), or withdraw BTC via an Ika dWallet whose authority lives on Sui itself — Ika runs natively on Sui, so the network and the ${program} co-sign every redemption (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof; the nullifier prevents double-spending without revealing which note you're spending.`
+        ? `Exit the privacy pool in two ways: unshield coins back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority lives on Sui itself — Ika runs natively on Sui, so the network and the ${program} co-sign every redemption (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof; the nullifier prevents double-spending without revealing which note you're spending.`
         : `Exit the privacy pool in two ways: unshield SPL tokens back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
-      detail: isSui ? "Coin: wiring · BTC: Ika dWallet (Sui-controlled)" : "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
+      detail: isSui ? "Coin: instant · BTC: Ika dWallet (Sui-controlled)" : "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
   ];
 }
@@ -411,7 +411,7 @@ function getSecurityItems(chain: Chain) {
     {
       icon: ShieldCheck, title: isSui ? "Redemption Policy Gate" : "On-Chain Policy Gate",
       desc: isSui
-        ? "Amount limits, fee bounds, paused state, and destination whitelist guard every BTC redemption. On Solana this policy is enforced inside the program before the Ika `approve_message` CPI; on Sui the equivalent on-chain Move policy gate is being brought up, so today the relayer applies the same bounds before co-signing."
+        ? "Amount limits, fee bounds, paused state, and destination whitelist guard every BTC redemption on-chain: the Move `ika_policy::approve_signing` gate checks them before the Ika network is authorized to sign. A compromised backend cannot drain funds by submitting forged sighashes."
         : "Signing policy lives in the Solana program itself: amount limits, fee bounds, paused state, and destination whitelist are checked on-chain before the program issues the Ika `approve_message` CPI. A compromised backend cannot drain funds by submitting forged sighashes.",
     },
     {
@@ -423,7 +423,7 @@ function getSecurityItems(chain: Chain) {
     {
       icon: GitBranch, title: "Trustless Verification",
       desc: isSui
-        ? "Bitcoin deposits are gated on confirmation depth. A native Move SPV light client that tracks the BTC header chain and verifies Merkle inclusion on Sui is the production target; until it lands, the relayer performs that check off-chain."
+        ? "Bitcoin deposits are verified on-chain via SPV proofs against a native Move light client tracking BTC block headers. The Move package validates Merkle inclusion and confirmation depth directly in the deposit transaction block — no oracle or trusted third party."
         : "Bitcoin deposits are verified on-chain via SPV proofs against a light client tracking BTC block headers. The Solana program validates Merkle inclusion directly — no oracle or trusted third party.",
     },
     {

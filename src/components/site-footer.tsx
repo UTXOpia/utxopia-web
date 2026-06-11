@@ -45,7 +45,7 @@ export function SiteFooter() {
 
         <div className="flex items-center gap-4">
           <span className="text-caption text-gray/60">
-            Privacy-preserving bridge infrastructure
+            Alpha software — unaudited, testnet only. Use test funds.
           </span>
           <a
             href="https://github.com/UTXOpia"
