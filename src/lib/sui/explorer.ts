@@ -129,7 +129,8 @@ async function fetchSuiExplorerEvents(config: NetworkConfig): Promise<SuiEvent[]
     const result = await client.queryEvents({
       query: {
         MoveEventModule: {
-          package: config.sui.packageId,
+          // Event types keep their original defining-package id across upgrades.
+          package: config.sui.eventsPackageId ?? config.sui.packageId,
           module: "events",
         },
       },

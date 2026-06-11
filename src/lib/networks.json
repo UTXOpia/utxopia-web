@@ -216,7 +216,8 @@
           "symbol": "UTXT",
           "name": "UTXOpia Test"
         }
-      }
+      },
+      "eventsPackageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411"
     }
   },
   "testnet": {
@@ -440,7 +441,8 @@
           "symbol": "UTXT",
           "name": "UTXOpia Test"
         }
-      }
+      },
+      "eventsPackageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411"
     }
   }
 }

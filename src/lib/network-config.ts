@@ -76,6 +76,13 @@ export interface NetworkConfig {
     rpcUrl: string;
     explorerUrl: string;
     packageId: string;
+    /**
+     * Original (first-publish) package id. Move event types keep the defining
+     * package's id across upgrades, so event queries (MoveEventModule filter)
+     * must use this, not the upgraded `packageId`. Falls back to `packageId`
+     * when the deployment has never been upgraded.
+     */
+    eventsPackageId?: string;
     pool: SuiSharedObjectRef;
     /** Poseidon commitment tree — required by transact since the hardened ABI. */
     commitmentTree?: SuiSharedObjectRef;

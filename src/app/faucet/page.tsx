@@ -6,6 +6,7 @@ import { ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { cn } from "@/lib/utils";
 
 /**
@@ -338,11 +339,19 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
     setResult(null);
   }, [address, amountSats]);
 
+  // Prefill the recipient: an explicit ?address= wins, otherwise fall back to
+  // the signed-in vault's own stealth address so a logged-in user never has to
+  // paste their own address to drip test funds.
+  const myStealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
     const initialAddress = params.get("address");
-    if (initialAddress) setAddress(initialAddress);
-  }, []);
+    if (initialAddress) {
+      setAddress(initialAddress);
+    } else if (myStealthAddress) {
+      setAddress((cur) => (cur ? cur : myStealthAddress));
+    }
+  }, [myStealthAddress]);
 
   // Live cooldown countdown so the user sees the seconds tick down.
   const [cooldownLeft, setCooldownLeft] = useState(0);
