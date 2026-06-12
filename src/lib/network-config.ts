@@ -138,6 +138,8 @@ export interface NetworkMeta {
   caveats: string[];
   /** Whether this network is generally usable (e.g. has a deployed program). */
   enabled: boolean;
+  /** Shown in the selector but not yet selectable — renders a "Coming soon" badge. */
+  comingSoon?: boolean;
 }
 
 export const NETWORK_META: NetworkMeta[] = [
@@ -150,6 +152,7 @@ export const NETWORK_META: NetworkMeta[] = [
       "Testnet4 blocks take ~10 min. Needs testnet4 BTC from a faucet.",
     ],
     enabled: true,
+    comingSoon: true,
   },
   {
     id: "devnet-regtest",
@@ -167,9 +170,10 @@ export const NETWORK_META: NetworkMeta[] = [
     tagline: "Sui testnet + Bitcoin testnet4",
     description: "Move-object version of the UTXOpia core proof paths: commitment insert, Sui Groth16 JoinSplit, redemption request, and relayer-gated redemption completion.",
     caveats: [
-      "Hidden from the selector until backend URL, BTC pool address, and BTC light-client state are populated.",
+      "Not yet live — backend URL, BTC pool address, and BTC light-client state still being populated.",
     ],
-    enabled: false,
+    enabled: true,
+    comingSoon: true,
   },
   {
     id: "sui-regtest",

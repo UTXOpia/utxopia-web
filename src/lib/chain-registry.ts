@@ -18,7 +18,7 @@ export const CHAIN_ADAPTERS: Record<ChainId, ChainAdapter> = {
     query: "sol",
     displayName: "Solana",
     nativeToken: "SOL",
-    defaultNetwork: "devnet",
+    defaultNetwork: "devnet-regtest",
     hybridNetwork: "devnet-regtest",
     networkIds: ["devnet", "devnet-regtest", "testnet", "mainnet", "localnet"],
   },

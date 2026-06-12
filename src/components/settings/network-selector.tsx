@@ -136,23 +136,25 @@ function NetworkRow({
   onSelect: () => void;
 }) {
   const isSui = networkChain(meta.id) === "sui";
+  const locked = !!meta.comingSoon;
   return (
     <li>
       <div
         className={cn(
           "group relative py-3 px-1 transition-colors",
-          active ? (isSui ? "bg-sui/[0.04]" : "bg-privacy/[0.03]") : "hover:bg-muted/20",
+          active ? (isSui ? "bg-sui/[0.04]" : "bg-privacy/[0.03]") : !locked && "hover:bg-muted/20",
           pending && "opacity-50",
+          locked && "opacity-50",
         )}
       >
         <div className="flex items-start gap-3">
           {/* Radio indicator — filled privacy-green when active */}
           <button
             type="button"
-            onClick={onSelect}
-            disabled={pending}
+            onClick={locked ? undefined : onSelect}
+            disabled={pending || locked}
             aria-pressed={active}
-            aria-label={`Switch to ${meta.label}`}
+            aria-label={locked ? `${meta.label} (coming soon)` : `Switch to ${meta.label}`}
             className={cn(
               "shrink-0 mt-1 h-3.5 w-3.5 rounded-full transition-all duration-200",
               "flex items-center justify-center",
@@ -161,7 +163,7 @@ function NetworkRow({
                   ? "bg-sui ring-2 ring-sui/30 ring-offset-2 ring-offset-background"
                   : "bg-privacy ring-2 ring-privacy/30 ring-offset-2 ring-offset-background"
                 : "border border-gray/40 hover:border-foreground/60",
-              pending ? "cursor-wait" : "cursor-pointer",
+              locked ? "cursor-not-allowed" : pending ? "cursor-wait" : "cursor-pointer",
             )}
           />
 
@@ -169,9 +171,12 @@ function NetworkRow({
             {/* Click target spans the label area too */}
             <button
               type="button"
-              onClick={onSelect}
-              disabled={pending}
-              className="block w-full text-left disabled:cursor-wait"
+              onClick={locked ? undefined : onSelect}
+              disabled={pending || locked}
+              className={cn(
+                "block w-full text-left",
+                locked ? "disabled:cursor-not-allowed" : "disabled:cursor-wait",
+              )}
             >
               <div className="flex items-baseline gap-2 flex-wrap">
                 <span
@@ -193,6 +198,11 @@ function NetworkRow({
                     isSui ? "text-sui" : "text-privacy",
                   )}>
                     Active
+                  </span>
+                )}
+                {locked && (
+                  <span className="text-[9px] uppercase tracking-[0.15em] font-semibold text-amber-400/80 border border-amber-400/30 rounded-full px-1.5 py-0.5">
+                    Coming soon
                   </span>
                 )}
               </div>

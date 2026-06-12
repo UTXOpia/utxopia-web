@@ -2,7 +2,6 @@
 
 import React, { memo } from "react";
 import Link from "next/link";
-import Image from "next/image";
 import { motion } from "framer-motion";
 import { Shield, Zap, Lock, ArrowRight, EyeOff, ShieldCheck, Loader2, ChevronRight, Layers, Rocket } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
@@ -76,13 +75,7 @@ const BackedViz = () => (
       </div>
       <div className="flex flex-col items-center gap-2">
         <div className="w-14 h-14 rounded-2xl border border-privacy/25 bg-background/40 flex items-center justify-center">
-          <Image
-            src="/brand/logo-transparent-96.png"
-            alt="UTXOpia shielded pool"
-            width={32}
-            height={32}
-            className="w-8 h-8 object-contain opacity-80"
-          />
+          <Shield className="w-8 h-8 text-privacy/70" aria-hidden="true" />
         </div>
         <span className="text-[10px] font-mono text-privacy/50">Shielded</span>
       </div>
