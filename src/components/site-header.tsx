@@ -3,7 +3,7 @@
 import { useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { Droplets, Github, Menu, Wallet, X, Settings as SettingsIcon } from "lucide-react";
+import { Droplets, Menu, Wallet, X, Settings as SettingsIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AdvancedModeBadge } from "@/components/ui/advanced-mode-badge";
 import { NetworkBadge } from "@/components/ui/network-badge";
@@ -82,15 +82,6 @@ export function SiteHeader() {
                 </Link>
               </motion.div>
             )}
-            <a
-              href="https://github.com/UTXOpia"
-              target="_blank"
-              rel="noopener noreferrer"
-              aria-label="GitHub"
-              className="p-2 rounded-full text-gray hover:text-foreground hover:bg-muted/50 transition-colors"
-            >
-              <Github className="w-3.5 h-3.5" />
-            </a>
             <Link
               href={chainHref("/settings")}
               aria-label="Settings"
@@ -157,16 +148,6 @@ export function SiteHeader() {
                     {label}
                   </Link>
                 ))}
-                <a
-                  href="https://github.com/UTXOpia"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  onClick={() => setMobileOpen(false)}
-                  className="flex items-center gap-2 px-4 py-3 rounded-xl text-sm font-medium text-gray-light hover:text-foreground hover:bg-muted/50 transition-colors"
-                >
-                  <Github className="w-4 h-4" />
-                  GitHub
-                </a>
               </div>
             </motion.div>
           </>
