@@ -195,7 +195,7 @@ function SuiFaucetLink({ network }: { network: NetworkId }) {
  *  the /api/faucet/spl proxy. */
 function SplFaucetForm({ token, network }: { token: "USDC" | "USDT"; network: NetworkId }) {
   const [address, setAddress] = useState("");
-  const [amount, setAmount] = useState(100);
+  const [amount, setAmount] = useState(10);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<
     | { kind: "ok"; signature: string; ata?: string }
@@ -260,8 +260,8 @@ function SplFaucetForm({ token, network }: { token: "USDC" | "USDT"; network: Ne
         <input
           type="number"
           min={1}
-          max={1000}
-          step={10}
+          max={10}
+          step={1}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value) || 0)}
           className={cn(
