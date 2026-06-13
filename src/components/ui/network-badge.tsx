@@ -2,7 +2,6 @@
 
 import { useSyncExternalStore } from "react";
 import Link from "next/link";
-import { Network } from "lucide-react";
 import {
   detectNetwork,
   hrefWithChain,
@@ -26,12 +25,10 @@ function subscribe(onChange: () => void) {
 export function getNetworkBadgePresentation(active: NetworkId) {
   const meta = NETWORK_META.find((m) => m.id === active);
   const chain = networkChain(active);
-  const chainLabel = chain === "sui" ? "Sui" : "Solana";
   const networkLabel = meta?.label ?? active;
-  const shortNetwork = networkLabel.split(" (")[0];
-  const label = shortNetwork.toLowerCase().includes(chainLabel.toLowerCase())
-    ? shortNetwork
-    : `${chainLabel} ${shortNetwork}`;
+  // The chain logo carries the chain context, so the badge text is just the
+  // network (e.g. "Hybrid"), not "Solana Hybrid".
+  const label = networkLabel.split(" (")[0];
 
   return {
     chain,
@@ -66,7 +63,8 @@ export function NetworkBadge() {
           : "border-privacy/20 bg-privacy/10 text-privacy hover:bg-privacy/15 hover:border-privacy/30",
       )}
     >
-      <Network className="h-3 w-3" />
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={`/tokens/${badge.chain}.png`} alt="" className="h-3.5 w-3.5 rounded-full" />
       {badge.label}
     </Link>
   );
