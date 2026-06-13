@@ -43,7 +43,6 @@ import { useUTXOpiaStore } from "@/stores";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useStealthInbox } from "@/hooks/use-utxopia";
-import { getConfig } from "@utxopia/sdk";
 import { notifyCopied } from "@/lib/notifications";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { OnboardingModal } from "@/components/onboarding-modal";
@@ -62,6 +61,7 @@ import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
+import { getSnsConfig } from "@/lib/names/sns";
 
 export default function VaultPage() {
   const wallet = useWallet();
@@ -164,8 +164,7 @@ export default function VaultPage() {
     );
   }
 
-  const snsConfig = getConfig();
-  const parentDomain = snsConfig.snsParentDomain || "utxopia";
+  const parentDomain = getSnsConfig(networkConfig)?.parentDomain || "utxopia";
   const hasVaultValue =
     depositCount > 0 ||
     Object.values(balancesByToken).some((balance) => balance > 0n);

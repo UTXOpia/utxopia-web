@@ -28,6 +28,7 @@ export function ReceiveNamePrompt() {
   const [seen, setSeen] = useState(true);
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
+  const [localError, setLocalError] = useState<string | null>(null);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -54,6 +55,7 @@ export function ReceiveNamePrompt() {
   async function handleRegister() {
     const name = value.trim().toLowerCase();
     if (!name) return;
+    setLocalError(null);
     try {
       await claimPrivateReceiveName({
         chain: "solana",
@@ -62,8 +64,8 @@ export function ReceiveNamePrompt() {
         solanaClaim: sns.registerSnsSubdomain,
       });
       dismiss();
-    } catch {
-      // useSnsName owns the user-facing error (sns.error).
+    } catch (err) {
+      setLocalError(err instanceof Error ? err.message : "Could not claim Solana private name.");
     }
   }
 
@@ -127,8 +129,8 @@ export function ReceiveNamePrompt() {
               .{parentDomain}.sol
             </span>
           </div>
-          {sns.error && (
-            <p className="mt-2 px-1 text-[11px] text-destructive">{sns.error}</p>
+          {(sns.error || localError) && (
+            <p className="mt-2 px-1 text-[11px] text-destructive">{sns.error || localError}</p>
           )}
 
           <div className="flex gap-3 mt-5">
