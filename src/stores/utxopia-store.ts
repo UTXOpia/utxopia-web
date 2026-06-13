@@ -20,6 +20,7 @@ import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-uti
 import { API_ENDPOINTS } from "@/lib/api/constants";
 import { ensureChainEnvironment, getChainEnvironment } from "@/lib/chain-environment";
 import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
+import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
 
 // ============================================================================
 // localStorage Key Persistence (AES-256-GCM encrypted)
@@ -175,6 +176,10 @@ interface UTXOpiaState {
   isViewOnly: boolean;
   stealthAddress: StealthMetaAddress | null;
   stealthAddressEncoded: string | null;
+  /** In-memory name-owner Solana keypair secret derived from the passkey seed.
+   *  Non-fund; used only to own + sign the user's .utxopia.sol name. Never
+   *  persisted. null for wallet/Privy logins (they bring their own authority). */
+  passkeyNameOwnerSecret: Uint8Array | null;
   isLoading: boolean;
   error: string | null;
   hasKeys: boolean;
@@ -230,6 +235,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   isViewOnly: false,
   stealthAddress: null,
   stealthAddressEncoded: null,
+  passkeyNameOwnerSecret: null,
   isLoading: false,
   error: null,
   hasKeys: false,
@@ -369,6 +375,10 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         : "default";
       await persistKeys("passkey:" + credentialId, seed);
 
+      // Derive + hold the in-memory name-owner Solana key (non-fund; for .utxopia.sol).
+      const nameOwner = deriveNameOwnerKeypair(seed);
+      set({ passkeyNameOwnerSecret: nameOwner.secretKey });
+
       set({
         keys: derivedKeys,
         stealthAddress: meta,
@@ -458,6 +468,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       isViewOnly: false,
       stealthAddress: null,
       stealthAddressEncoded: null,
+      passkeyNameOwnerSecret: null,
       error: null,
       hasKeys: false,
       inboxNotes: [],

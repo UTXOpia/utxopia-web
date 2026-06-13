@@ -7,6 +7,7 @@ import { TOKEN_PROGRAM_ID, NATIVE_MINT, getAssociatedTokenAddressSync, createAss
 import { useUTXOpiaKeys } from "./use-utxopia";
 import { getConnectionAdapter } from "@/lib/adapters/connection-adapter";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana";
+import { usePasskeySolanaAuthority } from "@/hooks/use-passkey-solana-authority";
 import {
   getConfig,
   resolveSnsName,
@@ -58,7 +59,7 @@ interface UseSnsNameReturn {
    *  Pass null to zero out the slot. */
   setAuditorPubkey: (value: PublicKey | null) => Promise<boolean>;
   canRegister: boolean;
-  authorityLabel: "wallet" | "privy" | null;
+  authorityLabel: "wallet" | "privy" | "passkey" | null;
 }
 
 /**
@@ -73,6 +74,7 @@ export function useSnsName(): UseSnsNameReturn {
   const { connection } = useConnection();
   const wallet = useWallet();
   const privySolana = usePrivySolanaAuthority();
+  const passkeySolana = usePasskeySolanaAuthority();
   const { stealthAddress } = useUTXOpiaKeys();
   const { networkId } = useChainEnvironment();
 
@@ -97,8 +99,14 @@ export function useSnsName(): UseSnsNameReturn {
       : null,
     [privySolana.publicKey],
   );
-  const activeAuthority = walletAuthority ?? privyAuthority;
-  const canRegister = Boolean(walletAuthority || privySolana.enabled);
+  const passkeyAuthority = useMemo(
+    () => passkeySolana.publicKey
+      ? { publicKey: passkeySolana.publicKey, label: "passkey" as const }
+      : null,
+    [passkeySolana.publicKey],
+  );
+  const activeAuthority = walletAuthority ?? privyAuthority ?? passkeyAuthority;
+  const canRegister = Boolean(walletAuthority || privySolana.enabled || passkeySolana.enabled);
 
   const signAndSubmitSnsTransaction = useCallback(async (
     tx: Transaction,
@@ -110,8 +118,11 @@ export function useSnsName(): UseSnsNameReturn {
     if (privySolana.publicKey?.equals(signer)) {
       return privySolana.signTransaction(tx);
     }
+    if (passkeySolana.publicKey?.equals(signer)) {
+      return passkeySolana.signTransaction(tx);
+    }
     throw new Error("No Solana signer available for SNS transaction");
-  }, [privySolana, wallet]);
+  }, [passkeySolana, privySolana, wallet]);
 
   const registerViaRelayer = useCallback(async (
     name: string,
@@ -275,7 +286,9 @@ export function useSnsName(): UseSnsNameReturn {
     setError(null);
 
     try {
-      const owner = walletAuthority?.publicKey ?? await privySolana.ensureWallet();
+      const owner = walletAuthority?.publicKey
+        ?? passkeyAuthority?.publicKey
+        ?? await privySolana.ensureWallet();
       if (!owner) {
         setError(privySolana.enabled
           ? "Finish Privy sign-in, then click Register again"
@@ -485,7 +498,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, lookupSnsName, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, stealthAddress, walletAuthority]);
+  }, [connection, lookupSnsName, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, stealthAddress, walletAuthority]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
