@@ -78,14 +78,14 @@ function Section({
   return (
     <section className="space-y-3">
       <div className="flex items-baseline justify-between gap-3 px-1">
-        <h2 className="text-[10px] uppercase tracking-[0.18em] text-gray font-semibold">
+        <h2 className="text-[11px] uppercase tracking-[0.18em] text-gray-light font-semibold">
           {label}
         </h2>
         {hint && (
           <span className="text-[11px] text-gray/70 truncate">{hint}</span>
         )}
       </div>
-      <div className="divide-y divide-gray/10 border-y border-gray/10">
+      <div className="divide-y divide-gray/10">
         {children}
       </div>
     </section>

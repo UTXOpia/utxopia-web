@@ -211,36 +211,12 @@ function NetworkRow({
               </p>
             </button>
 
-            {(meta.description || meta.caveats.length > 0) && (
-              <details
-                className="mt-1.5 group/d"
-                onClick={(e) => e.stopPropagation()}
-              >
-                <summary className="list-none cursor-pointer inline-flex items-center gap-1 text-[11px] text-gray/80 hover:text-foreground transition-colors">
-                  <ChevronDown className="w-3 h-3 transition-transform group-open/d:rotate-180" />
-                  Details
-                </summary>
-                <div className="mt-2 space-y-2 pl-1">
-                  {meta.description && (
-                    <p className="text-[12px] text-gray leading-relaxed max-w-[60ch]">
-                      {meta.description}
-                    </p>
-                  )}
-                  {meta.caveats.length > 0 && (
-                    <ul className="space-y-1">
-                      {meta.caveats.map((c, i) => (
-                        <li
-                          key={i}
-                          className="text-[11px] text-gray flex items-start gap-1.5"
-                        >
-                          <AlertTriangle className="h-3 w-3 mt-0.5 text-warning shrink-0" />
-                          <span>{c}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </details>
+            {/* Active network: surface its one key caveat inline — no expander. */}
+            {active && meta.caveats.length > 0 && (
+              <p className="mt-1.5 flex items-start gap-1.5 text-[11px] text-gray/70">
+                <AlertTriangle className="h-3 w-3 mt-0.5 text-warning/70 shrink-0" />
+                <span>{meta.caveats[0]}</span>
+              </p>
             )}
           </div>
         </div>
