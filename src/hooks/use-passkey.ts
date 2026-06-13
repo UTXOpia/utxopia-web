@@ -17,11 +17,12 @@ import type {
 const CREDENTIAL_STORAGE_KEY = "utxo:passkey_credential_id";
 const SEED_STORAGE_KEY = "utxo:passkey_seed";
 /** Derive per-user PRF salt by mixing domain separator with credential ID.
- *  The base string "aegis-passkey-prf-v1" is a LOAD-BEARING domain separator —
- *  the project's name is now "UTXOpia" but this string stays as-is so
- *  existing passkey-derived keys keep working. */
+ *  "utxopia-passkey-prf-v1" is a LOAD-BEARING domain separator — once real
+ *  passkey accounts exist, this string is FROZEN. Changing it re-derives every
+ *  user's keys and locks them out of funds. Bump the version suffix only as a
+ *  deliberate, migrated break. */
 function getPrfSalt(credentialId?: string | null): Uint8Array {
-  const base = "aegis-passkey-prf-v1";
+  const base = "utxopia-passkey-prf-v1";
   const input = credentialId ? `${base}:${credentialId}` : base;
   return sha256(new TextEncoder().encode(input));
 }
@@ -61,20 +62,19 @@ export function clearStoredCredential(): void {
 // ── Fallback seed storage (used when PRF is not available) ──
 
 /** Derive AES-GCM key from credential ID for encrypting fallback seed at rest.
- *  "aegis-seed-enc:" and "aegis-fallback-seed" are LOAD-BEARING HKDF inputs
- *  frozen from the pre-rename era — changing them breaks the fallback-seed
- *  recovery path for every existing passkey user. Project name is now
- *  "UTXOpia" but these strings stay as-is. */
+ *  "utxopia-seed-enc:" and "utxopia-fallback-seed" are LOAD-BEARING HKDF inputs.
+ *  Once real passkey accounts exist these are FROZEN — changing them breaks the
+ *  fallback-seed recovery path and locks users out. */
 async function deriveStorageKey(credentialId: string): Promise<CryptoKey> {
   const keyMaterial = await crypto.subtle.importKey(
     "raw",
-    new TextEncoder().encode(`aegis-seed-enc:${credentialId}`),
+    new TextEncoder().encode(`utxopia-seed-enc:${credentialId}`),
     "HKDF",
     false,
     ["deriveKey"],
   );
   return crypto.subtle.deriveKey(
-    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: new TextEncoder().encode("aegis-fallback-seed") },
+    { name: "HKDF", hash: "SHA-256", salt: new Uint8Array(32), info: new TextEncoder().encode("utxopia-fallback-seed") },
     keyMaterial,
     { name: "AES-GCM", length: 256 },
     false,
