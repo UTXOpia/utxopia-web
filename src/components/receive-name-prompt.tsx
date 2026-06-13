@@ -6,7 +6,8 @@ import { AtSign, ArrowRight, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { getConfig } from "@utxopia/sdk";
+import { getChainAdapter } from "@/lib/chain-registry";
+import { getSnsConfig } from "@/lib/names/sns";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 
 const SEEN_KEY = "utxopia-name-prompt-seen";
@@ -18,8 +19,10 @@ const SEEN_KEY = "utxopia-name-prompt-seen";
  */
 export function ReceiveNamePrompt() {
   const sns = useSnsName();
-  const { networkId } = useChainEnvironment();
-  const parentDomain = getConfig().snsParentDomain || "utxopia";
+  const { networkId, config } = useChainEnvironment();
+  const snsConfig = getSnsConfig(config);
+  const isSolanaNetwork = getChainAdapter(config).id === "solana";
+  const parentDomain = snsConfig?.parentDomain || "utxopia";
 
   // Default to "seen" so nothing flashes during SSR / before we read storage.
   const [seen, setSeen] = useState(true);
@@ -32,10 +35,10 @@ export function ReceiveNamePrompt() {
   }, []);
 
   useEffect(() => {
-    if (!seen && sns.canRegister && !sns.hasRegisteredSnsName && !sns.isLoading) {
+    if (isSolanaNetwork && snsConfig && !seen && sns.canRegister && !sns.hasRegisteredSnsName && !sns.isLoading) {
       setOpen(true);
     }
-  }, [seen, sns.canRegister, sns.hasRegisteredSnsName, sns.isLoading]);
+  }, [isSolanaNetwork, seen, sns.canRegister, sns.hasRegisteredSnsName, sns.isLoading, snsConfig]);
 
   // If a name shows up (registered here or elsewhere), close.
   useEffect(() => {
@@ -64,7 +67,7 @@ export function ReceiveNamePrompt() {
     }
   }
 
-  if (!open) return null;
+  if (!isSolanaNetwork || !snsConfig || !open) return null;
 
   const clean = value.trim().toLowerCase();
   const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);

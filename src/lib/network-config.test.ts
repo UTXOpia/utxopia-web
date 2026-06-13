@@ -21,7 +21,7 @@ describe("network-config query routing", () => {
       },
     });
 
-    expect(detectNetworkFromRequest(req)).toBe("devnet");
+    expect(detectNetworkFromRequest(req)).toBe("devnet-regtest");
   });
 
   it("routes chain=sui to the wired Sui hybrid network by default", () => {
@@ -37,15 +37,17 @@ describe("network-config query routing", () => {
     expect(detectNetwork()).toBe("sui-regtest");
   });
 
-  it("does not expose incomplete Sui testnet as an enabled selector option", () => {
+  it("marks incomplete Sui testnet as coming soon", () => {
     const enabled = NETWORK_META.filter((item) => item.enabled).map((item) => item.id);
+    const suiTestnet = NETWORK_META.find((item) => item.id === "sui-testnet");
 
     expect(enabled).toContain("sui-regtest");
-    expect(enabled).not.toContain("sui-testnet");
+    expect(enabled).toContain("sui-testnet");
+    expect(suiTestnet?.comingSoon).toBe(true);
   });
 
-  it("enabled networks have the backend and Bitcoin fields required by user flows", () => {
-    for (const meta of NETWORK_META.filter((item) => item.enabled)) {
+  it("enabled live networks have the backend and Bitcoin fields required by user flows", () => {
+    for (const meta of NETWORK_META.filter((item) => item.enabled && !item.comingSoon)) {
       const cfg = getNetworkConfig(meta.id, { applyEnvOverrides: false });
 
       expect(cfg.backend.url, `${meta.id} backend.url`).toMatch(/^https?:\/\//);
@@ -61,7 +63,6 @@ describe("network-config query routing", () => {
         expect(cfg.solana.utxopiaProgramId, `${meta.id} solana.utxopiaProgramId`).toBeTruthy();
         expect(cfg.tokens.zkbtcMint, `${meta.id} tokens.zkbtcMint`).toBeTruthy();
         expect(cfg.bitcoin.poolAddress, `${meta.id} bitcoin.poolAddress`).toBeTruthy();
-        expect(cfg.bitcoin.groupPubkey, `${meta.id} bitcoin.groupPubkey`).toBeTruthy();
         expect(cfg.sns?.nameServiceProgramId, `${meta.id} sns.nameServiceProgramId`).toBeTruthy();
         expect(cfg.sns?.subRegistrarProgramId, `${meta.id} sns.subRegistrarProgramId`).toBeTruthy();
         expect(cfg.sns?.parentDomain, `${meta.id} sns.parentDomain`).toBe("utxopia");

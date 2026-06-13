@@ -8,9 +8,10 @@ import { useSnsName } from "@/hooks/use-sns-name";
 import { cn } from "@/lib/utils";
 import { NetworkSelector } from "@/components/settings/network-selector";
 import { InfoTip } from "@/components/ui/info-tip";
-import { getConfig, SnsComplianceFlags } from "@utxopia/sdk";
+import { SnsComplianceFlags } from "@utxopia/sdk";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
+import { getSnsConfig } from "@/lib/names/sns";
 
 /**
  * Settings — grouped into three semantic sections (Network · Identity ·
@@ -182,8 +183,8 @@ function Toggle({
  */
 function SnsNameRow() {
   const sns = useSnsName();
-  const { networkId } = useChainEnvironment();
-  const parentDomain = getConfig().snsParentDomain || "utxopia";
+  const { networkId, config } = useChainEnvironment();
+  const parentDomain = getSnsConfig(config)?.parentDomain || "utxopia";
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState("");
   const disabled = !sns.canRegister || sns.isLoading;

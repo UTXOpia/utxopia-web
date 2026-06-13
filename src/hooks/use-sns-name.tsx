@@ -5,18 +5,20 @@ import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey, Transaction, TransactionInstruction, SystemProgram, SYSVAR_RENT_PUBKEY } from "@solana/web3.js";
 import { TOKEN_PROGRAM_ID, NATIVE_MINT, getAssociatedTokenAddressSync, createAssociatedTokenAccountIdempotentInstruction, createSyncNativeInstruction, createCloseAccountInstruction } from "@solana/spl-token";
 import { useUTXOpiaKeys } from "./use-utxopia";
-import { getConnectionAdapter } from "@/lib/adapters/connection-adapter";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana";
 import { usePasskeySolanaAuthority } from "@/hooks/use-passkey-solana-authority";
 import {
-  getConfig,
-  resolveSnsName,
   parseSnsStealthData,
-  deriveParentDomainKey,
-  sha256Hash,
   type SnsStealthAddress,
 } from "@utxopia/sdk";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import {
+  deriveParentDomainKey,
+  deriveReverseLookupKey,
+  deriveSubdomainKey,
+  getSnsConfig,
+  resolveSnsNameForNetwork,
+} from "@/lib/names/sns";
 
 /** SPL Name Service instruction discriminators */
 const SNS_DISC_UPDATE = 1;
@@ -30,9 +32,6 @@ const STEALTH_DATA_VERSION = 2;
 
 /** Bonfida fee owner (constant across networks) */
 const BONFIDA_FEE_OWNER = new PublicKey("5D2zKog251d6KPCyFyLMt3KroWwXXPWSgTPyhV22K2gR");
-
-/** SNS hash prefix used for PDA derivation */
-const HASH_PREFIX = "SPL Name Service";
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -76,7 +75,8 @@ export function useSnsName(): UseSnsNameReturn {
   const privySolana = usePrivySolanaAuthority();
   const passkeySolana = usePasskeySolanaAuthority();
   const { stealthAddress } = useUTXOpiaKeys();
-  const { networkId } = useChainEnvironment();
+  const { networkId, config: networkConfig } = useChainEnvironment();
+  const snsConfig = useMemo(() => getSnsConfig(networkConfig), [networkConfig]);
 
   const [registeredSnsName, setRegisteredSnsName] = useState<string | null>(null);
   const [hasRegisteredSnsName, setHasRegisteredSnsName] = useState(false);
@@ -106,7 +106,7 @@ export function useSnsName(): UseSnsNameReturn {
     [passkeySolana.publicKey],
   );
   const activeAuthority = walletAuthority ?? privyAuthority ?? passkeyAuthority;
-  const canRegister = Boolean(walletAuthority || privySolana.enabled || passkeySolana.enabled);
+  const canRegister = Boolean(snsConfig && (walletAuthority || privySolana.enabled || passkeySolana.enabled));
 
   const signAndSubmitSnsTransaction = useCallback(async (
     tx: Transaction,
@@ -170,31 +170,30 @@ export function useSnsName(): UseSnsNameReturn {
 
   // Resolve an SNS name to stealth keys
   const lookupSnsName = useCallback(async (name: string): Promise<SnsStealthAddress | null> => {
-    const connectionAdapter = getConnectionAdapter();
-    return resolveSnsName(connectionAdapter as Parameters<typeof resolveSnsName>[0], name);
-  }, []);
+    if (!snsConfig) return null;
+    return resolveSnsNameForNetwork(connection, name, snsConfig);
+  }, [connection, snsConfig]);
 
   // Check if connected wallet owns a *.utxopia.sol subdomain
   const lookupMySnsName = useCallback(async () => {
     const owner = activeAuthority?.publicKey;
     if (!owner || !stealthAddress) return;
 
-    const config = getConfig();
-    if (!config.snsNameServiceProgramId || !config.snsParentDomain) return;
+    if (!snsConfig) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
       // Get parent domain key for memcmp filter
-      const parentKey = await deriveParentDomainKey(config.snsParentDomain);
+      const parentPubkey = deriveParentDomainKey(snsConfig);
 
       // Search for name accounts owned by this wallet under the parent domain
-      const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
+      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
       const accounts = await connection.getProgramAccounts(nameServiceProgramId, {
         filters: [
           // parent field at offset 0 = parentKey (32 bytes)
-          { memcmp: { offset: 0, bytes: parentKey } },
+          { memcmp: { offset: 0, bytes: parentPubkey.toBase58() } },
           // owner field at offset 32 = wallet pubkey (32 bytes)
           { memcmp: { offset: 32, bytes: owner.toBase58() } },
         ],
@@ -222,15 +221,7 @@ export function useSnsName(): UseSnsNameReturn {
             setNeedsUpdate(mpkAllZero || isOldVersion || mpkMismatch);
 
             // Reverse lookup: derive reverse key from subdomain account key
-            const reverseLookupClass = new PublicKey(config.snsReverseLookupClass);
-            const parentPubkey = new PublicKey(parentKey);
-            const reverseHash = sha256Hash(
-              new TextEncoder().encode(HASH_PREFIX + account.pubkey.toBase58())
-            );
-            const [reverseKey] = PublicKey.findProgramAddressSync(
-              [reverseHash, reverseLookupClass.toBytes(), parentPubkey.toBytes()],
-              nameServiceProgramId,
-            );
+            const reverseKey = deriveReverseLookupKey(account.pubkey, parentPubkey, snsConfig);
             const reverseAcct = await connection.getAccountInfo(reverseKey);
             if (reverseAcct && reverseAcct.data.length > 100) {
               // SNS header(96) + borsh string(u32 len + bytes)
@@ -259,7 +250,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, connection]);
+  }, [activeAuthority?.publicKey, stealthAddress, connection, snsConfig]);
 
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)
@@ -270,8 +261,7 @@ export function useSnsName(): UseSnsNameReturn {
       return false;
     }
 
-    const config = getConfig();
-    if (!config.snsSubRegistrarProgramId || !config.snsNameServiceProgramId) {
+    if (!snsConfig) {
       setError("SNS not configured for this network");
       return false;
     }
@@ -299,33 +289,36 @@ export function useSnsName(): UseSnsNameReturn {
       // Check if already exists
       const existing = await lookupSnsName(subdomain);
       if (existing) {
-        setError(`"${subdomain}.${config.snsParentDomain}.sol" is already registered`);
+        setError(`"${subdomain}.${snsConfig.parentDomain}.sol" is already registered`);
         return false;
       }
 
-      const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
-      const subRegistrarProgramId = new PublicKey(config.snsSubRegistrarProgramId);
-      const snsRegistrarProgramId = new PublicKey(config.snsRegistrarProgramId);
-      const rootDomain = new PublicKey(config.snsRootDomain);
+      const stealthData = new Uint8Array(STEALTH_DATA_SIZE);
+      stealthData[0] = STEALTH_DATA_VERSION;
+      stealthData.set(stealthAddress.viewingPubKey, 1);
+      stealthData.set(stealthAddress.mpk, 33);
+
+      const sponsoredResult = await registerViaRelayer(subdomain, owner, stealthData);
+      if (sponsoredResult === "success") {
+        setRegisteredSnsName(subdomain);
+        setHasRegisteredSnsName(true);
+        return true;
+      }
+
+      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
+      const subRegistrarProgramId = new PublicKey(snsConfig.subRegistrarProgramId);
+      const snsRegistrarProgramId = new PublicKey(snsConfig.registrarProgramId);
+      const rootDomain = new PublicKey(snsConfig.rootDomain);
 
       // Derive parent domain key
-      const parentKey = await deriveParentDomainKey(config.snsParentDomain);
-      const parentPubkey = new PublicKey(parentKey);
+      const parentPubkey = deriveParentDomainKey(snsConfig);
 
       // Derive subdomain key: hash("\0" + name) under parent
-      const hashedSub = sha256Hash(new TextEncoder().encode(HASH_PREFIX + "\0" + subdomain));
-      const [subdomainKey] = PublicKey.findProgramAddressSync(
-        [hashedSub, new Uint8Array(32), parentPubkey.toBytes()],
-        nameServiceProgramId,
-      );
+      const subdomainKey = deriveSubdomainKey(subdomain, parentPubkey, snsConfig);
 
       // Derive reverse lookup key: hash(subdomainKey.base58) under [reverseLookupClass, parent]
-      const reverseLookupClass = new PublicKey(config.snsReverseLookupClass);
-      const reverseHash = sha256Hash(new TextEncoder().encode(HASH_PREFIX + subdomainKey.toBase58()));
-      const [reverseKey] = PublicKey.findProgramAddressSync(
-        [reverseHash, reverseLookupClass.toBytes(), parentPubkey.toBytes()],
-        nameServiceProgramId,
-      );
+      const reverseLookupClass = new PublicKey(snsConfig.reverseLookupClass);
+      const reverseKey = deriveReverseLookupKey(subdomainKey, parentPubkey, snsConfig);
 
       // Derive registrar PDA: ["registrar", parentDomainKey]
       const [registrar] = PublicKey.findProgramAddressSync(
@@ -449,18 +442,6 @@ export function useSnsName(): UseSnsNameReturn {
         data: Buffer.from(reallocData),
       }));
 
-      const stealthData = new Uint8Array(STEALTH_DATA_SIZE);
-      stealthData[0] = STEALTH_DATA_VERSION;
-      stealthData.set(stealthAddress.viewingPubKey, 1);
-      stealthData.set(stealthAddress.mpk, 33);
-
-      const sponsoredResult = await registerViaRelayer(subdomain, owner, stealthData);
-      if (sponsoredResult === "success") {
-        setRegisteredSnsName(subdomain);
-        setHasRegisteredSnsName(true);
-        return true;
-      }
-
       const updateData = new Uint8Array(1 + 4 + 4 + stealthData.length);
       updateData[0] = SNS_DISC_UPDATE;
       new DataView(updateData.buffer).setUint32(1, 0, true);
@@ -498,7 +479,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, lookupSnsName, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, stealthAddress, walletAuthority]);
+  }, [connection, lookupSnsName, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
@@ -508,8 +489,7 @@ export function useSnsName(): UseSnsNameReturn {
       return false;
     }
 
-    const config = getConfig();
-    if (!config.snsNameServiceProgramId) {
+    if (!snsConfig) {
       setError("SNS not configured");
       return false;
     }
@@ -518,7 +498,7 @@ export function useSnsName(): UseSnsNameReturn {
     setError(null);
 
     try {
-      const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
+      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
       const ixs: TransactionInstruction[] = [];
 
       // Realloc to new size (65 bytes — may shrink from 97)
@@ -579,7 +559,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, connection, registeredSubdomainKey, signAndSubmitSnsTransaction]);
+  }, [activeAuthority?.publicKey, stealthAddress, connection, registeredSubdomainKey, signAndSubmitSnsTransaction, snsConfig]);
 
   /**
    * Set the compliance-flag byte on the user's registered SNS subdomain.
@@ -599,8 +579,7 @@ export function useSnsName(): UseSnsNameReturn {
       return false;
     }
 
-    const config = getConfig();
-    if (!config.snsNameServiceProgramId) {
+    if (!snsConfig) {
       setError("SNS not configured");
       return false;
     }
@@ -609,7 +588,7 @@ export function useSnsName(): UseSnsNameReturn {
     setError(null);
 
     try {
-      const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
+      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
       const ixs: TransactionInstruction[] = [];
 
       // Account layout: 96-byte header + 65-byte stealth payload + 1-byte flag
@@ -673,7 +652,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction]);
+  }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction, snsConfig]);
 
   /**
    * Set or clear the 32-byte auditor pubkey hint at offset 66 of the
@@ -686,8 +665,7 @@ export function useSnsName(): UseSnsNameReturn {
       setError("Solana authority not connected or no SNS subdomain registered");
       return false;
     }
-    const config = getConfig();
-    if (!config.snsNameServiceProgramId) {
+    if (!snsConfig) {
       setError("SNS not configured");
       return false;
     }
@@ -696,7 +674,7 @@ export function useSnsName(): UseSnsNameReturn {
     setError(null);
 
     try {
-      const nameServiceProgramId = new PublicKey(config.snsNameServiceProgramId);
+      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
       const ixs: TransactionInstruction[] = [];
 
       // Payload layout: stealth(65) + flag(1) + auditor(32) = 98 bytes
@@ -760,7 +738,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction]);
+  }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction, snsConfig]);
 
   // Auto-check on mount when wallet connected
   useEffect(() => {

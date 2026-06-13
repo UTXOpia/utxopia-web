@@ -5,14 +5,14 @@ describe("NetworkBadge presentation", () => {
   it("surfaces Solana devnet as an explicit active network", () => {
     expect(getNetworkBadgePresentation("devnet")).toMatchObject({
       chain: "sol",
-      label: "Solana Devnet",
+      label: "Devnet",
     });
   });
 
   it("surfaces Solana hybrid without hiding the chain context", () => {
     expect(getNetworkBadgePresentation("devnet-regtest")).toMatchObject({
       chain: "sol",
-      label: "Solana Hybrid",
+      label: "Hybrid",
     });
   });
 
