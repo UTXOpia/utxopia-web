@@ -19,6 +19,7 @@ const SEEN_KEY = "utxopia-name-prompt-seen";
  */
 export function ReceiveNamePrompt() {
   const sns = useSnsName();
+  const isNameRegistered = sns.isNameRegistered;
   const { networkId, config } = useChainEnvironment();
   const snsConfig = getSnsConfig(config);
   const isSolanaNetwork = getChainAdapter(config).id === "solana";
@@ -29,6 +30,7 @@ export function ReceiveNamePrompt() {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
+  const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -46,6 +48,33 @@ export function ReceiveNamePrompt() {
     if (sns.hasRegisteredSnsName) setOpen(false);
   }, [sns.hasRegisteredSnsName]);
 
+  const clean = value.trim().toLowerCase();
+  const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
+
+  useEffect(() => {
+    if (!open || !nameValid) {
+      setAvailability("idle");
+      return;
+    }
+
+    let cancelled = false;
+    setAvailability("checking");
+    const timer = window.setTimeout(() => {
+      void isNameRegistered(clean)
+        .then((registered) => {
+          if (!cancelled) setAvailability(registered ? "taken" : "available");
+        })
+        .catch(() => {
+          if (!cancelled) setAvailability("idle");
+        });
+    }, 300);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [clean, isNameRegistered, nameValid, open]);
+
   function dismiss() {
     if (typeof window !== "undefined") localStorage.setItem(SEEN_KEY, "true");
     setSeen(true);
@@ -54,7 +83,7 @@ export function ReceiveNamePrompt() {
 
   async function handleRegister() {
     const name = value.trim().toLowerCase();
-    if (!name) return;
+    if (!name || !nameValid || availability === "checking" || availability === "taken") return;
     setLocalError(null);
     try {
       await claimPrivateReceiveName({
@@ -71,8 +100,12 @@ export function ReceiveNamePrompt() {
 
   if (!isSolanaNetwork || !snsConfig || !open) return null;
 
-  const clean = value.trim().toLowerCase();
-  const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
+  const nameTaken = availability === "taken";
+  const checkingName = availability === "checking";
+  const availabilityError = nameTaken
+    ? `"${clean}.${parentDomain}.sol" is already registered`
+    : null;
+  const canRegister = nameValid && !nameTaken && !checkingName && !sns.isRegistering;
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) dismiss(); }}>
@@ -117,9 +150,12 @@ export function ReceiveNamePrompt() {
             <input
               autoFocus
               value={value}
-              onChange={(e) => setValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""))}
+              onChange={(e) => {
+                setLocalError(null);
+                setValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+              }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && nameValid && !sns.isRegistering) handleRegister();
+                if (e.key === "Enter" && canRegister) handleRegister();
               }}
               placeholder="yourname"
               maxLength={32}
@@ -129,8 +165,11 @@ export function ReceiveNamePrompt() {
               .{parentDomain}.sol
             </span>
           </div>
-          {(sns.error || localError) && (
-            <p className="mt-2 px-1 text-[11px] text-destructive">{sns.error || localError}</p>
+          {(availabilityError || sns.error || localError) && (
+            <p className="mt-2 px-1 text-[11px] text-destructive">{availabilityError || sns.error || localError}</p>
+          )}
+          {checkingName && (
+            <p className="mt-2 px-1 text-[11px] text-gray">Checking availability...</p>
           )}
 
           <div className="flex gap-3 mt-5">
@@ -142,7 +181,7 @@ export function ReceiveNamePrompt() {
             </button>
             <button
               onClick={handleRegister}
-              disabled={!nameValid || sns.isRegistering}
+              disabled={!canRegister}
               className={cn(
                 "flex-1 py-3 px-4 rounded-[12px] text-body2 text-background",
                 "bg-foreground hover:bg-white transition-colors",

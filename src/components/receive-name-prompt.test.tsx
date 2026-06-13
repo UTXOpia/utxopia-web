@@ -5,6 +5,7 @@ import { getNetworkConfig, type NetworkId } from "@/lib/network-config";
 
 let mockedNetwork: NetworkId = "devnet-regtest";
 let registerSnsSubdomain = async () => true;
+let isNameRegistered = async () => false;
 let snsError: string | null = null;
 
 mock.module("@/lib/chain-environment", () => ({
@@ -26,6 +27,7 @@ mock.module("@/hooks/use-sns-name", () => ({
     auditorPubkey: null,
     lookupMySnsName: async () => {},
     lookupSnsName: async () => null,
+    isNameRegistered,
     registerSnsSubdomain,
     updateSnsStealthData: async () => false,
     setComplianceFlag: async () => false,
@@ -41,6 +43,7 @@ beforeEach(() => {
   localStorage.clear();
   mockedNetwork = "devnet-regtest";
   registerSnsSubdomain = async () => true;
+  isNameRegistered = async () => false;
   snsError = null;
 });
 
@@ -78,11 +81,32 @@ describe("ReceiveNamePrompt", () => {
     fireEvent.change(screen.getByPlaceholderText("yourname"), {
       target: { value: "albert" },
     });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Register" }).hasAttribute("disabled")).toBe(false);
+    });
     fireEvent.click(screen.getByRole("button", { name: "Register" }));
 
     await waitFor(() => {
       expect(screen.getByText("Could not claim Solana private name.")).toBeTruthy();
     });
     expect(screen.getByText("Claim your receive name")).toBeTruthy();
+  });
+
+  it("disables registration when the typed name is already registered", async () => {
+    isNameRegistered = async () => true;
+    render(<ReceiveNamePrompt />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Claim your receive name")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("yourname"), {
+      target: { value: "albert" },
+    });
+
+    await waitFor(() => {
+      expect(screen.getByText('"albert.utxopia.sol" is already registered')).toBeTruthy();
+    });
+    expect(screen.getByRole("button", { name: "Register" }).hasAttribute("disabled")).toBe(true);
   });
 });

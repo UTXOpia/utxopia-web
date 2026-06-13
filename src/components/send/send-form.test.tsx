@@ -65,6 +65,7 @@ mock.module("@/hooks/use-sns-name", () => ({
     isRegistering: false,
     error: null,
     lookupMySnsName: async () => {},
+    isNameRegistered: async () => false,
     registerSnsSubdomain: async () => false,
     updateSnsStealthData: async () => false,
   }),

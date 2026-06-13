@@ -96,3 +96,16 @@ export async function resolveSnsNameForNetwork(
     auditorPubkey: parsed.auditorPubkey,
   };
 }
+
+export async function isSnsSubdomainRegistered(
+  connection: { getAccountInfo: (key: PublicKey) => Promise<unknown | null> },
+  name: string,
+  sns: SnsNetworkConfig,
+): Promise<boolean> {
+  const subdomain = normalizeSnsSubdomain(name, sns);
+  if (!subdomain) return false;
+
+  const parentKey = deriveParentDomainKey(sns);
+  const subdomainKey = deriveSubdomainKey(subdomain, parentKey, sns);
+  return Boolean(await connection.getAccountInfo(subdomainKey));
+}

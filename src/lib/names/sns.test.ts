@@ -5,6 +5,7 @@ import {
   deriveParentDomainKey,
   deriveSubdomainKey,
   getSnsConfig,
+  isSnsSubdomainRegistered,
   resolveSnsNameForNetwork,
   SNS_HEADER_SIZE,
 } from "./sns";
@@ -46,5 +47,24 @@ describe("network-scoped SNS helpers", () => {
     expect(resolved?.version).toBe(2);
     expect(Array.from(resolved?.viewingPubKey ?? [])).toEqual(Array.from(viewingPubKey));
     expect(Array.from(resolved?.mpk ?? [])).toEqual(Array.from(mpk));
+  });
+
+  it("checks registration by raw SNS account existence", async () => {
+    const sns = getSnsConfig(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }));
+    expect(sns).toBeTruthy();
+    if (!sns) return;
+
+    const parentKey = deriveParentDomainKey(sns);
+    const subdomainKey = deriveSubdomainKey("alice", parentKey, sns);
+
+    const registered = await isSnsSubdomainRegistered(
+      {
+        getAccountInfo: async (key: PublicKey) => key.equals(subdomainKey) ? { data: new Uint8Array() } : null,
+      },
+      "alice.utxopia.sol",
+      sns,
+    );
+
+    expect(registered).toBe(true);
   });
 });

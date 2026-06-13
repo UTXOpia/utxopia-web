@@ -17,6 +17,7 @@ import {
   deriveReverseLookupKey,
   deriveSubdomainKey,
   getSnsConfig,
+  isSnsSubdomainRegistered,
   resolveSnsNameForNetwork,
 } from "@/lib/names/sns";
 
@@ -50,6 +51,7 @@ interface UseSnsNameReturn {
   auditorPubkey: Uint8Array | null;
   lookupMySnsName: () => Promise<void>;
   lookupSnsName: (name: string) => Promise<SnsStealthAddress | null>;
+  isNameRegistered: (name: string) => Promise<boolean>;
   registerSnsSubdomain: (name: string) => Promise<boolean>;
   updateSnsStealthData: () => Promise<boolean>;
   /** Set the compliance-flag byte on the user's registered SNS subdomain. */
@@ -174,6 +176,11 @@ export function useSnsName(): UseSnsNameReturn {
     return resolveSnsNameForNetwork(connection, name, snsConfig);
   }, [connection, snsConfig]);
 
+  const isNameRegistered = useCallback(async (name: string): Promise<boolean> => {
+    if (!snsConfig) return false;
+    return isSnsSubdomainRegistered(connection, name, snsConfig);
+  }, [connection, snsConfig]);
+
   // Check if connected wallet owns a *.utxopia.sol subdomain
   const lookupMySnsName = useCallback(async () => {
     const owner = activeAuthority?.publicKey;
@@ -287,8 +294,7 @@ export function useSnsName(): UseSnsNameReturn {
       }
 
       // Check if already exists
-      const existing = await lookupSnsName(subdomain);
-      if (existing) {
+      if (await isNameRegistered(subdomain)) {
         setError(`"${subdomain}.${snsConfig.parentDomain}.sol" is already registered`);
         return false;
       }
@@ -479,7 +485,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, lookupSnsName, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
+  }, [connection, isNameRegistered, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
@@ -763,6 +769,7 @@ export function useSnsName(): UseSnsNameReturn {
     auditorPubkey,
     lookupMySnsName,
     lookupSnsName,
+    isNameRegistered,
     registerSnsSubdomain,
     updateSnsStealthData,
     setComplianceFlag,
