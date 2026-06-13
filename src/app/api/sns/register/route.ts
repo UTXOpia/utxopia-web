@@ -48,6 +48,7 @@ type PrepareRequest = {
 type SubmitRequest = {
   action: "submit";
   signedTransaction: string;
+  lastValidBlockHeight?: number;
 };
 
 function jsonError(message: string, status: number) {
@@ -340,10 +341,25 @@ export async function POST(request: NextRequest) {
       const raw = Buffer.from(body.signedTransaction, "base64");
       if (raw.length > 32_000) return jsonError("Transaction too large", 400);
       const connection = new Connection(routeContext.config.solana.rpcUrl, "confirmed");
+      const tx = Transaction.from(raw);
       const signature = await connection.sendRawTransaction(raw, {
         skipPreflight: false,
         preflightCommitment: "confirmed",
       });
+      const confirmation = await connection.confirmTransaction(
+        {
+          signature,
+          blockhash: tx.recentBlockhash ?? (await connection.getLatestBlockhash("confirmed")).blockhash,
+          lastValidBlockHeight:
+            typeof body.lastValidBlockHeight === "number"
+              ? body.lastValidBlockHeight
+              : (await connection.getLatestBlockhash("confirmed")).lastValidBlockHeight,
+        },
+        "confirmed",
+      );
+      if (confirmation.value.err) {
+        return jsonError(`SNS registration failed on-chain: ${JSON.stringify(confirmation.value.err)}`, 400);
+      }
       return NextResponse.json({ success: true, signature });
     }
 

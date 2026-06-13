@@ -143,7 +143,13 @@ export function useSnsName(): UseSnsNameReturn {
       }),
     });
     const prepared = await prepareResp.json().catch(() => null) as
-      | { success?: boolean; transaction?: string; error?: string; relayerUnavailable?: boolean }
+      | {
+          success?: boolean;
+          transaction?: string;
+          error?: string;
+          relayerUnavailable?: boolean;
+          lastValidBlockHeight?: number;
+        }
       | null;
 
     if (!prepareResp.ok || !prepared?.success || !prepared.transaction) {
@@ -159,16 +165,31 @@ export function useSnsName(): UseSnsNameReturn {
       body: JSON.stringify({
         action: "submit",
         signedTransaction: signed.serialize().toString("base64"),
+        lastValidBlockHeight: prepared.lastValidBlockHeight,
       }),
     });
     const submitted = await submitResp.json().catch(() => null) as
-      | { success?: boolean; error?: string }
+      | { success?: boolean; error?: string; signature?: string }
       | null;
-    if (!submitResp.ok || !submitted?.success) {
+    if (!submitResp.ok || !submitted?.success || !submitted.signature) {
       throw new Error(submitted?.error || "Failed to submit sponsored SNS registration");
     }
+    if (!tx.recentBlockhash || typeof prepared.lastValidBlockHeight !== "number") {
+      throw new Error("Sponsored SNS transaction is missing confirmation metadata");
+    }
+    const confirmation = await connection.confirmTransaction(
+      {
+        signature: submitted.signature,
+        blockhash: tx.recentBlockhash,
+        lastValidBlockHeight: prepared.lastValidBlockHeight,
+      },
+      "confirmed",
+    );
+    if (confirmation.value.err) {
+      throw new Error(`SNS registration failed on-chain: ${JSON.stringify(confirmation.value.err)}`);
+    }
     return "success";
-  }, [networkId, signAndSubmitSnsTransaction]);
+  }, [connection, networkId, signAndSubmitSnsTransaction]);
 
   // Resolve an SNS name to stealth keys
   const lookupSnsName = useCallback(async (name: string): Promise<SnsStealthAddress | null> => {
@@ -306,8 +327,14 @@ export function useSnsName(): UseSnsNameReturn {
 
       const sponsoredResult = await registerViaRelayer(subdomain, owner, stealthData);
       if (sponsoredResult === "success") {
+        const parentPubkey = deriveParentDomainKey(snsConfig);
+        const subdomainKey = deriveSubdomainKey(subdomain, parentPubkey, snsConfig);
         setRegisteredSnsName(subdomain);
         setHasRegisteredSnsName(true);
+        setRegisteredSubdomainKey(subdomainKey);
+        setNeedsUpdate(false);
+        setComplianceFlags(0);
+        setAuditorPubkeyState(null);
         return true;
       }
 
