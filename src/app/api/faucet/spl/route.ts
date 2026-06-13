@@ -9,10 +9,10 @@
 import { NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/api/constants";
 import { detectNetworkFromRequest } from "@/lib/network-config";
+import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 
 export const dynamic = "force-dynamic";
 
-const BACKEND_API_KEY = process.env.BACKEND_API_KEY || "";
 const API_KEY = process.env.REGTEST_FAUCET_API_KEY;
 
 export async function POST(req: Request) {
@@ -39,8 +39,7 @@ export async function POST(req: Request) {
 
   const network = detectNetworkFromRequest(req);
   const backendUrl = process.env.REGTEST_FAUCET_BACKEND_URL || getBackendUrl(network);
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (BACKEND_API_KEY) headers["X-API-Key"] = BACKEND_API_KEY;
+  const headers = applyBackendAuthHeaders({ "Content-Type": "application/json" });
 
   try {
     const res = await fetch(`${backendUrl}/api/faucet/spl`, {

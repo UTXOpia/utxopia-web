@@ -44,6 +44,7 @@ import {
 } from "@/lib/network-config";
 import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
 import { getBackendUrl } from "@/lib/api/constants";
+import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 import { getClientIp } from "@/lib/server/rate-limit";
 import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
 import {
@@ -74,7 +75,6 @@ const DEFAULT_SATS = Math.min(
 );
 const CONFIRMATIONS = Math.max(1, Number(process.env.REGTEST_FAUCET_CONFIRMATIONS || "6"));
 const API_KEY = process.env.REGTEST_FAUCET_API_KEY;
-const BACKEND_API_KEY = process.env.BACKEND_API_KEY || "";
 const REMOTE_FAUCET_MODE = process.env.REGTEST_FAUCET_MODE || (process.env.VERCEL ? "backend" : "local");
 const AUTOMINE = process.env.REGTEST_FAUCET_AUTOMINE !== "0";
 // Coinbase outputs need 100 confirmations before they're spendable, so mine
@@ -204,8 +204,7 @@ async function callBackendFaucet(
   },
 ): Promise<NextResponse | null> {
   const backendUrl = process.env.REGTEST_FAUCET_BACKEND_URL || getBackendUrl(network);
-  const headers: Record<string, string> = { "Content-Type": "application/json" };
-  if (BACKEND_API_KEY) headers["X-API-Key"] = BACKEND_API_KEY;
+  const headers = applyBackendAuthHeaders({ "Content-Type": "application/json" });
 
   let res: Response;
   try {
