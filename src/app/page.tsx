@@ -196,10 +196,10 @@ const FeatureCard = memo(function FeatureCard({
 FeatureCard.displayName = "FeatureCard";
 
 const FEATURE_CARDS = [
-  { icon: EyeOff, title: "ZK Private", description: "Amounts & addresses hidden by zero-knowledge proofs", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "01", visualization: PrivacyViz },
-  { icon: Layers, title: "Cross-Chain Shielding", description: "Bitcoin and supported native tokens shielded into one pool", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "02", visualization: BackedViz },
-  { icon: Zap, title: "Instant", description: "Auto-confirmed deposits, sub-second settlement", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
-  { icon: ShieldCheck, title: "Audit-Ready", description: "Selective disclosure on demand. Your viewing keys, your control.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
+  { icon: EyeOff, title: "Private Transfers", description: "Proofs verify transfers without revealing sender, recipient, or amount.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "01", visualization: PrivacyViz },
+  { icon: Layers, title: "Shielded Assets", description: "Bitcoin and supported tokens become private commitments.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "02", visualization: BackedViz },
+  { icon: Zap, title: "Fast Flow", description: "Shield, send, and unshield through a guided testnet flow.", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
+  { icon: ShieldCheck, title: "Viewing Keys", description: "Share read-only activity with an auditor when needed.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
 ];
 
 function FeatureCarousel() {
@@ -364,11 +364,11 @@ export default function Home() {
             <ScrollReveal>
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-8 gap-4">
                 <div>
-                  <h2 className="section-title text-3xl md:text-4xl text-foreground mb-2">
-                    Shield <span className="text-privacy">Any Token</span>
+              <h2 className="section-title text-3xl md:text-4xl text-foreground mb-2">
+                    Shield <span className="text-privacy">Supported Assets</span>
                   </h2>
                   <p className="text-sm text-gray font-light">
-                    Deposit and shield tokens into private commitments.
+                    Deposit Bitcoin and supported tokens into private commitments.
                   </p>
                 </div>
                 <Link href={chainHref("/vault")} className="text-sm text-privacy/70 hover:text-privacy transition-colors flex items-center gap-1 shrink-0">
@@ -449,8 +449,8 @@ export default function Home() {
                   <h2 className="section-title text-3xl md:text-4xl text-foreground mb-3">
                     Start <span className="text-privacy">Shielding</span>
                   </h2>
-                  <p className="text-base text-gray font-light mb-8 max-w-md mx-auto">
-                    Shield any token. Transfer privately. Stay anonymous.
+                <p className="text-base text-gray font-light mb-8 max-w-md mx-auto">
+                    Shield assets, transfer privately, and disclose activity only when you choose.
                   </p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
