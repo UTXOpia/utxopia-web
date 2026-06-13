@@ -47,6 +47,7 @@ import { getConfig } from "@utxopia/sdk";
 import { notifyCopied } from "@/lib/notifications";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { OnboardingModal } from "@/components/onboarding-modal";
+import { ReceiveNamePrompt } from "@/components/receive-name-prompt";
 import { AuthModal } from "@/components/auth-modal";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
@@ -446,6 +447,9 @@ export default function VaultPage() {
 
       {/* First-time user onboarding */}
       <OnboardingModal />
+
+      {/* First-login nudge to claim a private receive name (skippable) */}
+      <ReceiveNamePrompt />
 
       {/* Auth modal */}
       <AuthModal
