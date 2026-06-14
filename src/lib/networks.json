@@ -211,12 +211,7 @@
         "objectId": "0xd717a5aa327ef23d402535f957ebbd90fb7a433ca389fbd22054f5d311dde2b3",
         "initialSharedVersion": "902538898"
       },
-      "coinMetadata": {
-        "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
-          "symbol": "UTXT",
-          "name": "UTXOpia Test"
-        }
-      },
+      "coinMetadata": {},
       "eventsPackageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "indexerUrl": "https://sui-explorer.utxopia.com"
     }
@@ -437,12 +432,7 @@
         "objectId": "0xd717a5aa327ef23d402535f957ebbd90fb7a433ca389fbd22054f5d311dde2b3",
         "initialSharedVersion": "902538898"
       },
-      "coinMetadata": {
-        "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
-          "symbol": "UTXT",
-          "name": "UTXOpia Test"
-        }
-      },
+      "coinMetadata": {},
       "eventsPackageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "indexerUrl": "https://sui-explorer.utxopia.com"
     }
