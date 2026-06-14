@@ -75,6 +75,12 @@ export interface NetworkConfig {
   sui?: {
     rpcUrl: string;
     explorerUrl: string;
+    /**
+     * Optional Sui indexer base URL (events → DB → web). When set, the explorer reads
+     * normalized data from `${indexerUrl}/api/explorer/*` and falls back to direct RPC
+     * if the indexer is unreachable. Unset → direct RPC (current behavior).
+     */
+    indexerUrl?: string;
     packageId: string;
     /**
      * Original (first-publish) package id. Move event types keep the defining

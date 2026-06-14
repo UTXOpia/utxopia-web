@@ -35,12 +35,54 @@ export interface SuiMerkleProofResponse {
   source: "sui-events";
 }
 
+/**
+ * Read normalized data from the Sui indexer (events → DB) when `config.sui.indexerUrl`
+ * is set; returns null on any failure so callers transparently fall back to direct RPC.
+ */
+async function tryIndexer<T>(config: NetworkConfig, path: string): Promise<T | null> {
+  const base = config.sui?.indexerUrl;
+  if (!base) return null;
+  try {
+    const res = await fetch(`${base.replace(/\/$/, "")}${path}`, {
+      signal: AbortSignal.timeout(4000),
+    });
+    if (!res.ok) return null;
+    return (await res.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+function safeBigint(value: string): bigint {
+  try {
+    return BigInt(value);
+  } catch {
+    return 0n;
+  }
+}
+
 export async function fetchSuiExplorerTransactions(config: NetworkConfig): Promise<ExplorerTx[]> {
+  const indexed = await tryIndexer<ExplorerTx[]>(config, "/api/explorer/transactions");
+  if (indexed) return indexed;
   const events = await fetchSuiExplorerEvents(config);
   return buildSuiExplorerTransactions(config, events);
 }
 
 export async function fetchSuiExplorerStats(config: NetworkConfig): Promise<SuiExplorerStats> {
+  const indexed = await tryIndexer<{
+    totalShielded: string;
+    volume: string;
+    depositCount: number;
+    totalCommitments: number;
+  }>(config, "/api/explorer/stats");
+  if (indexed) {
+    return {
+      totalShielded: safeBigint(indexed.totalShielded),
+      volume: safeBigint(indexed.volume),
+      depositCount: indexed.depositCount,
+      totalCommitments: indexed.totalCommitments,
+    };
+  }
   const events = await fetchSuiExplorerEvents(config);
   const commitments = new Set<string>();
   let maxLeafIndex = -1;
