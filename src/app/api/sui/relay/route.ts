@@ -115,7 +115,8 @@ export async function POST(request: NextRequest) {
       commitmentsOut: commitments,
       btcScripts: (body.btcScripts ?? []).map((script, i) => validateHex(script, `btcScripts[${i}]`, undefined)),
       amountsSats: (body.redeemAmounts ?? []).map((amount) => BigInt(amount)),
-      maxFeesSats: (body.redeemAmounts ?? []).map(() => BigInt(process.env.UTXOPIA_SUI_REDEEM_MAX_FEE_SATS ?? "20000")),
+      // Miner-fee cap is a protocol constant on-chain (redemption::MAX_FEE_SATS); the
+      // redeem entry no longer accepts a per-request cap, so we don't pass one here.
       nPublicOutputs: body.redeemAmounts?.length ?? 0,
       stealthData,
     };
