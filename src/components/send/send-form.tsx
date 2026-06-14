@@ -3,6 +3,7 @@
 import { useReducer, useState, useMemo, useCallback, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { PublicKey } from "@solana/web3.js";
 import { Bitcoin, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { detectRecipient, type RecipientType } from "./recipient-detect";
@@ -414,6 +415,19 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         throw new Error("Withdrawing to Bitcoin is only available for zkBTC.");
       }
 
+      // For BTC redeem, the proof binds the on-chain signer (the relayer) as requester. Fetch
+      // the relayer's pubkey so the bound-params hash matches what the relay will submit.
+      let requesterPubkey: Uint8Array | undefined;
+      if (mode === "btc") {
+        const res = await fetch(
+          `/api/sol/relay?network=${encodeURIComponent(chainEnv.networkId)}`,
+        );
+        if (!res.ok) throw new Error("Could not fetch relayer pubkey for BTC withdrawal");
+        const { relayerPubkey } = await res.json();
+        if (!relayerPubkey) throw new Error("Relayer pubkey unavailable");
+        requesterPubkey = new PublicKey(relayerPubkey).toBytes();
+      }
+
       const params = await buildTransferParams({
         mode,
         amountSats: BigInt(amountSats),
@@ -427,6 +441,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         boundChainId,
         tokenMint: selectedPayToken.mint || undefined,
         recipient: recipientArg,
+        requesterPubkey,
       });
 
       const ok = await submitter.submit(params, BigInt(amountSats));

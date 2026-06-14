@@ -141,6 +141,25 @@ function deriveRedemptionRequestPDA(
 // Main Handler
 // =============================================================================
 
+/**
+ * GET /api/sol/relay — returns the relayer's Solana pubkey.
+ *
+ * The redeem proof binds `requester = accounts[3]`, which is this relayer (the redeem signer).
+ * The client must bind the same pubkey into its bound-params hash at proof time, so it fetches
+ * it here first.
+ */
+export async function GET() {
+  try {
+    const relayer = getRelayerKeypair();
+    return NextResponse.json({ relayerPubkey: relayer.publicKey.toBase58() });
+  } catch (err) {
+    return NextResponse.json(
+      { error: err instanceof Error ? err.message : "relayer not configured" },
+      { status: 500 },
+    );
+  }
+}
+
 export async function POST(request: NextRequest) {
   // Rate limit: 10 relay requests per minute per IP
   const rl = checkRateLimit(getClientIp(request.headers), "relay", { maxTokens: 10, windowMs: 60_000 });

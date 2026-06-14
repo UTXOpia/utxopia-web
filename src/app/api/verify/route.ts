@@ -357,6 +357,7 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     const [commitmentTreePDA] = deriveCommitmentTreePDA(utxopiaProgramId);
     const [lightClientPDA] = deriveLightClientPDA(btcLightClientProgramId);
     const poolVaultATA = derivePoolVaultATA(utxopiaProgramId, zkbtcMint, token2022ProgramId);
+    // Active complete_deposit (disc 11) flow keys the receipt by txid only (web-local helper).
     const [depositReceiptPDA] = deriveDepositReceiptPDA(depositTxidInternal, utxopiaProgramId);
 
     // Block header PDA: derive from block hash

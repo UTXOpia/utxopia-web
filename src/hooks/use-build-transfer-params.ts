@@ -39,6 +39,12 @@ export interface TransferUserInputs {
     solanaAddress?: string;           // public/unshield mode
     btcScriptPubKey?: Uint8Array;     // btc withdraw mode
   };
+  /**
+   * Redeem (btc) only: 32-byte pubkey of the on-chain redeem signer (the relayer that becomes
+   * RedemptionRequest.requester). Bound into the redeem proof so it cannot be replayed under a
+   * different signer. REQUIRED for mode === "btc".
+   */
+  requesterPubkey?: Uint8Array;
 }
 
 export interface TransferParams {
@@ -231,7 +237,15 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   let unshieldRecipientAddress: Uint8Array | undefined;
 
   if (mode === "btc") {
-    const redeemParams = createRedeemBoundParams(recipient.btcScriptPubKey!, stealthDataHash, boundChainId);
+    if (!inputs.requesterPubkey || inputs.requesterPubkey.length !== 32) {
+      throw new Error("btc redeem requires requesterPubkey (32-byte relayer pubkey)");
+    }
+    const redeemParams = createRedeemBoundParams(
+      recipient.btcScriptPubKey!,
+      stealthDataHash,
+      inputs.requesterPubkey,
+      boundChainId,
+    );
     boundParamsHash = computeBoundParamsHash(redeemParams);
   } else if (mode === "public") {
     unshieldRecipientAddress = new PublicKey(recipient.solanaAddress!).toBytes();
