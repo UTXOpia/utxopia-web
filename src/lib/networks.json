@@ -98,7 +98,7 @@
     },
     "bitcoin": {
       "network": "testnet4",
-      "poolAddress": "",
+      "poolAddress": "tb1pxf5hhyjwadx8vavrs0m6cc8xhpal64acev4h4qh8e2hjvte0nyyqedhh5m",
       "groupPubkey": "",
       "depositMode": "sweep",
       "explorerUrl": "https://mempool.space/testnet4"
@@ -117,37 +117,37 @@
       "explorerUrl": "https://suiscan.xyz/testnet",
       "packageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "pool": {
-        "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
-        "initialSharedVersion": "897528279"
+        "objectId": "0xb26294ec15a509a9f03ff1d27c39c31c421d0cfbe4ef5b6fe7d2f348bffaa8e2",
+        "initialSharedVersion": "902538871"
       },
       "commitmentTree": {
-        "objectId": "0x32918f2fc13e4a08dc6f8d5b95d0cef1a7399c2d996d2e32c16146bb1f425572",
-        "initialSharedVersion": "897528280"
+        "objectId": "0x349f86a4e189f673ae295df1a2e3aef0445a21f4d8e22bbeee981620d897338c",
+        "initialSharedVersion": "902538872"
       },
       "btcDepositRegistry": {
-        "objectId": "0x093560e98ad79298ebb2a90b2550b3a2228f5a481b859b5167ca0c535891b24c",
-        "initialSharedVersion": "897528281"
+        "objectId": "0x1872bdc48edcd9eafcce04ba7fe6d10c1921db8a0ee7837d6f25a92fcb954ae0",
+        "initialSharedVersion": "902538873"
       },
       "utxoSet": {
-        "objectId": "0xdf8113ae6a8074ec7df179a6f75835df3f07e717966b3f6a30af6386a6ec7c3a",
-        "initialSharedVersion": "897528282"
+        "objectId": "0x7c330bb24d78b1ef6f4577e88740840ddd0869684ea6bc46394696d6540eb677",
+        "initialSharedVersion": "902538874"
       },
       "nullifierRegistry": {
-        "objectId": "0x0aadc94b834613d549a0609ac01a5f2b90c81928692854940d2ac8645dc38c8a",
-        "initialSharedVersion": "897528283"
+        "objectId": "0x1ba94c10d3673b6deffbb99a49c5a9c95ed2f5cddfc29d939e164cb1a3534edc",
+        "initialSharedVersion": "902538875"
       },
       "redemptionQueue": {
-        "objectId": "0x2196260cd5a95dcf32021677115165f3ca0fd7d723d701150d214a34eec09daa",
-        "initialSharedVersion": "897528284"
+        "objectId": "0xea7d90ce86bbf0411e58eae7c5bc728cd1d06896833ffd01accd32458d6b8bd4",
+        "initialSharedVersion": "902538876"
       },
       "redemptionCap": {
-        "objectId": "0x1ab0668d2ffd632a1f574b685b1a04b58472f480a41eb40391da4d666f2d8990",
-        "version": "897528284",
-        "digest": "HWZJubcPuGEDpZEFsPJ1mqYRMUMyxqDVnWgrjK57y41k"
+        "objectId": "0x3031a5051b9b9358b52521d89a8ef9da5675fe2fc77295060097ac62004e5d34",
+        "version": "902538876",
+        "digest": "5xfLyA3V7EcDUGshYdtTqzgoyfbbHcPdRMT6nzbKPgUs"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x13ecb8f9697fc517c74ea5624cd70a39ef1714922160fe05978b1460102812d2",
-        "initialSharedVersion": "897528285"
+        "objectId": "0x0689c95e40bd13a50cbc67015c32589c4ffb58d3c93bf474c0a7c8dfce355be5",
+        "initialSharedVersion": "902538877"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -169,8 +169,8 @@
           "objectId": "0x4d157b7415a298c56ec2cb1dcab449525fa74aec17ddba376a83a7600f2062fc",
           "initialSharedVersion": "510819272"
         },
-        "dWalletId": "0x7f0b719d886f7c20003842f58d5c5d06c65eb49a22d5b9a48902da57b154b002",
-        "dWalletCapObjectId": "0xea3894048ad18ce501c1f1d266f158595a4bc8ae308eef023f0806099cb5150b",
+        "dWalletId": "0xe926ed3b44e53110cc9366ba88ff5cf99c43113a5820364e9b8b76cb601cc112",
+        "dWalletCapObjectId": "0xb3ec73fa4ceb518159894faedceb53886c4d2cf4d437a8517a0199df8753280f",
         "networkEncryptionKeyId": "0xe7c79a60931299e110297554fc02e0a0e095e96778775092c97f07a1bd1337cc"
       },
       "vk": {
@@ -179,37 +179,37 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "745d536fb3a86424ee9560cb7b630bb0eb3d3c3af06c85bcda1eb7bcc5b1a07a",
-          "registerTxDigest": "HhWDW4pDxzSHVtVMUTmDfqb4DENybD9YrLzeTR3C4t7j"
+          "registerTxDigest": "9fj3yfLHH2KJ9p631PepFssLQ4Hryukihrbkg2Uqu3i6"
         },
         "joinsplit_1x2": {
           "nInputs": 1,
           "nOutputs": 2,
           "nPublic": 5,
           "vkHash": "f782d4bc2f696417688cdec3cb4f822d6961892192e13e8842505bd8d119fa6d",
-          "registerTxDigest": "69Zoy57x5qwequyy3Q6NbwuXJzPKDMJRh3aJgPyAYWFM"
+          "registerTxDigest": "4WmPz9B1tSUj13tKDDkVcrYkfDQLgygPmBpk7Bx1Rvnb"
         },
         "joinsplit_2x1": {
           "nInputs": 2,
           "nOutputs": 1,
           "nPublic": 5,
           "vkHash": "3af6cdad3c1f4de9e088975a1ac5b20e0445d7f3fea0a5038f300102cf98fd98",
-          "registerTxDigest": "612cjb246yLud9Wii4PJEsdFym3daWrackZVLbkn2jX7"
+          "registerTxDigest": "98JXcSUzdfScjUura3uiDEDtTxsgiDz3No4fqg2CchCG"
         },
         "joinsplit_2x2": {
           "nInputs": 2,
           "nOutputs": 2,
           "nPublic": 6,
           "vkHash": "6fffc4962028d0ac69f4d7877badc9f5adea4b83e6224ebb8db22657e847e7b8",
-          "registerTxDigest": "4unn3E8h52pPsehTT1BeDLfHTAVkK8P1FHA77Uv3Setf"
+          "registerTxDigest": "H5utnRUQf9qHwkSjhEKq7Rvqz3QmMA9aHXfMtBqveztq"
         }
       },
       "lightClient": {
-        "objectId": "0x9a897a46941c34a8a7a2b50e6b49f216bdf8a3700f903f7b39fef46910ac0434",
-        "initialSharedVersion": "897528296"
+        "objectId": "0xaec86662571066800080e9ca070abcf81d5e0bde40e309a40a1ac46dbfdd9a71",
+        "initialSharedVersion": "902538902"
       },
       "tokenRegistry": {
-        "objectId": "0x72d486165530990e9486c5bb4bc59a817fef76f5c11cffd6979c28bcc654610a",
-        "initialSharedVersion": "897572546"
+        "objectId": "0xd717a5aa327ef23d402535f957ebbd90fb7a433ca389fbd22054f5d311dde2b3",
+        "initialSharedVersion": "902538898"
       },
       "coinMetadata": {
         "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
@@ -217,7 +217,7 @@
           "name": "UTXOpia Test"
         }
       },
-      "eventsPackageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
+      "eventsPackageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "indexerUrl": "https://sui-explorer.utxopia.com"
     }
   },
@@ -324,7 +324,7 @@
     },
     "bitcoin": {
       "network": "regtest",
-      "poolAddress": "",
+      "poolAddress": "bcrt1pxf5hhyjwadx8vavrs0m6cc8xhpal64acev4h4qh8e2hjvte0nyyq55a3pp",
       "groupPubkey": "",
       "depositMode": "direct",
       "explorerUrl": "https://btc.utxopia.com/regtest"
@@ -343,37 +343,37 @@
       "explorerUrl": "https://suiexplorer.com",
       "packageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "pool": {
-        "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
-        "initialSharedVersion": "897528279"
+        "objectId": "0xb26294ec15a509a9f03ff1d27c39c31c421d0cfbe4ef5b6fe7d2f348bffaa8e2",
+        "initialSharedVersion": "902538871"
       },
       "commitmentTree": {
-        "objectId": "0x32918f2fc13e4a08dc6f8d5b95d0cef1a7399c2d996d2e32c16146bb1f425572",
-        "initialSharedVersion": "897528280"
+        "objectId": "0x349f86a4e189f673ae295df1a2e3aef0445a21f4d8e22bbeee981620d897338c",
+        "initialSharedVersion": "902538872"
       },
       "btcDepositRegistry": {
-        "objectId": "0x093560e98ad79298ebb2a90b2550b3a2228f5a481b859b5167ca0c535891b24c",
-        "initialSharedVersion": "897528281"
+        "objectId": "0x1872bdc48edcd9eafcce04ba7fe6d10c1921db8a0ee7837d6f25a92fcb954ae0",
+        "initialSharedVersion": "902538873"
       },
       "utxoSet": {
-        "objectId": "0xdf8113ae6a8074ec7df179a6f75835df3f07e717966b3f6a30af6386a6ec7c3a",
-        "initialSharedVersion": "897528282"
+        "objectId": "0x7c330bb24d78b1ef6f4577e88740840ddd0869684ea6bc46394696d6540eb677",
+        "initialSharedVersion": "902538874"
       },
       "nullifierRegistry": {
-        "objectId": "0x0aadc94b834613d549a0609ac01a5f2b90c81928692854940d2ac8645dc38c8a",
-        "initialSharedVersion": "897528283"
+        "objectId": "0x1ba94c10d3673b6deffbb99a49c5a9c95ed2f5cddfc29d939e164cb1a3534edc",
+        "initialSharedVersion": "902538875"
       },
       "redemptionQueue": {
-        "objectId": "0x2196260cd5a95dcf32021677115165f3ca0fd7d723d701150d214a34eec09daa",
-        "initialSharedVersion": "897528284"
+        "objectId": "0xea7d90ce86bbf0411e58eae7c5bc728cd1d06896833ffd01accd32458d6b8bd4",
+        "initialSharedVersion": "902538876"
       },
       "redemptionCap": {
-        "objectId": "0x1ab0668d2ffd632a1f574b685b1a04b58472f480a41eb40391da4d666f2d8990",
-        "version": "897528284",
-        "digest": "HWZJubcPuGEDpZEFsPJ1mqYRMUMyxqDVnWgrjK57y41k"
+        "objectId": "0x3031a5051b9b9358b52521d89a8ef9da5675fe2fc77295060097ac62004e5d34",
+        "version": "902538876",
+        "digest": "5xfLyA3V7EcDUGshYdtTqzgoyfbbHcPdRMT6nzbKPgUs"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x13ecb8f9697fc517c74ea5624cd70a39ef1714922160fe05978b1460102812d2",
-        "initialSharedVersion": "897528285"
+        "objectId": "0x0689c95e40bd13a50cbc67015c32589c4ffb58d3c93bf474c0a7c8dfce355be5",
+        "initialSharedVersion": "902538877"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -405,37 +405,37 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "745d536fb3a86424ee9560cb7b630bb0eb3d3c3af06c85bcda1eb7bcc5b1a07a",
-          "registerTxDigest": "HhWDW4pDxzSHVtVMUTmDfqb4DENybD9YrLzeTR3C4t7j"
+          "registerTxDigest": "9fj3yfLHH2KJ9p631PepFssLQ4Hryukihrbkg2Uqu3i6"
         },
         "joinsplit_1x2": {
           "nInputs": 1,
           "nOutputs": 2,
           "nPublic": 5,
           "vkHash": "f782d4bc2f696417688cdec3cb4f822d6961892192e13e8842505bd8d119fa6d",
-          "registerTxDigest": "69Zoy57x5qwequyy3Q6NbwuXJzPKDMJRh3aJgPyAYWFM"
+          "registerTxDigest": "4WmPz9B1tSUj13tKDDkVcrYkfDQLgygPmBpk7Bx1Rvnb"
         },
         "joinsplit_2x1": {
           "nInputs": 2,
           "nOutputs": 1,
           "nPublic": 5,
           "vkHash": "3af6cdad3c1f4de9e088975a1ac5b20e0445d7f3fea0a5038f300102cf98fd98",
-          "registerTxDigest": "612cjb246yLud9Wii4PJEsdFym3daWrackZVLbkn2jX7"
+          "registerTxDigest": "98JXcSUzdfScjUura3uiDEDtTxsgiDz3No4fqg2CchCG"
         },
         "joinsplit_2x2": {
           "nInputs": 2,
           "nOutputs": 2,
           "nPublic": 6,
           "vkHash": "6fffc4962028d0ac69f4d7877badc9f5adea4b83e6224ebb8db22657e847e7b8",
-          "registerTxDigest": "4unn3E8h52pPsehTT1BeDLfHTAVkK8P1FHA77Uv3Setf"
+          "registerTxDigest": "H5utnRUQf9qHwkSjhEKq7Rvqz3QmMA9aHXfMtBqveztq"
         }
       },
       "lightClient": {
-        "objectId": "0x9a897a46941c34a8a7a2b50e6b49f216bdf8a3700f903f7b39fef46910ac0434",
-        "initialSharedVersion": "897528296"
+        "objectId": "0xaec86662571066800080e9ca070abcf81d5e0bde40e309a40a1ac46dbfdd9a71",
+        "initialSharedVersion": "902538902"
       },
       "tokenRegistry": {
-        "objectId": "0x72d486165530990e9486c5bb4bc59a817fef76f5c11cffd6979c28bcc654610a",
-        "initialSharedVersion": "897572546"
+        "objectId": "0xd717a5aa327ef23d402535f957ebbd90fb7a433ca389fbd22054f5d311dde2b3",
+        "initialSharedVersion": "902538898"
       },
       "coinMetadata": {
         "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
@@ -443,7 +443,7 @@
           "name": "UTXOpia Test"
         }
       },
-      "eventsPackageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411",
+      "eventsPackageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "indexerUrl": "https://sui-explorer.utxopia.com"
     }
   }
