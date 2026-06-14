@@ -115,7 +115,7 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiscan.xyz/testnet",
-      "packageId": "0x719b02e476df24cea6e5f9ff85e97727bcb5235dbe713996807485f697491b3e",
+      "packageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "pool": {
         "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
         "initialSharedVersion": "897528279"
@@ -340,39 +340,39 @@
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",
       "explorerUrl": "https://suiexplorer.com",
-      "packageId": "0xaa4666263bb8e7089e4ec55d7252fdd2da512d9e0fa8f48b488fdbbffa92bf0d",
+      "packageId": "0x916737cd9b1970eb5b8b400a501ac07cd7ffa25d5da433cf9391ee4e44a2da05",
       "pool": {
-        "objectId": "0xb757a0d307b5a29a430bfbc4ca4b738a1699c6ebeef1963af739d5140648bac2",
-        "initialSharedVersion": "901272749"
+        "objectId": "0x488a900e4617871b66d812faa6c305ad1776053b7828e2dba40814a3c597fc79",
+        "initialSharedVersion": "897528279"
       },
       "commitmentTree": {
-        "objectId": "0x6c0467bdff2da81fdf462dd88e75b61ff08d3eed2d3f558b0aea578fd42a5f48",
-        "initialSharedVersion": "901272750"
+        "objectId": "0x32918f2fc13e4a08dc6f8d5b95d0cef1a7399c2d996d2e32c16146bb1f425572",
+        "initialSharedVersion": "897528280"
       },
       "btcDepositRegistry": {
-        "objectId": "0xbb17bcd99dcc7169e4166daec40ce76e871ad491d5dc86d3a269e52bea8c2d23",
-        "initialSharedVersion": "901272751"
+        "objectId": "0x093560e98ad79298ebb2a90b2550b3a2228f5a481b859b5167ca0c535891b24c",
+        "initialSharedVersion": "897528281"
       },
       "utxoSet": {
-        "objectId": "0xc9d2832169fa7b16469115ab8a08088dc780acd615d723676f5edf3bf906d7a9",
-        "initialSharedVersion": "901272752"
+        "objectId": "0xdf8113ae6a8074ec7df179a6f75835df3f07e717966b3f6a30af6386a6ec7c3a",
+        "initialSharedVersion": "897528282"
       },
       "nullifierRegistry": {
-        "objectId": "0xd8270ad9c70c5170be2ecafd2da7385b0d9214dc1a96976a3a71a05258d59b63",
-        "initialSharedVersion": "901272753"
+        "objectId": "0x0aadc94b834613d549a0609ac01a5f2b90c81928692854940d2ac8645dc38c8a",
+        "initialSharedVersion": "897528283"
       },
       "redemptionQueue": {
-        "objectId": "0x66fd259fb4925e213dfb78ba979649d3962ccfaf5a9870782ee46092ca6a330b",
-        "initialSharedVersion": "901272754"
+        "objectId": "0x2196260cd5a95dcf32021677115165f3ca0fd7d723d701150d214a34eec09daa",
+        "initialSharedVersion": "897528284"
       },
       "redemptionCap": {
-        "objectId": "0xd06cab2eb6cf89b9311774ea5d2fc58b50ccdb67c60ec0c22747e4d7cd478147",
-        "version": "901272754",
-        "digest": "ARQSy3N3x8q591Pq8SczYC5SE7Qnf3SqUS4ceiWvAvVD"
+        "objectId": "0x1ab0668d2ffd632a1f574b685b1a04b58472f480a41eb40391da4d666f2d8990",
+        "version": "897528284",
+        "digest": "HWZJubcPuGEDpZEFsPJ1mqYRMUMyxqDVnWgrjK57y41k"
       },
       "verifyingKeyRegistry": {
-        "objectId": "0x553f63bb2a5dd6d1249311a9511e57beaa01bcad4b5b0089939370bc1a5a54b2",
-        "initialSharedVersion": "901272755"
+        "objectId": "0x13ecb8f9697fc517c74ea5624cd70a39ef1714922160fe05978b1460102812d2",
+        "initialSharedVersion": "897528285"
       },
       "relayer": {
         "address": "0x0517834683ffa77da332b1f1f7a79d17e419d007f71e0fc68595704d6edda4d1"
@@ -404,117 +404,45 @@
           "nOutputs": 1,
           "nPublic": 4,
           "vkHash": "745d536fb3a86424ee9560cb7b630bb0eb3d3c3af06c85bcda1eb7bcc5b1a07a",
-          "registerTxDigest": "J1Vj4uL8uygAeCbmb4giHpBYukEGLW9pTWFxQ6HbCXXY"
+          "registerTxDigest": "HhWDW4pDxzSHVtVMUTmDfqb4DENybD9YrLzeTR3C4t7j"
         },
         "joinsplit_1x2": {
           "nInputs": 1,
           "nOutputs": 2,
           "nPublic": 5,
           "vkHash": "f782d4bc2f696417688cdec3cb4f822d6961892192e13e8842505bd8d119fa6d",
-          "registerTxDigest": "3nggSsZ9UaC5UF9zsHM2UtoeBr5DmMtVDRCpTHBkpoKV"
-        },
-        "joinsplit_1x3": {
-          "nInputs": 1,
-          "nOutputs": 3,
-          "nPublic": 6,
-          "vkHash": "ca396f36bbd1b07255b7a2f5585cedb4a51f925149747dd6ab4f695d19aa6ff8",
-          "registerTxDigest": "8zuoonrYnHSDm4ngchA6eypyWGVhW3cZkQkRB4GFSZfe"
-        },
-        "joinsplit_1x4": {
-          "nInputs": 1,
-          "nOutputs": 4,
-          "nPublic": 7,
-          "vkHash": "01728b82e810a8ba604cc66aa6a563444d18f4598c402d11767d0a7e5049a9be",
-          "registerTxDigest": "Hg1hxpPJsrXUCzfr9tT2VSgq2dJgxXEEAYGtbA4taSUN"
-        },
-        "joinsplit_1x5": {
-          "nInputs": 1,
-          "nOutputs": 5,
-          "nPublic": 8,
-          "vkHash": "57b0386dbe8f88007f39253192120f4fd372006f394d5b4b1eb029d517e5c1b2",
-          "registerTxDigest": "9FMHjthFwFz9CvYXZVLyNpByCVoW23Spm7U37QbGGzzA"
+          "registerTxDigest": "69Zoy57x5qwequyy3Q6NbwuXJzPKDMJRh3aJgPyAYWFM"
         },
         "joinsplit_2x1": {
           "nInputs": 2,
           "nOutputs": 1,
           "nPublic": 5,
           "vkHash": "3af6cdad3c1f4de9e088975a1ac5b20e0445d7f3fea0a5038f300102cf98fd98",
-          "registerTxDigest": "J6dP4CuTsYsXfHMqzeEzEJjA8MP894t3Lgac79Jd5GW7"
+          "registerTxDigest": "612cjb246yLud9Wii4PJEsdFym3daWrackZVLbkn2jX7"
         },
         "joinsplit_2x2": {
           "nInputs": 2,
           "nOutputs": 2,
           "nPublic": 6,
           "vkHash": "6fffc4962028d0ac69f4d7877badc9f5adea4b83e6224ebb8db22657e847e7b8",
-          "registerTxDigest": "7sKYs8KK6wYttch35gUYKoAaQJPHKZJcmJBaFrtH14zf"
-        },
-        "joinsplit_2x3": {
-          "nInputs": 2,
-          "nOutputs": 3,
-          "nPublic": 7,
-          "vkHash": "bf398583f064de96560cb9092b1357b0d742991a88f18a351e5b8793fed4b7a7",
-          "registerTxDigest": "KGtM4W8AFVRpHxkxfVTfary7vPTDyDuL4wmnUCcbjMf"
-        },
-        "joinsplit_2x4": {
-          "nInputs": 2,
-          "nOutputs": 4,
-          "nPublic": 8,
-          "vkHash": "b4c83d89226ff0538fbe4382dddfbdd99dd5db7c8c6354772f9cc90a63f59ecd",
-          "registerTxDigest": "4hw2ZCAnNj2XVajouKpTerFiYZXLG55YF8AvRKFZzZaf"
-        },
-        "joinsplit_3x1": {
-          "nInputs": 3,
-          "nOutputs": 1,
-          "nPublic": 6,
-          "vkHash": "4e0c5cbea0ccf80302d2589e41a2f22e19287f5acc5d0577451680fd909e1942",
-          "registerTxDigest": "FUniTJE75hCq5UPvKiTgsg3azvxhEzqqrjGBibeU5pLV"
-        },
-        "joinsplit_3x2": {
-          "nInputs": 3,
-          "nOutputs": 2,
-          "nPublic": 7,
-          "vkHash": "9da8d33d57896e76aadf3f5c66295774bd3273511af6e733ca7f9446ab58d42e",
-          "registerTxDigest": "G8ViV4o8SxE2Ss8EJ1SpQDTE3spWWkphQQKcezVt7ceY"
-        },
-        "joinsplit_3x3": {
-          "nInputs": 3,
-          "nOutputs": 3,
-          "nPublic": 8,
-          "vkHash": "f2d7c13cda1710389ab650e29719cbac37dedafc94a9e2181269dca64f35f885",
-          "registerTxDigest": "G4hMuHkFGcaUk1Xo4deiNi2VyxDXYsgcAF5BAcqjv1r4"
-        },
-        "joinsplit_4x1": {
-          "nInputs": 4,
-          "nOutputs": 1,
-          "nPublic": 7,
-          "vkHash": "0362b306b17dae916d836d9448a26c97e51b1b0a1a0ed052ebfbd4800e5000cf",
-          "registerTxDigest": "7qfJh16vHVAvfCJvzKR2YNRpuyLEwGWUbBzMSdiwx4U8"
-        },
-        "joinsplit_4x2": {
-          "nInputs": 4,
-          "nOutputs": 2,
-          "nPublic": 8,
-          "vkHash": "e17b98885f086fbebc9de9477d6a37e505e50071796d500dcf1444b753577fd8",
-          "registerTxDigest": "A8fcYjiPTtKzZpvZPmACSYJ2ytqte6BU8q5rPCEXLqsL"
-        },
-        "joinsplit_5x1": {
-          "nInputs": 5,
-          "nOutputs": 1,
-          "nPublic": 8,
-          "vkHash": "e1ddcd9270e339951ec49669ec59394c50d0979f98c85e5765c9dd63378d688a",
-          "registerTxDigest": "6nV8ggyoRFbjpjXBXibUrkc5TpEdtiUARCC8SDhC2pFo"
+          "registerTxDigest": "4unn3E8h52pPsehTT1BeDLfHTAVkK8P1FHA77Uv3Setf"
         }
       },
       "lightClient": {
-        "objectId": "0x34a22f07c78aee91731afde0936e2f56db2a4decc73f451401a882a111f8b473",
-        "initialSharedVersion": "901272762"
+        "objectId": "0x9a897a46941c34a8a7a2b50e6b49f216bdf8a3700f903f7b39fef46910ac0434",
+        "initialSharedVersion": "897528296"
       },
       "tokenRegistry": {
-        "objectId": "0x0534d435a699f63205fa515f8c5bfaf6e015764e02ad1d42e1bc0045769e1d02",
-        "initialSharedVersion": "901272779"
+        "objectId": "0x54604c716da196578244c7869f59eda88d5500e8c6a3b1a7f7952fcd0979361d",
+        "initialSharedVersion": "349181734"
       },
-      "coinMetadata": {},
-      "eventsPackageId": "0xaa4666263bb8e7089e4ec55d7252fdd2da512d9e0fa8f48b488fdbbffa92bf0d"
+      "coinMetadata": {
+        "0x98ffbd7f24239f831bacb0ace67b82a6b994a5e597b85999bcf53997a5ea039c::utxt::UTXT": {
+          "symbol": "UTXT",
+          "name": "UTXOpia Test"
+        }
+      },
+      "eventsPackageId": "0x91c4577db19910b717838736b89d1dc108977ada2c09c55877fdbc2b56030411"
     }
   }
 }
