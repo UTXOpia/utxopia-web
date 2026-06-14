@@ -75,6 +75,9 @@ export function useJoinSplitSubmit() {
         boundParamsHash: boundParamsHashHex,
         nullifiers: nullifierHexes,
         commitmentsOut: commitmentHexes,
+        // Frozen source-tree PDA when a spent note predates a tree rotation; undefined (omitted)
+        // for the common single/active-tree case.
+        ...(params.sourceTree ? { sourceTree: params.sourceTree } : {}),
       };
 
       let relayResult: { success: boolean; signature?: string; error?: string };

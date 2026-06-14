@@ -99,6 +99,14 @@ interface RelayRequest {
    * outgoing-history simply has a gap. Omit to skip the channel entirely.
    */
   senderMemos?: string[];
+  /**
+   * Optional frozen source-tree PDA (base58). Only set when a spent note was committed in a
+   * PREVIOUS commitment tree that was rotated out (active_tree_index advanced past it). The
+   * on-chain program proves membership against this tree while inserting new outputs into the
+   * active tree. Inserted just before the proof buffer so it matches the program's positional
+   * detection. Omit for the common case (note in the active tree) — strictly no-op then.
+   */
+  sourceTree?: string;
 }
 
 // =============================================================================
@@ -190,6 +198,9 @@ export async function POST(request: NextRequest) {
     const body: RelayRequest = await request.json();
     const { mode = "transfer" } = body;
     const { nInputs, nOutputs, proof, merkleRoot, boundParamsHash, nullifiers, commitmentsOut, stealthData } = body;
+    // Optional frozen source tree (pre-rotation note membership). Inserted just before the proof
+    // buffer in every mode so it matches the on-chain positional detection (account at len-1-pb).
+    const sourceTreeKey = body.sourceTree ? new PublicKey(body.sourceTree) : null;
 
     // ── Common validation ──────────────────────────────────────────────
     if (
@@ -317,6 +328,7 @@ export async function POST(request: NextRequest) {
       );
       for (const rta of recipientTokenPubkeys) keys.push({ pubkey: rta, isSigner: false, isWritable: true });
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
+      if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
 
       // Ensure recipient ATAs exist
@@ -387,6 +399,7 @@ export async function POST(request: NextRequest) {
       );
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
       for (const rpda of redemptionRequestPDAs) keys.push({ pubkey: rpda, isSigner: false, isWritable: true });
+      if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
 
     } else {
@@ -430,6 +443,7 @@ export async function POST(request: NextRequest) {
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
       );
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
+      if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
     }
 

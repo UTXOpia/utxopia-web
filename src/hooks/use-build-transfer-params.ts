@@ -45,6 +45,13 @@ export interface TransferUserInputs {
    * different signer. REQUIRED for mode === "btc".
    */
   requesterPubkey?: Uint8Array;
+  /**
+   * Frozen source-tree PDA (base58) when a spent note predates a tree rotation (its tree index <
+   * the active index). Forwarded to the relay so the program proves membership against that tree.
+   * Undefined for the common single/active-tree case. Detection requires per-note tree indices,
+   * which the indexer records only after a rotation occurs.
+   */
+  sourceTree?: string;
 }
 
 export interface TransferParams {
@@ -63,6 +70,12 @@ export interface TransferParams {
   relayerFeeOutputIndex?: number;
   /** Change amount in sats */
   changeSats: number;
+  /**
+   * Frozen source-tree PDA (base58) when a spent note predates a tree rotation. The relay inserts
+   * it before the proof buffer so the program proves membership against that tree while inserting
+   * new outputs into the active tree. Undefined for the common single/active-tree case.
+   */
+  sourceTree?: string;
 }
 
 export async function buildTransferParams(inputs: TransferUserInputs): Promise<TransferParams> {
@@ -308,5 +321,6 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     btcScriptPubKey: recipient.btcScriptPubKey,
     relayerFeeOutputIndex,
     changeSats,
+    sourceTree: inputs.sourceTree,
   };
 }

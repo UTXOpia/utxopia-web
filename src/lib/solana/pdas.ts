@@ -66,10 +66,13 @@ export function derivePoolStatePDA(
 }
 
 export function deriveCommitmentTreePDA(
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  treeIndex = 0
 ): [PublicKey, number] {
+  const idx = Buffer.alloc(4);
+  idx.writeUInt32LE(treeIndex, 0);
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), Buffer.from([0, 0, 0, 0])],
+    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), idx],
     programId
   );
 }
