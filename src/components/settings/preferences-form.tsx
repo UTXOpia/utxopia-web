@@ -7,6 +7,7 @@ import { useUiMode } from "@/hooks/use-ui-mode";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { cn } from "@/lib/utils";
 import { NetworkSelector } from "@/components/settings/network-selector";
+import { RelaySelector } from "@/components/settings/relay-selector";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SnsComplianceFlags } from "@utxopia/sdk";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -22,6 +23,7 @@ import { getSnsConfig } from "@/lib/names/sns";
  */
 export function PreferencesForm() {
   const { isAdvanced } = useUiMode();
+  const { config, networkId } = useChainEnvironment();
   // Phase 1: read-only.
   const advancedDisabled = true;
 
@@ -29,6 +31,22 @@ export function PreferencesForm() {
     <div className="space-y-12">
       <Section label="Network">
         <NetworkSelector />
+      </Section>
+
+      <Section
+        label="Relay"
+        hintNode={
+          <InfoTip label="About relays">
+            Relays submit your transaction so your wallet address stays private.
+            They can&apos;t see your balance or move your funds.{" "}
+            <span className="text-gray/70">
+              Permissioned-pool deposits are submitted via the pool&apos;s
+              auditor; relay selection applies to all other sends.
+            </span>
+          </InfoTip>
+        }
+      >
+        <RelaySelector chainId={config.chain ?? "solana"} networkId={networkId} />
       </Section>
 
       <Section
@@ -70,21 +88,24 @@ export function PreferencesForm() {
 function Section({
   label,
   hint,
+  hintNode,
   children,
 }: {
   label: string;
   hint?: string;
+  /** Rich node alternative to the plain `hint` string. Rendered to the right of the label. */
+  hintNode?: React.ReactNode;
   children: React.ReactNode;
 }) {
   return (
     <section className="space-y-3">
-      <div className="flex items-baseline justify-between gap-3 px-1">
+      <div className="flex items-center justify-between gap-3 px-1">
         <h2 className="text-[11px] uppercase tracking-[0.18em] text-gray-light font-semibold">
           {label}
         </h2>
-        {hint && (
+        {hintNode ?? (hint && (
           <span className="text-[11px] text-gray/70 truncate">{hint}</span>
-        )}
+        ))}
       </div>
       <div className="divide-y divide-gray/10">
         {children}
