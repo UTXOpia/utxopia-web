@@ -20,6 +20,8 @@ import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { networkForChain } from "@/lib/chain-registry";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { UTXOpiaKeys, StealthMetaAddress } from "@utxopia/sdk";
+import { useRelayCandidates } from "@/hooks/use-relay";
+import { submitWithFailover } from "@/lib/relay-submit";
 
 export type SuiTransferStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
@@ -40,6 +42,7 @@ export function useSuiTransfer() {
   const prover = useProver();
   const { networkId } = useChainEnvironment();
   const suiNetwork = networkForChain(networkId, "sui");
+  const relayCandidates = useRelayCandidates("sui", suiNetwork);
 
   const [status, setStatus] = useState<SuiTransferStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -178,20 +181,27 @@ export function useSuiTransfer() {
         const nullifierHexes = publicSignals.slice(2, 2 + nIn).map((s: string) => toHex64(BigInt(s)));
         const commitmentHexes = publicSignals.slice(2 + nIn, 2 + nIn + nOut).map((s: string) => toHex64(BigInt(s)));
 
-        const relayUrl = `/api/sui/relay?network=${encodeURIComponent(suiNetwork)}`;
-        const result = await utxopia.submitToRelay(
+        const result = await submitWithFailover(
+          (url) => utxopia.submitToRelay(
+            {
+              mode: "transfer",
+              nInputs: nIn,
+              nOutputs: nOut,
+              proof: bytesToHex(proofBytes),
+              merkleRoot: merkleRootHex,
+              boundParamsHash: boundParamsHashHex,
+              nullifiers: nullifierHexes,
+              commitmentsOut: commitmentHexes,
+              stealthData: stealthArrays.map((sd) => bytesToHex(sd)),
+            },
+            url,
+          ),
+          relayCandidates,
           {
-            mode: "transfer",
-            nInputs: nIn,
-            nOutputs: nOut,
-            proof: bytesToHex(proofBytes),
-            merkleRoot: merkleRootHex,
-            boundParamsHash: boundParamsHashHex,
-            nullifiers: nullifierHexes,
-            commitmentsOut: commitmentHexes,
-            stealthData: stealthArrays.map((sd) => bytesToHex(sd)),
+            onFailover: (failedUrl, nextUrl, err) => {
+              console.warn("[SuiTransfer] Relay failed, retrying via another relay...", { failedUrl, nextUrl, err });
+            },
           },
-          relayUrl,
         );
 
         if (!result.success) throw new Error(result.error || "Transfer failed");
@@ -204,7 +214,7 @@ export function useSuiTransfer() {
         setStatusMessage("");
       }
     },
-    [prover, suiNetwork],
+    [prover, suiNetwork, relayCandidates],
   );
 
   const reset = useCallback(() => {

@@ -18,6 +18,8 @@ import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { networkForChain } from "@/lib/chain-registry";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { UTXOpiaKeys, StealthMetaAddress } from "@utxopia/sdk";
+import { useRelayCandidates } from "@/hooks/use-relay";
+import { submitWithFailover } from "@/lib/relay-submit";
 
 export type SuiUnshieldStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
@@ -52,6 +54,7 @@ export function useSuiUnshield() {
   const prover = useProver();
   const { networkId } = useChainEnvironment();
   const suiNetwork = networkForChain(networkId, "sui");
+  const relayCandidates = useRelayCandidates("sui", suiNetwork);
 
   const [status, setStatus] = useState<SuiUnshieldStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
@@ -203,23 +206,30 @@ export function useSuiUnshield() {
 
         const treeStealthData = stealthArraysForHash;
         // coinType travels in the query string — it is not part of the typed relay payload.
-        const relayUrl = `/api/sui/relay?network=${encodeURIComponent(suiNetwork)}&coinType=${encodeURIComponent(input.coinType)}`;
-
-        const result = await utxopia.submitToRelay(
+        // Applied per-candidate so failover carries the same coinType suffix.
+        const result = await submitWithFailover(
+          (url) => utxopia.submitToRelay(
+            {
+              mode: "unshield",
+              nInputs: nIn,
+              nOutputs: nOut,
+              proof: bytesToHex(proofBytes),
+              merkleRoot: merkleRootHex,
+              boundParamsHash: boundParamsHashHex,
+              nullifiers: nullifierHexes,
+              commitmentsOut: commitmentHexes,
+              stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
+              unshieldAmounts: [input.amount.toString()],
+              recipientAddresses: [input.recipient],
+            },
+            `${url}&coinType=${encodeURIComponent(input.coinType)}`,
+          ),
+          relayCandidates,
           {
-            mode: "unshield",
-            nInputs: nIn,
-            nOutputs: nOut,
-            proof: bytesToHex(proofBytes),
-            merkleRoot: merkleRootHex,
-            boundParamsHash: boundParamsHashHex,
-            nullifiers: nullifierHexes,
-            commitmentsOut: commitmentHexes,
-            stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
-            unshieldAmounts: [input.amount.toString()],
-            recipientAddresses: [input.recipient],
+            onFailover: (failedUrl, nextUrl, err) => {
+              console.warn("[SuiUnshield] Relay failed, retrying via another relay...", { failedUrl, nextUrl, err });
+            },
           },
-          relayUrl,
         );
 
         if (!result.success) throw new Error(result.error || "Unshield failed");
@@ -232,7 +242,7 @@ export function useSuiUnshield() {
         setStatusMessage("");
       }
     },
-    [prover, suiNetwork],
+    [prover, suiNetwork, relayCandidates],
   );
 
   const reset = useCallback(() => {

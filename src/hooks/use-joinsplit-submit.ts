@@ -12,12 +12,16 @@ import type { TransferParams } from "@/hooks/use-build-transfer-params";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
+import { useRelayCandidates } from "@/hooks/use-relay";
+import { submitWithFailover } from "@/lib/relay-submit";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
 export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
+  const chainId = getChainAdapter(chainEnv.config).id;
+  const relayCandidates = useRelayCandidates(chainId, chainEnv.networkId);
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [txSignature, setTxSignature] = useState<string | null>(null);
@@ -82,10 +86,9 @@ export function useJoinSplitSubmit() {
 
       let relayResult: { success: boolean; signature?: string; error?: string };
 
-      const chainId = getChainAdapter(chainEnv.config).id;
-      const relayUrl = chainId === "sui"
-        ? `/api/sui/relay?network=${encodeURIComponent(chainEnv.networkId)}`
-        : `/api/sol/relay?network=${encodeURIComponent(chainEnv.networkId)}`;
+      const onFailover = (failedUrl: string, nextUrl: string, err: unknown) => {
+        console.warn("[Submit] Relay failed, retrying via another relay...", { failedUrl, nextUrl, err });
+      };
 
       if (params.relayMode === "unshield" && chainId === "sui") {
         throw new Error("Sui public unshield is not enabled yet");
@@ -94,14 +97,18 @@ export function useJoinSplitSubmit() {
       if (params.relayMode === "redeem") {
         const treeStealthData = params.stealthDataArrays.slice(0, -1);
         const requestNonce = BigInt(Date.now());
-        relayResult = await relayClient.submitToRelay({
-          ...commonFields,
-          mode: "redeem",
-          stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
-          redeemAmounts: [(redeemAmountSats ?? 0n).toString()],
-          btcScripts: [bytesToHex(params.btcScriptPubKey!)],
-          requestNonces: [requestNonce.toString()],
-        }, relayUrl);
+        relayResult = await submitWithFailover(
+          (url) => relayClient.submitToRelay({
+            ...commonFields,
+            mode: "redeem",
+            stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
+            redeemAmounts: [(redeemAmountSats ?? 0n).toString()],
+            btcScripts: [bytesToHex(params.btcScriptPubKey!)],
+            requestNonces: [requestNonce.toString()],
+          }, url),
+          relayCandidates,
+          { onFailover },
+        );
       } else if (params.relayMode === "unshield") {
         const { PublicKey } = await import("@solana/web3.js");
         const recipientPubkey = new PublicKey(params.unshieldRecipientAddress!);
@@ -116,13 +123,17 @@ export function useJoinSplitSubmit() {
         // derives the same accounts as before — byte-identical for zkBTC.
         const unshieldMint = params.unshieldMint || chainEnv.config.tokens.zkbtcMint;
 
-        relayResult = await relayClient.submitToRelay({
-          ...commonFields,
-          mode: "unshield",
-          stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
-          unshieldAmounts: [unshieldAmount.toString()],
-          recipientAddresses: [recipientPubkey.toBase58()],
-        }, `${relayUrl}&unshieldMint=${encodeURIComponent(unshieldMint)}`);
+        relayResult = await submitWithFailover(
+          (url) => relayClient.submitToRelay({
+            ...commonFields,
+            mode: "unshield",
+            stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
+            unshieldAmounts: [unshieldAmount.toString()],
+            recipientAddresses: [recipientPubkey.toBase58()],
+          }, `${url}&unshieldMint=${encodeURIComponent(unshieldMint)}`),
+          relayCandidates,
+          { onFailover },
+        );
       } else {
         // Transfer mode: opportunistically attach sender memos so the sender
         // retains an encrypted, AAD-bound record of their own outgoing
@@ -175,13 +186,17 @@ export function useJoinSplitSubmit() {
           }
         }
 
-        relayResult = await relayClient.submitToRelay({
-          ...commonFields,
-          mode: "transfer",
-          stealthData: params.stealthDataArrays.map((sd) => bytesToHex(sd)),
-          relayerFeeOutputIndex: params.relayerFeeOutputIndex,
-          senderMemos: senderMemosHex,
-        }, relayUrl);
+        relayResult = await submitWithFailover(
+          (url) => relayClient.submitToRelay({
+            ...commonFields,
+            mode: "transfer",
+            stealthData: params.stealthDataArrays.map((sd) => bytesToHex(sd)),
+            relayerFeeOutputIndex: params.relayerFeeOutputIndex,
+            senderMemos: senderMemosHex,
+          }, url),
+          relayCandidates,
+          { onFailover },
+        );
       }
 
       if (!relayResult.success) {
@@ -205,7 +220,7 @@ export function useJoinSplitSubmit() {
       setStatusMessage("");
       return false;
     }
-  }, [prover, chainEnv]);
+  }, [prover, chainEnv, relayCandidates]);
 
   const reset = useCallback(() => {
     setStatus("idle");
