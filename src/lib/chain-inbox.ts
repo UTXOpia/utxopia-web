@@ -130,6 +130,239 @@ export function getTokenScanTargets(
   return tokensToScan;
 }
 
+// ---------------------------------------------------------------------------
+// Auditor-ciphertext collection
+// ---------------------------------------------------------------------------
+
+/**
+ * Discriminator byte for the auditor-ciphertext sol_log_data event (0x16 = 22).
+ * Layout: disc(1) + commitment(32) + blob(112) = three segments.
+ */
+const EVENT_AUDITOR_CIPHERTEXT = 0x16;
+
+/** Auditor-ciphertext blob as returned by fetchAuditorCiphertexts. */
+export interface AuditorCiphertextRecord {
+  commitment: Uint8Array;
+  /** 112-byte encrypted blob for the designated auditor. */
+  blob: Uint8Array;
+  /** Solana slot (Solana path only). */
+  slot?: number;
+  /** Unix timestamp in seconds (both paths, when available). */
+  blockTime?: number;
+}
+
+/**
+ * Collect auditor-ciphertext events across both chains.
+ *
+ * - **Sui**: scans the same `BtcDepositVerified` / `StealthAnnounced` events
+ *   already used by the inbox path and extracts any non-empty `auditor_ciphertext`
+ *   field via {@link auditorCiphertextFromSuiFields}.
+ * - **Solana**: performs a lightweight RPC scan (same `getSignaturesForAddress` +
+ *   `getTransaction` pattern used by the SDK's announcement client) and parses
+ *   disc-0x16 sol_log_data events via {@link parseAuditorCiphertextSegments}.
+ *
+ * Today this always returns `[]` because no permissioned pools are live yet.
+ */
+export async function fetchAuditorCiphertexts(
+  env: ChainEnvironment,
+): Promise<AuditorCiphertextRecord[]> {
+  const chain = getChainAdapter(env.config);
+  if (chain.id === "sui") {
+    return fetchSuiAuditorCiphertexts(env.config);
+  }
+  return fetchSolanaAuditorCiphertexts();
+}
+
+// ---------------------------------------------------------------------------
+// Internal parsers (mirrors SDK spec; implemented here until SDK ships them)
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse a disc-0x16 auditor-ciphertext event from sol_log_data segments.
+ * Expected layout: [disc(1)] [commitment(32)] [blob(112)]
+ * Returns null if segments are missing, wrong size, or disc doesn't match.
+ */
+export function parseAuditorCiphertextSegments(
+  segments: Uint8Array[],
+): { commitment: Uint8Array; blob: Uint8Array } | null {
+  if (segments.length < 3) return null;
+  if (segments[0].length !== 1 || segments[0][0] !== EVENT_AUDITOR_CIPHERTEXT) return null;
+  if (segments[1].length !== 32) return null;
+  if (segments[2].length !== 112) return null;
+  return {
+    commitment: segments[1],
+    blob: segments[2],
+  };
+}
+
+/**
+ * Extract an auditor-ciphertext record from a Sui event's parsed JSON fields.
+ * The blob rides existing events (`BtcDepositVerified` / `StealthAnnounced`) as
+ * an `auditor_ciphertext` field (number[]) and a `commitment` field (number[]).
+ * Returns null when `auditor_ciphertext` is absent or empty.
+ */
+export function auditorCiphertextFromSuiFields(
+  payload: Record<string, unknown>,
+  blockTime?: number,
+): AuditorCiphertextRecord | null {
+  const ciphertextField = payload.auditor_ciphertext;
+  if (!Array.isArray(ciphertextField) || ciphertextField.length === 0) return null;
+  const blob = bytesField(ciphertextField);
+  if (!blob || blob.length !== 112) return null;
+  const commitment = bytesField(payload.commitment);
+  if (!commitment || commitment.length !== 32) return null;
+  return { commitment, blob, blockTime };
+}
+
+// ---------------------------------------------------------------------------
+// Sui auditor ciphertext fetcher
+// ---------------------------------------------------------------------------
+
+async function fetchSuiAuditorCiphertexts(
+  config: NetworkConfig,
+): Promise<AuditorCiphertextRecord[]> {
+  if (!config.sui) return [];
+
+  const { SuiJsonRpcClient } = await import("@mysten/sui/jsonRpc");
+  type SuiEvent = Awaited<
+    ReturnType<InstanceType<typeof SuiJsonRpcClient>["queryEvents"]>
+  >["data"][number];
+  const client = new SuiJsonRpcClient({
+    url: config.sui.rpcUrl,
+    network: suiNetworkName(config.sui.rpcUrl),
+  });
+
+  const events: SuiEvent[] = [];
+  let cursor: { txDigest: string; eventSeq: string } | null = null;
+
+  for (let page = 0; page < 20; page += 1) {
+    const result = await client.queryEvents({
+      query: {
+        MoveEventModule: {
+          package: config.sui.eventsPackageId ?? config.sui.packageId,
+          module: "events",
+        },
+      },
+      cursor,
+      limit: 50,
+      order: "descending",
+    });
+    events.push(...result.data);
+    if (!result.hasNextPage || !result.nextCursor) break;
+    cursor = result.nextCursor;
+  }
+
+  const records: AuditorCiphertextRecord[] = [];
+
+  for (const event of events) {
+    const type = event.type.split("::").at(-1) ?? "";
+    if (type !== "BtcDepositVerified" && type !== "StealthAnnounced") continue;
+    const payload = objectPayload(event.parsedJson);
+    const blockTime = Math.floor(Number(event.timestampMs ?? 0) / 1000) || undefined;
+    const record = auditorCiphertextFromSuiFields(payload, blockTime);
+    if (record) records.push(record);
+  }
+
+  return records;
+}
+
+// ---------------------------------------------------------------------------
+// Solana auditor ciphertext fetcher
+// ---------------------------------------------------------------------------
+
+async function fetchSolanaAuditorCiphertexts(): Promise<AuditorCiphertextRecord[]> {
+  const utxopiaClient = UTXOpiaClient.instance();
+  const programId = utxopiaClient.config.utxopiaProgramId;
+  const commitmentTreeAddress = utxopiaClient.config.commitmentTreePda;
+  const rpcUrl = getSolanaRpcUrl();
+  const queryAddress = commitmentTreeAddress || programId;
+
+  // Fetch recent signatures
+  let signatures: Array<{ signature: string; slot: number; blockTime?: number | null }> = [];
+  try {
+    const sigsResp = await fetch(rpcUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        jsonrpc: "2.0",
+        id: 1,
+        method: "getSignaturesForAddress",
+        params: [queryAddress, { limit: 200 }],
+      }),
+      signal: AbortSignal.timeout(10_000),
+    });
+    const sigsData: { result?: Array<{ signature: string; slot: number; blockTime?: number | null }> } =
+      await sigsResp.json();
+    signatures = sigsData.result ?? [];
+  } catch {
+    // Network error — return empty (inert today)
+    return [];
+  }
+
+  if (signatures.length === 0) return [];
+
+  const records: AuditorCiphertextRecord[] = [];
+  const batchSize = 10;
+
+  for (let i = 0; i < signatures.length; i += batchSize) {
+    const batch = signatures.slice(i, i + batchSize);
+    let txResponses: Array<{ result?: { meta?: { logMessages?: string[] }; slot?: number; blockTime?: number | null } }>;
+    try {
+      txResponses = await Promise.all(
+        batch.map((s) =>
+          fetch(rpcUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              jsonrpc: "2.0",
+              id: 1,
+              method: "getTransaction",
+              params: [s.signature, { encoding: "json", maxSupportedTransactionVersion: 0 }],
+            }),
+            signal: AbortSignal.timeout(10_000),
+          }).then((r) => r.json() as Promise<typeof txResponses[number]>),
+        ),
+      );
+    } catch {
+      continue;
+    }
+
+    for (let j = 0; j < txResponses.length; j++) {
+      const txData = txResponses[j];
+      const logs = txData?.result?.meta?.logMessages;
+      if (!Array.isArray(logs)) continue;
+
+      const sig = batch[j];
+      const slot = txData.result?.slot ?? sig.slot;
+      const blockTime = txData.result?.blockTime ?? sig.blockTime ?? undefined;
+
+      // parseProgramEvents covers all known discs but not 0x16 yet; parse manually
+      // by scanning log lines for "Program data: ..." with the auditor ciphertext disc.
+      for (const line of logs) {
+        if (!line.startsWith("Program data: ")) continue;
+        const parts = line.slice("Program data: ".length).trim().split(" ");
+        const segments = parts.map((p) => {
+          try {
+            return Uint8Array.from(Buffer.from(p, "base64"));
+          } catch {
+            return new Uint8Array(0);
+          }
+        });
+        const parsed = parseAuditorCiphertextSegments(segments);
+        if (parsed) {
+          records.push({
+            ...parsed,
+            slot,
+            blockTime: typeof blockTime === "number" ? blockTime : undefined,
+          });
+        }
+      }
+    }
+  }
+
+  return records;
+}
+
 async function fetchSuiInboxEvents(config: NetworkConfig): Promise<InboxSource> {
   if (!config.sui) return { announcements: [], spentNullifiers: new Set() };
 
