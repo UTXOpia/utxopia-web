@@ -31,6 +31,7 @@ import {
   SuiTokensEmpty,
   SuiTokensLoading,
 } from "@/components/sui/flow-kit";
+import { RelayControl } from "@/components/relay/relay-control";
 import { decodeStealthMetaAddress, type StealthMetaAddress } from "@utxopia/sdk";
 import type { InboxNote } from "@/hooks/use-utxopia";
 
@@ -334,6 +335,13 @@ export function SuiSendFlow({ className }: SuiSendFlowProps) {
       </div>
 
       {shownError && !busy && <SuiFlowError message={shownError} />}
+
+      {/* Per-tx relay line — low-emphasis reassurance above the submit button.
+          viaAuditor is dormant (default false) until the app tracks
+          permissioned pools. */}
+      {canSubmit && (
+        <RelayControl chainId="sui" networkId={networkId} viaAuditor={false} />
+      )}
 
       <SuiSubmitButton
         busy={busy}

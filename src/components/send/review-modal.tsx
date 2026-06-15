@@ -3,6 +3,7 @@
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { HoldButton } from "@/components/ui/hold-button";
+import { RelayControl } from "@/components/relay/relay-control";
 
 export interface ReviewModalProps {
   open: boolean;
@@ -13,6 +14,10 @@ export interface ReviewModalProps {
   onConfirm: () => void;
   /** Optional warning row (e.g. BTC privacy notice). */
   warning?: string;
+  /** Relay registry chain id ("sol" / "sui") for the per-tx relay line. */
+  chainId: string;
+  /** Full network id for relay health probing. */
+  networkId: string;
 }
 
 export function ReviewModal({
@@ -23,6 +28,8 @@ export function ReviewModal({
   feeLabel,
   onConfirm,
   warning,
+  chainId,
+  networkId,
 }: ReviewModalProps) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -52,6 +59,17 @@ export function ReviewModal({
               {warning}
             </div>
           )}
+
+          {/* Per-tx relay line — low-emphasis reassurance, with an inline
+              "Change" popover (not a nested modal). viaAuditor is dormant
+              (default false) until the app tracks permissioned pools. */}
+          <div className="mt-4 border-t border-gray/10 pt-3">
+            <RelayControl
+              chainId={chainId}
+              networkId={networkId}
+              viaAuditor={false}
+            />
+          </div>
 
           <div className="mt-5">
             <HoldButton

@@ -650,6 +650,8 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
             ? "Cashing out to Bitcoin reveals the destination address on-chain."
             : undefined
         }
+        chainId={activeChainId}
+        networkId={chainEnv.networkId}
         onConfirm={onSend}
       />
 
