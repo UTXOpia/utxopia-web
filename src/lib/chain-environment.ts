@@ -31,7 +31,6 @@ const SDK_INITIALIZERS: Record<ChainId, (env: ChainEnvironment) => Promise<void>
         utxopiaProgramId: env.config.solana.utxopiaProgramId,
         zkbtcMint: env.config.tokens.zkbtcMint,
         solanaRpcUrl: env.config.solana.rpcUrl,
-        groupPubKey: env.config.bitcoin.groupPubkey,
         ikaDwalletXOnlyPubkey: env.config.ika?.dwalletXOnlyPubkey,
         depositMode: env.config.bitcoin.depositMode,
       });
