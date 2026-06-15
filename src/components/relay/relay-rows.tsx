@@ -45,7 +45,7 @@ export const HEALTH_CONFIG: Record<
   checking: {
     label: "Checking…",
     dotClass: "bg-gray/30 animate-pulse",
-    captionClass: "text-gray/60",
+    captionClass: "text-gray",
   },
 };
 
@@ -158,10 +158,10 @@ export function AutoRow({
         </span>
       );
     } else {
-      subLine = <span className="text-gray/60">via {effective.name}</span>;
+      subLine = <span className="text-gray">via {effective.name}</span>;
     }
   } else {
-    subLine = <span className="text-gray/60">No healthy relay found</span>;
+    subLine = <span className="text-gray">No healthy relay found</span>;
   }
 
   return (
@@ -573,7 +573,7 @@ export function RelayRows({
       {isPinned && (
         <p
           className={cn(
-            "px-1 text-[11px] text-gray/70 leading-snug",
+            "px-1 text-[11px] text-gray leading-snug",
             "transition-opacity duration-200 motion-reduce:transition-none",
           )}
           role="note"

@@ -49,8 +49,8 @@ export function useEffectiveRelayUrl(chainId: string, networkId: string): string
   return useMemo(() => {
     if (effective) return effective.url(networkId);
     // No health data yet — use first builtin as cold-start default.
-    const fallback = relays[0];
-    return fallback ? fallback.url(networkId) : `/api/${chainId}/relay?network=${encodeURIComponent(networkId)}`;
+    // relays[0] is always defined for known chains (builtins are non-empty).
+    return relays[0].url(networkId);
   }, [effective, relays, chainId, networkId]);
 }
 

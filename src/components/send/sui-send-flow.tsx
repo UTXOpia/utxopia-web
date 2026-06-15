@@ -340,7 +340,7 @@ export function SuiSendFlow({ className }: SuiSendFlowProps) {
           viaAuditor is dormant (default false) until the app tracks
           permissioned pools. */}
       {canSubmit && (
-        <RelayControl chainId="sui" networkId={networkId} viaAuditor={false} />
+        <RelayControl chainId="sui" networkId={suiNetwork} viaAuditor={false} />
       )}
 
       <SuiSubmitButton
