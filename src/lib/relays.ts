@@ -63,13 +63,25 @@ const BUILTIN_RELAYS: Record<string, SerializableRelay[]> = {
 };
 
 /**
+ * Normalize the app's chain id ("solana"/"sui", from `config.chain`) to the
+ * registry/API key ("sol"/"sui"). Accepts either form so callers using either
+ * convention resolve correctly.
+ */
+function relayChainKey(chainId: string): string {
+  const c = chainId.toLowerCase();
+  if (c === "solana" || c === "sol") return "sol";
+  if (c === "sui") return "sui";
+  return c;
+}
+
+/**
  * Returns the built-in relay list for a chain.
  * Seam for future: replace body with a fetch from on-chain registry or remote API.
  */
 export function getBuiltinRelays(chainId: string): RelayConfig[] {
-  return (BUILTIN_RELAYS[chainId] ?? []).map(serializableToConfig);
+  return (BUILTIN_RELAYS[relayChainKey(chainId)] ?? []).map(serializableToConfig);
 }
 
 export function getBuiltinRelaysSerializable(chainId: string): SerializableRelay[] {
-  return BUILTIN_RELAYS[chainId] ?? [];
+  return BUILTIN_RELAYS[relayChainKey(chainId)] ?? [];
 }
