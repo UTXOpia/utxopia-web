@@ -40,6 +40,10 @@ export interface NetworkConfig {
     utxopiaProgramId: string;
     btcLightClientId: string;
     chadbufferId: string;
+    /** If true, value-entry (deposits/shields) require the auditor's co-signature. */
+    permissioned?: boolean;
+    /** Base58-encoded auditor viewing pubkey (Solana). Absent ⇒ not permissioned. */
+    auditorViewingPubkey?: string;
   };
   tokens: {
     zkbtcMint: string;
@@ -75,6 +79,12 @@ export interface NetworkConfig {
   sui?: {
     rpcUrl: string;
     explorerUrl: string;
+    /** If true, value-entry (deposits/shields) require the auditor's co-signature. */
+    permissioned?: boolean;
+    /** Hex-encoded auditor viewing pubkey (Sui). Absent ⇒ not permissioned. */
+    auditorViewingPubkey?: string;
+    /** Sui object ID of the AuditorCap. Required when permissioned=true on Sui. */
+    auditorCapId?: string;
     /**
      * Optional Sui indexer base URL (events → DB → web). When set, the explorer reads
      * normalized data from `${indexerUrl}/api/explorer/*` and falls back to direct RPC

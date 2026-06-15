@@ -337,8 +337,7 @@ export function SuiSendFlow({ className }: SuiSendFlowProps) {
       {shownError && !busy && <SuiFlowError message={shownError} />}
 
       {/* Per-tx relay line — low-emphasis reassurance above the submit button.
-          viaAuditor is dormant (default false) until the app tracks
-          permissioned pools. */}
+          Spends (transfer/unshield/redeem) are NOT auditor-gated; viaAuditor stays false. */}
       {canSubmit && (
         <RelayControl chainId="sui" networkId={suiNetwork} viaAuditor={false} />
       )}

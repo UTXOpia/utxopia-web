@@ -22,7 +22,7 @@ import {
 import { UTXOpiaClient } from "@utxopia/sdk";
 import { derivePoolStatePDA, deriveCommitmentTreePDA, deriveTokenConfigPDA } from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
-import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check } from "lucide-react";
+import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StealthRecipientInput } from "@/components/ui/stealth-recipient-input";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -38,6 +38,7 @@ import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview"
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -53,6 +54,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const { connection } = useConnection();
   const chainEnv = useChainEnvironment();
   const { networkId } = chainEnv;
+  const { permissioned: poolPermissioned } = usePoolPermissioned();
   const { setVisible: openWalletModal } = useWalletModal();
   const { keys, stealthAddress } = useUTXOpia();
 
@@ -460,10 +462,19 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </div>
         )}
 
+        {/* Permissioned-pool indicator — visible only when config marks pool permissioned */}
+        {poolPermissioned && (
+          <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-muted border border-gray/15">
+            <Info className="w-3.5 h-3.5 shrink-0 text-gray" aria-hidden />
+            <span className="text-[11px] text-gray">Deposits to this pool are submitted via the pool&apos;s auditor.</span>
+          </div>
+        )}
+
         {/* Add funds / Preview button */}
         {btcWallet.connected ? (
           <button
             onClick={buildTxPreview}
+            // TODO(permissioned): route value-entry through the auditor co-signing service
             disabled={!canSubmitBtc || buildingPreview || btcAmountSats < BTC_DUST_LIMIT || (btcWallet.balance !== null && btcAmountSats > btcWallet.balance)}
             className={cn(
               "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",
@@ -615,9 +626,18 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         </div>
       )}
 
+      {/* Permissioned-pool indicator — visible only when config marks pool permissioned */}
+      {poolPermissioned && (
+        <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-muted border border-gray/15">
+          <Info className="w-3.5 h-3.5 shrink-0 text-gray" aria-hidden />
+          <span className="text-[11px] text-gray">Deposits to this pool are submitted via the pool&apos;s auditor.</span>
+        </div>
+      )}
+
       {/* Add funds button */}
       <button
         onClick={handleShield}
+        // TODO(permissioned): route value-entry through the auditor co-signing service
         disabled={!canSubmit || status === "processing"}
         className={cn(
           "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",

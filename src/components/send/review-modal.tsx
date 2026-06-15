@@ -60,9 +60,9 @@ export function ReviewModal({
             </div>
           )}
 
-          {/* Per-tx relay line — low-emphasis reassurance, with an inline
-              "Change" popover (not a nested modal). viaAuditor is dormant
-              (default false) until the app tracks permissioned pools. */}
+          {/* Per-tx relay line — low-emphasis reassurance, with an inline "Change" popover
+              (not a nested modal). Spends (transfer/unshield/redeem) are NOT auditor-gated;
+              viaAuditor stays false. */}
           <div className="mt-4 border-t border-gray/10 pt-3">
             <RelayControl
               chainId={chainId}
