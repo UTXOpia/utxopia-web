@@ -198,8 +198,8 @@ export function parseAuditorCiphertextSegments(
 /**
  * Extract an auditor-ciphertext record from a Sui event's parsed JSON fields.
  * The blob rides existing events (`BtcDepositVerified` / `StealthAnnounced`) as
- * an `auditor_ciphertext` field (number[]) and a `commitment` field (number[]).
- * Returns null when `auditor_ciphertext` is absent or empty.
+ * an `auditor_ciphertext` field (number[]) and a `commitment` (or `note`) field
+ * (number[]). Returns null when `auditor_ciphertext` is absent or empty.
  */
 export function auditorCiphertextFromSuiFields(
   payload: Record<string, unknown>,
@@ -209,7 +209,9 @@ export function auditorCiphertextFromSuiFields(
   if (!Array.isArray(ciphertextField) || ciphertextField.length === 0) return null;
   const blob = bytesField(ciphertextField);
   if (!blob || blob.length !== 112) return null;
-  const commitment = bytesField(payload.commitment);
+  // The Sui event may name the 32-byte field `commitment` or `note` — accept both
+  // (matches the SDK's auditorCiphertextFromSuiEventFields).
+  const commitment = bytesField(payload.commitment) ?? bytesField(payload.note);
   if (!commitment || commitment.length !== 32) return null;
   return { commitment, blob, blockTime };
 }
@@ -336,8 +338,9 @@ async function fetchSolanaAuditorCiphertexts(): Promise<AuditorCiphertextRecord[
       const slot = txData.result?.slot ?? sig.slot;
       const blockTime = txData.result?.blockTime ?? sig.blockTime ?? undefined;
 
-      // parseProgramEvents covers all known discs but not 0x16 yet; parse manually
-      // by scanning log lines for "Program data: ..." with the auditor ciphertext disc.
+      // Scan "Program data: ..." log lines for the 0x16 auditor-ciphertext disc and
+      // parse locally via parseAuditorCiphertextSegments (equivalent to the SDK's
+      // parseAuditorCiphertextEvent; kept local to avoid a hot-path SDK import here).
       for (const line of logs) {
         if (!line.startsWith("Program data: ")) continue;
         const parts = line.slice("Program data: ".length).trim().split(" ");

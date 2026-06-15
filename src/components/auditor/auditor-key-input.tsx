@@ -176,7 +176,7 @@ export function AuditorKeyInput({ onKey, disabled, className }: AuditorKeyInputP
         )}
 
         {isValid && (
-          <p className="text-[11px] text-privacy mt-1">
+          <p className="text-xs text-success mt-1">
             Key accepted (32 bytes).
           </p>
         )}
