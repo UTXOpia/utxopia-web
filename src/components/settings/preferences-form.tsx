@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Loader2, ChevronRight } from "lucide-react";
 import { PublicKey } from "@solana/web3.js";
 import { useUiMode } from "@/hooks/use-ui-mode";
 import { useSnsName } from "@/hooks/use-sns-name";
@@ -11,6 +12,7 @@ import { RelaySelector } from "@/components/settings/relay-selector";
 import { InfoTip } from "@/components/ui/info-tip";
 import { SnsComplianceFlags } from "@utxopia/sdk";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { hrefWithChain } from "@/lib/network-config";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
 
@@ -71,6 +73,13 @@ export function PreferencesForm() {
             </>
           }
         />
+      </Section>
+
+      <Section
+        label="Advanced"
+        hint="Tools for permissioned-pool operators and auditors."
+      >
+        <AuditorDashboardLinkRow />
       </Section>
     </div>
   );
@@ -489,5 +498,45 @@ function AuditorPubkeyRow() {
         )}
       </div>
     </div>
+  );
+}
+
+/* -------------------------------------------------------------------------- */
+/*  Advanced section rows                                                      */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * Low-key link to the Method-Y Auditor dashboard.
+ * Not a primary nav item — rendered in the Advanced section of Settings,
+ * near the auditor pubkey configuration rows.
+ */
+function AuditorDashboardLinkRow() {
+  const { networkId } = useChainEnvironment();
+  return (
+    <Link
+      href={hrefWithChain("/auditor", networkId)}
+      className={cn(
+        "group flex items-center justify-between gap-4 py-4 px-1 transition-colors",
+        "hover:text-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-privacy/40 rounded-sm",
+      )}
+    >
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="text-sm font-medium text-foreground">
+          Method-Y Auditor
+        </span>
+        <span className="text-[10px] uppercase tracking-wide text-gray bg-muted/40 px-1.5 py-0.5 rounded">
+          Permissioned pools
+        </span>
+        <InfoTip label="About Method-Y Auditor">
+          Decrypt auditor ciphertexts emitted by permissioned-pool deposits using
+          your Ed25519 viewing private key. The key is never stored — it lives
+          only in the browser tab for the duration of the scan.
+        </InfoTip>
+      </div>
+      <ChevronRight
+        className="w-4 h-4 text-gray group-hover:text-gray-light transition-colors shrink-0"
+        aria-hidden="true"
+      />
+    </Link>
   );
 }
