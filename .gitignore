@@ -73,3 +73,5 @@ images/
 *keypair*.json
 *demo-seed*
 *.key
+e2e/.dev-keys.json
+e2e/screenshots/

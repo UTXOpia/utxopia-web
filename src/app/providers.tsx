@@ -11,6 +11,7 @@ import { HELIUS_RPC_DEVNET } from "@/lib/helius";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
 import { UtxopiaPrivyProvider } from "@/lib/privy-solana";
+import { DevSigner, devSolanaAdapters } from "@/lib/dev-signer";
 
 // Import wallet adapter CSS
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -27,14 +28,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
   );
 
   // Configure supported wallets
-  const wallets = useMemo(
-    () => [
-      new PhantomWalletAdapter(),
-      // Add more wallets as needed
-      // new SolflareWalletAdapter(),
-    ],
-    []
-  );
+  const wallets = useMemo(() => [new PhantomWalletAdapter(), ...devSolanaAdapters()], []);
 
   return (
     <UtxopiaPrivyProvider>
@@ -44,6 +38,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <UiModeProvider>
               {/* Hydrate Zustand stores (Bitcoin wallet, Poseidon) */}
               <StoreHydration />
+              <DevSigner />
               {/* Reflect active chain onto <html data-chain> for accent tokens */}
               <ChainThemeSync />
               {children}
