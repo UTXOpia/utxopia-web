@@ -200,6 +200,10 @@ export const NETWORK_META: NetworkMeta[] = [
       "Uses local regtest BTC and local relayer signing. Native Ika signing is intentionally disabled until testnet IKA is available.",
     ],
     enabled: true,
+    // Gated for the Solana alpha: Sui unshield is not implemented yet
+    // (use-joinsplit-submit throws), so keep all Sui networks locked to avoid a
+    // dead-end flow. Remove once Sui unshield lands.
+    comingSoon: true,
   },
   {
     id: "localnet",
