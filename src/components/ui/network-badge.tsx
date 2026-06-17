@@ -46,7 +46,9 @@ export function NetworkBadge() {
   const active = useSyncExternalStore(
     subscribe,
     () => detectNetwork(),
-    () => "devnet" as const,
+    // Server snapshot follows the env-resolved default (NEXT_PUBLIC_NETWORK)
+    // instead of hardcoding devnet — see chain-environment.ts.
+    () => detectNetwork(),
   );
 
   const badge = getNetworkBadgePresentation(active);

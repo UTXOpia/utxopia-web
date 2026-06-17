@@ -66,7 +66,11 @@ export function useChainEnvironment(): ChainEnvironment {
   const networkId = useSyncExternalStore<NetworkId>(
     subscribeToNetwork,
     () => detectNetwork(),
-    () => "devnet",
+    // Server snapshot: follow the env-resolved default (NEXT_PUBLIC_NETWORK) so
+    // SSR matches the build's network instead of hardcoding devnet. detectNetwork()
+    // is SSR-safe (guards `window`) and, for a fresh visitor, matches the client
+    // snapshot — avoiding a hydration mismatch.
+    () => detectNetwork(),
   );
   return getChainEnvironment(networkId);
 }
