@@ -63,10 +63,7 @@ export function useSuiTransfer() {
           parseMerkleProofResponse,
           computeJoinSplitCommitmentSync,
           createStealthDepositWithKeys,
-          computeBoundParamsHash,
-          createTransferBoundParams,
-          computeStealthDataHash,
-          SUI_BOUND_CHAIN_ID,
+          computeSuiTransferBoundParamsHash,
           UTXOpiaClient,
           bytesToHex,
         } = await import("@utxopia/sdk");
@@ -135,9 +132,9 @@ export function useSuiTransfer() {
           sd.set(r.encryptedAmount, 32);
           return sd;
         });
-        const stealthDataHash = computeStealthDataHash(stealthArrays);
-        const boundParams = createTransferBoundParams(stealthDataHash, SUI_BOUND_CHAIN_ID);
-        const boundParamsHash = computeBoundParamsHash(boundParams);
+        // Length-prefixed Sui bound-params (audit #4/#51-54) — must match the on-chain
+        // bound_params.move encoding (count + per-item length).
+        const boundParamsHash = computeSuiTransferBoundParamsHash(stealthArrays);
 
         const merkleRoot = inputsData[0].claimInputs.merkleRoot;
         const allNullifiers = inputsData.map((d) => d.claimInputs.nullifier);

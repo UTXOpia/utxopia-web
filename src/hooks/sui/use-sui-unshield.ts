@@ -75,9 +75,7 @@ export function useSuiUnshield() {
           parseMerkleProofResponse,
           computeJoinSplitCommitmentSync,
           createStealthDepositWithKeys,
-          computeBoundParamsHash,
-          createSuiUnshieldBoundParams,
-          computeStealthDataHash,
+          computeSuiUnshieldBoundParamsHash,
           UTXOpiaClient,
           bytesToHex,
         } = await import("@utxopia/sdk");
@@ -158,9 +156,10 @@ export function useSuiUnshield() {
           sd.set(r.encryptedAmount, 32);
           return sd;
         });
-        const stealthDataHash = computeStealthDataHash(stealthArraysForHash);
-        const boundParams = createSuiUnshieldBoundParams(recipientBytes, stealthDataHash);
-        const boundParamsHash = computeBoundParamsHash(boundParams);
+        // Length-prefixed Sui bound-params (audit #4/#51-54) — must match the on-chain
+        // bound_params.move encoding (count + per-item length). `recipients` is the
+        // vector<address> the program hashes; single-output here, so a 1-element list.
+        const boundParamsHash = computeSuiUnshieldBoundParamsHash([recipientBytes], stealthArraysForHash);
 
         const merkleRoot = inputsData[0].claimInputs.merkleRoot;
         const allNullifiers = inputsData.map((d) => d.claimInputs.nullifier);
