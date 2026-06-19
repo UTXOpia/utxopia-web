@@ -6,6 +6,7 @@ import { loadDevKeys } from "./keys";
 import { installUnisatShim } from "./btc-unisat";
 import { installSuiWalletShim } from "./sui-wallet";
 import { loginDevIdentity } from "./identity";
+import { saveSuiAuthState } from "@/lib/sui/client";
 
 export function DevSigner() {
   useEffect(() => {
@@ -22,7 +23,12 @@ export function DevSigner() {
       "color:#fff;background:#b30;padding:2px 6px",
     );
     installUnisatShim(keys.btcWif, network);
-    installSuiWalletShim(keys.suiSecretKey, network);
+    const suiAddress = installSuiWalletShim(keys.suiSecretKey, network);
+    // Mark the Sui session as wallet-connected so wallet-gated flows (Coin<T>
+    // shield, which requires suiAuth.method === "wallet") are reachable headlessly.
+    if (network.includes("sui")) {
+      saveSuiAuthState({ method: "wallet", address: suiAddress });
+    }
     void loginDevIdentity(keys.utxopiaSeedHex);
   }, []);
   return null;
