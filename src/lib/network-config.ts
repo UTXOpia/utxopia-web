@@ -197,13 +197,9 @@ export const NETWORK_META: NetworkMeta[] = [
     tagline: "Sui testnet + local regtest BTC",
     description: "Sui testnet package with local Bitcoin regtest plumbing for faster deposit and withdraw iteration.",
     caveats: [
-      "Uses local regtest BTC and local relayer signing. Native Ika signing is intentionally disabled until testnet IKA is available.",
+      "Uses local regtest BTC with the upgraded Sui testnet package and Ika-backed BTC redemption signing.",
     ],
     enabled: true,
-    // Gated for the Solana alpha: Sui unshield is not implemented yet
-    // (use-joinsplit-submit throws), so keep all Sui networks locked to avoid a
-    // dead-end flow. Remove once Sui unshield lands.
-    comingSoon: true,
   },
   {
     id: "localnet",
