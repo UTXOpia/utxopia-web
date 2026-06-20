@@ -349,18 +349,14 @@ export default function VaultPage() {
           {!keys && !isViewOnly ? (
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
-              <div className="relative mb-5 flex items-center justify-center">
-                <div
-                  aria-hidden
-                  className="absolute inset-0 -m-6 rounded-full bg-[radial-gradient(circle,var(--color-privacy)_0%,transparent_70%)] opacity-[0.18] blur-xl"
-                />
+              <div className="mb-5 flex items-center justify-center">
                 <Image
                   src="/brand/logo-transparent-256.png"
                   alt="UTXOpia"
                   width={104}
                   height={104}
                   priority
-                  className="relative w-[104px] h-[104px] object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
+                  className="w-[104px] h-[104px] object-contain drop-shadow-[0_4px_20px_rgba(0,0,0,0.35)]"
                 />
               </div>
               <h1 className="text-[22px] font-bold text-foreground mb-1.5">Your private vault</h1>

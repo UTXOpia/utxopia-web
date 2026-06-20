@@ -39,6 +39,18 @@ export interface SuiZkLoginSession {
   ephemeralSecretKey: string;
   ephemeralPublicKey: string;
   startedAt: number;
+  /** Sui network the login was started on, so the callback can land back on chain=sui. */
+  network?: NetworkId;
+}
+
+/** OAuth `state` prefix; the sui network is appended so the callback restores chain context. */
+export const ZKLOGIN_STATE_PREFIX = "utxopia-sui-zklogin";
+
+/** Parse the sui network out of the OAuth `state` value (e.g. "utxopia-sui-zklogin:sui-testnet"). */
+export function suiNetworkFromZkLoginState(state: string | null | undefined): NetworkId | null {
+  if (!state || !state.startsWith(`${ZKLOGIN_STATE_PREFIX}:`)) return null;
+  const net = state.slice(ZKLOGIN_STATE_PREFIX.length + 1);
+  return net ? (net as NetworkId) : null;
 }
 
 export interface SuiZkLoginCallback {
@@ -159,6 +171,7 @@ export async function createSuiZkLoginSession(networkId?: NetworkId): Promise<Su
     ephemeralSecretKey: keypair.getSecretKey(),
     ephemeralPublicKey: getExtendedEphemeralPublicKey(keypair.getPublicKey()),
     startedAt: Date.now(),
+    network: networkForChain(networkId ?? detectNetwork(), "sui"),
   };
   saveSuiZkLoginSession(session);
   return session;
@@ -179,7 +192,9 @@ export function buildGoogleZkLoginUrl(session: SuiZkLoginSession): string {
   url.searchParams.set("response_type", "id_token");
   url.searchParams.set("scope", "openid email profile");
   url.searchParams.set("nonce", session.nonce);
-  url.searchParams.set("state", "utxopia-sui-zklogin");
+  // Carry the sui network in `state` so the callback restores chain=sui (Google echoes
+  // `state` back in the redirect fragment). Without this the callback page defaults to sol.
+  url.searchParams.set("state", `${ZKLOGIN_STATE_PREFIX}:${session.network ?? ""}`);
   url.searchParams.set("prompt", "select_account");
   return url.toString();
 }

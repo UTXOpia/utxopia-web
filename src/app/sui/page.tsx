@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { hrefWithChain } from "@/lib/network-config";
+import { networkForChain } from "@/lib/chain-registry";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
 export default function SuiPage() {
@@ -10,7 +11,14 @@ export default function SuiPage() {
   const { networkId } = useChainEnvironment();
 
   useEffect(() => {
-    router.replace(hrefWithChain("/vault", networkId));
+    // If Google returned here with a zkLogin token, let ZkLoginCallbackHandler
+    // consume it and redirect (it restores chain=sui from `state`). Don't race it.
+    if (typeof window !== "undefined") {
+      const hash = new URLSearchParams(window.location.hash.replace(/^#/, ""));
+      if (hash.get("id_token") || hash.get("error")) return;
+    }
+    // Plain visit to /sui → open the Sui vault (always the sui chain, never sol).
+    router.replace(hrefWithChain("/vault", networkForChain(networkId, "sui")));
   }, [networkId, router]);
 
   return (
