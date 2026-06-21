@@ -29,6 +29,7 @@ export function StoreHydration(): JSX.Element {
   // Track if we've already triggered a refresh
   const hasRefreshedRef = useRef(false);
   const hasHydratedRef = useRef(false);
+  const hasPasskeyHydratedRef = useRef(false);
 
   useEffect(() => {
     // Hydrate Bitcoin wallet from localStorage
@@ -46,13 +47,16 @@ export function StoreHydration(): JSX.Element {
     }
   }, [walletPubkey, isPoseidonReady, keys, hydrateKeys]);
 
-  // Auto-hydrate passkey keys (no wallet needed)
+  // Auto-hydrate passkey keys for the active chain. Runs independently of the
+  // wallet (a passkey user may also have a Solana wallet auto-connected — the
+  // old `!walletPubkey` gate blocked passkey restore in that case, bouncing them
+  // back to sign-in on the Solana side). Per-chain so switching chains re-restores.
   useEffect(() => {
-    if (isPoseidonReady && !keys && !walletPubkey && !hasHydratedRef.current) {
-      hasHydratedRef.current = true;
+    if (isPoseidonReady && !keys && !hasPasskeyHydratedRef.current) {
+      hasPasskeyHydratedRef.current = true;
       hydratePasskeyKeys();
     }
-  }, [isPoseidonReady, keys, walletPubkey, hydratePasskeyKeys]);
+  }, [isPoseidonReady, keys, hydratePasskeyKeys]);
 
   // Reset hydration flag when wallet disconnects
   useEffect(() => {

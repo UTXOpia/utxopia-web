@@ -16,8 +16,10 @@ import {
   type ScannedNote,
   type ViewOnlyScannedNote,
 } from "@utxopia/sdk";
+import { sha256 } from "@noble/hashes/sha2.js";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { API_ENDPOINTS } from "@/lib/api/constants";
+import { detectNetwork, networkChain, type NetworkId } from "@/lib/network-config";
 import { ensureChainEnvironment, getChainEnvironment } from "@/lib/chain-environment";
 import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
 import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
@@ -120,6 +122,26 @@ async function loadKeys(walletPubkey: string, solanaPublicKey: Uint8Array): Prom
   }
 }
 
+// Chain-scope a passkey seed so one passkey yields a SEPARATE private identity
+// per chain+network — matching the wallet/zkLogin auth-signature domain separation
+// ({account, chain, network}) and keeping cross-chain activity unlinkable. Without
+// this, the same passkey produced one shared stealth address on every chain.
+function chainScopedPasskeySeed(seed: Uint8Array, networkId: NetworkId): Uint8Array {
+  const domain = new TextEncoder().encode(
+    `utxopia-passkey-chain:v1:${networkChain(networkId)}:${networkId}`,
+  );
+  const buf = new Uint8Array(domain.length + seed.length);
+  buf.set(domain, 0);
+  buf.set(seed, domain.length);
+  return sha256(buf);
+}
+
+// Per-chain storage owner id for a passkey identity (so each chain's encrypted
+// keys live under their own localStorage key).
+function passkeyStorageOwner(credentialId: string, networkId: NetworkId): string {
+  return `passkey:${credentialId}:${networkChain(networkId)}:${networkId}`;
+}
+
 function removeKeys(walletPubkey: string): void {
   try {
     localStorage.removeItem(KEYS_STORAGE_PREFIX + walletPubkey);
@@ -212,8 +234,8 @@ interface UTXOpiaState {
     chain?: string;
     network?: string;
   }) => Promise<void>;
-  deriveKeysFromPasskeySeed: (seed: Uint8Array) => Promise<void>;
-  hydratePasskeyKeys: () => Promise<boolean>;
+  deriveKeysFromPasskeySeed: (seed: Uint8Array, networkId?: NetworkId) => Promise<void>;
+  hydratePasskeyKeys: (networkId?: NetworkId) => Promise<boolean>;
   loadViewOnlyKeys: (encoded: string) => Promise<void>;
   clearKeys: (walletPubkey?: string) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
@@ -361,22 +383,25 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  deriveKeysFromPasskeySeed: async (seed: Uint8Array) => {
+  deriveKeysFromPasskeySeed: async (seed: Uint8Array, networkId?: NetworkId) => {
     set({ isLoading: true, error: null });
     try {
       await ensureChainEnvironment();
       const client = UTXOpiaClient.instance();
+      // One passkey → a separate private identity per chain+network (see chainScopedPasskeySeed).
+      const net = networkId ?? detectNetwork();
+      const scopedSeed = chainScopedPasskeySeed(seed, net);
       const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
-        await client.loginWithSeed(seed);
+        await client.loginWithSeed(scopedSeed);
 
-      // Persist with "passkey:" prefix, encrypted under the passkey seed secret.
+      // Persist per chain+network, encrypted under the chain-scoped seed.
       const credentialId = typeof window !== "undefined"
         ? localStorage.getItem("utxo:passkey_credential_id") || "default"
         : "default";
-      await persistKeys("passkey:" + credentialId, seed);
+      await persistKeys(passkeyStorageOwner(credentialId, net), scopedSeed);
 
       // Derive + hold the in-memory name-owner Solana key (non-fund; for .utxopia.sol).
-      const nameOwner = deriveNameOwnerKeypair(seed);
+      const nameOwner = deriveNameOwnerKeypair(scopedSeed);
       set({ passkeyNameOwnerSecret: nameOwner.secretKey });
 
       set({
@@ -394,7 +419,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  hydratePasskeyKeys: async () => {
+  hydratePasskeyKeys: async (networkId?: NetworkId) => {
     try {
       await ensureChainEnvironment();
       const credentialId = typeof window !== "undefined"
@@ -402,7 +427,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         : null;
       if (!credentialId) return false;
 
-      const storageId = "passkey:" + credentialId;
+      const storageId = passkeyStorageOwner(credentialId, networkId ?? detectNetwork());
       const restored = await loadKeys(storageId, new Uint8Array(32));
       if (!restored) return false;
 

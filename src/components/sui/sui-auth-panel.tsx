@@ -172,7 +172,7 @@ export function SuiAuthPanel({
         setStatus("idle");
         return;
       }
-      await deriveKeysFromPasskeySeed(seed);
+      await deriveKeysFromPasskeySeed(seed, suiNetwork);
       const store = useUTXOpiaStore.getState();
       if (!store.stealthAddressEncoded) {
         throw new Error(store.error ?? "Passkey key derivation did not return a private vault address.");
