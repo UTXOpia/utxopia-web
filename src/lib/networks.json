@@ -221,8 +221,8 @@
           "name": "USD Coin"
         },
         "0x2e290a13f3e33724921b5ce1cc90aa8fb6736abefcda46e72fdaf874a05756a8::dusd::DUSD": {
-          "symbol": "DUSD",
-          "name": "Demo USD"
+          "symbol": "XUSD",
+          "name": "Test USD"
         }
       },
       "eventsPackageId": "0x76912b3abccf12a4bdf5ada3348b3fb4f188f35d498af61a6d56ef9f028c6c39",
