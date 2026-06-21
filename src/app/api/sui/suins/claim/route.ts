@@ -1,17 +1,25 @@
-import { spawnSync } from "node:child_process";
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
+import os from "node:os";
 import { NextRequest, NextResponse } from "next/server";
+import { ALLOWED_METADATA, SuinsClient, SuinsTransaction } from "@mysten/suins";
+import { SuiJsonRpcClient } from "@mysten/sui/jsonRpc";
+import { Transaction } from "@mysten/sui/transactions";
 import { checkRateLimit, getClientIp } from "@/lib/server/rate-limit";
+import { getSuiRelayerKeypair } from "@/lib/server/sui-relayer";
 import type { NetworkId } from "@/lib/network-config";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const UTXOPIA_SUINS_PARENT = "utxopia.sui";
+const UTXOPIA_CONTENT_HASH_PREFIX = "utxopia:v1";
 const LABEL_RE = /^[a-z0-9]{1,63}$/;
 const ADDRESS_RE = /^0x[0-9a-fA-F]{64}$/;
 const HEX_32_RE = /^[0-9a-fA-F]{64}$/;
+const DEFAULT_GAS_BUDGET = 100_000_000n;
+const DEFAULT_SUBNAME_DAYS = 365;
+const CHILD_EXPIRY_BUFFER_MS = 60_000;
 
 type ClaimRequest = {
   handle?: string;
@@ -43,19 +51,49 @@ function jsonError(message: string, status: number, extra?: Record<string, unkno
 }
 
 function getLedgerPath() {
-  return process.env.UTXOPIA_SUINS_CLAIMS_PATH || path.join(process.cwd(), ".data", "sui-suins-claims.json");
+  // Default to a writable dir (Vercel's FS is read-only except os.tmpdir()).
+  // The ledger is a best-effort double-claim hint; the authoritative guard is the
+  // on-chain SuiNS name-record check in mintSubName().
+  return process.env.UTXOPIA_SUINS_CLAIMS_PATH || path.join(os.tmpdir(), "sui-suins-claims.json");
 }
 
 function readLedger(): ClaimLedger {
-  const file = getLedgerPath();
-  if (!existsSync(file)) return { version: 1, claims: [] };
-  return JSON.parse(readFileSync(file, "utf8")) as ClaimLedger;
+  try {
+    const file = getLedgerPath();
+    if (!existsSync(file)) return { version: 1, claims: [] };
+    return JSON.parse(readFileSync(file, "utf8")) as ClaimLedger;
+  } catch {
+    return { version: 1, claims: [] };
+  }
 }
 
 function writeLedger(ledger: ClaimLedger) {
-  const file = getLedgerPath();
-  mkdirSync(path.dirname(file), { recursive: true });
-  writeFileSync(file, JSON.stringify(ledger, null, 2));
+  try {
+    const file = getLedgerPath();
+    mkdirSync(path.dirname(file), { recursive: true });
+    writeFileSync(file, JSON.stringify(ledger, null, 2));
+  } catch {
+    // Best-effort only — serverless FS may be ephemeral/read-only. The on-chain
+    // SuiNS name-record check is the authoritative duplicate guard.
+  }
+}
+
+function suinsNetworkFromAppNetwork(network: string | undefined) {
+  return network === "mainnet" ? "mainnet" : "testnet";
+}
+
+function encodeContentHash(input: { network?: string; viewingPubKey: string; mpk: string }) {
+  return [
+    UTXOPIA_CONTENT_HASH_PREFIX,
+    input.network ?? "sui-testnet",
+    input.viewingPubKey.toLowerCase(),
+    input.mpk.toLowerCase(),
+  ].join(":");
+}
+
+function isMissingSuiNsRecordError(error: unknown) {
+  const message = error instanceof Error ? error.message : String(error);
+  return message.includes("does not exist") || message.includes("not found");
 }
 
 function normalizeName(input: string) {
@@ -71,29 +109,80 @@ function normalizeName(input: string) {
   return `${label}.${UTXOPIA_SUINS_PARENT}`;
 }
 
-function claimName(input: Required<Pick<ClaimRequest, "suiAddress" | "viewingPubKey" | "mpk">> & ClaimRequest) {
-  normalizeName(input.handle ?? input.name ?? "");
+// Sponsored SuiNS subname mint — runs INLINE (no child process) so it works on
+// serverless (Vercel). Signs with the relayer keypair (UTXOPIA_SUI_RELAYER_PRIVATE_KEY),
+// which holds the utxopia.sui parent NFT. Ported from scripts/sui-suins-claim.ts.
+async function claimName(
+  input: Required<Pick<ClaimRequest, "suiAddress" | "viewingPubKey" | "mpk">> & ClaimRequest,
+): Promise<{ normalizedName: string; nftId: string | null; createDigest: string }> {
+  const normalizedName = normalizeName(input.handle ?? input.name ?? "");
   if (!ADDRESS_RE.test(input.suiAddress)) throw new Error("Invalid Sui address.");
   if (!HEX_32_RE.test(input.viewingPubKey)) throw new Error("viewingPubKey must be 32 bytes of hex.");
   if (!HEX_32_RE.test(input.mpk)) throw new Error("mpk must be 32 bytes of hex.");
-  const scriptPath = path.join(process.cwd(), "scripts", "sui-suins-claim.ts");
-  const result = spawnSync(process.env.BUN_BIN || "bun", [scriptPath], {
-    cwd: process.cwd(),
-    input: JSON.stringify(input),
-    encoding: "utf8",
-    timeout: Number(process.env.UTXOPIA_SUINS_CLAIM_TIMEOUT_MS ?? "120000"),
-    env: process.env,
+
+  const parentNftId =
+    process.env.UTXOPIA_SUINS_PARENT_NFT_ID || process.env.NEXT_PUBLIC_UTXOPIA_SUINS_PARENT_NFT_ID;
+  if (!parentNftId) throw new Error("UTXOPIA_SUINS_PARENT_NFT_ID is required for sponsored SuiNS claims.");
+
+  const network = suinsNetworkFromAppNetwork(input.network);
+  const rpcUrl =
+    process.env.UTXOPIA_SUI_RPC_URL ||
+    process.env.NEXT_PUBLIC_SUI_RPC_URL ||
+    "https://fullnode.testnet.sui.io:443";
+  const client = new SuiJsonRpcClient({ url: rpcUrl, network });
+  const suinsClient = new SuinsClient({ client, network });
+
+  const existing = await suinsClient.getNameRecord(normalizedName).catch((error) => {
+    if (isMissingSuiNsRecordError(error)) return null;
+    throw error;
   });
-  if (result.error) throw result.error;
-  if (result.status !== 0) {
-    throw new Error(result.stderr.trim() || result.stdout.trim() || "Could not claim SuiNS name.");
+  if (existing) throw new Error(`${normalizedName} is already claimed.`);
+
+  const parentRecord = await suinsClient.getNameRecord(UTXOPIA_SUINS_PARENT);
+  if (!parentRecord?.expirationTimestampMs) {
+    throw new Error(`${UTXOPIA_SUINS_PARENT} parent expiration was not discoverable.`);
   }
-  const output = JSON.parse(result.stdout) as {
-    normalizedName: string;
-    nftId: string | null;
-    createDigest: string;
-  };
-  return output;
+  const desiredExpirationMs = Date.now() + DEFAULT_SUBNAME_DAYS * 24 * 60 * 60 * 1000;
+  const expirationTimestampMs = Math.min(
+    desiredExpirationMs,
+    Number(parentRecord.expirationTimestampMs) - CHILD_EXPIRY_BUFFER_MS,
+  );
+  if (expirationTimestampMs <= Date.now()) {
+    throw new Error(`${UTXOPIA_SUINS_PARENT} is expired or too close to expiry.`);
+  }
+
+  const signer = getSuiRelayerKeypair();
+  const tx = new Transaction();
+  const suinsTx = new SuinsTransaction(suinsClient, tx);
+  const subNft = suinsTx.createSubName({
+    parentNft: parentNftId,
+    name: normalizedName,
+    expirationTimestampMs,
+    allowChildCreation: false,
+    allowTimeExtension: false,
+  });
+  suinsTx.setTargetAddress({ nft: subNft, address: input.suiAddress, isSubname: true });
+  suinsTx.setUserData({
+    nft: subNft,
+    key: ALLOWED_METADATA.contentHash,
+    value: encodeContentHash(input),
+    isSubname: true,
+  });
+  tx.transferObjects([subNft], signer.toSuiAddress());
+  tx.setSender(signer.toSuiAddress());
+  tx.setGasBudget(BigInt(process.env.UTXOPIA_SUINS_GAS_BUDGET ?? DEFAULT_GAS_BUDGET.toString()));
+
+  const result = await client.signAndExecuteTransaction({
+    signer,
+    transaction: tx,
+    options: { showEffects: true, showObjectChanges: true },
+  });
+  await client.waitForTransaction({ digest: result.digest, options: { showEffects: true } });
+  if (result.effects?.status?.status === "failure") {
+    throw new Error(result.effects.status.error || "SuiNS claim transaction failed");
+  }
+  const record = await suinsClient.getNameRecord(normalizedName).catch(() => null);
+  return { normalizedName, nftId: record?.nftId ?? null, createDigest: result.digest };
 }
 
 export async function POST(request: NextRequest) {
@@ -142,7 +231,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const claimed = claimName(body as Required<Pick<ClaimRequest, "suiAddress" | "viewingPubKey" | "mpk">> & ClaimRequest);
+    const claimed = await claimName(body as Required<Pick<ClaimRequest, "suiAddress" | "viewingPubKey" | "mpk">> & ClaimRequest);
     const claim: ClaimRecord = {
       loginId,
       suiAddress: body.suiAddress,
