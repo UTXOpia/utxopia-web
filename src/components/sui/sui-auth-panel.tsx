@@ -84,13 +84,16 @@ export function SuiAuthPanel({
         }
         if (callback.jwt) {
           setAddress(callback.address);
-          setStatus(callback.address ? "ready" : "idle");
+          // Google/zkLogin authenticates the Sui *address* but cannot derive the private
+          // vault spending key — zkLogin exposes no stable user-held secret (per Sui docs:
+          // ephemeral keys rotate each login; the only stable secret is the salt-server salt).
+          // So don't signal full sign-in; keep the panel open and steer the user to passkey.
+          setStatus("idle");
           setMessage(
             callback.address
-              ? "Signed in with Google."
+              ? "Google connected your Sui address. Use a passkey below to unlock your private vault for sending."
               : "Google sign-in completed, but the salt endpoint is not configured.",
           );
-          if (callback.address) onAuthenticated?.();
         }
       } catch (error) {
         if (!cancelled) {
@@ -203,39 +206,39 @@ export function SuiAuthPanel({
       <div className={cn("space-y-3", !embedded && "mt-4")}>
         <button
           type="button"
-          onClick={startZkLogin}
-          disabled={status === "loading"}
-          className="flex w-full items-center gap-4 rounded-[14px] border border-sui/15 bg-sui/8 p-4 text-left transition-colors hover:border-sui/30 hover:bg-sui/12 disabled:cursor-wait disabled:opacity-60"
-        >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-sui/12 text-sui">
-            <LogIn className="h-5 w-5" />
-          </span>
-          <span className="min-w-0">
-            <span className="block text-sm font-semibold text-sui">
-              {status === "loading" ? "Opening Google..." : "Continue with Google"}
-            </span>
-            <span className="mt-0.5 block text-xs text-gray">zkLogin</span>
-          </span>
-        </button>
-
-        <button
-          type="button"
           onClick={usePasskeyLogin}
           disabled={status === "loading" || passkeyLoading || !passkeySupported}
-          className="flex w-full items-center gap-4 rounded-[14px] border border-gray/15 bg-muted/20 p-4 text-left transition-colors hover:border-sui/25 hover:bg-muted/30 disabled:cursor-not-allowed disabled:opacity-60"
+          className="flex w-full items-center gap-4 rounded-[14px] border border-sui/15 bg-sui/8 p-4 text-left transition-colors hover:border-sui/30 hover:bg-sui/12 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-background/55 text-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-sui/12 text-sui">
             <Fingerprint className="h-5 w-5" />
           </span>
           <span className="min-w-0">
-            <span className="block text-sm font-semibold text-foreground">
+            <span className="block text-sm font-semibold text-sui">
               {passkeyLoading
                 ? "Waiting for passkey..."
                 : hasPasskeyCredential
                   ? "Sign in with passkey"
                   : "Create passkey"}
             </span>
-            <span className="mt-0.5 block text-xs text-gray">Private vault key</span>
+            <span className="mt-0.5 block text-xs text-gray">Unlocks your private vault · recommended</span>
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={startZkLogin}
+          disabled={status === "loading"}
+          className="flex w-full items-center gap-4 rounded-[14px] border border-gray/15 bg-muted/20 p-4 text-left transition-colors hover:border-sui/25 hover:bg-muted/30 disabled:cursor-wait disabled:opacity-60"
+        >
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-background/55 text-foreground">
+            <LogIn className="h-5 w-5" />
+          </span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-foreground">
+              {status === "loading" ? "Opening Google..." : "Continue with Google"}
+            </span>
+            <span className="mt-0.5 block text-xs text-gray">zkLogin · Sui address only (receive)</span>
           </span>
         </button>
 
