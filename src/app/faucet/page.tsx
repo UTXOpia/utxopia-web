@@ -19,7 +19,7 @@ import { cn } from "@/lib/utils";
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
-  const [faucetToken, setFaucetToken] = useState<"BTC" | "USDC" | "USDT" | "SUI">("BTC");
+  const [faucetToken, setFaucetToken] = useState<"BTC" | "USDC" | "USDT" | "SUI" | "XUSD">("BTC");
   const { networkId: activeNetwork } = useChainEnvironment();
 
   useEffect(() => {
@@ -32,14 +32,14 @@ export default function FaucetPage() {
   const isHybrid = !!network && isHybridNetwork(network);
   const chainHref = (href: string) => network ? hrefWithChain(href, network) : href;
   const isSui = chain?.id === "sui";
-  // Solana mints SPL test tokens (custom faucet); Sui just links to the official
-  // testnet faucet. Guard against a token left over from switching chains.
-  const tokenOptions: readonly ("BTC" | "USDC" | "USDT" | "SUI")[] = isSui
-    ? ["BTC", "SUI"]
+  // Sui: SUI/USDC via external faucets + XUSD minted in-app (works on any Sui network,
+  // not just hybrid); BTC only on the regtest hybrid stack. Solana mints SPL test tokens.
+  const tokenOptions: readonly ("BTC" | "USDC" | "USDT" | "SUI" | "XUSD")[] = isSui
+    ? (isHybrid ? ["SUI", "USDC", "XUSD", "BTC"] : ["SUI", "USDC", "XUSD"])
     : ["BTC", "USDC", "USDT"];
-  const activeToken = tokenOptions.includes(faucetToken) ? faucetToken : "BTC";
+  const activeToken = tokenOptions.includes(faucetToken) ? faucetToken : tokenOptions[0];
 
-  if (!mounted) {
+  if (!mounted || !network) {
     return (
       <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
         <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-warning animate-spin" />
@@ -75,7 +75,7 @@ export default function FaucetPage() {
           </div>
           <div>
             <h1 className="text-heading6 text-foreground">
-              {activeToken === "BTC" ? "Regtest zkBTC airdrop" : activeToken === "SUI" ? "Get test SUI" : `Test ${activeToken} airdrop`}
+              {activeToken === "BTC" ? "Regtest zkBTC airdrop" : activeToken === "SUI" ? "Get test SUI" : activeToken === "XUSD" ? "Get test XUSD" : `Test ${activeToken} airdrop`}
             </h1>
             <p className="text-caption text-gray">
               {activeToken === "BTC"
@@ -84,12 +84,14 @@ export default function FaucetPage() {
                   : "Deposit 0.001 regtest BTC into a UTXOpia stealth address."
                 : activeToken === "SUI"
                   ? "Claim test SUI from the official faucet, then deposit it to your private vault."
-                  : `Send test ${activeToken} to your wallet, then deposit it to your private vault.`}
+                  : activeToken === "XUSD"
+                    ? "Mint test XUSD straight to your wallet, then deposit it to go private."
+                    : `Send test ${activeToken} to your wallet, then deposit it to your private vault.`}
             </p>
           </div>
         </div>
 
-        {isHybrid && tokenOptions.length > 1 && (
+        {(isHybrid || isSui) && tokenOptions.length > 1 && (
           <div className="mb-4 flex gap-1.5 rounded-[12px] bg-muted p-1">
             {tokenOptions.map((t) => (
               <button
@@ -108,10 +110,14 @@ export default function FaucetPage() {
           </div>
         )}
 
-        {!isHybrid ? (
-          <NotAvailableNotice network={network ?? "unknown"} />
-        ) : activeToken === "SUI" ? (
+        {activeToken === "SUI" ? (
           <SuiFaucetLink network={network} />
+        ) : activeToken === "XUSD" ? (
+          <SuiXusdFaucetForm network={network} />
+        ) : isSui && activeToken === "USDC" ? (
+          <SuiUsdcFaucetLink network={network} />
+        ) : !isHybrid ? (
+          <NotAvailableNotice network={network ?? "unknown"} />
         ) : activeToken === "USDC" || activeToken === "USDT" ? (
           <SplFaucetForm token={activeToken} network={network} />
         ) : (
@@ -185,6 +191,132 @@ function SuiFaucetLink({ network }: { network: NetworkId }) {
         className="inline-flex items-center gap-1.5 text-caption font-medium text-sui hover:text-sui/80"
       >
         Already have SUI? Deposit it <ExternalLink className="w-3 h-3" />
+      </Link>
+    </div>
+  );
+}
+
+/** Sui USDC faucet = a link to Circle's faucet (real Circle testnet USDC). */
+function SuiUsdcFaucetLink({ network }: { network: NetworkId }) {
+  return (
+    <div className="space-y-4">
+      <div className="rounded-[12px] border border-sui/25 bg-sui/5 p-4 text-body2 text-gray-light">
+        UTXOpia uses real Circle USDC on Sui — claim test USDC from Circle&apos;s faucet
+        (pick <span className="font-mono text-foreground">Sui Testnet</span>), then deposit it to go private.
+      </div>
+      <a href="https://faucet.circle.com/" target="_blank" rel="noreferrer" className="btn-primary w-full">
+        <Droplets className="w-5 h-5" />
+        Open the Circle USDC faucet
+        <ExternalLink className="w-4 h-4" />
+      </a>
+      <Link
+        href={hrefWithChain("/vault/deposit", network)}
+        className="inline-flex items-center gap-1.5 text-caption font-medium text-sui hover:text-sui/80"
+      >
+        Already have USDC? Deposit it <ExternalLink className="w-3 h-3" />
+      </Link>
+    </div>
+  );
+}
+
+/** XUSD faucet: mints the XUSD demo coin straight to the user's Sui wallet in-app
+ *  (relayer-sponsored TreasuryCap mint) — no external faucet. Calls /api/faucet/sui-xusd. */
+function SuiXusdFaucetForm({ network }: { network: NetworkId }) {
+  const [address, setAddress] = useState("");
+  const [amount, setAmount] = useState(100);
+  const [submitting, setSubmitting] = useState(false);
+  const [result, setResult] = useState<{ kind: "ok"; digest: string } | { kind: "err"; message: string } | null>(null);
+
+  useEffect(() => { setResult(null); }, [address, amount]);
+
+  const trimmed = address.trim();
+  const validAddress = /^0x[0-9a-fA-F]{64}$/.test(trimmed);
+  const invalid = trimmed.length > 0 && !validAddress;
+
+  async function handleDrip() {
+    setSubmitting(true);
+    setResult(null);
+    try {
+      const res = await fetch(`/api/faucet/sui-xusd?network=${encodeURIComponent(network)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: trimmed, amount }),
+      });
+      const body = (await res.json()) as { success: boolean; digest?: string; error?: string };
+      if (!res.ok || !body.success) setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
+      else setResult({ kind: "ok", digest: body.digest ?? "" });
+    } catch (e) {
+      setResult({ kind: "err", message: e instanceof Error ? e.message : String(e) });
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  const disabled = !validAddress || submitting || amount <= 0;
+
+  return (
+    <div className="space-y-4">
+      <div>
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">Your Sui wallet address</label>
+        <div className="relative">
+          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
+          <input
+            type="text"
+            value={address}
+            onChange={(e) => setAddress(e.target.value)}
+            placeholder="Paste your Sui wallet (0x…)"
+            spellCheck={false}
+            className={cn(
+              "w-full p-3 pl-10 bg-muted border rounded-[12px]",
+              "text-body2 font-mono text-foreground placeholder:text-gray",
+              "outline-none transition-colors",
+              invalid ? "border-red-500/40 focus:border-red-500/60" : "border-gray/15 focus:border-warning/40",
+            )}
+          />
+        </div>
+        <p className={cn("text-caption mt-1 pl-2", invalid ? "text-red-400" : "text-gray")}>
+          {invalid ? "Enter a valid Sui address (0x + 64 hex)." : "Test XUSD is minted here; then deposit it to go private."}
+        </p>
+      </div>
+
+      <div>
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">Amount (XUSD)</label>
+        <input
+          type="number"
+          min={1}
+          max={1000}
+          step={1}
+          value={amount}
+          onChange={(e) => setAmount(Number(e.target.value) || 0)}
+          className={cn(
+            "w-full p-3 bg-muted border border-gray/15 rounded-[12px]",
+            "text-body2 font-mono text-foreground",
+            "outline-none focus:border-warning/40 transition-colors",
+          )}
+        />
+      </div>
+
+      <button onClick={handleDrip} disabled={disabled} className="btn-primary w-full">
+        <Droplets className="w-5 h-5" />
+        {submitting ? "Minting…" : "Mint test XUSD"}
+      </button>
+
+      {result?.kind === "ok" && (
+        <div className="rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success break-all">
+          Minted {amount} XUSD ✓ — tx {result.digest.slice(0, 12)}…
+        </div>
+      )}
+      {result?.kind === "err" && (
+        <div className="rounded-[10px] border border-red-500/30 bg-red-500/5 p-3 text-caption text-red-400 break-words">
+          {result.message}
+        </div>
+      )}
+
+      <Link
+        href={hrefWithChain("/vault/deposit", network)}
+        className="inline-flex items-center gap-1.5 text-caption font-medium text-sui hover:text-sui/80"
+      >
+        Got XUSD? Deposit it <ExternalLink className="w-3 h-3" />
       </Link>
     </div>
   );
