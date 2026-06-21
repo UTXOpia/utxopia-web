@@ -248,7 +248,7 @@ export function SuiAuthPanel({
           disabled={status === "loading"}
           className="flex w-full items-center gap-4 rounded-[14px] border border-gray/15 bg-muted/20 p-4 text-left transition-colors hover:border-sui/25 hover:bg-muted/30 disabled:cursor-wait disabled:opacity-60"
         >
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[10px] bg-background/55 text-foreground">
+          <span className="flex h-10 w-10 shrink-0 items-center justify-center text-foreground">
             <Wallet className="h-5 w-5" />
           </span>
           <span className="min-w-0">
