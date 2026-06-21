@@ -126,7 +126,7 @@ export async function GET(request: Request) {
       const deposits = transactions.map((tx) => ({
         txSignature: tx.txSignature,
         commitment: String(tx.outputs[0]?.commitment ?? ""),
-        amountSats: Number(tx.outputs[0]?.amount ?? tx.inputs[0]?.amount ?? 0),
+        amountSats: Number(tx.outputs[0]?.amount ?? 0),
         leafIndex: Number(tx.outputs[0]?.leafIndex ?? -1),
         timestamp: tx.timestamp,
         status: tx.status,
@@ -134,7 +134,7 @@ export async function GET(request: Request) {
         tokenSymbol: tx.tokenSymbol,
         tokenId: tx.tokenId,
         ephemeralPub: undefined,
-        grossAmount: Number(tx.inputs[0]?.grossAmount ?? tx.inputs[0]?.amount ?? tx.outputs[0]?.amount ?? 0),
+        grossAmount: Number(tx.inputs[0]?.grossAmount ?? tx.outputs[0]?.amount ?? 0),
         fee: null,
         btcMeta: tx.btcMeta ?? null,
       }));

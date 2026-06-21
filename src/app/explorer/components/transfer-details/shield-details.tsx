@@ -15,8 +15,8 @@ export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: Netwo
   const token = tokenSym ? getTokenBySymbol(tokenSym) ?? SUPPORTED_TOKENS[0] : SUPPORTED_TOKENS[0];
   const isBtc = token.isBtcNative || token.symbol === "BTC" || token.symbol === "zkBTC";
   const isPending = !tx.txSignature || (tx.outputs?.[0]?.leafIndex ?? -1) < 0;
-  const grossAmount = tx.inputs?.[0]?.grossAmount ?? tx.inputs?.[0]?.netAmount ?? tx.inputs?.[0]?.amount ?? tx.outputs?.[0]?.amount ?? 0;
-  const netAmount = tx.inputs?.[0]?.netAmount ?? tx.inputs?.[0]?.amount ?? tx.outputs?.[0]?.amount ?? grossAmount;
+  const grossAmount = tx.inputs?.[0]?.grossAmount ?? tx.inputs?.[0]?.netAmount ?? tx.outputs?.[0]?.amount ?? 0;
+  const netAmount = tx.inputs?.[0]?.netAmount ?? tx.outputs?.[0]?.amount ?? grossAmount;
   const fee = tx.inputs?.[0]?.fee ?? 0;
   const hasFee = fee > 0 && grossAmount !== netAmount;
   const btcMeta = tx.btcMeta;
