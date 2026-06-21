@@ -22,6 +22,7 @@ import {
   Settings,
   X,
 } from "lucide-react";
+import { Ed25519Keypair } from "@mysten/sui/keypairs/ed25519";
 import { SuiAuthPanel } from "@/components/sui/sui-auth-panel";
 import { SuiNsPanel } from "@/components/sui/suins-panel";
 import { isChainHybridNetwork, networkForChain } from "@/lib/chain-registry";
@@ -108,8 +109,19 @@ function SuiVaultCard({ networkId, sui }: { networkId: NetworkId; sui: SuiConfig
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddress);
   const keys = useUTXOpiaStore((s) => s.keys);
   const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
+  const passkeyNameOwnerSecret = useUTXOpiaStore((s) => s.passkeyNameOwnerSecret);
   const identity = stealthAddressEncoded;
-  const suiAccount = suiAuth?.address ?? null;
+  // Passkey users have no wallet/zkLogin Sui address, so the SuiNS claim was disabled.
+  // Derive a deterministic Sui address from the passkey identity to target the name at.
+  const passkeySuiAddress = useMemo(() => {
+    if (!passkeyNameOwnerSecret) return null;
+    try {
+      return Ed25519Keypair.fromSecretKey(passkeyNameOwnerSecret.slice(0, 32)).toSuiAddress();
+    } catch {
+      return null;
+    }
+  }, [passkeyNameOwnerSecret]);
+  const suiAccount = suiAuth?.address ?? passkeySuiAddress;
   const totalUsd = useMemo(
     () => computeSuiVaultUsd(balancesByToken, tokenPrices),
     [balancesByToken, tokenPrices],
