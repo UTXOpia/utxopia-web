@@ -237,8 +237,11 @@ export function usePasskey(): UsePasskeyReturn {
       const rpId = getRpId();
       const storedId = getStoredCredentialId();
 
-      // Use per-user PRF salt when credential ID is known
-      const prfSalt = getPrfSalt(storedId);
+      // MUST match registration's PRF salt or the derived seed differs and the user
+      // lands in a different (empty) vault. Registration has no credential ID yet, so
+      // it uses the base salt — authenticate must use the base salt too, NOT a
+      // per-credential one. (The base string is the frozen domain separator.)
+      const prfSalt = getPrfSalt();
 
       const requestOptions: PublicKeyCredentialRequestOptionsJSON = {
         rpId,
