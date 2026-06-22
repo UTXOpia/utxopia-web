@@ -196,12 +196,36 @@ export function usePasskey(): UsePasskeyReturn {
         optionsJSON: creationOptions,
       });
 
-      // Try PRF first
+      // PRF value is usually NOT returned by create() — browsers return only
+      // prf.enabled there. Reading it at create time made us fall back to a random,
+      // browser-local seed even for PRF-capable authenticators, so the vault never
+      // travelled across devices. Derive the seed from a follow-up assertion with
+      // the SAME base salt instead — that yields the deterministic PRF output that
+      // every device with this synced passkey reproduces. authenticate() uses the
+      // identical get()+base-salt path, so register and sign-in match.
       let seed = tryExtractPrfOutput(credential.clientExtensionResults);
+      const prfEnabled =
+        (credential.clientExtensionResults as { prf?: { enabled?: boolean } }).prf?.enabled === true;
+
+      if (!seed && prfEnabled) {
+        const assertion = await startAuthentication({
+          optionsJSON: {
+            rpId,
+            challenge: randomBase64URL(32),
+            allowCredentials: [{ id: credential.id, type: "public-key" }],
+            userVerification: "required",
+            extensions: {
+              prf: { eval: { first: prfSalt.buffer as ArrayBuffer } },
+            } as Record<string, unknown>,
+          },
+        });
+        seed = tryExtractPrfOutput(assertion.clientExtensionResults);
+      }
 
       if (!seed) {
-        // PRF not supported — generate random seed and encrypt in localStorage.
+        // Truly no PRF — generate random seed and encrypt in localStorage.
         // The passkey serves as a biometric gate; the seed is encrypted at rest.
+        // This path is browser-bound (no cross-device recovery).
         seed = new Uint8Array(32);
         crypto.getRandomValues(seed);
         await storeFallbackSeed(seed, credential.id);
