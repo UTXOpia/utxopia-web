@@ -50,6 +50,7 @@ export function SuiAuthPanel({
   const [session, setSession] = useState<SuiZkLoginSession | null>(null);
   const [status, setStatus] = useState<"idle" | "loading" | "ready" | "error">("idle");
   const [message, setMessage] = useState("");
+  const [accountMethod, setAccountMethod] = useState<"zklogin" | "wallet" | null>(null);
   const { networkId } = useChainEnvironment();
   const suiNetwork = networkForChain(networkId, "sui");
   const {
@@ -64,11 +65,18 @@ export function SuiAuthPanel({
   const deriveKeysFromAuthSignature = useUTXOpiaStore((s) => s.deriveKeysFromAuthSignature);
   const stealthAddressEncoded = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const displayAddress = stealthAddressEncoded ?? address;
+  // The Google (zkLogin) login authenticates the account address but can't unlock
+  // the private vault — that needs the passkey-derived seed. Show the add/unlock
+  // passkey step while the account is connected but the vault is still locked.
+  const vaultUnlocked = Boolean(stealthAddressEncoded);
+  const googleReceiveOnly = accountMethod === "zklogin" && Boolean(address) && !vaultUnlocked;
 
   useEffect(() => {
     const saved = getSuiAuthState();
     if (saved) {
       setAddress(saved.address);
+      if (saved.method === "zklogin") setAccountMethod("zklogin");
+      else if (saved.method === "wallet") setAccountMethod("wallet");
       setStatus("ready");
     }
     setSession(getSuiZkLoginSession());
@@ -84,6 +92,7 @@ export function SuiAuthPanel({
         }
         if (callback.jwt) {
           setAddress(callback.address);
+          if (callback.address) setAccountMethod("zklogin");
           // Google/zkLogin authenticates the Sui *address* but cannot derive the private
           // vault spending key — zkLogin exposes no stable user-held secret (per Sui docs:
           // ephemeral keys rotate each login; the only stable secret is the salt-server salt).
@@ -121,6 +130,7 @@ export function SuiAuthPanel({
       if (!accounts[0]) throw new Error("No Sui account was returned by the wallet.");
       saveSuiAuthState({ method: "wallet", address: accounts[0] });
       setAddress(accounts[0]);
+      setAccountMethod("wallet");
       const signature = await signSuiVaultMessage(wallet);
       if (signature) {
         await deriveKeysFromAuthSignature({
@@ -159,15 +169,21 @@ export function SuiAuthPanel({
   }
 
   async function usePasskeyLogin() {
+    return unlockWithPasskey(false);
+  }
+
+  // forceAuthenticate=true skips the register path and prompts the platform to use
+  // an EXISTING (synced) passkey — needed cross-device, where this browser has no
+  // stored credential id but the user's synced passkey reproduces the same vault.
+  async function unlockWithPasskey(forceAuthenticate: boolean) {
     setStatus("loading");
     setMessage("");
     try {
       if (!passkeySupported) {
         throw new Error("Passkeys are not supported in this browser.");
       }
-      const seed = hasPasskeyCredential
-        ? await authenticatePasskey()
-        : await registerPasskey();
+      const authenticating = forceAuthenticate || hasPasskeyCredential;
+      const seed = authenticating ? await authenticatePasskey() : await registerPasskey();
       if (!seed) {
         setStatus("idle");
         return;
@@ -178,7 +194,7 @@ export function SuiAuthPanel({
         throw new Error(store.error ?? "Passkey key derivation did not return a private vault address.");
       }
       setStatus("ready");
-      setMessage(hasPasskeyCredential ? "Passkey signed in." : "Passkey created.");
+      setMessage(authenticating ? "Vault unlocked." : "Passkey created — vault unlocked.");
       onAuthenticated?.();
     } catch (error) {
       setStatus("error");
@@ -204,6 +220,15 @@ export function SuiAuthPanel({
       )}
 
       <div className={cn("space-y-3", !embedded && "mt-4")}>
+        {googleReceiveOnly && (
+          <div className="flex items-start gap-2 rounded-[12px] border border-sui/25 bg-sui/10 px-3 py-2.5">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-sui" />
+            <p className="text-xs leading-5 text-foreground/85">
+              Signed in with Google — <span className="text-gray">receive-only</span>. Add a passkey below to
+              unlock your private vault and enable spending.
+            </p>
+          </div>
+        )}
         <button
           type="button"
           onClick={usePasskeyLogin}
@@ -224,6 +249,17 @@ export function SuiAuthPanel({
             <span className="mt-0.5 block text-xs text-gray">Unlocks your private vault · recommended</span>
           </span>
         </button>
+
+        {passkeySupported && !hasPasskeyCredential && (
+          <button
+            type="button"
+            onClick={() => unlockWithPasskey(true)}
+            disabled={status === "loading" || passkeyLoading}
+            className="block w-full text-center text-[11px] text-gray transition-colors hover:text-sui disabled:opacity-60"
+          >
+            Already created a passkey on another device? Use it to unlock
+          </button>
+        )}
 
         <button
           type="button"
