@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   AlertCircle,
   CheckCircle2,
@@ -20,6 +20,7 @@ import {
   type SuiNsUtxopiaRecord,
 } from "@/lib/sui/suins";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
+import { getClaimedSuiNsName, setClaimedSuiNsName } from "@/lib/sui/suins-claimed";
 import { getSuiObjectUrl, getSuiTransactionUrl } from "@/lib/chain-links";
 import { cn } from "@/lib/utils";
 
@@ -42,10 +43,57 @@ export function SuiNsPanel({
   const [claimState, setClaimState] = useState<PanelState>("idle");
   const [message, setMessage] = useState("");
   const [digest, setDigest] = useState<string | null>(null);
+  const [ownedRecord, setOwnedRecord] = useState<SuiNsUtxopiaRecord | null>(null);
 
   const normalized = normalizeSuiNsName(name);
   const suinsNetwork = suinsNetworkFromAppNetwork(networkId);
   const canClaim = Boolean(stealthAddress && suiAddress && name.trim());
+  const displayRecord = ownedRecord ?? record;
+
+  // On login, detect a name this Sui address already owns and show it instead of
+  // the claim bar. The claimed name is remembered locally (the subname NFT is
+  // sponsor-held, so there's no owned object to reverse-look-up); a server-ledger
+  // GET is the cross-device fallback. Either way we confirm on-chain that the name
+  // still targets this address before showing it.
+  useEffect(() => {
+    let cancelled = false;
+    async function detectOwned() {
+      if (!suiAddress) {
+        setOwnedRecord(null);
+        return;
+      }
+      let candidate = getClaimedSuiNsName(suiAddress);
+      if (!candidate) {
+        try {
+          const res = await fetch(`/api/sui/suins/claim?loginId=${encodeURIComponent(suiAddress)}`, {
+            cache: "no-store",
+          });
+          const data = (await res.json().catch(() => null)) as
+            | { claimed?: boolean; normalizedName?: string }
+            | null;
+          if (data?.claimed && data.normalizedName) candidate = data.normalizedName;
+        } catch {
+          // ledger unreachable — fall back to "no owned name"
+        }
+      }
+      if (!candidate) {
+        if (!cancelled) setOwnedRecord(null);
+        return;
+      }
+      const rec = await resolveSuiNsUtxopiaRecord(candidate, networkId).catch(() => null);
+      if (cancelled) return;
+      if (rec?.targetAddress && rec.targetAddress.toLowerCase() === suiAddress.toLowerCase()) {
+        setOwnedRecord(rec);
+        setClaimedSuiNsName(suiAddress, rec.normalizedName);
+      } else {
+        setOwnedRecord(null);
+      }
+    }
+    void detectOwned();
+    return () => {
+      cancelled = true;
+    };
+  }, [suiAddress, networkId]);
 
   async function resolveName() {
     if (!name.trim()) {
@@ -105,9 +153,11 @@ export function SuiNsPanel({
       setDigest(result.digest || null);
       setClaimState("success");
       setMessage(`Claimed ${result.normalizedName}.`);
+      if (suiAddress) setClaimedSuiNsName(suiAddress, result.normalizedName);
       try {
         const next = await resolveSuiNsUtxopiaRecord(name, networkId);
         setRecord(next);
+        if (next) setOwnedRecord(next);
       } catch {
         setRecord(null);
       }
@@ -127,7 +177,9 @@ export function SuiNsPanel({
           <div className="min-w-0">
             <h2 className="text-sm font-semibold text-foreground">SuiNS private name</h2>
             <p className="mt-0.5 text-xs leading-5 text-gray/65">
-              Claim one sponsored receive name for this Sui login.
+              {ownedRecord
+                ? "Your sponsored receive name for this Sui login."
+                : "Claim one sponsored receive name for this Sui login."}
             </p>
           </div>
         </div>
@@ -136,6 +188,7 @@ export function SuiNsPanel({
         </span>
       </div>
 
+      {!ownedRecord && (
       <div className="grid gap-2 sm:grid-cols-[1fr_auto_auto]">
         <input
           value={name}
@@ -169,21 +222,27 @@ export function SuiNsPanel({
           Claim free name
         </button>
       </div>
+      )}
 
-      {record && (
+      {displayRecord && (
         <div className="mt-3 rounded-[10px] border border-gray/10 bg-background/35 px-3 py-3">
+          {ownedRecord && (
+            <p className="mb-2 inline-flex items-center gap-1.5 text-[11px] font-semibold text-sui">
+              <CheckCircle2 className="h-3.5 w-3.5" /> Your private name
+            </p>
+          )}
           <div className="mb-2 flex items-center justify-between gap-3">
             <div className="min-w-0">
-              <p className="truncate font-mono text-xs font-semibold text-foreground">{record.normalizedName}</p>
-              {record.targetAddress && (
+              <p className="truncate font-mono text-xs font-semibold text-foreground">{displayRecord.normalizedName}</p>
+              {displayRecord.targetAddress && (
                 <p className="mt-0.5 truncate font-mono text-[11px] text-gray/50">
-                  {record.targetAddress}
+                  {displayRecord.targetAddress}
                 </p>
               )}
             </div>
-            {record.nftId && (
+            {displayRecord.nftId && (
               <a
-                href={getSuiObjectUrl(explorerBaseUrl, record.nftId, networkId)}
+                href={getSuiObjectUrl(explorerBaseUrl, displayRecord.nftId, networkId)}
                 target="_blank"
                 rel="noreferrer"
                 className="inline-flex shrink-0 items-center gap-1 rounded-[8px] border border-gray/10 px-2 py-1 text-[11px] text-gray transition-colors hover:text-sui"
@@ -193,10 +252,10 @@ export function SuiNsPanel({
             )}
           </div>
 
-          {record.metadata ? (
+          {displayRecord.metadata ? (
             <div className="grid gap-2">
-              <MetadataRow label="viewing" value={bytesToHex(record.metadata.viewingPubKey)} />
-              <MetadataRow label="mpk" value={bytesToHex(record.metadata.mpk)} />
+              <MetadataRow label="viewing" value={bytesToHex(displayRecord.metadata.viewingPubKey)} />
+              <MetadataRow label="mpk" value={bytesToHex(displayRecord.metadata.mpk)} />
             </div>
           ) : (
             <p className="text-xs text-gray/55">No UTXOpia receive metadata is attached yet.</p>

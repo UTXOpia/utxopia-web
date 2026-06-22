@@ -185,6 +185,30 @@ async function claimName(
   return { normalizedName, nftId: record?.nftId ?? null, createDigest: result.digest };
 }
 
+export async function GET(request: NextRequest) {
+  // Best-effort reverse lookup: has this login already claimed a name? Backed by
+  // the (possibly ephemeral) ledger, so a miss is not authoritative — the client
+  // also persists the claimed name locally and confirms it on-chain.
+  const url = new URL(request.url);
+  const loginId = (url.searchParams.get("loginId") || url.searchParams.get("suiAddress") || "")
+    .trim()
+    .toLowerCase();
+  if (!loginId) return jsonError("loginId or suiAddress required", 400);
+  const ledger = readLedger();
+  const claim = ledger.claims.find(
+    (c) => c.loginId === loginId || c.suiAddress.toLowerCase() === loginId,
+  );
+  if (!claim) return NextResponse.json({ success: true, claimed: false });
+  return NextResponse.json({
+    success: true,
+    claimed: true,
+    normalizedName: claim.normalizedName,
+    nftId: claim.nftId,
+    network: claim.network,
+    createDigest: claim.createDigest,
+  });
+}
+
 export async function POST(request: NextRequest) {
   const ip = getClientIp(request.headers);
   const rl = checkRateLimit(ip, "sui-suins-claim", { maxTokens: 3, windowMs: 60_000 });
