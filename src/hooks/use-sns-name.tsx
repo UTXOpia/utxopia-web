@@ -33,9 +33,16 @@ const STEALTH_DATA_VERSION = 2;
 
 /** Bonfida fee owner (constant across networks) */
 const BONFIDA_FEE_OWNER = new PublicKey("5D2zKog251d6KPCyFyLMt3KroWwXXPWSgTPyhV22K2gR");
+const SPONSORED_SUBMIT_TIMEOUT_MS = 15_000;
+const SPONSORED_RECOVERY_ATTEMPTS = 8;
+const SPONSORED_RECOVERY_DELAY_MS = 1_000;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
+}
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 interface UseSnsNameReturn {
@@ -159,37 +166,54 @@ export function useSnsName(): UseSnsNameReturn {
 
     const tx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
     const signed = await signAndSubmitSnsTransaction(tx, owner);
-    const submitResp = await fetch(`/api/sns/register${networkQuery}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        action: "submit",
-        signedTransaction: signed.serialize().toString("base64"),
-        lastValidBlockHeight: prepared.lastValidBlockHeight,
-      }),
-    });
-    const submitted = await submitResp.json().catch(() => null) as
-      | { success?: boolean; error?: string; signature?: string }
-      | null;
-    if (!submitResp.ok || !submitted?.success || !submitted.signature) {
-      throw new Error(submitted?.error || "Failed to submit sponsored SNS registration");
+
+    const recoverIfRegistered = async () => {
+      if (!snsConfig) return false;
+      for (let attempt = 0; attempt < SPONSORED_RECOVERY_ATTEMPTS; attempt += 1) {
+        if (attempt > 0) await sleep(SPONSORED_RECOVERY_DELAY_MS);
+        try {
+          if (await isSnsSubdomainRegistered(connection, name, snsConfig)) return true;
+        } catch {
+          // Keep the user-facing path focused on recovery. If every retry fails,
+          // the original submit error below is more actionable.
+        }
+      }
+      return false;
+    };
+
+    const submitController = new AbortController();
+    const submitTimer = window.setTimeout(() => submitController.abort(), SPONSORED_SUBMIT_TIMEOUT_MS);
+    try {
+      const submitResp = await fetch(`/api/sns/register${networkQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: submitController.signal,
+        body: JSON.stringify({
+          action: "submit",
+          signedTransaction: signed.serialize().toString("base64"),
+          lastValidBlockHeight: prepared.lastValidBlockHeight,
+        }),
+      });
+      const submitted = await submitResp.json().catch(() => null) as
+        | { success?: boolean; error?: string; signature?: string }
+        | null;
+      if (!submitResp.ok || !submitted?.success || !submitted.signature) {
+        if (await recoverIfRegistered()) return "success";
+        throw new Error(submitted?.error || "Failed to submit sponsored SNS registration");
+      }
+    } catch (err) {
+      if (await recoverIfRegistered()) return "success";
+      if (err instanceof DOMException && err.name === "AbortError") {
+        throw new Error("Solana registration is still confirming. Please try again in a few seconds.");
+      }
+      throw err;
+    } finally {
+      window.clearTimeout(submitTimer);
     }
-    if (!tx.recentBlockhash || typeof prepared.lastValidBlockHeight !== "number") {
-      throw new Error("Sponsored SNS transaction is missing confirmation metadata");
-    }
-    const confirmation = await connection.confirmTransaction(
-      {
-        signature: submitted.signature,
-        blockhash: tx.recentBlockhash,
-        lastValidBlockHeight: prepared.lastValidBlockHeight,
-      },
-      "confirmed",
-    );
-    if (confirmation.value.err) {
-      throw new Error(`SNS registration failed on-chain: ${JSON.stringify(confirmation.value.err)}`);
-    }
+    // The submit endpoint only returns success after confirmed finality, so
+    // repeating confirmTransaction here adds another full RPC wait on mobile.
     return "success";
-  }, [connection, networkId, signAndSubmitSnsTransaction]);
+  }, [connection, networkId, signAndSubmitSnsTransaction, snsConfig]);
 
   // Resolve an SNS name to stealth keys
   const lookupSnsName = useCallback(async (name: string): Promise<SnsStealthAddress | null> => {

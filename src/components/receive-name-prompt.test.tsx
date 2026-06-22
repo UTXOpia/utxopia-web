@@ -92,6 +92,34 @@ describe("ReceiveNamePrompt", () => {
     expect(screen.getByText("Claim your receive name")).toBeTruthy();
   });
 
+  it("shows progress while registration is pending", async () => {
+    let finishRegistration: ((ok: boolean) => void) | null = null;
+    registerSnsSubdomain = () => new Promise<boolean>((resolve) => {
+      finishRegistration = resolve;
+    });
+    render(<ReceiveNamePrompt />);
+
+    await waitFor(() => {
+      expect(screen.getByText("Claim your receive name")).toBeTruthy();
+    });
+
+    fireEvent.change(screen.getByPlaceholderText("yourname"), {
+      target: { value: "albert" },
+    });
+    await waitFor(() => {
+      expect(screen.getByRole("button", { name: "Register" }).hasAttribute("disabled")).toBe(false);
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Register" }));
+
+    expect(screen.getByRole("status").textContent).toContain("Preparing your receive name");
+    expect(screen.getByRole("button", { name: "Registering" }).hasAttribute("disabled")).toBe(true);
+
+    finishRegistration?.(false);
+    await waitFor(() => {
+      expect(screen.getByText("Could not claim Solana private name.")).toBeTruthy();
+    });
+  });
+
   it("disables registration when the typed name is already registered", async () => {
     isNameRegistered = async () => true;
     render(<ReceiveNamePrompt />);

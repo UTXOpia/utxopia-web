@@ -11,6 +11,13 @@ import { getSnsConfig } from "@/lib/names/sns";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 
 const SEEN_KEY = "utxopia-name-prompt-seen";
+const REGISTER_PROGRESS = [
+  "Preparing your receive name...",
+  "Approve the Solana registration if prompted.",
+  "Submitting registration...",
+  "Confirming on Solana. This can take a moment.",
+  "Still working. Keep this tab open.",
+];
 
 /**
  * First-login nudge to claim a private receive name. Shows once, after the user
@@ -31,6 +38,8 @@ export function ReceiveNamePrompt() {
   const [value, setValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [progressIndex, setProgressIndex] = useState(0);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -50,6 +59,7 @@ export function ReceiveNamePrompt() {
 
   const clean = value.trim().toLowerCase();
   const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
+  const registering = sns.isRegistering || isSubmitting;
 
   useEffect(() => {
     if (!open || !nameValid) {
@@ -75,7 +85,26 @@ export function ReceiveNamePrompt() {
     };
   }, [clean, isNameRegistered, nameValid, open]);
 
-  function dismiss() {
+  useEffect(() => {
+    if (!registering) {
+      setProgressIndex(0);
+      return;
+    }
+
+    const timers = [
+      window.setTimeout(() => setProgressIndex(1), 1200),
+      window.setTimeout(() => setProgressIndex(2), 3500),
+      window.setTimeout(() => setProgressIndex(3), 8000),
+      window.setTimeout(() => setProgressIndex(4), 18000),
+    ];
+
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer));
+    };
+  }, [registering]);
+
+  function dismiss(force = false) {
+    if (registering && !force) return;
     if (typeof window !== "undefined") localStorage.setItem(SEEN_KEY, "true");
     setSeen(true);
     setOpen(false);
@@ -83,8 +112,10 @@ export function ReceiveNamePrompt() {
 
   async function handleRegister() {
     const name = value.trim().toLowerCase();
-    if (!name || !nameValid || availability === "checking" || availability === "taken") return;
+    if (!name || !nameValid || availability === "checking" || availability === "taken" || registering) return;
     setLocalError(null);
+    setIsSubmitting(true);
+    setProgressIndex(0);
     try {
       await claimPrivateReceiveName({
         chain: "solana",
@@ -92,9 +123,11 @@ export function ReceiveNamePrompt() {
         networkId,
         solanaClaim: sns.registerSnsSubdomain,
       });
-      dismiss();
+      dismiss(true);
     } catch (err) {
       setLocalError(err instanceof Error ? err.message : "Could not claim Solana private name.");
+    } finally {
+      setIsSubmitting(false);
     }
   }
 
@@ -105,7 +138,7 @@ export function ReceiveNamePrompt() {
   const availabilityError = nameTaken
     ? `"${clean}.${parentDomain}.sol" is already registered`
     : null;
-  const canRegister = nameValid && !nameTaken && !checkingName && !sns.isRegistering;
+  const canRegister = nameValid && !nameTaken && !checkingName && !registering;
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) dismiss(); }}>
@@ -122,7 +155,8 @@ export function ReceiveNamePrompt() {
         >
           <Dialog.Close asChild>
             <button
-              onClick={dismiss}
+              onClick={() => dismiss()}
+              disabled={registering}
               className="absolute right-4 top-4 p-1.5 rounded-full bg-gray/10 hover:bg-gray/20 text-gray transition-colors"
               aria-label="Close"
             >
@@ -171,10 +205,21 @@ export function ReceiveNamePrompt() {
           {checkingName && (
             <p className="mt-2 px-1 text-[11px] text-gray">Checking availability...</p>
           )}
+          {registering && (
+            <div
+              role="status"
+              aria-live="polite"
+              className="mt-3 flex items-start gap-2 rounded-[10px] border border-privacy/20 bg-privacy/10 px-3 py-2 text-[11px] leading-4 text-gray-light"
+            >
+              <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-privacy" />
+              <span>{REGISTER_PROGRESS[progressIndex]}</span>
+            </div>
+          )}
 
           <div className="flex gap-3 mt-5">
             <button
-              onClick={dismiss}
+              onClick={() => dismiss()}
+              disabled={registering}
               className="flex-1 py-3 px-4 rounded-[12px] text-body2 text-gray hover:text-gray-light bg-gray/10 hover:bg-gray/15 transition-colors"
             >
               Maybe later
@@ -189,8 +234,11 @@ export function ReceiveNamePrompt() {
                 "disabled:opacity-50 disabled:cursor-not-allowed",
               )}
             >
-              {sns.isRegistering ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+              {registering ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  Registering
+                </>
               ) : (
                 <>
                   Register
