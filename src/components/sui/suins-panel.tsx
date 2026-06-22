@@ -14,6 +14,7 @@ import {
 import { bytesToHex, type StealthMetaAddress } from "@utxopia/sdk";
 import type { NetworkId } from "@/lib/network-config";
 import {
+  findOwnedUtxopiaSuiNsName,
   normalizeSuiNsName,
   resolveSuiNsUtxopiaRecord,
   suinsNetworkFromAppNetwork,
@@ -62,7 +63,10 @@ export function SuiNsPanel({
         setOwnedRecord(null);
         return;
       }
-      let candidate = getClaimedSuiNsName(suiAddress);
+      // Primary: on-chain ownership of the subname NFT (durable, cross-device).
+      let candidate = await findOwnedUtxopiaSuiNsName(suiAddress, networkId).catch(() => null);
+      // Fallbacks for names minted before the NFT was transferred to the user.
+      if (!candidate) candidate = getClaimedSuiNsName(suiAddress);
       if (!candidate) {
         try {
           const res = await fetch(`/api/sui/suins/claim?loginId=${encodeURIComponent(suiAddress)}`, {

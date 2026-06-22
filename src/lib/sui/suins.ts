@@ -79,6 +79,41 @@ function isMissingSuiNsRecordError(error: unknown) {
   return message.includes("does not exist") || message.includes("not found");
 }
 
+/**
+ * Reverse lookup: find the *.utxopia.sui subname this Sui address OWNS on-chain.
+ * Durable and cross-device (no localStorage/ledger), and needs no signature — the
+ * claim transfers the SubDomainRegistration NFT to the user, so it shows up in
+ * getOwnedObjects. Returns the normalized name or null.
+ */
+export async function findOwnedUtxopiaSuiNsName(
+  suiAddress: string | null | undefined,
+  network?: NetworkId,
+): Promise<string | null> {
+  if (!suiAddress) return null;
+  const client = getSuiClient(network);
+  const suinsClient = new SuinsClient({ client, network: suinsNetworkFromAppNetwork(network) });
+  const pkg = (suinsClient.config as { packageIdV1?: string }).packageIdV1;
+  if (!pkg) return null;
+  const structType = `${pkg}::subdomain_registration::SubDomainRegistration`;
+  try {
+    const owned = await client.getOwnedObjects({
+      owner: suiAddress,
+      filter: { StructType: structType },
+      options: { showContent: true },
+    });
+    for (const obj of owned.data ?? []) {
+      const content = obj.data?.content as
+        | { fields?: { nft?: { fields?: { domain_name?: string } } } }
+        | undefined;
+      const name = content?.fields?.nft?.fields?.domain_name;
+      if (name && isUtxopiaSuiNsName(name)) return normalizeSuiNsName(name);
+    }
+  } catch {
+    return null;
+  }
+  return null;
+}
+
 export async function resolveSuiNsUtxopiaRecord(
   input: string,
   network?: NetworkId,

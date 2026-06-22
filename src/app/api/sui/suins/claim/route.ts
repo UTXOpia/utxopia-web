@@ -159,7 +159,8 @@ async function claimName(
     name: normalizedName,
     expirationTimestampMs,
     allowChildCreation: false,
-    allowTimeExtension: false,
+    // User owns the subname NFT (transferred below), so allow them to extend it.
+    allowTimeExtension: true,
   });
   suinsTx.setTargetAddress({ nft: subNft, address: input.suiAddress, isSubname: true });
   suinsTx.setUserData({
@@ -168,7 +169,10 @@ async function claimName(
     value: encodeContentHash(input),
     isSubname: true,
   });
-  tx.transferObjects([subNft], signer.toSuiAddress());
+  // Transfer the subname NFT to the user so login detection is a read-only
+  // getOwnedObjects lookup (durable, cross-device, no user signature/gas needed —
+  // works for passkey-only logins). The sponsor still signs + pays for the mint.
+  tx.transferObjects([subNft], input.suiAddress);
   tx.setSender(signer.toSuiAddress());
   tx.setGasBudget(BigInt(process.env.UTXOPIA_SUINS_GAS_BUDGET ?? DEFAULT_GAS_BUDGET.toString()));
 
