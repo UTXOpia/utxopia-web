@@ -172,13 +172,13 @@ function TokenCheckboxDropdown({
               <img
                 src={token.logo}
                 alt={token.label}
-                className={cn("w-5 h-5 rounded-full", !token.live && "opacity-30")}
+                className={cn("w-5 h-5 rounded-full object-cover", !token.live && "opacity-30")}
               />
               {token.secondLogo && (
                 <img
                   src={token.secondLogo}
                   alt=""
-                  className="w-5 h-5 rounded-full ring-1 ring-background"
+                  className="w-5 h-5 rounded-full object-cover ring-1 ring-background"
                 />
               )}
             </span>
@@ -229,7 +229,7 @@ export function FlowIcon({ icon, label, className }: { icon: string | "shield"; 
   if (icon === "shield") {
     return <Shield className={cn("w-4 h-4 text-privacy shrink-0", className)} aria-label={label} />;
   }
-  return <img src={icon} alt={label} className={cn("w-4 h-4 rounded-full", className)} />;
+  return <img src={icon} alt={label} className={cn("w-4 h-4 rounded-full object-cover", className)} />;
 }
 
 export function FlowCell({

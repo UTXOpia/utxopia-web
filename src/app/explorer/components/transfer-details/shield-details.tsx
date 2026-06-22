@@ -47,7 +47,7 @@ export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: Netwo
           </div>
           <div className={cn("px-3 py-2.5 rounded-[8px] space-y-1.5", isBtc ? "bg-btc/4 border border-btc/10" : "bg-green-500/4 border border-green-500/10")}>
             <div className="flex items-center gap-2">
-              <img src={token.logo} alt={token.symbol} className="w-3.5 h-3.5 rounded-full shrink-0" />
+              <img src={token.logo} alt={token.symbol} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
               <span className="text-body2 text-foreground font-mono font-semibold">
                 {grossAmount ? formatTokenAmount(grossAmount, token) : "\u2014"}
               </span>

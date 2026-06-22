@@ -46,7 +46,7 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
           </div>
           <div className="px-3 py-2.5 rounded-[8px] bg-green-500/4 border border-green-500/10 space-y-1.5">
             <div className="flex items-center gap-2">
-              <img src={token.shieldedLogo} alt={token.shieldedSymbol} className="w-3.5 h-3.5 rounded-full shrink-0" />
+              <img src={token.shieldedLogo} alt={token.shieldedSymbol} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
               <span className="text-body2 text-foreground font-mono font-semibold">
                 {grossAmount ? formatTokenAmount(grossAmount, token) : "\u2014"}
               </span>

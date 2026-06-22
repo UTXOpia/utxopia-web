@@ -126,12 +126,12 @@ export function UnshieldAmountDisplay({ grossAmount, netAmount, fee, token }: { 
   return (
     <>
       <div className="flex items-center gap-2 flex-wrap">
-        <img src={token.shieldedLogo} alt={token.shieldedSymbol} className="w-3.5 h-3.5 rounded-full shrink-0" />
+        <img src={token.shieldedLogo} alt={token.shieldedSymbol} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
         <span className="text-body2 text-foreground font-mono font-semibold">
           {fmt(grossAmount)} <span className="text-[10px] text-gray font-normal">{token.shieldedSymbol}</span>
         </span>
         <span className="text-[10px] text-gray/40">&rarr;</span>
-        <img src={outLogo} alt={outSymbol} className="w-3.5 h-3.5 rounded-full shrink-0" />
+        <img src={outLogo} alt={outSymbol} className="w-3.5 h-3.5 rounded-full object-cover shrink-0" />
         <span className="text-body2 text-foreground font-mono font-semibold">
           {fmt(netAmount)} <span className="text-[10px] text-gray font-normal">{outSymbol}</span>
         </span>
