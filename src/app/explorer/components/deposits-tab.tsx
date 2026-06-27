@@ -32,17 +32,21 @@ import { DEPOSIT_STATUS_CONFIG, DEPOSIT_STATUS_ORDER } from "@/lib/deposit-statu
 // Deposit Status
 // =============================================================================
 
-function getDepositStatusDot(status: string | null): { variant: StatusDotVariant; label: string } {
+function getDepositStatusDot(status: string | null, isBtcDeposit: boolean): { variant: StatusDotVariant; label: string } {
   const resolved = status ?? "claimed";
   if (resolved === "ready" || resolved === "claimed") return { variant: "confirmed", label: "Confirmed" };
   if (resolved === "failed") return { variant: "failed", label: "Failed" };
   if (resolved === "stalled") return { variant: "stalled", label: "Retrying" };
   if (resolved === "pending") return { variant: "pending", label: "Pending" };
+  if (!isBtcDeposit && (resolved === "sweeping" || resolved === "sweep_confirming")) {
+    return { variant: "processing", label: "Processing" };
+  }
   return { variant: "processing", label: DEPOSIT_STATUS_CONFIG[resolved]?.label ?? "Processing" };
 }
 
 // Subtext so a slow-but-healthy deposit reads as progress, not failure.
-function getDepositStatusSubtext(d: DepositRecord): string | null {
+function getDepositStatusSubtext(d: DepositRecord, isBtcDeposit: boolean): string | null {
+  if (!isBtcDeposit) return null;
   const status = d.status ?? "";
   const confs = d.btcMeta?.confirmations ?? null;
   if ((status === "confirming" || status === "sweeping") && confs != null) {
@@ -377,12 +381,10 @@ const SHIELD_TYPE_CONFIG: Record<string, ShieldTypeConfig> = {
 
 export function DepositRow({
   deposit,
-  index,
   expanded,
   onToggle,
 }: {
   deposit: DepositRecord;
-  index: number;
   expanded: boolean;
   onToggle: () => void;
 }) {
@@ -409,9 +411,9 @@ export function DepositRow({
       >
         <Td>
           <div className="flex flex-col gap-0.5">
-            <StatusDot {...getDepositStatusDot(d.status)} />
-            {getDepositStatusSubtext(d) && (
-              <span className="text-[11px] text-gray">{getDepositStatusSubtext(d)}</span>
+            <StatusDot {...getDepositStatusDot(d.status, isBtcDeposit)} />
+            {getDepositStatusSubtext(d, isBtcDeposit) && (
+              <span className="text-[11px] text-gray">{getDepositStatusSubtext(d, isBtcDeposit)}</span>
             )}
           </div>
         </Td>
@@ -519,7 +521,6 @@ export function DepositsTab() {
                 <DepositRow
                   key={depositKey}
                   deposit={d}
-                  index={i}
                   expanded={expanded.has(depositKey)}
                   onToggle={() => toggle(depositKey)}
                 />

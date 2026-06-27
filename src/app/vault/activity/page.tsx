@@ -2,6 +2,7 @@
 
 import { useState, useMemo, useEffect, useRef, Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import {
   ArrowUp,
   ArrowDown,
@@ -213,6 +214,14 @@ function ActivityRow({ note }: { note: InboxNote }) {
 
 function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
+  const searchParams = useSearchParams();
+  const forcedRefreshRef = useRef(false);
+
+  useEffect(() => {
+    if (forcedRefreshRef.current || searchParams.get("refresh") !== "inbox") return;
+    forcedRefreshRef.current = true;
+    refresh(undefined, true);
+  }, [refresh, searchParams]);
 
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {

@@ -17,7 +17,7 @@ import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo } from "./helpers";
 import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
-import { SUPPORTED_TOKENS, formatTokenAmount, getTokenBySymbol } from "@/lib/supported-tokens";
+import { SUPPORTED_TOKENS, getTokenBySymbol } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
 import { TransferDetails } from "./transfer-details";
 import { useBtcTipHeight, confirmationsFromHeight } from "@/hooks/use-btc-tip-height";
@@ -38,8 +38,8 @@ export function getTransferKind(tx: TransferTx): "shield" | "transfer" | "unshie
   return "transfer";
 }
 
-/** Map deposit tracker status to StatusDot variant + label */
-function getShieldStatus(status: string): { variant: StatusDotVariant; label: string } {
+/** Map shield status to StatusDot variant + label. Sweep statuses are BTC-only. */
+function getShieldStatus(status: string, hasBtcLifecycle: boolean): { variant: StatusDotVariant; label: string } {
   switch (status) {
     case "detected":
       return { variant: "processing", label: "Detected" };
@@ -47,7 +47,9 @@ function getShieldStatus(status: string): { variant: StatusDotVariant; label: st
       return { variant: "processing", label: "Confirming" };
     case "sweeping":
     case "sweep_confirming":
-      return { variant: "processing", label: "Sweeping" };
+      return hasBtcLifecycle
+        ? { variant: "processing", label: "Sweeping" }
+        : { variant: "processing", label: "Processing" };
     case "verifying":
     case "ready":
       return { variant: "processing", label: "Verifying" };
@@ -92,7 +94,7 @@ export function TransferRow({
       >
         <Td>
           {tx.type === "shield" ? (() => {
-            const s = getShieldStatus(tx.status);
+            const s = getShieldStatus(tx.status, Boolean(tx.btcMeta));
             return <StatusDot variant={s.variant} label={s.label} />;
           })() : (
             <StatusDot

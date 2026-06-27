@@ -187,7 +187,6 @@ export async function GET(request: Request) {
         // Detect deposit type from backend data:
         // - BTC SPV: is_verified=true, has btc_deposit_txid
         // - SPL shield: is_verified=false, no btc_txid, has token_id
-        const isBtc = a.is_verified && !!a.btc_deposit_txid;
         const leafTime = leafTimestamps.get(a.leaf_index) ?? 0;
         const timestamp = a.block_time || leafTime || (tracker?.created_at ?? 0);
 

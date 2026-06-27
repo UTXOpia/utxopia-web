@@ -665,7 +665,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
           )}
           <div className="flex flex-wrap gap-2 pt-2">
             <Link
-              href={hrefWithChain(isSui ? "/vault/activity?result=deposit_btc" : "/vault/activity", network)}
+              href={hrefWithChain(isSui ? "/vault/activity?result=deposit_btc&refresh=inbox" : "/vault/activity?refresh=inbox", network)}
               className="inline-flex items-center justify-center rounded-[8px] border border-success/25 px-3 py-2 text-[11px] font-semibold text-success transition-colors hover:bg-success/10"
             >
               View activity
