@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-react";
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -500,6 +500,8 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
   }, [result]);
 
   const validAddress = /^utxo:[0-9a-fA-F]{192}$/.test(address.trim());
+  const hasAddress = address.trim().length > 0;
+  const addressInvalid = hasAddress && !validAddress;
 
   async function handleDrip() {
     setSubmitting(true);
@@ -605,9 +607,34 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
         </p>
       </div>
 
+      {(!validAddress || cooldownActive) && (
+        <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3 text-caption text-warning">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            {!hasAddress ? (
+              <>
+                Open your vault to create a private receive address, or paste a{" "}
+                <span className="font-mono">utxo:</span> address here.
+                <Link
+                  href={hrefWithChain("/vault", network)}
+                  className="ml-1 font-semibold underline underline-offset-2"
+                >
+                  Open vault
+                </Link>
+              </>
+            ) : addressInvalid ? (
+              <>Enter a valid UTXOpia address: <span className="font-mono">utxo:</span> plus 192 hex characters.</>
+            ) : (
+              <>Cooldown active. Try again in {cooldownLeft}s.</>
+            )}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={handleDrip}
         disabled={disabled}
+        title={!hasAddress ? "Paste or create a UTXOpia receive address first" : undefined}
         className="btn-primary w-full"
       >
         <Droplets className="w-5 h-5" />
