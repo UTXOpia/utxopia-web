@@ -37,13 +37,25 @@ describe("network-config query routing", () => {
     expect(detectNetwork()).toBe("sui-regtest");
   });
 
-  it("marks incomplete Sui testnet as coming soon", () => {
+  it("does not expose testnet4-backed networks as supported", () => {
     const enabled = NETWORK_META.filter((item) => item.enabled).map((item) => item.id);
+    const devnet = NETWORK_META.find((item) => item.id === "devnet");
     const suiTestnet = NETWORK_META.find((item) => item.id === "sui-testnet");
 
     expect(enabled).toContain("sui-regtest");
-    expect(enabled).toContain("sui-testnet");
+    expect(enabled).not.toContain("devnet");
+    expect(enabled).not.toContain("sui-testnet");
+    expect(devnet?.comingSoon).toBe(true);
     expect(suiTestnet?.comingSoon).toBe(true);
+  });
+
+  it("falls back from unsupported testnet4 networks to supported hybrids", () => {
+    expect(detectNetworkFromRequest(new Request("https://app.utxopia.test/?chain=sol&network=devnet"))).toBe(
+      "devnet-regtest",
+    );
+    expect(detectNetworkFromRequest(new Request("https://app.utxopia.test/?chain=sui&network=sui-testnet"))).toBe(
+      "sui-regtest",
+    );
   });
 
   it("enabled live networks have the backend and Bitcoin fields required by user flows", () => {

@@ -163,11 +163,11 @@ export const NETWORK_META: NetworkMeta[] = [
     id: "devnet",
     label: "Devnet",
     tagline: "Solana devnet + Bitcoin testnet4",
-    description: "Live demo stack. Full flow with the production Ika dWallet.",
+    description: "Legacy testnet4 stack. Not supported for alpha while BTC header relay is disabled.",
     caveats: [
-      "Testnet4 blocks take ~10 min. Needs testnet4 BTC from a faucet.",
+      "Unsupported: use Hybrid for Solana devnet + local regtest BTC.",
     ],
-    enabled: true,
+    enabled: false,
     comingSoon: true,
   },
   {
@@ -184,11 +184,11 @@ export const NETWORK_META: NetworkMeta[] = [
     id: "sui-testnet",
     label: "Sui Testnet",
     tagline: "Sui testnet + Bitcoin testnet4",
-    description: "Move-object version of the UTXOpia core proof paths: commitment insert, Sui Groth16 JoinSplit, redemption request, and relayer-gated redemption completion.",
+    description: "Legacy testnet4-backed Sui path. Not supported for alpha.",
     caveats: [
-      "Not yet live — backend URL, BTC pool address, and BTC light-client state still being populated.",
+      "Unsupported: use Sui Hybrid for Sui testnet + local regtest BTC.",
     ],
-    enabled: true,
+    enabled: false,
     comingSoon: true,
   },
   {
@@ -240,6 +240,12 @@ function isKnownNetwork(value: string | null | undefined): value is NetworkId {
   return !!value && value in networks;
 }
 
+function isSupportedNetwork(value: NetworkId | null | undefined): value is NetworkId {
+  if (!value) return false;
+  const meta = NETWORK_META.find((item) => item.id === value);
+  return meta?.enabled === true;
+}
+
 export function networkChain(network: NetworkId): ChainQuery {
   const chain = (Object.keys(CHAIN_ADAPTERS) as ChainId[])
     .find((key) => CHAIN_ADAPTERS[key].networkIds.includes(network));
@@ -249,9 +255,12 @@ export function networkChain(network: NetworkId): ChainQuery {
 function defaultNetworkForChain(chain: ChainQuery): NetworkId {
   const env = process.env.NEXT_PUBLIC_NETWORK || process.env.UTXOPIA_NETWORK;
   const adapter = Object.values(CHAIN_ADAPTERS).find((item) => item.query === chain) ?? CHAIN_ADAPTERS.solana;
-  return env && adapter.networkIds.includes(env as NetworkId)
+  const envNetwork = env && adapter.networkIds.includes(env as NetworkId)
     ? env as NetworkId
-    : adapter.defaultNetwork;
+    : null;
+  if (isSupportedNetwork(envNetwork)) return envNetwork;
+  if (isSupportedNetwork(adapter.hybridNetwork)) return adapter.hybridNetwork;
+  return adapter.defaultNetwork;
 }
 
 function normalizeChainQuery(value: string | null): ChainQuery | null {
@@ -263,7 +272,7 @@ function normalizeChainQuery(value: string | null): ChainQuery | null {
 function networkFromQuery(params: URLSearchParams, preferred?: NetworkId | null): NetworkId | null {
   const chain = normalizeChainQuery(params.get("chain"));
   const exact = params.get("network");
-  if (isKnownNetwork(exact) && (!chain || networkChain(exact) === chain)) {
+  if (isKnownNetwork(exact) && isSupportedNetwork(exact) && (!chain || networkChain(exact) === chain)) {
     return exact;
   }
   if (chain === "sui" || chain === "sol") {
@@ -318,7 +327,7 @@ export function detectNetworkFromRequest(req: Request): NetworkId {
   const cookieNet = parseNetworkCookie(req.headers.get("cookie"));
   const queryNet = networkFromQuery(url.searchParams, cookieNet);
   if (queryNet) return queryNet;
-  if (cookieNet) return cookieNet;
+  if (isSupportedNetwork(cookieNet)) return cookieNet;
   return detectNetwork();
 }
 
@@ -340,8 +349,8 @@ export function detectNetwork(): NetworkId {
     const preferred = stored ?? cookieNet;
     const queryNet = networkFromQuery(params, preferred);
     if (queryNet) return queryNet;
-    if (stored) return stored;
-    if (cookieNet) return cookieNet;
+    if (isSupportedNetwork(stored)) return stored;
+    if (isSupportedNetwork(cookieNet)) return cookieNet;
   }
 
   // 3. env vars (build-time default)
@@ -349,14 +358,14 @@ export function detectNetwork(): NetworkId {
     process.env.NEXT_PUBLIC_NETWORK ||
     process.env.UTXOPIA_NETWORK ||
     "devnet";
-  if (env === "mainnet" || env === "mainnet-beta") return "mainnet";
-  if (env === "testnet") return "testnet";
+  if (env === "mainnet" || env === "mainnet-beta") return isSupportedNetwork("mainnet") ? "mainnet" : "devnet-regtest";
+  if (env === "testnet") return isSupportedNetwork("testnet") ? "testnet" : "devnet-regtest";
   if (env === "sui-regtest") return "sui-regtest";
-  if (env === "sui-testnet") return "sui-testnet";
+  if (env === "sui-testnet") return "sui-regtest";
   if (env === "sui") return defaultNetworkForChain("sui");
   if (env === "localnet") return "localnet";
   if (env === "devnet-regtest" || env === "hybrid") return "devnet-regtest";
-  return "devnet";
+  return "devnet-regtest";
 }
 
 /** Persist the user's network choice. Writes both localStorage (so client-only
