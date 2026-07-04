@@ -7,6 +7,7 @@ import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { recordAlphaDemoDeposit } from "@/lib/alpha-demo-ledger";
 import { cn } from "@/lib/utils";
 
 /**
@@ -541,6 +542,14 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       } else if (!res.ok || !body.ok) {
         setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
       } else {
+        recordAlphaDemoDeposit({
+          networkId: network,
+          stealthAddress: address.trim(),
+          amountSats: body.amountSats ?? amountSats,
+          txid: body.txid ?? "",
+          opReturn: body.opReturn,
+        });
+        void useUTXOpiaStore.getState().refreshInbox(undefined, true);
         setResult({
           kind: "ok",
           txid: body.txid ?? "",

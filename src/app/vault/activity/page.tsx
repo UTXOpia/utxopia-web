@@ -296,6 +296,7 @@ function ActivityContent() {
     authenticate: passkeyAuthenticate,
   } = usePasskey();
   const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
+  const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
 
   const handlePasskeyRegister = async () => {
     const seed = await passkeyRegister();
@@ -341,6 +342,7 @@ function ActivityContent() {
               onPasskeyAuthenticate: handlePasskeyAuthenticate,
               onWalletConnect: () => { setAuthModalOpen(false); setWalletModalVisible(true); },
               onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
+              onViewOnlyLogin: (viewingKey) => { void loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
             }}
           />
         </>

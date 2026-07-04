@@ -7,6 +7,8 @@ import {
   hexToBytes,
   bytesToHex,
   deserializeKeysFromStorage,
+  deriveChainScopedPasskeySeed,
+  passkeyStorageOwner as sdkPasskeyStorageOwner,
   scanUnifiedNotes,
   scanAnnouncementsViewOnly,
   decodeViewOnlyKeys,
@@ -16,13 +18,13 @@ import {
   type ScannedNote,
   type ViewOnlyScannedNote,
 } from "@utxopia/sdk";
-import { sha256 } from "@noble/hashes/sha2.js";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { API_ENDPOINTS } from "@/lib/api/constants";
 import { detectNetwork, networkChain, type NetworkId } from "@/lib/network-config";
 import { ensureChainEnvironment, getChainEnvironment } from "@/lib/chain-environment";
 import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
 import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
+import { getAlphaDemoInboxNotes } from "@/lib/alpha-demo-ledger";
 
 // ============================================================================
 // localStorage Key Persistence (AES-256-GCM encrypted)
@@ -122,24 +124,20 @@ async function loadKeys(walletPubkey: string, solanaPublicKey: Uint8Array): Prom
   }
 }
 
-// Chain-scope a passkey seed so one passkey yields a SEPARATE private identity
-// per chain+network — matching the wallet/zkLogin auth-signature domain separation
-// ({account, chain, network}) and keeping cross-chain activity unlinkable. Without
-// this, the same passkey produced one shared stealth address on every chain.
-function chainScopedPasskeySeed(seed: Uint8Array, networkId: NetworkId): Uint8Array {
-  const domain = new TextEncoder().encode(
-    `utxopia-passkey-chain:v1:${networkChain(networkId)}:${networkId}`,
-  );
-  const buf = new Uint8Array(domain.length + seed.length);
-  buf.set(domain, 0);
-  buf.set(seed, domain.length);
-  return sha256(buf);
-}
-
 // Per-chain storage owner id for a passkey identity (so each chain's encrypted
 // keys live under their own localStorage key).
 function passkeyStorageOwner(credentialId: string, networkId: NetworkId): string {
-  return `passkey:${credentialId}:${networkChain(networkId)}:${networkId}`;
+  return sdkPasskeyStorageOwner(credentialId, {
+    chain: networkChain(networkId),
+    network: networkId,
+  });
+}
+
+function chainScopedPasskeySeed(seed: Uint8Array, networkId: NetworkId): Uint8Array {
+  return deriveChainScopedPasskeySeed(seed, {
+    chain: networkChain(networkId),
+    network: networkId,
+  });
 }
 
 function removeKeys(walletPubkey: string): void {
@@ -627,6 +625,12 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
             tokenSymbol: note.tokenSymbol ?? "zkBTC",
           };
         });
+
+        const alphaDemoNotes = getAlphaDemoInboxNotes(env.networkId, get().stealthAddressEncoded);
+        const existingIds = new Set(notes.map((note) => note.id));
+        for (const note of alphaDemoNotes) {
+          if (!existingIds.has(note.id)) notes.push(note);
+        }
 
         notes.sort((a, b) => b.createdAt - a.createdAt);
 

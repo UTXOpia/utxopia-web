@@ -20,6 +20,14 @@ import {
   isSnsSubdomainRegistered,
   resolveSnsNameForNetwork,
 } from "@/lib/names/sns";
+import {
+  ALPHA_DEMO_NAME_EVENT,
+  alphaDemoLedgerEnabled,
+  getAlphaDemoName,
+  getAlphaDemoNameForOwner,
+  recordAlphaDemoName,
+  resolveAlphaDemoName,
+} from "@/lib/alpha-demo-ledger";
 
 /** SPL Name Service instruction discriminators */
 const SNS_DISC_UPDATE = 1;
@@ -217,14 +225,17 @@ export function useSnsName(): UseSnsNameReturn {
 
   // Resolve an SNS name to stealth keys
   const lookupSnsName = useCallback(async (name: string): Promise<SnsStealthAddress | null> => {
+    const alphaName = resolveAlphaDemoName(networkId, name);
+    if (alphaName) return alphaName as SnsStealthAddress;
     if (!snsConfig) return null;
     return resolveSnsNameForNetwork(connection, name, snsConfig);
-  }, [connection, snsConfig]);
+  }, [connection, networkId, snsConfig]);
 
   const isNameRegistered = useCallback(async (name: string): Promise<boolean> => {
+    if (getAlphaDemoName(networkId, name)) return true;
     if (!snsConfig) return false;
     return isSnsSubdomainRegistered(connection, name, snsConfig);
-  }, [connection, snsConfig]);
+  }, [connection, networkId, snsConfig]);
 
   // Check if connected wallet owns a *.utxopia.sol subdomain
   const lookupMySnsName = useCallback(async () => {
@@ -237,6 +248,18 @@ export function useSnsName(): UseSnsNameReturn {
     setError(null);
 
     try {
+      const alphaName = getAlphaDemoNameForOwner(networkId, owner.toBase58());
+      if (alphaName) {
+        setHasRegisteredSnsName(true);
+        setRegisteredSubdomainKey(null);
+        setRegisteredSnsName(alphaName.handle);
+        setComplianceFlags(0);
+        setAuditorPubkeyState(null);
+        setNeedsUpdate(false);
+        setIsLoading(false);
+        return;
+      }
+
       // Get parent domain key for memcmp filter
       const parentPubkey = deriveParentDomainKey(snsConfig);
 
@@ -302,7 +325,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, connection, snsConfig]);
+  }, [activeAuthority?.publicKey, stealthAddress, connection, networkId, snsConfig]);
 
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)
@@ -348,6 +371,23 @@ export function useSnsName(): UseSnsNameReturn {
       stealthData[0] = STEALTH_DATA_VERSION;
       stealthData.set(stealthAddress.viewingPubKey, 1);
       stealthData.set(stealthAddress.mpk, 33);
+
+      if (alphaDemoLedgerEnabled(networkId)) {
+        recordAlphaDemoName({
+          networkId,
+          handle: subdomain,
+          ownerAddress: owner.toBase58(),
+          viewingPubKey: stealthAddress.viewingPubKey,
+          mpk: stealthAddress.mpk,
+        });
+        setRegisteredSnsName(subdomain);
+        setHasRegisteredSnsName(true);
+        setRegisteredSubdomainKey(null);
+        setNeedsUpdate(false);
+        setComplianceFlags(0);
+        setAuditorPubkeyState(null);
+        return true;
+      }
 
       const sponsoredResult = await registerViaRelayer(subdomain, owner, stealthData);
       if (sponsoredResult === "success") {
@@ -536,7 +576,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, isNameRegistered, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
+  }, [connection, isNameRegistered, networkId, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
@@ -808,6 +848,17 @@ export function useSnsName(): UseSnsNameReturn {
       setAuditorPubkeyState(null);
     }
   }, [activeAuthority?.publicKey, stealthAddress, lookupMySnsName]);
+
+  useEffect(() => {
+    if (!alphaDemoLedgerEnabled(networkId)) return;
+    const refresh = () => {
+      if (activeAuthority?.publicKey && stealthAddress) {
+        void lookupMySnsName();
+      }
+    };
+    window.addEventListener(ALPHA_DEMO_NAME_EVENT, refresh);
+    return () => window.removeEventListener(ALPHA_DEMO_NAME_EVENT, refresh);
+  }, [activeAuthority?.publicKey, lookupMySnsName, networkId, stealthAddress]);
 
   return {
     registeredSnsName,
