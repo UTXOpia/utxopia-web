@@ -24,12 +24,14 @@ describe("resolveRegtestRouteConfig", () => {
     expect(result.config.bitcoin.network).toBe("regtest");
   });
 
-  it("rejects non-regtest networks", () => {
-    expect(resolveRegtestRouteConfig(
+  it("falls back from unsupported testnet4 networks to Solana regtest", () => {
+    const result = resolveRegtestRouteConfig(
       new Request("https://app.utxopia.test/api/regtest/mine?network=devnet") as any,
-    )).toEqual({
-      error: "regtest helper only available on regtest; current network=devnet, btcNetwork=testnet4",
-      status: 400,
-    });
+    );
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.network).toBe("devnet-regtest");
+    expect(result.config.bitcoin.network).toBe("regtest");
   });
 });

@@ -11,7 +11,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { Transaction } from "@mysten/sui/transactions";
 import { UTXOpiaClient } from "@utxopia/sdk";
-import { fetchSuiEnabledTokens, type SuiSupportedToken } from "@utxopia/sdk/sui";
+import { deriveSuiTokenId, fetchSuiEnabledTokens, type SuiSupportedToken } from "@utxopia/sdk/sui";
 import { networkForChain } from "@/lib/chain-registry";
 import { getNetworkConfig } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -33,6 +33,7 @@ export interface SuiShieldToken extends SuiSupportedToken {
 }
 
 export type SuiShieldStatus = "idle" | "processing" | "done" | "error";
+const TOKEN_REGISTRY_TIMEOUT_MS = 3_000;
 
 interface SuiCoinObject {
   coinObjectId: string;
@@ -44,6 +45,51 @@ interface SuiCoinObject {
 function coinTypeTail(coinType: string): string {
   const parts = coinType.split("::");
   return parts[parts.length - 1] ?? coinType;
+}
+
+function inferDemoDecimals(symbol: string): number {
+  const normalized = symbol.toUpperCase();
+  if (normalized === "SUI") return 9;
+  if (normalized === "USDC" || normalized === "USDT" || normalized === "XUSD" || normalized === "DUSD") {
+    return 6;
+  }
+  return 9;
+}
+
+function fallbackTokensFromConfig(cfg: ReturnType<typeof getNetworkConfig>): SuiShieldToken[] {
+  const meta = cfg.sui?.coinMetadata ?? {};
+  return Object.entries(meta).map(([coinType, m]) => {
+    const decimals = inferDemoDecimals(m.symbol);
+    return {
+      coinType,
+      tokenId: deriveSuiTokenId(coinType),
+      decimals,
+      enabled: true,
+      minDeposit: 1n,
+      maxDeposit: 1_000_000_000_000_000n,
+      depositCap: 1_000_000_000_000_000n,
+      totalShielded: 0n,
+      feeBps: 0,
+      symbol: m.symbol,
+      name: m.name,
+      logo: m.logo,
+      walletBalance: 0n,
+    };
+  });
+}
+
+async function withTimeout<T>(promise: Promise<T>, ms: number, label: string): Promise<T> {
+  let timeout: ReturnType<typeof setTimeout> | null = null;
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timeout = setTimeout(() => reject(new Error(`${label} timed out`)), ms);
+      }),
+    ]);
+  } finally {
+    if (timeout) clearTimeout(timeout);
+  }
 }
 
 /** Pick the largest single coin object that covers `amount`, else the largest. */
@@ -72,11 +118,19 @@ export function useSuiShield(walletAddress: string | null) {
       const cfg = getNetworkConfig(suiNetwork, { applyEnvOverrides: false });
       const registryId = cfg.sui?.tokenRegistry?.objectId;
       if (!registryId) {
-        setTokens([]);
+        setTokens(fallbackTokensFromConfig(cfg));
         return;
       }
       const client = getSuiClient(suiNetwork);
-      const registered = await fetchSuiEnabledTokens(client, registryId);
+      const registered = await withTimeout(
+        fetchSuiEnabledTokens(client, registryId),
+        TOKEN_REGISTRY_TIMEOUT_MS,
+        "Sui token registry",
+      );
+      if (registered.length === 0) {
+        setTokens(fallbackTokensFromConfig(cfg));
+        return;
+      }
       const meta = cfg.sui?.coinMetadata ?? {};
 
       const enriched = await Promise.all(
@@ -106,6 +160,7 @@ export function useSuiShield(walletAddress: string | null) {
       setTokens(enriched);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to load Sui tokens");
+      setTokens((current) => (current.length > 0 ? current : fallbackTokensFromConfig(getNetworkConfig(suiNetwork, { applyEnvOverrides: false }))));
     } finally {
       setLoadingTokens(false);
     }

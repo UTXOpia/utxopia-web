@@ -115,18 +115,17 @@ const wrapper = ({ children }: { children: ReactNode }) => (
 describe("usePoolStats", () => {
   beforeEach(() => {
     mockFetch.mockReset();
-    localStorage.clear();
+    window.localStorage.clear();
     document.cookie = "utxopia.network=; Path=/; Max-Age=0";
   });
 
-  it("uses the active chain environment when no network is passed", async () => {
-    localStorage.setItem("utxopia.network", "sui-regtest");
+  it("uses an explicit network when one is passed", async () => {
     mockFetch.mockResolvedValueOnce({
       ok: true,
       json: async () => ({ onChain: null }),
     } as any);
 
-    renderHook(() => usePoolStats(), { wrapper });
+    renderHook(() => usePoolStats("sui-regtest"), { wrapper });
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();

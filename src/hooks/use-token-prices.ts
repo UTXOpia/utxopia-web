@@ -4,6 +4,7 @@ const PRICES_API_URL = "/api/token-prices";
 
 const CACHE_KEY = "token_prices_cache";
 const STALE_MS = 60_000; // refresh every 60s
+const FETCH_TIMEOUT_MS = 3_000;
 
 export interface TokenPrices {
   btc: number | null;
@@ -39,8 +40,10 @@ function writeCache(prices: TokenPrices) {
 }
 
 async function fetchPricesFromApi(): Promise<TokenPrices | null> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
   try {
-    const res = await fetch(PRICES_API_URL);
+    const res = await fetch(PRICES_API_URL, { signal: controller.signal });
     if (!res.ok) return null;
     const data = await res.json();
     return {
@@ -53,6 +56,8 @@ async function fetchPricesFromApi(): Promise<TokenPrices | null> {
   } catch (err) {
     console.error("[TokenPrices] API fetch error:", err);
     return null;
+  } finally {
+    clearTimeout(timeout);
   }
 }
 

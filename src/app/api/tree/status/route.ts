@@ -8,7 +8,7 @@ export async function GET(req: NextRequest) {
   const network = detectNetworkFromRequest(req);
 
   if (networkChain(network) === "sui") {
-    const { fetchSuiExplorerStats } = await import("@/lib/sui/explorer");
+    const { fetchSuiExplorerStats } = await import("@/lib/sui/explorer-stats");
     const stats = await fetchSuiExplorerStats(
       getNetworkConfig(network, { applyEnvOverrides: false }),
     );

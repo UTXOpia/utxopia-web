@@ -18,3 +18,7 @@ mock.module("@/lib/sui/explorer", () => ({
   fetchSuiExplorerStats,
   fetchSuiMerkleProof,
 }));
+
+mock.module("@/lib/sui/explorer-stats", () => ({
+  fetchSuiExplorerStats,
+}));

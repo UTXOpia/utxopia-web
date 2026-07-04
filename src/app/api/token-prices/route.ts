@@ -5,6 +5,13 @@ const BINANCE_URL = `https://api.binance.com/api/v3/ticker/price?symbols=${JSON.
 
 const COINGECKO_IDS = "bitcoin,solana,sui,usd-coin,tether";
 const COINGECKO_URL = `https://api.coingecko.com/api/v3/simple/price?ids=${COINGECKO_IDS}&vs_currencies=usd`;
+const PRICE_TIMEOUT_MS = 2_500;
+
+function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
 
 export async function GET() {
   const binance = await fetchFromBinance();
@@ -29,7 +36,10 @@ export async function GET() {
 
 async function fetchFromBinance() {
   try {
-    const res = await fetch(BINANCE_URL, { next: { revalidate: 60 } });
+    const res = await fetch(BINANCE_URL, {
+      next: { revalidate: 60 },
+      signal: timeoutSignal(PRICE_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const data: { symbol: string; price: string }[] = await res.json();
     const map = Object.fromEntries(data.map((d) => [d.symbol, parseFloat(d.price)]));
@@ -48,7 +58,10 @@ async function fetchFromBinance() {
 
 async function fetchFromCoinGecko() {
   try {
-    const res = await fetch(COINGECKO_URL, { next: { revalidate: 60 } });
+    const res = await fetch(COINGECKO_URL, {
+      next: { revalidate: 60 },
+      signal: timeoutSignal(PRICE_TIMEOUT_MS),
+    });
     if (!res.ok) return null;
     const data = await res.json();
     return {

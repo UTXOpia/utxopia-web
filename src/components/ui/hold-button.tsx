@@ -54,6 +54,7 @@ export function HoldButton({
   title,
   disabled = false,
 }: HoldButtonProps) {
+  const fastConfirm = process.env.NEXT_PUBLIC_DEV_SIGNER === "1";
   const [holding, setHolding] = useState(false);
   const [progress, setProgress] = useState(0);
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -94,6 +95,7 @@ export function HoldButton({
   return (
     <button
       type="button"
+      onClick={fastConfirm ? onComplete : undefined}
       onMouseDown={startHold}
       onMouseUp={cancelHold}
       onMouseLeave={cancelHold}
@@ -101,7 +103,7 @@ export function HoldButton({
       onTouchEnd={cancelHold}
       onTouchCancel={cancelHold}
       disabled={disabled}
-      title={title}
+      title={title ?? (fastConfirm ? "Dev signer: click to confirm" : undefined)}
       className={cn(
         "relative overflow-hidden select-none transition-colors duration-200",
         "px-4 py-3 rounded-lg text-sm font-medium",

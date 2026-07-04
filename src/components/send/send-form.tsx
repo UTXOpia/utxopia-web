@@ -294,7 +294,15 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const amountValid = recipientValid && amountNum > 0;
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
-  const requiresBackup = !!ctx.keys && ctx.inboxDepositCount > 0 && !hasBackupForKeys(ctx.keys);
+  const alphaDemoTxEnabled =
+    process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
+    !chainEnv.networkId.includes("mainnet") &&
+    process.env.NEXT_PUBLIC_DISABLE_ALPHA_DEMO_TX !== "1";
+  const requiresBackup =
+    !!ctx.keys &&
+    ctx.inboxDepositCount > 0 &&
+    !alphaDemoTxEnabled &&
+    !hasBackupForKeys(ctx.keys);
   const isSubmittingInFlight =
     submitting ||
     (submitter.status !== "idle" &&
@@ -403,6 +411,24 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           );
       }
 
+      if (alphaDemoTxEnabled) {
+        await new Promise((resolve) => setTimeout(resolve, 700));
+        try {
+          const count = parseInt(localStorage.getItem("utxopia-tx-count") || "0", 10);
+          localStorage.setItem("utxopia-tx-count", String(count + 1));
+        } catch {}
+        scheduleInboxRefresh();
+        dispatch({ type: "reset" });
+        const result =
+          intent.kind === "redeem"
+            ? "cashout_btc"
+            : intent.kind === "unshield"
+              ? "cashout_wallet"
+              : "private_send";
+        router.push(hrefWithChain(`/vault/activity?result=${result}`, chainEnv.networkId));
+        return;
+      }
+
       if (noteSelector.selectedNotes.length === 0) {
         throw new Error(
           "No shielded notes available to cover this amount.",
@@ -468,6 +494,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     state.amount,
     effectiveToken,
     lookupSnsName,
+    alphaDemoTxEnabled,
     chainEnv.networkId,
     noteSelector.selectedNotes,
     relayerMeta,

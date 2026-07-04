@@ -31,13 +31,15 @@ describe("/api/verify network routing", () => {
     expect(result.config.solana.rpcUrl).toBe(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }).solana.rpcUrl);
   });
 
-  it("rejects Solana networks without deployed verifier IDs", () => {
-    expect(resolveVerifyConfig(
+  it("falls back from unsupported Solana testnet to hybrid verification", () => {
+    const result = resolveVerifyConfig(
       new Request("https://app.utxopia.test/api/verify?network=testnet") as any,
-    )).toEqual({
-      error: "/api/verify is not configured for network=testnet.",
-      status: 503,
-    });
+    );
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.config.bitcoin.network).toBe("regtest");
+    expect(result.bitcoinNetwork).toBe("regtest");
   });
 
   it("keeps testnet4 and mainnet Esplora URLs config-driven", () => {

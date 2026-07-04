@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { LockKeyhole, Loader2, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSuiShield, type SuiShieldToken } from "@/hooks/sui/use-sui-shield";
@@ -19,7 +20,7 @@ import { useElapsedSeconds } from "@/hooks/use-elapsed-seconds";
 import { useUTXOpiaStore } from "@/stores";
 import { networkForChain } from "@/lib/chain-registry";
 import { makeSuiExplorerLinks } from "@/lib/chain-links";
-import { getNetworkConfig } from "@/lib/network-config";
+import { getNetworkConfig, hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { detectRecipient } from "./recipient-detect";
 import { resolveSuiNsUtxopiaRecord } from "@/lib/sui/suins";
@@ -279,6 +280,16 @@ export function SuiSendFlow({ className }: SuiSendFlowProps) {
     !(detection.type === "stealth_suins" && nameState.kind !== "found") &&
     !!keys &&
     !!selfMeta;
+  const amountRawPreview =
+    amount && Number.isFinite(parseFloat(amount))
+      ? BigInt(Math.max(0, Math.floor(parseFloat(amount) * 10 ** decimals)))
+      : 0n;
+  const disabledHint =
+    !keys || !selfMeta
+      ? "Open your vault to create or unlock your private wallet."
+      : selected && amountRawPreview > shieldedBalance
+        ? `No private ${selected.symbol} available yet. Use the faucet, then deposit it to your vault.`
+        : null;
 
   return (
     <div className={cn("space-y-5", className)}>
@@ -351,6 +362,25 @@ export function SuiSendFlow({ className }: SuiSendFlowProps) {
         provingElapsed={provingElapsed}
         onClick={handleSubmit}
       />
+
+      {disabledHint && !busy && (
+        <div className="rounded-[10px] border border-sui/15 bg-sui/5 p-3 text-caption text-gray-light">
+          <p>{disabledHint}</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            <Link href={hrefWithChain("/vault", networkId)} className="text-sui hover:text-sui/80">
+              Open vault
+            </Link>
+            <span className="text-gray/40">/</span>
+            <Link href={hrefWithChain("/faucet", networkId)} className="text-sui hover:text-sui/80">
+              Faucet
+            </Link>
+            <span className="text-gray/40">/</span>
+            <Link href={hrefWithChain("/vault/deposit", networkId)} className="text-sui hover:text-sui/80">
+              Deposit
+            </Link>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

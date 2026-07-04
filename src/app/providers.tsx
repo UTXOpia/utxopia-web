@@ -7,7 +7,6 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Toaster } from "sonner";
 import { StoreHydration } from "@/stores";
 import { ChainThemeSync } from "@/components/chain-theme-sync";
-import { HELIUS_RPC_DEVNET } from "@/lib/helius";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
 import { UtxopiaPrivyProvider } from "@/lib/privy-solana";
@@ -24,7 +23,7 @@ import "@solana/wallet-adapter-react-ui/styles.css";
 export function Providers({ children }: { children: React.ReactNode }) {
   // Helius primary (supports getProgramAccounts), fallback to configured RPC
   const endpoint = useMemo(
-    () => HELIUS_RPC_DEVNET || getSolanaRpcUrl(),
+    () => getSolanaRpcUrl(),
     []
   );
 

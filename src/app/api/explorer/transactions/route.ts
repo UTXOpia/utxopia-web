@@ -9,32 +9,8 @@
 import { NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/api/constants";
 import { detectNetworkFromRequest, getNetworkConfig, networkChain } from "@/lib/network-config";
+import { ExplorerTx, normalizeExplorerTransaction } from "./helpers";
 export const dynamic = "force-dynamic";
-
-interface ExplorerTx {
-  txSignature?: string;
-  type?: string;
-  tokenId?: string;
-  tokenSymbol?: string | null;
-  timestamp?: number;
-  status?: string;
-  btcMeta?: unknown;
-  [key: string]: unknown;
-}
-
-function hasBtcMeta(tx: ExplorerTx): boolean {
-  if (!tx.btcMeta || typeof tx.btcMeta !== "object") return false;
-  return Object.values(tx.btcMeta as Record<string, unknown>).some((value) => value != null);
-}
-
-export function normalizeExplorerTransaction(tx: ExplorerTx): ExplorerTx {
-  if (tx.type !== "shield") return tx;
-  if (hasBtcMeta(tx)) return tx;
-  if (tx.status === "sweeping" || tx.status === "sweep_confirming") {
-    return { ...tx, status: tx.txSignature ? "confirmed" : "processing" };
-  }
-  return tx;
-}
 
 async function fetchFromBackendUnified(backendUrl: string): Promise<ExplorerTx[] | null> {
   try {

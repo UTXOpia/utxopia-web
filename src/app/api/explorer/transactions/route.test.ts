@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { normalizeExplorerTransaction } from "./route";
+import { normalizeExplorerTransaction } from "./helpers";
 
 describe("normalizeExplorerTransaction", () => {
   it("removes BTC sweep wording from confirmed non-BTC shield rows", () => {

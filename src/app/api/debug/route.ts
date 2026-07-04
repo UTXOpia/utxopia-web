@@ -20,6 +20,14 @@ import { getBackendUrl } from "@/lib/api/constants";
 
 export const dynamic = "force-dynamic";
 
+const DEBUG_PROBE_TIMEOUT_MS = 5_000;
+
+function timeoutSignal(ms: number): AbortSignal {
+  const controller = new AbortController();
+  setTimeout(() => controller.abort(), ms);
+  return controller.signal;
+}
+
 export async function GET(request: Request) {
   const cookieHeader = request.headers.get("cookie");
   const parsed = parseNetworkCookie(cookieHeader);
@@ -36,6 +44,7 @@ export async function GET(request: Request) {
   try {
     const r = await fetch(`${backendUrl}/api/tree/status`, {
       cache: "no-store",
+      signal: timeoutSignal(DEBUG_PROBE_TIMEOUT_MS),
     });
     probeStatus = r.status;
     probeBody = (await r.text()).slice(0, 200);

@@ -15,6 +15,17 @@ import { detectNetworkFromRequest } from "@/lib/network-config";
 const BACKEND_API_KEY =
   process.env.BACKEND_API_KEY || "";
 
+const DEFAULT_BACKEND_PROXY_TIMEOUT_MS = 8_000;
+
+function backendProxyTimeoutMs(): number {
+  const raw = Number(process.env.BACKEND_PROXY_TIMEOUT_MS);
+  return Number.isFinite(raw) && raw > 0 ? raw : DEFAULT_BACKEND_PROXY_TIMEOUT_MS;
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === "AbortError";
+}
+
 export async function proxyToBackend(
   request: Request,
   backendPath: string,
@@ -37,11 +48,14 @@ export async function proxyToBackend(
       : undefined;
 
   let res: Response;
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), backendProxyTimeoutMs());
   try {
     res = await fetch(target, {
       method: request.method,
       headers,
       body,
+      signal: controller.signal,
     });
   } catch (err) {
     // Backend unreachable (DNS/TLS/connect failure). Surface as 502 with a
@@ -53,20 +67,23 @@ export async function proxyToBackend(
     } catch {
       // ignore
     }
+    const timedOut = isAbortError(err);
     return new Response(
       JSON.stringify({
         success: false,
-        error: "Backend unreachable",
-        code: "BACKEND_UNREACHABLE",
+        error: timedOut ? "Backend request timed out" : "Backend unreachable",
+        code: timedOut ? "BACKEND_TIMEOUT" : "BACKEND_UNREACHABLE",
         network,
         backendHost: host,
         message,
       }),
       {
-        status: 502,
+        status: timedOut ? 504 : 502,
         headers: { "Content-Type": "application/json" },
       },
     );
+  } finally {
+    clearTimeout(timeout);
   }
 
   return new Response(await res.text(), {
