@@ -52,11 +52,11 @@ export default function FaucetPage() {
     <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
       <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
         <Link
-          href={chainHref("/")}
+          href={chainHref("/vault")}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
-          Back home
+          Back
         </Link>
         <span className="text-caption text-gray font-mono">
           {network ?? "?"}
