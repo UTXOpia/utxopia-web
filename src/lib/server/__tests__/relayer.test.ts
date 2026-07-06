@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, afterEach } from "bun:test";
+import { describe, it, expect, afterEach } from "bun:test";
+import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { getRelayerKeypair } from "../relayer";
 
 describe("getRelayerKeypair", () => {
@@ -10,6 +13,7 @@ describe("getRelayerKeypair", () => {
 
   it("returns null when RELAYER_KEYPAIR is not set", () => {
     delete process.env.RELAYER_KEYPAIR;
+    delete process.env.RELAYER_KEYPAIR_PATH;
     expect(getRelayerKeypair()).toBeNull();
   });
 
@@ -20,6 +24,7 @@ describe("getRelayerKeypair", () => {
 
   it("returns null when RELAYER_KEYPAIR is empty string", () => {
     process.env.RELAYER_KEYPAIR = "";
+    delete process.env.RELAYER_KEYPAIR_PATH;
     expect(getRelayerKeypair()).toBeNull();
   });
 
@@ -33,5 +38,31 @@ describe("getRelayerKeypair", () => {
     const result = getRelayerKeypair();
     expect(result).not.toBeNull();
     expect(result!.publicKey.toBase58()).toBe(testKeypair.publicKey.toBase58());
+  });
+
+  it("returns Keypair when RELAYER_KEYPAIR_PATH points to a keypair file", () => {
+    const { Keypair } = require("@solana/web3.js");
+    const testKeypair = Keypair.generate();
+    const dir = mkdtempSync(join(tmpdir(), "utxopia-relayer-"));
+    const keypairPath = join(dir, "id.json");
+    writeFileSync(keypairPath, JSON.stringify(Array.from(testKeypair.secretKey)));
+
+    try {
+      delete process.env.RELAYER_KEYPAIR;
+      process.env.RELAYER_KEYPAIR_PATH = keypairPath;
+
+      const result = getRelayerKeypair();
+      expect(result).not.toBeNull();
+      expect(result!.publicKey.toBase58()).toBe(testKeypair.publicKey.toBase58());
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("returns null when RELAYER_KEYPAIR_PATH cannot be read", () => {
+    delete process.env.RELAYER_KEYPAIR;
+    process.env.RELAYER_KEYPAIR_PATH = "/tmp/utxopia-missing-keypair.json";
+
+    expect(getRelayerKeypair()).toBeNull();
   });
 });
