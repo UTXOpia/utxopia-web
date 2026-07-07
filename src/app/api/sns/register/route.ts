@@ -169,6 +169,20 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
       parentPubkey,
       relayer.publicKey,
     );
+    const updateData = new Uint8Array(1 + 4 + 4 + stealthData.length);
+    updateData[0] = SNS_DISC_UPDATE;
+    new DataView(updateData.buffer).setUint32(1, 0, true);
+    new DataView(updateData.buffer).setUint32(5, stealthData.length, true);
+    updateData.set(stealthData, 9);
+
+    const updateIx = new TransactionInstruction({
+      programId: nameServiceProgramId,
+      keys: [
+        { pubkey: subdomainKey, isSigner: false, isWritable: true },
+        { pubkey: relayer.publicKey, isSigner: true, isWritable: false },
+      ],
+      data: Buffer.from(updateData),
+    });
     const transferIx = transferInstruction(
       nameServiceProgramId,
       subdomainKey,
@@ -179,26 +193,13 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
       relayer.publicKey,
     );
 
-    const updateData = new Uint8Array(1 + 4 + 4 + stealthData.length);
-    updateData[0] = SNS_DISC_UPDATE;
-    new DataView(updateData.buffer).setUint32(1, 0, true);
-    new DataView(updateData.buffer).setUint32(5, stealthData.length, true);
-    updateData.set(stealthData, 9);
-
     const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
     const tx = new Transaction({ feePayer: relayer.publicKey, blockhash, lastValidBlockHeight })
       .add(
         createIx,
         createReverseIx,
+        updateIx,
         transferIx,
-        new TransactionInstruction({
-          programId: nameServiceProgramId,
-          keys: [
-            { pubkey: subdomainKey, isSigner: false, isWritable: true },
-            { pubkey: owner, isSigner: true, isWritable: false },
-          ],
-          data: Buffer.from(updateData),
-        }),
       );
     tx.partialSign(relayer);
 
@@ -207,6 +208,7 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
       relayer: relayer.publicKey.toBase58(),
       lastValidBlockHeight,
       mode: "parent-owner-direct",
+      requiresOwnerSignature: false,
     };
   }
   const feeAccount = new PublicKey(registrarAcct.data.slice(34, 66));
@@ -302,6 +304,7 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
     transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
     relayer: relayer.publicKey.toBase58(),
     lastValidBlockHeight,
+    requiresOwnerSignature: true,
   };
 }
 

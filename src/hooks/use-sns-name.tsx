@@ -8,7 +8,6 @@ import { useUTXOpiaKeys } from "./use-utxopia";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana";
 import { usePasskeySolanaAuthority } from "@/hooks/use-passkey-solana-authority";
 import {
-  parseSnsStealthData,
   type SnsStealthAddress,
 } from "@utxopia/sdk";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -44,6 +43,24 @@ const BONFIDA_FEE_OWNER = new PublicKey("5D2zKog251d6KPCyFyLMt3KroWwXXPWSgTPyhV2
 const SPONSORED_SUBMIT_TIMEOUT_MS = 15_000;
 const SPONSORED_RECOVERY_ATTEMPTS = 8;
 const SPONSORED_RECOVERY_DELAY_MS = 1_000;
+
+type OwnedSnsRecord = {
+  name: string | null;
+  fullDomain: string | null;
+  subdomainKey: string;
+  version: number;
+  viewingPubKey: string;
+  mpk: string;
+  complianceFlags: number;
+  auditorPubkey: string | null;
+};
+
+type OwnedSnsResponse = {
+  success?: boolean;
+  registered?: boolean;
+  records?: OwnedSnsRecord[];
+  error?: string;
+};
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -164,6 +181,7 @@ export function useSnsName(): UseSnsNameReturn {
           error?: string;
           relayerUnavailable?: boolean;
           lastValidBlockHeight?: number;
+          requiresOwnerSignature?: boolean;
         }
       | null;
 
@@ -173,7 +191,9 @@ export function useSnsName(): UseSnsNameReturn {
     }
 
     const tx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
-    const signed = await signAndSubmitSnsTransaction(tx, owner);
+    const signed = prepared.requiresOwnerSignature === false
+      ? tx
+      : await signAndSubmitSnsTransaction(tx, owner);
 
     const recoverIfRegistered = async () => {
       if (!snsConfig) return false;
@@ -260,59 +280,33 @@ export function useSnsName(): UseSnsNameReturn {
         return;
       }
 
-      // Get parent domain key for memcmp filter
-      const parentPubkey = deriveParentDomainKey(snsConfig);
-
-      // Search for name accounts owned by this wallet under the parent domain
-      const nameServiceProgramId = new PublicKey(snsConfig.nameServiceProgramId);
-      const accounts = await connection.getProgramAccounts(nameServiceProgramId, {
-        filters: [
-          // parent field at offset 0 = parentKey (32 bytes)
-          { memcmp: { offset: 0, bytes: parentPubkey.toBase58() } },
-          // owner field at offset 32 = wallet pubkey (32 bytes)
-          { memcmp: { offset: 32, bytes: owner.toBase58() } },
-        ],
+      const networkQuery = new URLSearchParams({
+        network: networkId,
+        owner: owner.toBase58(),
       });
+      const response = await fetch(`/api/sns/owner?${networkQuery.toString()}`);
+      const body = await response.json().catch(() => null) as OwnedSnsResponse | null;
+      if (!response.ok || !body?.success) {
+        throw new Error(body?.error || "Failed to check SNS owner records");
+      }
 
-      // Check each matched account for stealth data
-      for (const account of accounts) {
-        const parsed = parseSnsStealthData(new Uint8Array(account.account.data));
-        if (parsed) {
-          const ourViewing = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
-          const foundViewing = Buffer.from(parsed.viewingPubKey).toString("hex");
+      const ourViewing = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
+      const record = (body.records ?? []).find((item) => item.viewingPubKey === ourViewing);
+      if (record) {
+        setHasRegisteredSnsName(true);
+        setRegisteredSubdomainKey(new PublicKey(record.subdomainKey));
+        setComplianceFlags(record.complianceFlags ?? 0);
+        setAuditorPubkeyState(record.auditorPubkey ? new PublicKey(record.auditorPubkey).toBytes() : null);
 
-          if (ourViewing === foundViewing) {
-            setHasRegisteredSnsName(true);
-            setRegisteredSubdomainKey(account.pubkey);
-            setComplianceFlags(parsed.complianceFlags ?? 0);
-            setAuditorPubkeyState(parsed.auditorPubkey ?? null);
-
-            // Detect if record needs update (old version, zero mpk, or stale mpk)
-            const mpkAllZero = parsed.mpk.every((b: number) => b === 0);
-            const isOldVersion = parsed.version !== STEALTH_DATA_VERSION;
-            const ourMpk = Buffer.from(stealthAddress.mpk).toString("hex");
-            const foundMpk = Buffer.from(parsed.mpk).toString("hex");
-            const mpkMismatch = ourMpk !== foundMpk;
-            setNeedsUpdate(mpkAllZero || isOldVersion || mpkMismatch);
-
-            // Reverse lookup: derive reverse key from subdomain account key
-            const reverseKey = deriveReverseLookupKey(account.pubkey, parentPubkey, snsConfig);
-            const reverseAcct = await connection.getAccountInfo(reverseKey);
-            if (reverseAcct && reverseAcct.data.length > 100) {
-              // SNS header(96) + borsh string(u32 len + bytes)
-              const nameLen = reverseAcct.data.readUInt32LE(96);
-              const rawName = reverseAcct.data.slice(100, 100 + nameLen).toString().replace(/\0/g, "").trim();
-              if (rawName) {
-                setRegisteredSnsName(rawName);
-                setIsLoading(false);
-                return;
-              }
-            }
-            setRegisteredSnsName(null);
-            setIsLoading(false);
-            return;
-          }
-        }
+        const foundMpk = Uint8Array.from(Buffer.from(record.mpk, "hex"));
+        const mpkAllZero = foundMpk.every((b: number) => b === 0);
+        const isOldVersion = record.version !== STEALTH_DATA_VERSION;
+        const ourMpk = Buffer.from(stealthAddress.mpk).toString("hex");
+        const mpkMismatch = ourMpk !== record.mpk;
+        setNeedsUpdate(mpkAllZero || isOldVersion || mpkMismatch);
+        setRegisteredSnsName(record.name);
+        setIsLoading(false);
+        return;
       }
 
       setHasRegisteredSnsName(false);
@@ -325,7 +319,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, connection, networkId, snsConfig]);
+  }, [activeAuthority?.publicKey, stealthAddress, networkId, snsConfig]);
 
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)

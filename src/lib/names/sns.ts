@@ -109,3 +109,14 @@ export async function isSnsSubdomainRegistered(
   const subdomainKey = deriveSubdomainKey(subdomain, parentKey, sns);
   return Boolean(await connection.getAccountInfo(subdomainKey));
 }
+
+export function parseSnsReverseName(data: Uint8Array | Buffer): string | null {
+  if (data.length <= SNS_HEADER_SIZE + 4) return null;
+  const bytes = Buffer.from(data);
+  const nameLen = bytes.readUInt32LE(SNS_HEADER_SIZE);
+  const start = SNS_HEADER_SIZE + 4;
+  const end = start + nameLen;
+  if (nameLen <= 0 || end > bytes.length) return null;
+  const name = bytes.subarray(start, end).toString("utf8").replace(/\0/g, "").trim();
+  return name || null;
+}

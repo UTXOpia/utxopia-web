@@ -6,6 +6,7 @@ import {
   deriveSubdomainKey,
   getSnsConfig,
   isSnsSubdomainRegistered,
+  parseSnsReverseName,
   resolveSnsNameForNetwork,
   SNS_HEADER_SIZE,
 } from "./sns";
@@ -66,5 +67,15 @@ describe("network-scoped SNS helpers", () => {
     );
 
     expect(registered).toBe(true);
+  });
+
+  it("parses SNS reverse lookup names from account data", () => {
+    const name = "\0alice";
+    const data = Buffer.alloc(SNS_HEADER_SIZE + 4 + name.length);
+    data.writeUInt32LE(name.length, SNS_HEADER_SIZE);
+    data.write(name, SNS_HEADER_SIZE + 4, "utf8");
+
+    expect(parseSnsReverseName(data)).toBe("alice");
+    expect(parseSnsReverseName(new Uint8Array(SNS_HEADER_SIZE))).toBeNull();
   });
 });

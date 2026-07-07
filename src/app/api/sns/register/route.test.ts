@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { Connection, Keypair } from "@solana/web3.js";
+import { Connection, Keypair, Transaction } from "@solana/web3.js";
 import { POST } from "./route";
 
 const originalEnv = { ...process.env };
@@ -58,9 +58,15 @@ describe("/api/sns/register", () => {
     expect(response.status).toBe(200);
     expect(body.success).toBe(true);
     expect(body.mode).toBe("parent-owner-direct");
+    expect(body.requiresOwnerSignature).toBe(false);
     expect(body.relayer).toBe(relayer.publicKey.toBase58());
     expect(typeof body.transaction).toBe("string");
     expect(body.transaction.length).toBeGreaterThan(100);
+    const tx = Transaction.from(Buffer.from(body.transaction, "base64"));
+    expect(tx.signatures.every((item) => item.signature !== null)).toBe(true);
+    expect(tx.signatures.map((item) => item.publicKey.toBase58())).toEqual([
+      relayer.publicKey.toBase58(),
+    ]);
     expect(getAccountInfoCalls).toBe(3);
   });
 
