@@ -31,7 +31,7 @@ const useProverWorker =
   process.env.NEXT_PUBLIC_DISABLE_PROVER_WORKER !== "1";
 const useServerProver =
   typeof window !== "undefined" &&
-  process.env.NEXT_PUBLIC_DISABLE_SERVER_PROVER !== "1";
+  process.env.NEXT_PUBLIC_ENABLE_SERVER_PROVER === "1";
 
 type WorkerResponse =
   | { id: number; ok: true; type: "init" }
