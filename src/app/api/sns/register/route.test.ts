@@ -70,6 +70,99 @@ describe("/api/sns/register", () => {
     expect(getAccountInfoCalls).toBe(3);
   });
 
+  it("prepares a sponsored owner-signed update when the subdomain already belongs to the owner", async () => {
+    const relayer = Keypair.generate();
+    const owner = Keypair.generate();
+    process.env.RELAYER_KEYPAIR = JSON.stringify(Array.from(relayer.secretKey));
+
+    const parentData = Buffer.alloc(96);
+    relayer.publicKey.toBuffer().copy(parentData, 32);
+    const subdomainData = Buffer.alloc(96 + 65);
+    owner.publicKey.toBuffer().copy(subdomainData, 32);
+    let getAccountInfoCalls = 0;
+
+    Connection.prototype.getAccountInfo = async function () {
+      getAccountInfoCalls += 1;
+      if (getAccountInfoCalls === 1) return { data: parentData } as never;
+      if (getAccountInfoCalls === 2) return { data: subdomainData } as never;
+      return null;
+    };
+    Connection.prototype.getLatestBlockhash = async function () {
+      return {
+        blockhash: "11111111111111111111111111111111",
+        lastValidBlockHeight: 456,
+      };
+    };
+
+    const response = await POST(new Request("https://app.utxopia.test/api/sns/register?network=devnet-regtest", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": `203.0.113.${Math.floor(Math.random() * 200) + 1}`,
+      },
+      body: JSON.stringify({
+        action: "prepare",
+        name: "alice",
+        owner: owner.publicKey.toBase58(),
+        stealthData: `02${"33".repeat(32)}${"44".repeat(32)}`,
+      }),
+    }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.mode).toBe("owner-update");
+    expect(body.requiresOwnerSignature).toBe(true);
+    const tx = Transaction.from(Buffer.from(body.transaction, "base64"));
+    expect(tx.signatures.map((item) => item.publicKey.toBase58())).toEqual([
+      relayer.publicKey.toBase58(),
+      owner.publicKey.toBase58(),
+    ]);
+    expect(tx.signatures[0].signature).not.toBeNull();
+    expect(tx.signatures[1].signature).toBeNull();
+    expect(getAccountInfoCalls).toBe(2);
+  });
+
+  it("returns a clear error when the subdomain belongs to another owner", async () => {
+    const relayer = Keypair.generate();
+    const owner = Keypair.generate();
+    const otherOwner = Keypair.generate();
+    process.env.RELAYER_KEYPAIR = JSON.stringify(Array.from(relayer.secretKey));
+
+    const parentData = Buffer.alloc(96);
+    relayer.publicKey.toBuffer().copy(parentData, 32);
+    const subdomainData = Buffer.alloc(96 + 65);
+    otherOwner.publicKey.toBuffer().copy(subdomainData, 32);
+    let getAccountInfoCalls = 0;
+
+    Connection.prototype.getAccountInfo = async function () {
+      getAccountInfoCalls += 1;
+      if (getAccountInfoCalls === 1) return { data: parentData } as never;
+      if (getAccountInfoCalls === 2) return { data: subdomainData } as never;
+      return null;
+    };
+
+    const response = await POST(new Request("https://app.utxopia.test/api/sns/register?network=devnet-regtest", {
+      method: "POST",
+      headers: {
+        "content-type": "application/json",
+        "x-forwarded-for": `203.0.113.${Math.floor(Math.random() * 200) + 1}`,
+      },
+      body: JSON.stringify({
+        action: "prepare",
+        name: "alice",
+        owner: owner.publicKey.toBase58(),
+        stealthData: `02${"33".repeat(32)}${"44".repeat(32)}`,
+      }),
+    }) as never);
+    const body = await response.json();
+
+    expect(response.status).toBe(400);
+    expect(body.success).toBe(false);
+    expect(body.error).toContain("already registered to another owner");
+    expect(getAccountInfoCalls).toBe(2);
+  });
+
   it("returns a clear error when no relayer key is configured", async () => {
     delete process.env.RELAYER_KEYPAIR;
 

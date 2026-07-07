@@ -117,8 +117,55 @@ async function buildSponsoredRegistrationTx(input: PrepareRequest, networkConfig
     [hashedSub, new Uint8Array(32), parentPubkey.toBytes()],
     nameServiceProgramId,
   );
-  if (await connection.getAccountInfo(subdomainKey)) {
-    throw new Error(`"${subdomain}.${sns.parentDomain}.sol" is already registered`);
+  const existingSubdomainInfo = await connection.getAccountInfo(subdomainKey);
+  if (existingSubdomainInfo) {
+    const currentOwner = new PublicKey(existingSubdomainInfo.data.slice(32, 64));
+    if (!currentOwner.equals(owner)) {
+      throw new Error(`"${subdomain}.${sns.parentDomain}.sol" is already registered to another owner`);
+    }
+
+    const ixs: TransactionInstruction[] = [];
+    if (existingSubdomainInfo.data.length < SNS_HEADER_SIZE + STEALTH_DATA_SIZE) {
+      const reallocData = new Uint8Array(5);
+      reallocData[0] = SNS_DISC_REALLOC;
+      new DataView(reallocData.buffer).setUint32(1, STEALTH_DATA_SIZE, true);
+      ixs.push(new TransactionInstruction({
+        programId: nameServiceProgramId,
+        keys: [
+          { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+          { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
+          { pubkey: subdomainKey, isSigner: false, isWritable: true },
+          { pubkey: owner, isSigner: true, isWritable: false },
+        ],
+        data: Buffer.from(reallocData),
+      }));
+    }
+
+    const updateData = new Uint8Array(1 + 4 + 4 + stealthData.length);
+    updateData[0] = SNS_DISC_UPDATE;
+    new DataView(updateData.buffer).setUint32(1, 0, true);
+    new DataView(updateData.buffer).setUint32(5, stealthData.length, true);
+    updateData.set(stealthData, 9);
+    ixs.push(new TransactionInstruction({
+      programId: nameServiceProgramId,
+      keys: [
+        { pubkey: subdomainKey, isSigner: false, isWritable: true },
+        { pubkey: owner, isSigner: true, isWritable: false },
+      ],
+      data: Buffer.from(updateData),
+    }));
+
+    const { blockhash, lastValidBlockHeight } = await connection.getLatestBlockhash();
+    const tx = new Transaction({ feePayer: relayer.publicKey, blockhash, lastValidBlockHeight }).add(...ixs);
+    tx.partialSign(relayer);
+
+    return {
+      transaction: tx.serialize({ requireAllSignatures: false }).toString("base64"),
+      relayer: relayer.publicKey.toBase58(),
+      lastValidBlockHeight,
+      mode: "owner-update",
+      requiresOwnerSignature: true,
+    };
   }
 
   const reverseHash = sha256Hash(new TextEncoder().encode(HASH_PREFIX + subdomainKey.toBase58()));
