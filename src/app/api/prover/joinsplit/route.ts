@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
       return Response.json({ success: false, error: "Missing proofInputs" }, { status: 400 });
     }
 
+    (globalThis as { snarkjs?: unknown }).snarkjs ??= await import("snarkjs");
+
     const {
       initProver,
       generateJoinSplitProof,
