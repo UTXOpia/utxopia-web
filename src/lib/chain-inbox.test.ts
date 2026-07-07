@@ -1,8 +1,17 @@
-import { describe, expect, it } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { getNetworkConfig } from "./network-config";
 import {
   auditorCiphertextFromSuiFields,
+  fetchInboxSource,
   parseAuditorCiphertextSegments,
 } from "./chain-inbox";
+
+const mockFetch = mock(() => Promise.resolve({} as Response));
+global.fetch = mockFetch as any;
+
+beforeEach(() => {
+  mockFetch.mockReset();
+});
 
 // ---------------------------------------------------------------------------
 // parseAuditorCiphertextSegments — Solana disc-0x16 sol_log_data parser
@@ -48,6 +57,38 @@ describe("parseAuditorCiphertextSegments", () => {
     const segs = makeSegments();
     segs[2] = new Uint8Array(111);
     expect(parseAuditorCiphertextSegments(segs)).toBeNull();
+  });
+});
+
+describe("fetchInboxSource", () => {
+  it("routes Solana announcements through the active network proxy", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        success: true,
+        announcements: [{
+          leaf_index: 7,
+          announcement_type: 0,
+          ephemeral_pub: "11".repeat(32),
+          encrypted_amount: "22".repeat(8),
+          commitment: "33".repeat(32),
+          token_id: "44".repeat(32),
+          block_time: 1_700_000_000,
+          slot: 123,
+        }],
+      }),
+    } as any);
+
+    const source = await fetchInboxSource({
+      networkId: "devnet-regtest",
+      config: getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }),
+    });
+
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/announcements?network=devnet-regtest");
+    expect(source.announcements).toHaveLength(1);
+    expect(source.announcements[0].leafIndex).toBe(7);
+    expect(source.announcements[0].blockTime).toBe(1_700_000_000);
+    expect(source.announcements[0].slot).toBe(123);
   });
 });
 

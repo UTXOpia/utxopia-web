@@ -3,6 +3,7 @@
 import { toHex64 } from "@/lib/utils/hex";
 import {
   EventClient,
+  parseAnnouncementsFromHex,
   UTXOpiaClient,
   type OnChainStealthAnnouncement,
 } from "@utxopia/sdk";
@@ -61,7 +62,41 @@ export async function fetchInboxSource(env: ChainEnvironment): Promise<InboxSour
   if (chain.id === "sui") {
     return fetchSuiInboxEvents(env.config);
   }
-  return { announcements: await getEventClient().fetchAll() };
+  return { announcements: await fetchSolanaInboxAnnouncements(env.networkId) };
+}
+
+interface BackendAnnouncementRow {
+  leaf_index: number;
+  announcement_type: number;
+  ephemeral_pub: string;
+  encrypted_amount: string;
+  commitment: string;
+  token_id?: string | null;
+  block_time?: number | null;
+  slot?: number | null;
+}
+
+async function fetchSolanaInboxAnnouncements(networkId: string): Promise<OnChainStealthAnnouncement[]> {
+  try {
+    const resp = await fetch(`/api/announcements?network=${encodeURIComponent(networkId)}`, {
+      cache: "no-store",
+    });
+    if (!resp.ok) throw new Error(`announcements proxy ${resp.status}`);
+
+    const data = await resp.json() as { success?: boolean; announcements?: BackendAnnouncementRow[] };
+    if (data.success === false) throw new Error("announcements proxy returned success=false");
+
+    const rows = data.announcements ?? [];
+    const parsed = parseAnnouncementsFromHex(rows);
+    return parsed.map((ann, index) => ({
+      ...ann,
+      blockTime: rows[index]?.block_time ?? 0,
+      slot: rows[index]?.slot ?? undefined,
+    }));
+  } catch (err) {
+    console.warn("[ChainInbox] backend announcements fetch failed; falling back to EventClient:", err);
+    return getEventClient().fetchAll();
+  }
 }
 
 export function getTokenScanTargets(
