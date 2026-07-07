@@ -15,7 +15,6 @@ import {
   proofToBytes,
   setCircuitPath,
 } from "@utxopia/sdk/prover/web";
-import { detectNetwork } from "@/lib/network-config";
 
 // Point circuit artifacts at R2 CDN when configured
 const cdnUrl = process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL;
@@ -29,34 +28,11 @@ const useProverWorker =
   typeof window !== "undefined" &&
   typeof Worker !== "undefined" &&
   process.env.NEXT_PUBLIC_DISABLE_PROVER_WORKER !== "1";
-const useServerProver =
-  typeof window !== "undefined" &&
-  process.env.NEXT_PUBLIC_ENABLE_SERVER_PROVER === "1";
 
 type WorkerResponse =
   | { id: number; ok: true; type: "init" }
   | { id: number; ok: true; type: "generate"; proof: ProofData; proofBytes: Uint8Array }
   | { id: number; ok: false; error: string };
-
-function encodeBigints(value: unknown): unknown {
-  if (typeof value === "bigint") return { __bigint: value.toString() };
-  if (Array.isArray(value)) return value.map(encodeBigints);
-  if (value && typeof value === "object") {
-    return Object.fromEntries(
-      Object.entries(value).map(([key, item]) => [key, encodeBigints(item)]),
-    );
-  }
-  return value;
-}
-
-function hexToBytes(hex: string): Uint8Array {
-  const clean = hex.startsWith("0x") ? hex.slice(2) : hex;
-  const out = new Uint8Array(clean.length / 2);
-  for (let i = 0; i < out.length; i += 1) {
-    out[i] = Number.parseInt(clean.slice(i * 2, i * 2 + 2), 16);
-  }
-  return out;
-}
 
 /**
  * Load snarkjs's official browser build (build/browser.esm.js, resolved by
@@ -162,26 +138,6 @@ export function useProver(): ProverState {
       setError(null);
       setProgress("Generating privacy proof...");
       try {
-        if (useServerProver && !detectNetwork().includes("mainnet")) {
-          const network = detectNetwork();
-          const res = await fetch(`/api/prover/joinsplit?network=${encodeURIComponent(network)}`, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ proofInputs: encodeBigints(inputs) }),
-          });
-          const body = (await res.json()) as {
-            success: boolean;
-            proof?: ProofData;
-            proofBytesHex?: string;
-            error?: string;
-          };
-          if (!res.ok || !body.success || !body.proof || !body.proofBytesHex) {
-            throw new Error(body.error ?? `Server prover failed with HTTP ${res.status}`);
-          }
-          setProgress(null);
-          return { proof: body.proof, proofBytes: hexToBytes(body.proofBytesHex) };
-        }
-
         if (useProverWorker) {
           const result = await callWorker<{
             id: number;
