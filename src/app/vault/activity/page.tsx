@@ -32,6 +32,7 @@ import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { Tooltip } from "@/components/ui/tooltip";
 import { getPendingFaucetActivities, type PendingFaucetActivity } from "@/lib/faucet-activity";
+import { getAlphaDemoNetworkInboxNotes } from "@/lib/alpha-demo-ledger";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -311,6 +312,16 @@ function ActivityFeed() {
   const { networkId } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
+  const alphaDemoNotes = useMemo(() => {
+    const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
+    return scoped.length > 0 ? scoped : getAlphaDemoNetworkInboxNotes(networkId);
+  }, [networkId, stealthAddress]);
+  const displayNotes = useMemo(() => {
+    const byId = new Map<string, InboxNote>();
+    for (const note of notes) byId.set(note.id, note);
+    for (const note of alphaDemoNotes) byId.set(note.id, note);
+    return Array.from(byId.values());
+  }, [alphaDemoNotes, notes]);
 
   useEffect(() => {
     if (forcedRefreshRef.current || searchParams.get("refresh") !== "inbox") return;
@@ -320,7 +331,7 @@ function ActivityFeed() {
 
   useEffect(() => {
     const sync = () => {
-      setPendingActivities(getPendingFaucetActivities({ networkId, stealthAddress, notes }));
+      setPendingActivities(getPendingFaucetActivities({ networkId, stealthAddress, notes: displayNotes }));
     };
     sync();
     window.addEventListener("storage", sync);
@@ -329,11 +340,11 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:faucet-activity", sync);
     };
-  }, [networkId, notes, stealthAddress]);
+  }, [displayNotes, networkId, stealthAddress]);
 
   const items = useMemo<ActivityItem[]>(() => {
     return [
-      ...notes.map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
+      ...displayNotes.map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
       ...pendingActivities.map((activity) => ({
         kind: "pending-faucet" as const,
         id: activity.id,
@@ -341,7 +352,7 @@ function ActivityFeed() {
         activity,
       })),
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [notes, pendingActivities]);
+  }, [displayNotes, pendingActivities]);
 
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {

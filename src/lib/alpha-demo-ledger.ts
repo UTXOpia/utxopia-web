@@ -87,9 +87,17 @@ export function recordAlphaDemoDeposit(input: {
 
 export function getAlphaDemoInboxNotes(networkId: string, stealthAddress: string | null): InboxNote[] {
   if (!stealthAddress || !alphaDemoLedgerEnabled(networkId)) return [];
+  return getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
+}
+
+export function getAlphaDemoNetworkInboxNotes(networkId: string, stealthAddress?: string | null): InboxNote[] {
+  if (!alphaDemoLedgerEnabled(networkId)) return [];
   return readLedger()
     .deposits
-    .filter((deposit) => deposit.networkId === networkId && deposit.stealthAddress === stealthAddress)
+    .filter((deposit) => {
+      if (deposit.networkId !== networkId) return false;
+      return !stealthAddress || deposit.stealthAddress === stealthAddress;
+    })
     .map((deposit, index) => {
       const seed = new TextEncoder().encode(`${deposit.id}:${deposit.opReturn ?? ""}`);
       const commitment = sha256(seed);

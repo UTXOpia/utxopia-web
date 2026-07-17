@@ -3,6 +3,7 @@ import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   alphaDemoLedgerEnabled,
   getAlphaDemoInboxNotes,
+  getAlphaDemoNetworkInboxNotes,
   recordAlphaDemoDeposit,
 } from "./alpha-demo-ledger";
 
@@ -65,6 +66,20 @@ describe("alpha demo ledger", () => {
     expect(getAlphaDemoInboxNotes("devnet-regtest", STEALTH_ADDRESS)).toHaveLength(1);
     expect(getAlphaDemoInboxNotes("devnet", STEALTH_ADDRESS)).toHaveLength(0);
     expect(getAlphaDemoInboxNotes("devnet-regtest", `utxo:${"cd".repeat(96)}`)).toHaveLength(0);
+  });
+
+  it("can recover locally recorded faucet notes by network", () => {
+    recordAlphaDemoDeposit({
+      networkId: "devnet-regtest",
+      stealthAddress: STEALTH_ADDRESS,
+      amountSats: 10_000,
+      txid: "faucet-tx-4",
+    });
+
+    const notes = getAlphaDemoNetworkInboxNotes("devnet-regtest");
+
+    expect(notes).toHaveLength(1);
+    expect(notes[0].amount).toBe(10_000n);
   });
 
   it("does not write demo faucet activity when real transactions are forced", () => {
