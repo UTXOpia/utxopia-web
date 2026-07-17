@@ -13,6 +13,7 @@ import {
   Copy,
   Check,
   RefreshCw,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -30,6 +31,7 @@ import type { InboxNote } from "@/stores/utxopia-store";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { Tooltip } from "@/components/ui/tooltip";
+import { getPendingFaucetActivities, type PendingFaucetActivity } from "@/lib/faucet-activity";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -212,10 +214,103 @@ function ActivityRow({ note }: { note: InboxNote }) {
   );
 }
 
+function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
+  const [expanded, setExpanded] = useState(false);
+  const { networkId: network } = useChainEnvironment();
+  const token = getToken("zkBTC");
+
+  return (
+    <div>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          "flex items-center gap-2.5 px-4 py-3 transition-colors cursor-pointer",
+          expanded ? "bg-muted/50" : "hover:bg-muted/40",
+        )}
+      >
+        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-warning/10">
+          <Loader2 className="w-3.5 h-3.5 text-warning animate-spin" />
+        </div>
+
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-foreground font-medium">Faucet deposit</span>
+          <p className="text-[11px] text-warning/75">Processing / {timeAgo(activity.createdAt)}</p>
+        </div>
+
+        <div className="text-right shrink-0">
+          <p className="text-sm font-semibold font-mono tabular-nums text-warning">
+            +{formatAmt(activity.amountSats, token)}{" "}
+            <span className="text-xs font-medium">{token.shieldedSymbol}</span>
+          </p>
+          <p className="text-[11px] text-gray/45">
+            waiting for vault credit
+          </p>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mx-4 mb-3">
+          <div className="rounded-[10px] bg-linear-to-b from-warning/8 to-transparent border border-warning/15 overflow-hidden">
+            <div className="px-3.5 py-2.5 border-b border-warning/10 bg-warning/5">
+              <div className="flex items-center gap-2">
+                <Loader2 className="h-4 w-4 text-warning animate-spin" />
+                <span className="text-sm font-semibold text-warning">Processing on testnet</span>
+              </div>
+            </div>
+
+            <div className="px-3.5 py-2 space-y-1.5 text-xs">
+              <div className="flex justify-between">
+                <span className="text-gray/40">Status</span>
+                <span className="text-warning">BTC confirmed, vault credit pending</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-gray/40">Time</span>
+                <span className="text-gray/60">{formatFullDate(activity.createdAt)}</span>
+              </div>
+              {activity.blocksMined != null && (
+                <div className="flex justify-between">
+                  <span className="text-gray/40">Blocks mined</span>
+                  <span className="text-gray/60 font-mono">{activity.blocksMined}</span>
+                </div>
+              )}
+              {activity.txid && (
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-gray/40 shrink-0">BTC tx</span>
+                  <code className="text-[10px] font-mono text-foreground/60 truncate">
+                    {activity.txid.slice(0, 12)}...{activity.txid.slice(-8)}
+                  </code>
+                </div>
+              )}
+            </div>
+
+            <div className="px-3.5 py-2 border-t border-warning/10">
+              <Link
+                href={hrefWithChain("/explorer", network)}
+                className="inline-flex items-center gap-1.5 text-[11px] text-warning hover:text-warning/80 transition-colors"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <ExternalLink className="w-3 h-3" />
+                Check Explorer
+              </Link>
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+type ActivityItem =
+  | { kind: "note"; id: string; createdAt: number; note: InboxNote }
+  | { kind: "pending-faucet"; id: string; createdAt: number; activity: PendingFaucetActivity };
+
 function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
   const searchParams = useSearchParams();
   const forcedRefreshRef = useRef(false);
+  const { networkId } = useChainEnvironment();
+  const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
+  const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
 
   useEffect(() => {
     if (forcedRefreshRef.current || searchParams.get("refresh") !== "inbox") return;
@@ -223,26 +318,50 @@ function ActivityFeed() {
     refresh(undefined, true);
   }, [refresh, searchParams]);
 
+  useEffect(() => {
+    const sync = () => {
+      setPendingActivities(getPendingFaucetActivities({ networkId, stealthAddress, notes }));
+    };
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("utxopia:faucet-activity", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("utxopia:faucet-activity", sync);
+    };
+  }, [networkId, notes, stealthAddress]);
+
+  const items = useMemo<ActivityItem[]>(() => {
+    return [
+      ...notes.map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
+      ...pendingActivities.map((activity) => ({
+        kind: "pending-faucet" as const,
+        id: activity.id,
+        createdAt: activity.createdAt,
+        activity,
+      })),
+    ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
+  }, [notes, pendingActivities]);
+
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {
-    const sorted = [...notes].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-    const groups: { date: string; notes: typeof sorted }[] = [];
-    for (const note of sorted) {
-      const dateKey = formatDateKey(note.createdAt);
+    const groups: { date: string; items: ActivityItem[] }[] = [];
+    for (const item of items) {
+      const dateKey = formatDateKey(item.createdAt);
       const last = groups[groups.length - 1];
       if (last && last.date === dateKey) {
-        last.notes.push(note);
+        last.items.push(item);
       } else {
-        groups.push({ date: dateKey, notes: [note] });
+        groups.push({ date: dateKey, items: [item] });
       }
     }
     return groups;
-  }, [notes]);
+  }, [items]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <span className="text-caption text-gray/50">{notes.length} transaction{notes.length !== 1 ? "s" : ""}</span>
+        <span className="text-caption text-gray/50">{items.length} transaction{items.length !== 1 ? "s" : ""}</span>
         <button
           onClick={refresh}
           disabled={isLoading}
@@ -252,13 +371,13 @@ function ActivityFeed() {
         </button>
       </div>
 
-      {isLoading && notes.length === 0 && (
+      {isLoading && items.length === 0 && (
         <div className="flex items-center justify-center py-6">
           <div className="w-6 h-6 border-2 border-privacy border-t-transparent rounded-full animate-spin" />
         </div>
       )}
 
-      {notes.length === 0 && !isLoading && (
+      {items.length === 0 && !isLoading && (
         <div className="text-center py-6">
           <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-30 mx-auto mb-2" />
           <p className="text-sm text-gray/50">No activity yet</p>
@@ -266,12 +385,14 @@ function ActivityFeed() {
         </div>
       )}
 
-      {grouped.map(({ date, notes: groupNotes }) => (
+      {grouped.map(({ date, items: groupItems }) => (
         <div key={date}>
           <p className="text-xs text-gray/50 font-medium px-1 mb-1.5">{date}</p>
           <div className="rounded-[12px] border border-gray/10 overflow-hidden divide-y divide-gray/8">
-            {groupNotes.map((note) => (
-              <ActivityRow key={note.id} note={note} />
+            {groupItems.map((item) => (
+              item.kind === "note"
+                ? <ActivityRow key={item.id} note={item.note} />
+                : <PendingFaucetRow key={item.id} activity={item.activity} />
             ))}
           </div>
         </div>

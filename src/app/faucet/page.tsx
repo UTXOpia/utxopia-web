@@ -8,6 +8,7 @@ import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-c
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { recordAlphaDemoDeposit } from "@/lib/alpha-demo-ledger";
+import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { cn } from "@/lib/utils";
 
 /**
@@ -149,7 +150,7 @@ docker compose -f docker-compose.regtest.yml up -d
 docker compose -f docker-compose.hybrid.yml up --build -d
 
 # 3. Sync the matching env
-UTXOPIA_NETWORK=sui-regtest ./scripts/sync-env.sh`}
+UTXOPIA_NETWORK=devnet-regtest ./scripts/sync-env.sh`}
         </pre>
         <p className="pt-1">
           Public testnet4 / mainnet users should use{" "}
@@ -504,6 +505,20 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
   const hasAddress = address.trim().length > 0;
   const addressInvalid = hasAddress && !validAddress;
 
+  async function mineMissingConfirmations(blocksAlreadyMined?: number): Promise<void> {
+    const blocks = Math.max(0, 6 - Math.max(0, Number(blocksAlreadyMined ?? 0)));
+    if (blocks === 0) return;
+    try {
+      await fetch(`/api/regtest/mine?network=${encodeURIComponent(network)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocks }),
+      });
+    } catch (e) {
+      console.warn("[Faucet] Follow-up regtest mining failed:", e);
+    }
+  }
+
   async function handleDrip() {
     setSubmitting(true);
     setResult(null);
@@ -542,6 +557,15 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       } else if (!res.ok || !body.ok) {
         setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
       } else {
+        recordPendingFaucetActivity({
+          networkId: network,
+          stealthAddress: address.trim(),
+          amountSats: body.amountSats ?? amountSats,
+          txid: body.txid ?? "",
+          opReturn: body.opReturn,
+          depositAddress: body.depositAddress,
+          blocksMined: body.blocksMined,
+        });
         recordAlphaDemoDeposit({
           networkId: network,
           stealthAddress: address.trim(),
@@ -549,7 +573,9 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
           txid: body.txid ?? "",
           opReturn: body.opReturn,
         });
-        void useUTXOpiaStore.getState().refreshInbox(undefined, true);
+        void mineMissingConfirmations(body.blocksMined).finally(() => {
+          void useUTXOpiaStore.getState().refreshInbox(undefined, true);
+        });
         setResult({
           kind: "ok",
           txid: body.txid ?? "",
