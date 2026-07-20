@@ -53,7 +53,7 @@ export async function claimPrivateReceiveName(input: ClaimPrivateReceiveNameInpu
   if (!input.stealthAddress) throw new Error("Create a private wallet before claiming a SuiNS name.");
   if (!input.suiAddress) throw new Error("Connect or create a Sui login before claiming a SuiNS name.");
 
-  const response = await fetch("/api/sui/suins/claim", {
+  const response = await fetch("/api/suins/register", {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({

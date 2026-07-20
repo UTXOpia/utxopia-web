@@ -69,7 +69,7 @@ export function SuiNsPanel({
       if (!candidate) candidate = getClaimedSuiNsName(suiAddress);
       if (!candidate) {
         try {
-          const res = await fetch(`/api/sui/suins/claim?loginId=${encodeURIComponent(suiAddress)}`, {
+          const res = await fetch(`/api/suins/register?loginId=${encodeURIComponent(suiAddress)}`, {
             cache: "no-store",
           });
           const data = (await res.json().catch(() => null)) as

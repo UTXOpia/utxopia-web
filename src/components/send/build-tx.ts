@@ -17,6 +17,19 @@ export interface BuildSendIntentInput {
   amount: string;
 }
 
+const BPS_DENOMINATOR = 10_000n;
+
+export function computeBtcServiceFee(
+  amountBaseUnits: bigint,
+  serviceFeeBase: number,
+  serviceFeeBps: number,
+): bigint {
+  if (amountBaseUnits <= 0n) return 0n;
+  const base = BigInt(Math.max(0, Math.floor(serviceFeeBase)));
+  const bps = BigInt(Math.max(0, Math.floor(serviceFeeBps)));
+  return (amountBaseUnits * bps) / BPS_DENOMINATOR + base;
+}
+
 /**
  * Pure dispatch: maps wizard state → which on-chain ix kind to build.
  * Caller threads the resulting `kind` to the right SDK builder.

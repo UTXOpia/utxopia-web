@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Copy, Check, X, Loader2 } from "lucide-react";
 import { TokenSourcePicker } from "./token-source-picker";
@@ -24,6 +24,7 @@ export interface ClaimLinkModalProps {
   unit: string;
   usdPerUnit: number | null;
   defaultToken?: string;
+  progressMessage?: string;
 }
 
 export function ClaimLinkModal({
@@ -35,12 +36,26 @@ export function ClaimLinkModal({
   unit,
   usdPerUnit,
   defaultToken = "zkBTC",
+  progressMessage,
 }: ClaimLinkModalProps) {
   const [sourceToken, setSourceToken] = useState(defaultToken);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ClaimLinkResult | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [elapsedSeconds, setElapsedSeconds] = useState(0);
+
+  useEffect(() => {
+    if (!busy) {
+      setElapsedSeconds(0);
+      return;
+    }
+    const startedAt = Date.now();
+    const timer = window.setInterval(() => {
+      setElapsedSeconds(Math.floor((Date.now() - startedAt) / 1000));
+    }, 1000);
+    return () => window.clearInterval(timer);
+  }, [busy]);
 
   const handleGenerate = async () => {
     setBusy(true);
@@ -56,7 +71,12 @@ export function ClaimLinkModal({
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    <Dialog.Root
+      open={open}
+      onOpenChange={(nextOpen) => {
+        if (!busy || nextOpen) onOpenChange(nextOpen);
+      }}
+    >
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
         <Dialog.Content className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[460px] max-w-[calc(100vw-32px)] bg-background border border-gray/20 rounded-2xl p-5 shadow-xl">
@@ -64,7 +84,14 @@ export function ClaimLinkModal({
             <Dialog.Title className="text-base font-semibold">
               Send via claim link
             </Dialog.Title>
-            <Dialog.Close className="p-1 rounded hover:bg-muted/60 text-muted-foreground">
+            <Dialog.Description className="sr-only">
+              Lock shielded funds and create a private link that the recipient can claim.
+            </Dialog.Description>
+            <Dialog.Close
+              aria-label="Close"
+              disabled={busy}
+              className="p-1 rounded hover:bg-muted/60 text-muted-foreground disabled:cursor-not-allowed disabled:opacity-40"
+            >
               <X className="w-4 h-4" />
             </Dialog.Close>
           </div>
@@ -84,15 +111,32 @@ export function ClaimLinkModal({
                 availableBaseUnits={availableBaseUnits}
                 usdPerUnit={usdPerUnit}
               />
-              {err && <div className="text-xs text-red-500">{err}</div>}
+              {busy && (
+                <div
+                  role="status"
+                  aria-live="polite"
+                  className="flex items-start gap-2 rounded-lg bg-muted/40 px-3 py-2.5 text-xs text-muted-foreground"
+                >
+                  <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin" />
+                  <div className="min-w-0">
+                    <p className="text-foreground/80">
+                      {progressMessage || "Preparing private transaction..."}
+                    </p>
+                    <p className="mt-0.5 text-muted-foreground/70">
+                      Proof generation can take up to two minutes. Keep this tab open.
+                      {elapsedSeconds > 0 ? ` ${elapsedSeconds}s elapsed.` : ""}
+                    </p>
+                  </div>
+                </div>
+              )}
+              {err && <div role="alert" className="text-xs text-red-500">{err}</div>}
               <button
                 type="button"
                 disabled={busy || !amount || amount === "0"}
                 onClick={handleGenerate}
                 className="w-full px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
               >
-                {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-                Generate claim link
+                {busy ? "Creating claim link..." : "Generate claim link"}
               </button>
             </div>
           ) : (

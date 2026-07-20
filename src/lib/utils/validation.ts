@@ -60,6 +60,23 @@ export function parseSats(amount: string): number | null {
   return isNaN(parsed) || parsed <= 0 ? null : parsed;
 }
 
+export function parseDecimalToBaseUnits(amount: string, decimals: number): number | null {
+  const trimmed = amount.trim();
+  if (!/^\d*(?:\.\d*)?$/.test(trimmed) || trimmed === "" || trimmed === ".") {
+    return null;
+  }
+
+  const [wholeRaw, fractionRaw = ""] = trimmed.split(".");
+  const whole = wholeRaw === "" ? "0" : wholeRaw;
+  const fraction = fractionRaw.padEnd(decimals, "0").slice(0, decimals);
+  const baseUnits = BigInt(whole) * 10n ** BigInt(decimals) + BigInt(fraction || "0");
+
+  if (baseUnits <= 0n || baseUnits > BigInt(Number.MAX_SAFE_INTEGER)) {
+    return null;
+  }
+  return Number(baseUnits);
+}
+
 export function satsToBtc(sats: number): number {
   return sats / 100_000_000;
 }

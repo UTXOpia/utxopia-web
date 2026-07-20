@@ -94,7 +94,7 @@ export function TransferRow({
       >
         <Td>
           {tx.type === "shield" ? (() => {
-            const s = getShieldStatus(tx.status, Boolean(tx.btcMeta));
+            const s = getShieldStatus(tx.status, Boolean(tx.btcMeta?.sweepTxid));
             return <StatusDot variant={s.variant} label={s.label} />;
           })() : (
             <StatusDot

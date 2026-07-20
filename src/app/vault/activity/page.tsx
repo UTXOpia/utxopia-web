@@ -33,6 +33,11 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { Tooltip } from "@/components/ui/tooltip";
 import { getPendingFaucetActivities, type PendingFaucetActivity } from "@/lib/faucet-activity";
 import { getAlphaDemoNetworkInboxNotes } from "@/lib/alpha-demo-ledger";
+import {
+  getSubmittedTransactions,
+  type SubmittedTransactionActivity,
+} from "@/lib/transaction-activity";
+import { getChainTransactionUrl } from "@/lib/chain-links";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -301,9 +306,104 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
   );
 }
 
+const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; status: string }> = {
+  private_send: { label: "Private transfer", status: "Relay confirmed" },
+  claim_link: { label: "Claim link funded", status: "Relay confirmed" },
+  cashout_btc: { label: "Bitcoin withdrawal", status: "Request confirmed on-chain" },
+  cashout_wallet: { label: "Wallet withdrawal", status: "Relay confirmed" },
+};
+
+function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionActivity }) {
+  const [expanded, setExpanded] = useState(false);
+  const [copied, setCopied] = useState(false);
+  const { networkId, config } = useChainEnvironment();
+  const token = getToken(activity.tokenSymbol);
+  const meta = SUBMITTED_LABELS[activity.kind];
+
+  const copySignature = async (event: React.MouseEvent) => {
+    event.stopPropagation();
+    await navigator.clipboard.writeText(activity.signature);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 1500);
+  };
+
+  return (
+    <div>
+      <div
+        onClick={() => setExpanded(!expanded)}
+        className={cn(
+          "flex items-center gap-2.5 px-4 py-3 transition-colors cursor-pointer",
+          expanded ? "bg-muted/50" : "hover:bg-muted/40",
+        )}
+      >
+        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-success/10">
+          <Check className="w-3.5 h-3.5 text-success" />
+        </div>
+        <div className="flex-1 min-w-0">
+          <span className="text-sm text-foreground font-medium">{meta.label}</span>
+          <p className="text-[11px] text-success/75">Submitted / {timeAgo(activity.createdAt)}</p>
+        </div>
+        <div className="text-right shrink-0">
+          <p className="text-sm font-semibold font-mono tabular-nums text-gray">
+            -{formatAmt(BigInt(activity.amountBaseUnits), token)}{" "}
+            <span className="text-xs font-medium">{token.shieldedSymbol}</span>
+          </p>
+          <p className="hidden sm:block text-[11px] text-gray/45">{meta.status}</p>
+        </div>
+      </div>
+
+      {expanded && (
+        <div className="mx-4 mb-3 rounded-[10px] border border-success/15 bg-success/4 overflow-hidden">
+          <div className="px-3.5 py-2 space-y-1.5 text-xs">
+            <div className="flex justify-between gap-3">
+              <span className="text-gray/40">Status</span>
+              <span className="text-success text-right">{meta.status}</span>
+            </div>
+            <div className="flex justify-between gap-3">
+              <span className="text-gray/40">Time</span>
+              <span className="text-gray/60 text-right">{formatFullDate(activity.createdAt)}</span>
+            </div>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-gray/40 shrink-0">Transaction</span>
+              <div className="flex items-center gap-1 min-w-0">
+                <code className="text-[10px] font-mono text-foreground/60 truncate">
+                  {activity.signature.slice(0, 12)}...{activity.signature.slice(-8)}
+                </code>
+                <button
+                  type="button"
+                  onClick={copySignature}
+                  aria-label="Copy transaction signature"
+                  className="p-0.5 rounded hover:bg-gray/10 transition-colors shrink-0"
+                >
+                  {copied
+                    ? <Check className="w-2.5 h-2.5 text-success" />
+                    : <Copy className="w-2.5 h-2.5 text-gray/40" />}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div className="px-3.5 py-2 border-t border-success/10">
+            <a
+              href={getChainTransactionUrl(config, activity.signature, networkId)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-[11px] text-success hover:text-success/80 transition-colors"
+              onClick={(event) => event.stopPropagation()}
+            >
+              <ExternalLink className="w-3 h-3" />
+              View transaction
+            </a>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 type ActivityItem =
   | { kind: "note"; id: string; createdAt: number; note: InboxNote }
-  | { kind: "pending-faucet"; id: string; createdAt: number; activity: PendingFaucetActivity };
+  | { kind: "pending-faucet"; id: string; createdAt: number; activity: PendingFaucetActivity }
+  | { kind: "submitted"; id: string; createdAt: number; activity: SubmittedTransactionActivity };
 
 function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
@@ -312,6 +412,7 @@ function ActivityFeed() {
   const { networkId } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
+  const [submittedActivities, setSubmittedActivities] = useState<SubmittedTransactionActivity[]>([]);
   const alphaDemoNotes = useMemo(() => {
     const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
     return scoped.length > 0 ? scoped : getAlphaDemoNetworkInboxNotes(networkId);
@@ -342,6 +443,17 @@ function ActivityFeed() {
     };
   }, [displayNotes, networkId, stealthAddress]);
 
+  useEffect(() => {
+    const sync = () => setSubmittedActivities(getSubmittedTransactions(networkId));
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener("utxopia:transaction-activity", sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener("utxopia:transaction-activity", sync);
+    };
+  }, [networkId]);
+
   const items = useMemo<ActivityItem[]>(() => {
     return [
       ...displayNotes.map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
@@ -351,8 +463,14 @@ function ActivityFeed() {
         createdAt: activity.createdAt,
         activity,
       })),
+      ...submittedActivities.map((activity) => ({
+        kind: "submitted" as const,
+        id: activity.id,
+        createdAt: activity.createdAt,
+        activity,
+      })),
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [displayNotes, pendingActivities]);
+  }, [displayNotes, pendingActivities, submittedActivities]);
 
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {
@@ -403,7 +521,9 @@ function ActivityFeed() {
             {groupItems.map((item) => (
               item.kind === "note"
                 ? <ActivityRow key={item.id} note={item.note} />
-                : <PendingFaucetRow key={item.id} activity={item.activity} />
+                : item.kind === "pending-faucet"
+                  ? <PendingFaucetRow key={item.id} activity={item.activity} />
+                  : <SubmittedTransactionRow key={item.id} activity={item.activity} />
             ))}
           </div>
         </div>

@@ -20,11 +20,12 @@ export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: Netwo
   const fee = tx.inputs?.[0]?.fee ?? 0;
   const hasFee = fee > 0 && grossAmount !== netAmount;
   const btcMeta = tx.btcMeta;
+  const hasSweep = !!btcMeta?.sweepTxid;
   const btcDepositAmount = btcMeta?.depositAmountSats ?? tx.inputs?.[0]?.depositAmountSats ?? null;
-  const btcSweepRemainder = btcMeta?.mintedSats ?? netAmount;
+  const btcPoolReceived = btcMeta?.mintedSats ?? netAmount;
   const btcMinerFee = btcMeta?.sweepFeeSats
-    ?? (btcDepositAmount != null && btcDepositAmount > btcSweepRemainder
-      ? btcDepositAmount - btcSweepRemainder
+    ?? (hasSweep && btcDepositAmount != null && btcDepositAmount > btcPoolReceived
+      ? btcDepositAmount - btcPoolReceived
       : null);
   const fmtBtcSats = (sats: number) => `${sats.toLocaleString()} sats`;
   // Live BTC confirmations — prefer the (immutable) block height stored in
@@ -56,8 +57,8 @@ export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: Netwo
               <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[10px] text-gray/55 font-mono pt-1 border-t border-btc/8">
                 <span>Deposit BTC</span>
                 <span>{fmtBtcSats(btcDepositAmount)}</span>
-                <span>Sweep remainder</span>
-                <span>{fmtBtcSats(btcSweepRemainder)} shielded</span>
+                <span>Pool received</span>
+                <span>{fmtBtcSats(btcPoolReceived)} shielded</span>
                 {btcMinerFee != null && btcMinerFee > 0 && (
                   <>
                     <span>Miner fee</span>
@@ -99,7 +100,7 @@ export function ShieldDetails({ tx, network }: { tx: TransferTx; network?: Netwo
                 <span className="font-mono">{liveDepositConfs == null ? "—" : liveDepositConfs}</span>
               </div>
               {btcMeta.sweepTxid && <div className="flex justify-between"><span>Sweep</span><span className="font-mono text-foreground/80">{truncate(btcMeta.sweepTxid, 6, 4)}</span></div>}
-              {liveSweepConfs != null && (
+              {btcMeta.sweepTxid && liveSweepConfs != null && (
                 <div className="flex justify-between"><span>Sweep Conf</span><span className="font-mono">{liveSweepConfs}</span></div>
               )}
             </div>

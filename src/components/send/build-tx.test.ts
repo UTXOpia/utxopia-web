@@ -1,6 +1,6 @@
 /** @happy-dom */
 import { describe, it, expect } from "bun:test";
-import { buildSendIntent } from "./build-tx";
+import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 
 describe("buildSendIntent", () => {
   it("dispatches BTC recipient to redeem kind", () => {
@@ -62,5 +62,15 @@ describe("buildSendIntent", () => {
         amount: "0.001",
       }),
     ).toThrow(/zkBTC/i);
+  });
+});
+
+describe("computeBtcServiceFee", () => {
+  it("uses the redemption service fee formula", () => {
+    expect(computeBtcServiceFee(100_000n, 2_000, 30)).toBe(2_300n);
+  });
+
+  it("floors percentage fees to match the backend", () => {
+    expect(computeBtcServiceFee(999n, 5, 30)).toBe(7n);
   });
 });

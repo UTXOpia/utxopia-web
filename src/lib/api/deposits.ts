@@ -37,6 +37,7 @@ export type DepositStatus =
   | "sweeping"
   | "sweep_confirming"
   | "verifying"
+  | "stalled"
   | "ready"
   | "claimed"
   | "failed";
@@ -87,29 +88,10 @@ export interface DepositStatusUpdate {
   error?: string;
 }
 
-/**
- * Retry a failed deposit
- *
- * @param depositId - The deposit ID to retry
- */
-export async function retryDeposit(
-  depositId: string,
-  network?: NetworkId,
-): Promise<{ success: boolean; message?: string }> {
-  const response = await fetch(withNetworkQuery(`/api/tracker/retry/${depositId}`, network), {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-  });
-
-  if (!response.ok) {
-    const error = await response.json().catch(() => ({
-      error: `HTTP ${response.status}: ${response.statusText}`,
-    }));
-    throw ApiError.fromResponse(error, response.status);
-  }
-
-  return response.json();
-}
+// NOTE: Public deposit retry was intentionally removed. Retries are support-only
+// and must be triggered via the ops CLI / backend admin API (which re-validates
+// on-chain state and skips already-completed steps). There is deliberately no
+// web-exposed retry route.
 
 /**
  * Fetch all deposits from backend
@@ -136,6 +118,7 @@ export type StealthDepositStatus =
   | "sweeping"
   | "sweep_confirming"
   | "verifying"
+  | "stalled"
   | "ready"
   | "failed";
 
@@ -467,7 +450,7 @@ export function isDepositPending(status: DepositStatus): boolean {
  * Check if a deposit status indicates it's being processed
  */
 export function isDepositProcessing(status: DepositStatus): boolean {
-  return ["confirmed", "sweeping", "sweep_confirming", "verifying"].includes(
+  return ["confirmed", "sweeping", "sweep_confirming", "verifying", "stalled"].includes(
     status
   );
 }
@@ -491,6 +474,7 @@ export function getStatusMessage(status: DepositStatus): string {
     sweeping: "Sweeping to pool wallet",
     sweep_confirming: "Sweep transaction confirming",
     verifying: "Verifying on Solana",
+    stalled: "Retrying verification",
     ready: "zkBTC Minted",
     claimed: "zkBTC Minted",
     failed: "Deposit failed",
@@ -532,6 +516,8 @@ export function getDepositProgress(
       return Math.min(70, 55 + Math.floor((sweepConfirmations / 6) * 15));
     case "verifying":
       return 80;
+    case "stalled":
+      return 80;
     case "ready":
       return 100;
     case "claimed":
@@ -560,7 +546,7 @@ export function isStealthDepositPending(status: StealthDepositStatus): boolean {
 export function isStealthDepositProcessing(
   status: StealthDepositStatus
 ): boolean {
-  return ["confirmed", "sweeping", "sweep_confirming", "verifying"].includes(
+  return ["confirmed", "sweeping", "sweep_confirming", "verifying", "stalled"].includes(
     status
   );
 }
@@ -593,6 +579,7 @@ export function getStealthStatusMessage(status: StealthDepositStatus): string {
     sweeping: "Sweeping to vault",
     sweep_confirming: "Sweep confirming",
     verifying: "Verifying on Solana",
+    stalled: "Retrying verification",
     ready: "Ready! Check your Stealth Inbox",
     failed: "Deposit failed",
   };
@@ -623,6 +610,8 @@ export function getStealthDepositProgress(
     case "sweep_confirming":
       return Math.min(75, 55 + sweepConfirmations * 20);
     case "verifying":
+      return 85;
+    case "stalled":
       return 85;
     case "ready":
       return 100;

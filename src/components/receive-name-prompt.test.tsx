@@ -61,7 +61,9 @@ describe("ReceiveNamePrompt", () => {
     expect(screen.getByText(".utxopia.sol")).toBeTruthy();
   });
 
-  it("does not open on Sui networks", async () => {
+  it("does not open on Sui-primary networks (names are network-scoped in the UI)", async () => {
+    // sui-regtest can serve .sol at the API level, but the UI only surfaces the
+    // current network's own name system — so the .sol prompt stays hidden here.
     mockedNetwork = "sui-regtest";
     render(<ReceiveNamePrompt />);
 

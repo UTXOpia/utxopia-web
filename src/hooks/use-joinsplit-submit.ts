@@ -17,6 +17,11 @@ import { submitWithFailover } from "@/lib/relay-submit";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
+export interface JoinSplitSubmitResult {
+  success: boolean;
+  signature: string | null;
+}
+
 export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
@@ -43,7 +48,7 @@ export function useJoinSplitSubmit() {
 
       // Generate ZK proof
       setStatus("processing");
-      setStatusMessage("Processing...");
+      setStatusMessage("Generating privacy proof. Keep this tab open...");
       const { proof: proofData, proofBytes } = await withTimeout(
         prover.generateProof(params.proofInputs),
         PROOF_TIMEOUT_MS,
@@ -52,7 +57,7 @@ export function useJoinSplitSubmit() {
 
       // Extract public signals
       setStatus("submitting");
-      setStatusMessage("Submitting transaction...");
+      setStatusMessage("Submitting proof to the relay...");
 
       const publicSignals = proofData.publicInputs;
       const nInputs = params.proofInputs.nInputs;
@@ -202,8 +207,11 @@ export function useJoinSplitSubmit() {
       if (!relayResult.success) {
         throw new Error(relayResult.error || "Transaction failed");
       }
+      if (!relayResult.signature) {
+        throw new Error("Relay accepted the request but did not return a transaction signature");
+      }
 
-      setTxSignature(relayResult.signature ?? null);
+      setTxSignature(relayResult.signature);
       setStatus("success");
       setStatusMessage("");
 
@@ -212,15 +220,15 @@ export function useJoinSplitSubmit() {
         const count = parseInt(localStorage.getItem("utxopia-tx-count") || "0", 10);
         localStorage.setItem("utxopia-tx-count", String(count + 1));
       } catch {};
-      return true;
+      return { success: true, signature: relayResult.signature } satisfies JoinSplitSubmitResult;
     } catch (err) {
       console.error("[Submit] Error:", err);
       setError(err instanceof Error ? err.message : "Transaction failed");
       setStatus("error");
       setStatusMessage("");
-      return false;
+      return { success: false, signature: null } satisfies JoinSplitSubmitResult;
     }
-  }, [prover, chainEnv, relayCandidates]);
+  }, [prover, chainEnv, chainId, relayCandidates]);
 
   const reset = useCallback(() => {
     setStatus("idle");

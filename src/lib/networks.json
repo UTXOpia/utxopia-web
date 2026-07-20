@@ -318,7 +318,7 @@
   "sui-regtest": {
     "chain": "sui",
     "solana": {
-      "rpcUrl": "",
+      "rpcUrl": "https://api.devnet.solana.com",
       "utxopiaProgramId": "",
       "btcLightClientId": "",
       "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF"
@@ -345,6 +345,15 @@
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"
+    },
+    "sns": {
+      "nameServiceProgramId": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",
+      "registrarProgramId": "snshBoEQ9jx4QoHBpZDQPYdNCtw7RMxJvYrKFEhwaPJ",
+      "subRegistrarProgramId": "31tT5CmpphAtRL3mstu962zeYH7C6TEkJWLB5nYxciBB",
+      "rootDomain": "5eoDkP6vCQBXqDV9YN2NdUs3nmML3dMRNmEYpiyVNBm2",
+      "parentDomain": "utxopia",
+      "reverseLookupClass": "7NbD1vprif6apthEZAqhRfYuhrqnuderB8qpnfXGCc8H",
+      "stealthDataVersion": 2
     },
     "sui": {
       "rpcUrl": "https://fullnode.testnet.sui.io:443",

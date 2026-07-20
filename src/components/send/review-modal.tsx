@@ -40,6 +40,9 @@ export function ReviewModal({
             <Dialog.Title className="text-base font-semibold">
               Review payment
             </Dialog.Title>
+            <Dialog.Description className="sr-only">
+              Confirm the recipient, amount, fees, and relay before submitting this transaction.
+            </Dialog.Description>
             <Dialog.Close
               aria-label="Close"
               className="p-1 rounded hover:bg-muted/60 text-muted-foreground"

@@ -29,6 +29,9 @@ export function ReceiveNamePrompt() {
   const isNameRegistered = sns.isNameRegistered;
   const { networkId, config } = useChainEnvironment();
   const snsConfig = getSnsConfig(config);
+  // Names are network-scoped in the UI: the .sol prompt is shown only on
+  // Solana-primary networks. (The backend can serve .sol on any network that
+  // configures SNS, but each UI view surfaces only its own chain's name.)
   const isSolanaNetwork = getChainAdapter(config).id === "solana";
   const parentDomain = snsConfig?.parentDomain || "utxopia";
 

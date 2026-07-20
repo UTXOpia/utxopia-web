@@ -14,6 +14,7 @@ export const DEPOSIT_STATUS_ORDER: Record<string, number> = {
   sweeping: 3,
   sweep_confirming: 3,
   verifying: 4,
+  stalled: 4,
   ready: 5,
   claimed: 5,
 };
@@ -46,6 +47,7 @@ export type DepositStatus =
   | "sweeping"
   | "sweep_confirming"
   | "verifying"
+  | "stalled"
   | "ready"
   | "claimed"
   | "failed";
@@ -67,6 +69,7 @@ export const DEPOSIT_STATUS_CONFIG: Record<string, StatusDisplayConfig> = {
   sweeping: { label: "Sweeping", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", spinning: true },
   sweep_confirming: { label: "Sweep Confirming", color: "text-blue-400", bg: "bg-blue-500/10 border-blue-500/20", spinning: true },
   verifying: { label: "Verifying", color: "text-sol", bg: "bg-sol/10 border-sol/20", spinning: true },
+  stalled: { label: "Retrying", color: "text-amber-400", bg: "bg-amber-500/10 border-amber-500/20", spinning: true },
   ready: { label: "Minted", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
   claimed: { label: "Minted", color: "text-green-400", bg: "bg-green-500/10 border-green-500/20" },
   failed: { label: "Failed", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },

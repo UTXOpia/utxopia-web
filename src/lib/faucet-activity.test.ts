@@ -73,6 +73,24 @@ describe("faucet activity", () => {
     expect(pending).toHaveLength(0);
   });
 
+  it("reconciles a faucet credit after the deposit service fee", () => {
+    const before = Date.now();
+    recordPendingFaucetActivity({
+      networkId: "sui-regtest",
+      stealthAddress: STEALTH_ADDRESS,
+      amountSats: 100_000,
+      txid: "btc-tx-net-credit",
+    });
+
+    const pending = getPendingFaucetActivities({
+      networkId: "sui-regtest",
+      stealthAddress: STEALTH_ADDRESS,
+      notes: [makeNote(99_300n, before + 1000)],
+    });
+
+    expect(pending).toHaveLength(0);
+  });
+
   it("keeps pending faucet activity when scanned notes do not match", () => {
     recordPendingFaucetActivity({
       networkId: "sui-regtest",
@@ -90,4 +108,3 @@ describe("faucet activity", () => {
     expect(pending).toHaveLength(1);
   });
 });
-

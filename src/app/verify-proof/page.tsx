@@ -4,6 +4,7 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import { ArrowLeft, FileCheck, Upload, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { resolveCircuitPath } from "@/lib/prover/circuit-path";
 
 /**
  * In-browser Groth16 proof verifier.
@@ -51,8 +52,7 @@ export default function VerifyProofPage() {
   const [result, setResult] = useState<VerifyResult | null>(null);
 
   const cdnBase = useMemo(() => {
-    const envBase = process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL ?? "";
-    return envBase ? `${envBase}/circuits/groth16` : "/circuits/groth16";
+    return resolveCircuitPath(process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL);
   }, []);
 
   function pasteFromFile(setter: (s: string) => void) {

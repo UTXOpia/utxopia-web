@@ -9,20 +9,9 @@
 
 import { useRef, useState, useCallback } from "react";
 import type { JoinSplitProofInputs, ProofData } from "@utxopia/sdk";
-import {
-  initProver,
-  generateJoinSplitProof,
-  proofToBytes,
-  setCircuitPath,
-} from "@utxopia/sdk/prover/web";
+import { resolveCircuitPath } from "@/lib/prover/circuit-path";
 
-// Point circuit artifacts at R2 CDN when configured
-const cdnUrl = process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL;
-if (cdnUrl) {
-  setCircuitPath(`${cdnUrl}/circuits/groth16`);
-}
-
-const circuitPath = cdnUrl ? `${cdnUrl}/circuits/groth16` : "/circuits/groth16";
+const circuitPath = resolveCircuitPath(process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL);
 const PROVER_WORKER_TIMEOUT_MS = 120_000;
 const useProverWorker =
   typeof window !== "undefined" &&
@@ -44,6 +33,13 @@ async function ensureBrowserSnarkjs(): Promise<void> {
   const g = globalThis as Record<string, unknown>;
   if (g.snarkjs) return;
   g.snarkjs = await import("snarkjs");
+}
+
+async function loadBrowserProver() {
+  await ensureBrowserSnarkjs();
+  const prover = await import("@utxopia/sdk/prover/web");
+  prover.setCircuitPath(circuitPath);
+  return prover;
 }
 
 interface ProverState {
@@ -122,13 +118,15 @@ export function useProver(): ProverState {
         setProgress(null);
         return;
       }
-      await ensureBrowserSnarkjs();
+      const { initProver } = await loadBrowserProver();
       await initProver();
       setIsInitialized(true);
       setProgress(null);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to initialize prover");
+      const error = err instanceof Error ? err : new Error("Failed to initialize prover");
+      setError(error.message);
       setProgress(null);
+      throw error;
     }
   }, [callWorker]);
 
@@ -149,7 +147,7 @@ export function useProver(): ProverState {
           setProgress(null);
           return { proof: result.proof, proofBytes: result.proofBytes };
         }
-        await ensureBrowserSnarkjs();
+        const { generateJoinSplitProof, proofToBytes } = await loadBrowserProver();
         const proof = await generateJoinSplitProof(inputs);
         const bytes = proofToBytes(proof);
         setProgress(null);

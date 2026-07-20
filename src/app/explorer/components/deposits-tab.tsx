@@ -1,9 +1,9 @@
 "use client";
 
 /**
- * Deposits Tab — displays BTC deposit lifecycle.
- * Shows deposit status badge, expandable detail rows with step-by-step
- * progress (BTC deposit → sweep → SPV verify → mint zkBTC).
+ * Deposits Tab — displays deposit lifecycle.
+ * Shows deposit status badge and expandable detail rows with step-by-step
+ * progress.
  */
 
 import { useState, useCallback, Fragment } from "react";
@@ -32,13 +32,13 @@ import { DEPOSIT_STATUS_CONFIG, DEPOSIT_STATUS_ORDER } from "@/lib/deposit-statu
 // Deposit Status
 // =============================================================================
 
-function getDepositStatusDot(status: string | null, isBtcDeposit: boolean): { variant: StatusDotVariant; label: string } {
+function getDepositStatusDot(status: string | null, hasSweep: boolean): { variant: StatusDotVariant; label: string } {
   const resolved = status ?? "claimed";
   if (resolved === "ready" || resolved === "claimed") return { variant: "confirmed", label: "Confirmed" };
   if (resolved === "failed") return { variant: "failed", label: "Failed" };
   if (resolved === "stalled") return { variant: "stalled", label: "Retrying" };
   if (resolved === "pending") return { variant: "pending", label: "Pending" };
-  if (!isBtcDeposit && (resolved === "sweeping" || resolved === "sweep_confirming")) {
+  if (!hasSweep && (resolved === "sweeping" || resolved === "sweep_confirming")) {
     return { variant: "processing", label: "Processing" };
   }
   return { variant: "processing", label: DEPOSIT_STATUS_CONFIG[resolved]?.label ?? "Processing" };
@@ -112,7 +112,7 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
               <div className="grid grid-cols-[auto_1fr] gap-x-3 gap-y-0.5 text-[10px] text-gray/55 font-mono pt-1 border-t border-btc/8">
                 <span>Deposit BTC</span>
                 <span>{fmtAmount(originalDeposit)} {config.unit}</span>
-                <span>{isDirectVaultDeposit ? "Shielded amount" : "Pool received"}</span>
+                <span>Pool received</span>
                 <span>{fmtAmount(shieldedAmount)} {config.to.label}</span>
               </div>
             )}
@@ -401,6 +401,7 @@ export function DepositRow({
     ? buildShieldConfig(resolvedToken)
     : SHIELD_TYPE_CONFIG[shieldType];
   const isBtcDeposit = shieldType === "btc";
+  const hasSweep = Boolean(d.btcMeta?.sweepTxid);
   const canExpand = true;
 
   return (
@@ -411,7 +412,7 @@ export function DepositRow({
       >
         <Td>
           <div className="flex flex-col gap-0.5">
-            <StatusDot {...getDepositStatusDot(d.status, isBtcDeposit)} />
+            <StatusDot {...getDepositStatusDot(d.status, hasSweep)} />
             {getDepositStatusSubtext(d, isBtcDeposit) && (
               <span className="text-[11px] text-gray">{getDepositStatusSubtext(d, isBtcDeposit)}</span>
             )}

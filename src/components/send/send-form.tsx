@@ -7,7 +7,7 @@ import { PublicKey } from "@solana/web3.js";
 import { Bitcoin, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { detectRecipient, type RecipientType } from "./recipient-detect";
-import { buildSendIntent } from "./build-tx";
+import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
 import { TokenSourcePicker } from "./token-source-picker";
 import { AmountField } from "./amount-field";
@@ -27,12 +27,13 @@ import { BackupRequiredCallout } from "@/components/vault/backup-required-callou
 import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
-import { parseSats } from "@/lib/utils/validation";
+import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
 import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
 import { resolveSuiNsUtxopiaRecord } from "@/lib/sui/suins";
+import { recordSubmittedTransaction, type SubmittedTransactionKind } from "@/lib/transaction-activity";
 import {
   decodeStealthMetaAddress,
   deriveMasterKey,
@@ -267,10 +268,15 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
       PAY_TOKENS[0],
     [effectiveToken],
   );
-  const { relayerMeta, effectiveRelayerFee } =
+  const {
+    relayerMeta,
+    effectiveRelayerFee,
+    effectiveServiceFee,
+    effectiveServiceFeeBps,
+  } =
     useRelayerConfig(selectedPayToken, chainEnv.networkId);
 
-  const amountSats = parseSats(state.amount) ?? 0;
+  const amountSats = parseDecimalToBaseUnits(state.amount, selectedPayToken.decimals) ?? 0;
   const totalNeeded = amountSats + effectiveRelayerFee;
   const noteSelector = useNoteAutoSelector(
     selectedPayToken.shieldedSymbol,
@@ -291,17 +297,27 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const recipientType = detection.type as RecipientType;
 
   const amountNum = parseFloat(state.amount || "0");
-  const amountValid = recipientValid && amountNum > 0;
+  const btcServiceFee = computeBtcServiceFee(
+    BigInt(Math.max(0, amountSats)),
+    effectiveServiceFee,
+    effectiveServiceFeeBps,
+  );
+  const btcNetPayout = BigInt(Math.max(0, amountSats)) - btcServiceFee;
+  const btcAmountTooSmall =
+    recipientValid &&
+    recipientType === "btc" &&
+    amountSats > 0 &&
+    btcNetPayout <= 0n;
+  const amountValid = recipientValid && amountNum > 0 && amountSats > 0 && !btcAmountTooSmall;
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
-  const alphaDemoTxEnabled =
+  const devSignerEnabled =
     process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
-    !chainEnv.networkId.includes("mainnet") &&
-    process.env.NEXT_PUBLIC_DISABLE_ALPHA_DEMO_TX !== "1";
+    !chainEnv.networkId.includes("mainnet");
   const requiresBackup =
     !!ctx.keys &&
     ctx.inboxDepositCount > 0 &&
-    !alphaDemoTxEnabled &&
+    !devSignerEnabled &&
     !hasBackupForKeys(ctx.keys);
   const isSubmittingInFlight =
     submitting ||
@@ -411,24 +427,6 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           );
       }
 
-      if (alphaDemoTxEnabled) {
-        await new Promise((resolve) => setTimeout(resolve, 700));
-        try {
-          const count = parseInt(localStorage.getItem("utxopia-tx-count") || "0", 10);
-          localStorage.setItem("utxopia-tx-count", String(count + 1));
-        } catch {}
-        scheduleInboxRefresh();
-        dispatch({ type: "reset" });
-        const result =
-          intent.kind === "redeem"
-            ? "cashout_btc"
-            : intent.kind === "unshield"
-              ? "cashout_wallet"
-              : "private_send";
-        router.push(hrefWithChain(`/vault/activity?result=${result}`, chainEnv.networkId));
-        return;
-      }
-
       if (noteSelector.selectedNotes.length === 0) {
         throw new Error(
           "No shielded notes available to cover this amount.",
@@ -468,20 +466,33 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         tokenMint: selectedPayToken.mint || undefined,
         recipient: recipientArg,
         requesterPubkey,
+        serviceFeeBase: effectiveServiceFee,
+        serviceFeeBps: effectiveServiceFeeBps,
       });
 
-      const ok = await submitter.submit(params, BigInt(amountSats));
-      if (!ok) return; // submitter.status === "error"; error + retry shown below
+      const submission = await submitter.submit(params, BigInt(amountSats));
+      if (!submission.success || !submission.signature) return;
       scheduleInboxRefresh();
 
       dispatch({ type: "reset" });
-      const result =
+      const result: SubmittedTransactionKind =
         intent.kind === "redeem"
           ? "cashout_btc"
           : intent.kind === "unshield"
             ? "cashout_wallet"
             : "private_send";
-      router.push(hrefWithChain(`/vault/activity?result=${result}`, chainEnv.networkId));
+      recordSubmittedTransaction({
+        networkId: chainEnv.networkId,
+        kind: result,
+        amountBaseUnits: BigInt(amountSats),
+        tokenSymbol: effectiveToken,
+        signature: submission.signature,
+        recipient: state.recipient.trim(),
+      });
+      router.push(hrefWithChain(
+        `/vault/activity?result=${result}&tx=${encodeURIComponent(submission.signature)}`,
+        chainEnv.networkId,
+      ));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Send failed");
     } finally {
@@ -494,11 +505,14 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     state.amount,
     effectiveToken,
     lookupSnsName,
-    alphaDemoTxEnabled,
     chainEnv.networkId,
     noteSelector.selectedNotes,
     relayerMeta,
     effectiveRelayerFee,
+    effectiveServiceFee,
+    effectiveServiceFeeBps,
+    boundChainId,
+    selectedPayToken.mint,
     submitter,
     amountSats,
     requiresBackup,
@@ -519,7 +533,8 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
       if (requiresBackup) {
         throw new Error("Back up your private wallet before creating a claim link.");
       }
-      const sats = parseSats(input.amount);
+      const linkToken = PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken) ?? selectedPayToken;
+      const sats = parseDecimalToBaseUnits(input.amount, linkToken.decimals);
       if (!sats || sats <= 0) {
         throw new Error("Enter a valid amount");
       }
@@ -556,22 +571,39 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           : undefined,
         relayerFee: effectiveRelayerFee,
         boundChainId,
-        tokenMint: PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken)?.mint || undefined,
+        tokenMint: linkToken.mint || undefined,
         recipient: { stealthMeta: noteMeta },
       });
 
-      const ok = await submitter.submit(params, BigInt(sats));
-      if (!ok) {
+      const submission = await submitter.submit(params, BigInt(sats));
+      if (!submission.success || !submission.signature) {
         throw new Error(submitter.error ?? "Could not lock funds for the claim link. Please try again.");
       }
       scheduleInboxRefresh();
+      recordSubmittedTransaction({
+        networkId: chainEnv.networkId,
+        kind: "claim_link",
+        amountBaseUnits: BigInt(sats),
+        tokenSymbol: input.sourceToken,
+        signature: submission.signature,
+      });
 
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
       const url = `${origin}/claim#note=${encodeURIComponent(phrase)}`;
       return { url, secret: phrase };
     },
-    [ctx, requiresBackup, relayerMeta, effectiveRelayerFee, submitter, scheduleInboxRefresh],
+    [
+      ctx,
+      requiresBackup,
+      relayerMeta,
+      effectiveRelayerFee,
+      submitter,
+      scheduleInboxRefresh,
+      selectedPayToken,
+      boundChainId,
+      chainEnv.networkId,
+    ],
   );
 
   return (
@@ -613,8 +645,14 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
             decimals={selectedPayToken.decimals}
             unit={selectedPayToken.unit}
             availableBaseUnits={totalAvailable}
+            feeBufferBaseUnits={BigInt(effectiveRelayerFee)}
             usdPerUnit={usdPerUnit}
           />
+          {btcAmountTooSmall && (
+            <div className="text-xs text-red-500">
+              BTC withdrawal amount must exceed the service fee ({btcServiceFee.toString()} sats).
+            </div>
+          )}
         </>
       )}
 
@@ -691,6 +729,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         unit={selectedPayToken.unit}
         usdPerUnit={usdPerUnit}
         defaultToken={effectiveToken}
+        progressMessage={submitter.statusMessage}
       />
 
       {isSubmittingInFlight && (

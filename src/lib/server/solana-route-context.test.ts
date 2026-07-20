@@ -17,13 +17,18 @@ describe("resolveSolanaRouteConfig", () => {
     expect(result.config.bitcoin.network).toBe("regtest");
   });
 
-  it("rejects Sui network requests", () => {
-    expect(resolveSolanaRouteConfig(
+  it("resolves a Sui-primary network that also configures SNS (backend serves both)", () => {
+    // The backend serves .sol on any network carrying an sns block; sui-regtest
+    // does, so the route resolves. (The UI stays network-scoped and only shows
+    // the current chain's names — that gating lives in the components.)
+    const result = resolveSolanaRouteConfig(
       new Request("https://app.utxopia.test/api/sns/register?network=sui-regtest") as any,
       "/api/sns/register",
-    )).toEqual({
-      error: "/api/sns/register is only available on Solana networks.",
-      status: 400,
-    });
+    );
+
+    expect("error" in result).toBe(false);
+    if ("error" in result) return;
+    expect(result.config.sns?.parentDomain).toBe("utxopia");
+    expect(result.config.solana.rpcUrl).not.toBe("");
   });
 });

@@ -51,7 +51,7 @@ mock.module("@/hooks/use-joinsplit-submit", () => ({
     statusMessage: "",
     txSignature: null,
     error: null,
-    submit: async () => {},
+    submit: async () => ({ success: false, signature: null }),
     reset: () => {},
   }),
 }));

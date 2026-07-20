@@ -44,9 +44,13 @@ function writeLedger(ledger: FaucetActivityLedger): void {
 }
 
 function hasMatchingScannedNote(activity: PendingFaucetActivity, notes: InboxNote[]): boolean {
+  const requestedAmount = BigInt(activity.amountSats);
+  const feeTolerance = requestedAmount / 20n + 1_000n;
   return notes.some((note) => {
     if (note.tokenSymbol !== "zkBTC") return false;
-    if (BigInt(activity.amountSats) !== BigInt(note.amount ?? 0)) return false;
+    const creditedAmount = BigInt(note.amount ?? 0);
+    if (creditedAmount > requestedAmount) return false;
+    if (requestedAmount - creditedAmount > feeTolerance) return false;
     return note.createdAt >= activity.createdAt - 5 * 60 * 1000;
   });
 }
@@ -100,4 +104,3 @@ export function getPendingFaucetActivities(input: {
   }
   return live.sort((a, b) => b.createdAt - a.createdAt);
 }
-

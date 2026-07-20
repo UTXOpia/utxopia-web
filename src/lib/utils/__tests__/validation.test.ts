@@ -4,6 +4,7 @@ import {
   validateWithdrawalAmount,
   validateBtcAddress,
   parseSats,
+  parseDecimalToBaseUnits,
   satsToBtc,
 } from "../validation";
 
@@ -107,6 +108,18 @@ describe("parseSats", () => {
     expect(parseSats("12.34")).toBe(12); // parseInt behavior
     expect(parseSats("-100")).toBeNull();
     expect(parseSats("0")).toBeNull();
+  });
+});
+
+describe("parseDecimalToBaseUnits", () => {
+  it("parses decimal token amounts into base units", () => {
+    expect(parseDecimalToBaseUnits("0.001", 8)).toBe(100000);
+    expect(parseDecimalToBaseUnits("1", 8)).toBe(100000000);
+    expect(parseDecimalToBaseUnits("1.25", 6)).toBe(1250000);
+  });
+
+  it("returns null when the amount rounds down to zero base units", () => {
+    expect(parseDecimalToBaseUnits("0.000000001", 8)).toBeNull();
   });
 });
 

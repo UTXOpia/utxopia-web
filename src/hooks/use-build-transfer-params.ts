@@ -27,6 +27,9 @@ export interface TransferUserInputs {
   /** Relayer stealth meta (for fee output) */
   relayerMeta?: StealthMetaAddress;
   relayerFee: number;
+  /** Redeem (btc) only: withdrawal service fee model read from relay meta. */
+  serviceFeeBase?: number;
+  serviceFeeBps?: number;
   /** Chain id folded into bound params (Solana 103, Sui 784). */
   boundChainId: bigint;
   /** Source token mint. Omit/empty for zkBTC (resolves to config.zkbtcMint);
@@ -98,6 +101,17 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   await initPoseidon();
 
   const { mode, amountSats, selectedNotes, keys, selfMeta, relayerMeta, relayerFee, recipient, boundChainId } = inputs;
+
+  if (mode === "btc") {
+    const base = BigInt(Math.max(0, Math.floor(inputs.serviceFeeBase ?? 0)));
+    const bps = BigInt(Math.max(0, Math.floor(inputs.serviceFeeBps ?? 0)));
+    const serviceFee = (amountSats * bps) / 10_000n + base;
+    if (amountSats <= serviceFee) {
+      throw new Error(
+        `BTC withdrawal amount must exceed the service fee (${serviceFee} sats).`,
+      );
+    }
+  }
 
   // 1. Fetch merkle proofs and prepare claim inputs for each note
   const utxopiaClient = UTXOpiaClient.isInitialized
