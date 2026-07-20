@@ -3,6 +3,9 @@ import type { NextConfig } from "next";
 const nextConfig: NextConfig = {
   experimental: {
     optimizePackageImports: ["lucide-react"],
+    webpackMemoryOptimizations: true,
+    webpackBuildWorker: true,
+    preloadEntriesOnStart: false,
   },
   transpilePackages: ["@utxopia/sdk"],
   // turbopack: {} is required in Next 16 when a webpack config is also present.

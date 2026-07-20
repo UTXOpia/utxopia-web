@@ -284,6 +284,7 @@ export default function Home() {
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                   <Link
                     href={chainHref("/vault")}
+                    prefetch={false}
                     className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-2.5 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                   >
                     <Rocket className="w-5 h-5" />
@@ -294,6 +295,7 @@ export default function Home() {
                 <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                   <Link
                     href={chainHref("/docs")}
+                    prefetch={false}
                     className="btn-tertiary btn-pill inline-flex items-center gap-2 px-5 py-2.5 border border-gray/10 backdrop-blur-md hover:bg-muted/50 hover:border-gray/20 transition-all"
                   >
                     <Shield className="w-4 h-4" />
@@ -371,7 +373,7 @@ export default function Home() {
                     Deposit Bitcoin and supported tokens into private commitments.
                   </p>
                 </div>
-                <Link href={chainHref("/vault")} className="text-sm text-privacy/70 hover:text-privacy transition-colors flex items-center gap-1 shrink-0">
+                <Link href={chainHref("/vault")} prefetch={false} className="text-sm text-privacy/70 hover:text-privacy transition-colors flex items-center gap-1 shrink-0">
                   Start shielding <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
@@ -456,6 +458,7 @@ export default function Home() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                       <Link
                         href={chainHref("/vault")}
+                        prefetch={false}
                         className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-3 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                       >
                         <Rocket className="w-5 h-5" />
@@ -466,6 +469,7 @@ export default function Home() {
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
                       <Link
                         href={chainHref("/explorer")}
+                        prefetch={false}
                         className="btn-tertiary btn-pill inline-flex items-center gap-2 px-5 py-3 border border-gray/10 backdrop-blur-md hover:bg-muted/50 hover:border-gray/20 transition-all"
                       >
                         View Explorer

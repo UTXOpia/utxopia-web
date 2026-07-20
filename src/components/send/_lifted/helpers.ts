@@ -105,18 +105,22 @@ export function estimateTransactionSize(nInputs: number, nOutputs: number): numb
 // --- Note Selection ---
 
 /**
- * Auto-select smallest combination of notes that covers the target amount.
- * Greedy: sort ascending, pick until covered.
+ * Select the fewest notes that cover the target amount. For positive notes,
+ * taking the largest values first minimizes JoinSplit inputs and proof cost.
  */
 export function autoSelectNotes(notes: InboxNote[], targetSats: number): Set<string> {
-  if (targetSats <= 0) return new Set();
-  const sorted = [...notes].sort((a, b) => Number(a.amount) - Number(b.amount));
+  if (!Number.isFinite(targetSats) || targetSats <= 0) return new Set();
+  const sorted = [...notes].sort((a, b) => {
+    if (a.amount === b.amount) return a.id.localeCompare(b.id);
+    return a.amount > b.amount ? -1 : 1;
+  });
   const selected = new Set<string>();
-  let total = 0;
+  let total = 0n;
+  const target = BigInt(Math.trunc(targetSats));
   for (const note of sorted) {
     selected.add(note.id);
-    total += Number(note.amount);
-    if (total >= targetSats) break;
+    total += note.amount;
+    if (total >= target) break;
   }
   return selected;
 }

@@ -5,6 +5,7 @@ import { RefreshCw, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { InboxItem } from "./InboxItem";
 import type { InboxNote } from "@/hooks/use-utxopia";
+import { useTokenPrices } from "@/hooks/use-token-prices";
 
 interface InboxListProps {
   notes: InboxNote[];
@@ -14,6 +15,7 @@ interface InboxListProps {
 
 export function InboxList({ notes, isLoading, onRefresh }: InboxListProps) {
   const [showSpent, setShowSpent] = useState(false);
+  const tokenPrices = useTokenPrices();
 
   const spendableNotes = useMemo(
     () => notes.filter((n) => !n.isSpent),
@@ -66,7 +68,7 @@ export function InboxList({ notes, isLoading, onRefresh }: InboxListProps) {
       {/* List */}
       <div className="space-y-3">
         {displayedNotes.map((note) => (
-          <InboxItem key={note.id} note={note} onClaimed={onRefresh} />
+          <InboxItem key={note.id} note={note} onClaimed={onRefresh} tokenPrices={tokenPrices} />
         ))}
         {spendableNotes.length === 0 && !showSpent && (
           <div className="text-center py-6">

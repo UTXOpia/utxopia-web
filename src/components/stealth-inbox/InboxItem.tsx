@@ -2,11 +2,11 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { ArrowDown, Copy, Check, ArrowRight } from "lucide-react";
+import { Copy, Check, ArrowRight } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
-import { useTokenPrices } from "@/hooks/use-token-prices";
+import type { TokenPrices } from "@/hooks/use-token-prices";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 
@@ -29,6 +29,7 @@ function formatNoteAmount(amount: bigint | number, token: SupportedToken): strin
 interface InboxItemProps {
   note: InboxNote;
   onClaimed?: () => void;
+  tokenPrices: TokenPrices;
 }
 
 function formatRelativeTime(timestamp: number): string {
@@ -58,13 +59,12 @@ function formatFullDate(timestamp: number): string {
   });
 }
 
-export function InboxItem({ note }: InboxItemProps) {
+export function InboxItem({ note, tokenPrices }: InboxItemProps) {
   const router = useRouter();
   const { networkId } = useChainEnvironment();
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const token = getTokenForNote(note);
-  const tokenPrices = useTokenPrices();
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(note.amount) / 10 ** token.decimals) * price : 0;
 

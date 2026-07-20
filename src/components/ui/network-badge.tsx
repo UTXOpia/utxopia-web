@@ -57,6 +57,7 @@ export function NetworkBadge() {
   return (
     <Link
       href={hrefWithChain("/settings", active)}
+      prefetch={false}
       title={badge.title}
       className={cn(
         "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",

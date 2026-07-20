@@ -59,6 +59,7 @@ export function SiteHeader() {
               <motion.div key={href} whileHover={{ y: -1 }}>
                 <Link
                   href={chainHref(href)}
+                  prefetch={false}
                   className="text-xs font-medium text-gray hover:text-foreground transition-all py-3 px-2"
                 >
                   {label}
@@ -75,6 +76,7 @@ export function SiteHeader() {
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
                 <Link
                   href={chainHref("/faucet")}
+                  prefetch={false}
                   className="inline-flex items-center gap-1.5 text-xs font-medium border border-warning/10 px-3.5 py-2.5 rounded-full transition-all text-warning/75 bg-warning/[0.06] hover:bg-warning/10 hover:border-warning/20 hover:text-warning"
                 >
                   <Droplets className="w-3 h-3" />
@@ -84,6 +86,7 @@ export function SiteHeader() {
             )}
             <Link
               href={chainHref("/settings")}
+              prefetch={false}
               aria-label="Settings"
               className="p-2 rounded-full text-gray hover:text-foreground hover:bg-muted/50 transition-colors"
             >
@@ -92,6 +95,7 @@ export function SiteHeader() {
             <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>
               <Link
                 href={chainHref("/vault")}
+                prefetch={false}
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all bg-foreground text-background hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
               >
                 <Wallet className="w-3 h-3" />

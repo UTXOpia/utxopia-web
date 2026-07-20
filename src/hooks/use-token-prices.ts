@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import useSWR from "swr";
 
 const PRICES_API_URL = "/api/token-prices";
 
@@ -61,33 +61,29 @@ async function fetchPricesFromApi(): Promise<TokenPrices | null> {
   }
 }
 
+async function getTokenPrices(): Promise<TokenPrices> {
+  const cached = readCache();
+  if (cached) return cached.prices;
+  return (await fetchPricesFromApi()) ?? EMPTY;
+}
+
+function hasPrice(prices: TokenPrices): boolean {
+  return Object.values(prices).some((price) => price != null);
+}
+
 /** Fetch all token prices (BTC, SOL, USDC, USDT) via same-origin API */
 export function useTokenPrices(): TokenPrices {
-  const [prices, setPrices] = useState<TokenPrices>(() => readCache()?.prices ?? EMPTY);
+  const { data } = useSWR<TokenPrices>(PRICES_API_URL, getTokenPrices, {
+    fallbackData: EMPTY,
+    dedupingInterval: STALE_MS,
+    refreshInterval: STALE_MS,
+    revalidateOnFocus: false,
+    refreshWhenHidden: false,
+    refreshWhenOffline: false,
+    onSuccess: (prices) => {
+      if (hasPrice(prices)) writeCache(prices);
+    },
+  });
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const fetchPrices = async () => {
-      const cached = readCache();
-      if (cached) {
-        setPrices(cached.prices);
-        return;
-      }
-      const p = await fetchPricesFromApi();
-      if (p && !cancelled) {
-        setPrices(p);
-        writeCache(p);
-      }
-    };
-
-    fetchPrices();
-    const interval = setInterval(fetchPrices, STALE_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, []);
-
-  return prices;
+  return data ?? EMPTY;
 }

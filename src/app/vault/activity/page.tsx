@@ -26,7 +26,7 @@ import { AuthModal } from "@/components/auth-modal";
 import { EmptyInbox } from "@/components/stealth-inbox";
 
 import { SUPPORTED_TOKENS, getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
-import { useTokenPrices } from "@/hooks/use-token-prices";
+import { useTokenPrices, type TokenPrices } from "@/hooks/use-token-prices";
 import type { InboxNote } from "@/stores/utxopia-store";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -77,11 +77,10 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function ActivityRow({ note }: { note: InboxNote }) {
+function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: TokenPrices }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const { networkId: network } = useChainEnvironment();
-  const tokenPrices = useTokenPrices();
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(note.amount) / 10 ** token.decimals) * price : 0;
@@ -407,6 +406,7 @@ type ActivityItem =
 
 function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
+  const tokenPrices = useTokenPrices();
   const searchParams = useSearchParams();
   const forcedRefreshRef = useRef(false);
   const { networkId } = useChainEnvironment();
@@ -520,7 +520,7 @@ function ActivityFeed() {
           <div className="rounded-[12px] border border-gray/10 overflow-hidden divide-y divide-gray/8">
             {groupItems.map((item) => (
               item.kind === "note"
-                ? <ActivityRow key={item.id} note={item.note} />
+                ? <ActivityRow key={item.id} note={item.note} tokenPrices={tokenPrices} />
                 : item.kind === "pending-faucet"
                   ? <PendingFaucetRow key={item.id} activity={item.activity} />
                   : <SubmittedTransactionRow key={item.id} activity={item.activity} />
