@@ -360,6 +360,19 @@ function getRequestNetworkConfig(network: NetworkId): NetworkConfig | FaucetNetw
   }
 }
 
+function getDeploymentBitcoinNetwork(): string | undefined {
+  const explicit = process.env.UTXOPIA_BITCOIN_NETWORK || process.env.NEXT_PUBLIC_BTC_NETWORK;
+  if (explicit) return explicit;
+
+  const deploymentNetwork = process.env.UTXOPIA_NETWORK || process.env.NEXT_PUBLIC_NETWORK;
+  if (!deploymentNetwork) return undefined;
+  try {
+    return getNetworkConfig(deploymentNetwork as NetworkId, { applyEnvOverrides: false }).bitcoin.network;
+  } catch {
+    return undefined;
+  }
+}
+
 async function createDepositForStealth(
   stealthAddress: string,
   cfg: NetworkConfig | FaucetNetworkConfig,
@@ -461,6 +474,14 @@ async function ensureWalletFunded(): Promise<string | null> {
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
+  const deploymentBtcNetwork = getDeploymentBitcoinNetwork();
+  if (deploymentBtcNetwork && deploymentBtcNetwork !== "regtest") {
+    return NextResponse.json(
+      { ok: false, error: "regtest faucet is not deployed on this Bitcoin network" },
+      { status: 404 },
+    );
+  }
+
   const activeNetwork = getRequestNetwork(req);
   const activeConfig = getRequestNetworkConfig(activeNetwork);
   const btcNetwork = activeConfig?.bitcoin?.network || process.env.NEXT_PUBLIC_BTC_NETWORK || "";
