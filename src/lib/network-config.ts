@@ -263,6 +263,14 @@ function defaultNetworkForChain(chain: ChainQuery): NetworkId {
   return adapter.defaultNetwork;
 }
 
+/** Sui support was removed from this build. Any network that still resolves to
+ *  the Sui chain (e.g. a stale cookie/localStorage value or a ?chain=sui link)
+ *  is coerced to the Solana default so no session can land on an unreachable
+ *  chain. The Sui type-level scaffolding stays for now; this is the runtime gate. */
+function coerceReachableNetwork(network: NetworkId): NetworkId {
+  return networkChain(network) === "sui" ? defaultNetworkForChain("sol") : network;
+}
+
 function normalizeChainQuery(value: string | null): ChainQuery | null {
   if (value === "sol" || value === "solana") return "sol";
   if (value === "sui") return "sui";
@@ -323,6 +331,10 @@ export function parseNetworkCookie(cookieHeader: string | null): NetworkId | nul
  *  cookies. Falls back to env-var default. Use this in API routes instead of
  *  the bare `detectNetwork()` (which only knows about the build-time env). */
 export function detectNetworkFromRequest(req: Request): NetworkId {
+  return coerceReachableNetwork(resolveNetworkFromRequest(req));
+}
+
+function resolveNetworkFromRequest(req: Request): NetworkId {
   const url = new URL(req.url);
   const cookieNet = parseNetworkCookie(req.headers.get("cookie"));
   const queryNet = networkFromQuery(url.searchParams, cookieNet);
@@ -332,6 +344,10 @@ export function detectNetworkFromRequest(req: Request): NetworkId {
 }
 
 export function detectNetwork(): NetworkId {
+  return coerceReachableNetwork(resolveActiveNetwork());
+}
+
+function resolveActiveNetwork(): NetworkId {
   // 1. localStorage (per-browser user preference, set via /settings)
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);

@@ -15,7 +15,7 @@ const getSolanaKit = () => import("@solana/kit");
 import { getHeliusRpcUrl } from "@/lib/helius-server";
 
 import { getBackendUrl } from "@/lib/api/constants";
-import { detectNetworkFromRequest, getNetworkConfig, networkChain } from "@/lib/network-config";
+import { detectNetworkFromRequest, getNetworkConfig } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
 interface TrackingEntry {
@@ -109,51 +109,6 @@ export async function GET(request: Request) {
   try {
     const { fetchExplorerRedemptions } = await getUTXOpiaSDK();
     const network = detectNetworkFromRequest(request);
-    if (networkChain(network) !== "sol") {
-      const { fetchSuiExplorerTransactions } = await import("@/lib/sui/explorer");
-      const transactions = await fetchSuiExplorerTransactions(
-        getNetworkConfig(network, { applyEnvOverrides: false }),
-      );
-      const redemptions = transactions
-        .filter((tx) => tx.type === "withdraw")
-        .map((tx) => {
-          const input = tx.inputs[0] ?? {};
-          const output = tx.outputs.find((item) => item.type === "withdraw") ?? tx.outputs[0] ?? {};
-          const requestId = String(output.requestId ?? input.requestId ?? tx.txSignature);
-          const amount = Number(output.amount ?? input.grossAmount ?? 0);
-          const serviceFee = Number(output.fee ?? input.fee ?? 0);
-          const payout = Number(output.payout ?? Math.max(0, amount - serviceFee));
-          const completed = tx.status === "confirmed";
-
-          return {
-            pubkey: requestId,
-            requestId,
-            amountSats: amount.toString(),
-            status: completed ? "Completed" : "Processing",
-            requester: "",
-            btcScript: String(output.btcScript ?? ""),
-            btcTxid: output.btcTxid ? String(output.btcTxid) : null,
-            localStatus: completed ? "Completed" : "Processing",
-            createdAt: tx.timestamp,
-            updatedAt: tx.timestamp,
-            retryCount: 0,
-            trackerError: null,
-            actualReceived: completed ? payout.toString() : null,
-            requestTxSignature: tx.txSignature,
-            processingTxSignature: completed ? null : tx.txSignature,
-            completeTxSignature: completed ? tx.txSignature : null,
-            simulated: false,
-            serviceFee: serviceFee > 0 ? serviceFee.toString() : null,
-            serviceFeeBps: 0,
-            serviceFeeBase: 0,
-            burnAmount: amount.toString(),
-            protocolRevenue: serviceFee.toString(),
-            inputCount: tx.inputs.length || 1,
-            outputCount: tx.outputs.length || 1,
-          };
-        });
-      return NextResponse.json({ success: true, redemptions, count: redemptions.length });
-    }
     const cfg = getNetworkConfig(network, { applyEnvOverrides: false });
     const rpcUrl = cfg.solana.rpcUrl || getHeliusRpcUrl(network === "mainnet" ? "mainnet" : "devnet");
     const backendUrl = getBackendUrl(network);
