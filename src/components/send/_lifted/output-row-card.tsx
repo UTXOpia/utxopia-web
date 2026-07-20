@@ -18,6 +18,7 @@ import type { StealthMetaAddress } from "@utxopia/sdk";
 import type { OutputRow } from "./helpers";
 import { isValidSolanaAddress } from "./helpers";
 import { NoteLinkPreview } from "./note-links";
+import { detectNetwork, hrefWithChain } from "@/lib/network-config";
 
 export interface OutputRowHandlers {
   onUpdate: (update: Partial<OutputRow>) => void;
@@ -228,17 +229,20 @@ function RecipientInput({ output, onUpdate, defaultAddress, selfMeta }: {
 
   if (output.mode === "note") {
     const origin = typeof window !== "undefined" ? window.location.origin : "";
+    const claimBase = typeof window !== "undefined"
+      ? `${origin}${hrefWithChain("/claim", detectNetwork())}#note=`
+      : "";
     const phrase = output.secretPhrase.trim();
     const fullClaimUrl = phrase.length >= 8
-      ? `${origin}/claim#note=${encodeURIComponent(phrase)}`
+      ? `${claimBase}${encodeURIComponent(phrase)}`
       : "";
     return (
       <div>
         <div className="flex items-center gap-1 mb-1 pl-1">
           <p className="text-[11px] font-mono text-gray/40 truncate flex-1">
             {phrase.length >= 8
-              ? `${origin}/claim#note=${encodeURIComponent(phrase)}`
-              : `${origin}/claim#note=`}
+              ? fullClaimUrl
+              : claimBase}
           </p>
           {fullClaimUrl && (
             <button

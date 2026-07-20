@@ -28,6 +28,7 @@ import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
 import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
+import { formatAmount } from "@/lib/utils/formatting";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
@@ -309,6 +310,13 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     amountSats > 0 &&
     btcNetPayout <= 0n;
   const amountValid = recipientValid && amountNum > 0 && amountSats > 0 && !btcAmountTooSmall;
+  const formatFee = (amount: bigint | number) => {
+    const raw = typeof amount === "bigint" ? amount : BigInt(amount);
+    return selectedPayToken.shieldedSymbol === "zkBTC"
+      ? `${raw.toLocaleString()} sats`
+      : `${formatAmount(Number(raw), selectedPayToken.decimals)} ${selectedPayToken.shieldedSymbol}`;
+  };
+  const totalFee = BigInt(effectiveRelayerFee) + (recipientType === "btc" ? btcServiceFee : 0n);
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
   const devSignerEnabled =
@@ -590,7 +598,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
 
       const origin =
         typeof window !== "undefined" ? window.location.origin : "";
-      const url = `${origin}/claim#note=${encodeURIComponent(phrase)}`;
+      const url = `${origin}${hrefWithChain("/claim", chainEnv.networkId)}#note=${encodeURIComponent(phrase)}`;
       return { url, secret: phrase };
     },
     [
@@ -659,8 +667,8 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
       {amountValid && (
         <FeeSummary
           recipientType={recipientType}
-          networkFeeLabel="≈ 120 sats"
-          serviceFeeLabel="≈ 5 sats"
+          relayFeeLabel={formatFee(effectiveRelayerFee)}
+          serviceFeeLabel={recipientType === "btc" ? formatFee(btcServiceFee) : undefined}
         />
       )}
 
@@ -709,7 +717,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         }
         recipientLabel={state.recipient.trim()}
         amountLabel={`${state.amount} ${effectiveToken}`}
-        feeLabel="≈ 125 sats"
+        feeLabel={formatFee(totalFee)}
         warning={
           detection.type === "btc"
             ? "Cashing out to Bitcoin reveals the destination address on-chain."

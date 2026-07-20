@@ -6,6 +6,7 @@ const MAX_AGE_MS = 7 * 24 * 60 * 60 * 1000;
 export type SubmittedTransactionKind =
   | "private_send"
   | "claim_link"
+  | "claim_receive"
   | "cashout_btc"
   | "cashout_wallet";
 

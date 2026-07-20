@@ -7,12 +7,19 @@ import {
   deriveKeysFromSeedCircuit,
   computeJoinSplitNullifierSync,
   scanUnifiedNotes,
-  parseAnnouncementsFromHex,
   type UTXOpiaKeys,
 } from "@utxopia/sdk";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { getBackendUrl } from "@/lib/api/constants";
 import type { NetworkId } from "@/lib/network-config";
+import {
+  fetchInboxSource,
+  getTokenScanTargets,
+} from "@/lib/chain-inbox";
+import {
+  ensureChainEnvironment,
+  getChainEnvironment,
+} from "@/lib/chain-environment";
 
 export interface ScannedSecretNote {
   amount: number;
@@ -20,6 +27,10 @@ export interface ScannedSecretNote {
   commitment: string;
   nullifierHash: string;
   isSpent: boolean;
+  ephemeralPub: Uint8Array;
+  stealthPub?: { x: bigint; y: bigint };
+  tokenSymbol: string;
+  blockTime: number;
   /** Full UTXOpiaKeys derived from phrase — use for scanning, signing, and proof generation */
   keys: UTXOpiaKeys;
 }
@@ -43,21 +54,25 @@ export async function scanSecretPhrase(
   const masterKey = deriveMasterKey(phrase.trim());
   const keys = await deriveKeysFromSeedCircuit(masterKey);
 
-  // Fetch all stealth announcements and scan with phrase-derived viewing key
-  const announcementsUrl = network
-    ? `/api/announcements?network=${encodeURIComponent(network)}`
-    : "/api/announcements";
-  const announcementsResp = await fetch(announcementsUrl);
-  if (!announcementsResp.ok) {
-    throw new Error("Failed to fetch stealth announcements");
+  await ensureChainEnvironment();
+  const env = getChainEnvironment();
+  const inboxSource = await fetchInboxSource(env);
+  const announcements = inboxSource.announcements;
+
+  // Claim links can hold any supported shielded token. Scan every configured
+  // token id, then deduplicate by leaf because a note can only match one token.
+  const scannedNotes: Array<
+    Awaited<ReturnType<typeof scanUnifiedNotes>>[number] & { tokenSymbol: string }
+  > = [];
+  const seenLeaves = new Set<number>();
+  for (const { symbol, tokenId } of getTokenScanTargets(env, announcements)) {
+    const matches = await scanUnifiedNotes(keys, announcements, tokenId);
+    for (const note of matches) {
+      if (seenLeaves.has(note.leafIndex)) continue;
+      seenLeaves.add(note.leafIndex);
+      scannedNotes.push({ ...note, tokenSymbol: symbol });
+    }
   }
-  const announcementsData = await announcementsResp.json();
-
-  // Parse announcements into the format scanUnifiedNotes expects
-  const announcements = parseAnnouncementsFromHex(announcementsData.announcements || []);
-
-  const { getActiveTokenId } = await import("@/lib/token-context");
-  const scannedNotes = await scanUnifiedNotes(keys, announcements, getActiveTokenId());
 
   if (scannedNotes.length === 0) {
     throw new Error(
@@ -67,7 +82,9 @@ export async function scanSecretPhrase(
 
   // Fetch spent nullifier PDAs, match client-side (privacy: backend never learns which notes we own)
   const backendUrl = getBackendUrl(network);
-  const spentPdas = await fetchSpentNullifierPDAs(backendUrl, network);
+  const spentPdas = inboxSource.spentNullifiers
+    ? null
+    : await fetchSpentNullifierPDAs(backendUrl, network);
 
   const results: ScannedSecretNote[] = [];
   for (const note of scannedNotes) {
@@ -81,7 +98,13 @@ export async function scanSecretPhrase(
       leafIndex: leafIndexBigint,
       commitment: commitmentHex,
       nullifierHash: nullifierHex,
-      isSpent: spentPdas.has(nullifierHashToPDA(nullifierHex)),
+      isSpent: inboxSource.spentNullifiers
+        ? inboxSource.spentNullifiers.has(nullifierHex)
+        : spentPdas!.has(nullifierHashToPDA(nullifierHex)),
+      ephemeralPub: note.ephemeralPub,
+      stealthPub: note.stealthPub,
+      tokenSymbol: note.tokenSymbol,
+      blockTime: note.blockTime ?? 0,
       keys,
     });
   }

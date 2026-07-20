@@ -312,16 +312,15 @@ export default function Home() {
                     <Loader2 className="w-5 h-5 animate-spin text-gray/40" />
                   </div>
                 ) : (
-                  <div className="flex items-center justify-center gap-8">
+                  <div className="grid grid-cols-3 items-stretch w-full max-w-md mx-auto">
                     {[
                       { label: "Transactions", value: txCount ?? 0, decimals: 0, color: "text-privacy" },
                       { label: "Commitments", value: stats?.totalCommitments ?? 0, decimals: 0, color: "text-foreground" },
                     ].map(({ label, value, decimals, color }, i) => (
                       <React.Fragment key={label}>
-                        {i > 0 && <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray/20 to-transparent" />}
-                        <div className="text-center">
+                        <div className={cn("text-center min-w-0 px-1", i > 0 && "border-l border-gray/15")}>
                           <div className="flex items-center justify-center gap-1.5">
-                            <AnimatedCounter value={value} decimals={decimals} className={`text-2xl font-semibold tracking-tight ${color}`} />
+                            <AnimatedCounter value={value} decimals={decimals} className={`text-xl sm:text-2xl font-semibold tracking-normal ${color}`} />
                           </div>
                           <div className="text-xs text-gray">{label}</div>
                         </div>
@@ -330,20 +329,19 @@ export default function Home() {
                     {/* TVL: total value locked across all tokens */}
                     {(stats?.tokenTVL?.length ?? 0) > 0 && (
                       <>
-                        <div className="w-px h-8 bg-gradient-to-b from-transparent via-gray/20 to-transparent" />
-                        <div className="text-center min-w-0">
+                        <div className="text-center min-w-0 px-1 border-l border-gray/15">
                           <div className="flex items-center justify-center gap-1.5">
                             {(() => {
                               const usd = tvlToUsd(stats!.tokenTVL, prices);
                               if (usd > 0) {
                                 return (
-                                  <span className="text-2xl font-semibold tracking-tight text-foreground">
+                                  <span className="text-xl sm:text-2xl font-semibold tracking-normal text-foreground whitespace-nowrap">
                                     ${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                                   </span>
                                 );
                               }
                               return (
-                                <span className="text-2xl font-semibold tracking-tight text-foreground/60">
+                                <span className="text-xl sm:text-2xl font-semibold tracking-normal text-foreground/60">
                                   No TVL
                                 </span>
                               );

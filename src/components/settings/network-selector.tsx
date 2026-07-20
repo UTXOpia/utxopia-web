@@ -154,7 +154,13 @@ function NetworkRow({
             onClick={locked ? undefined : onSelect}
             disabled={pending || locked}
             aria-pressed={active}
-            aria-label={locked ? `${meta.label} (coming soon)` : `Switch to ${meta.label}`}
+            aria-label={
+              locked
+                ? `${meta.label} (coming soon)`
+                : active
+                  ? `${meta.label} active network`
+                  : `Switch to ${meta.label}`
+            }
             className={cn(
               "shrink-0 mt-1 h-3.5 w-3.5 rounded-full transition-all duration-200",
               "flex items-center justify-center",

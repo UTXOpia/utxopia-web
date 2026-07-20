@@ -11,7 +11,6 @@ import { toHex64 } from "@/lib/utils/hex";
 import { PublicKey } from "@solana/web3.js";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { JoinSplitProofInputs, UTXOpiaKeys, StealthMetaAddress, ScannedNote } from "@utxopia/sdk";
-import { reduceToFieldOnChain } from "@/components/send/_lifted/helpers";
 
 export type TransferMode = "stealth" | "public" | "btc";
 
@@ -93,9 +92,7 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     createRedeemBoundParams,
     createTransferBoundParams,
     computeStealthDataHash,
-    decodeStealthMetaAddress,
     UTXOpiaClient,
-    bytesToHex,
   } = await import("@utxopia/sdk");
 
   await initPoseidon();
@@ -170,24 +167,25 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   const isSpecialOutput = mode === "public" || mode === "btc";
 
   if (mode === "btc") {
-    const result = await createStealthDepositWithKeys(selfMeta, amountSats, tokenId);
-    recipientNpks.push(result.stealthPubKeyX);
-    stealthResults.push({
-      ephemeralPub: new Uint8Array(32),
-      encryptedAmount: new Uint8Array(8),
-      commitment: result.commitment,
-      stealthPubKeyX: result.stealthPubKeyX,
-      npkBytes: result.npkBytes,
-    });
-  } else if (mode === "public") {
-    const addrBytes = new PublicKey(recipient.solanaAddress!).toBytes();
-    const addrReduced = reduceToFieldOnChain(addrBytes);
-    recipientNpks.push(addrReduced);
+    // Public outputs are burns, not private notes. The on-chain redeem
+    // instruction verifies Poseidon(0, token_id, amount) for this final output.
+    recipientNpks.push(0n);
     stealthResults.push({
       ephemeralPub: new Uint8Array(32),
       encryptedAmount: new Uint8Array(8),
       commitment: new Uint8Array(32),
-      stealthPubKeyX: addrReduced,
+      stealthPubKeyX: 0n,
+      npkBytes: new Uint8Array(32),
+    });
+  } else if (mode === "public") {
+    // The public recipient is bound separately. The final circuit output is a
+    // zero-owner burn commitment, matching the unshield program check.
+    recipientNpks.push(0n);
+    stealthResults.push({
+      ephemeralPub: new Uint8Array(32),
+      encryptedAmount: new Uint8Array(8),
+      commitment: new Uint8Array(32),
+      stealthPubKeyX: 0n,
       npkBytes: new Uint8Array(32),
     });
   } else {

@@ -1,62 +1,201 @@
 "use client";
 
-import { Suspense, useState, useEffect } from "react";
-import { useRouter } from "next/navigation";
-import { ArrowLeft, Key } from "lucide-react";
+import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { cn } from "@/lib/utils";
+import Image from "next/image";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
+import {
+  ArrowLeft,
+  CheckCircle2,
+  Key,
+  Loader2,
+  LockKeyhole,
+} from "lucide-react";
+import {
+  SOLANA_BOUND_CHAIN_ID,
+  createStealthMetaAddress,
+  decodeStealthMetaAddress,
+  hexToBytes,
+} from "@utxopia/sdk";
+import { AuthModal } from "@/components/auth-modal";
+import { buildTransferParams } from "@/hooks/use-build-transfer-params";
+import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
+import { usePasskey } from "@/hooks/use-passkey";
+import { useRelayerConfig } from "@/hooks/use-relayer-config";
+import { useUTXOpia } from "@/hooks/use-utxopia";
+import { scanSecretPhrase, type ScannedSecretNote } from "@/lib/claim-utils";
+import {
+  calculateClaimReceiveAmount,
+  selectUnspentClaimNote,
+} from "@/lib/claim-flow";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { hrefWithChain } from "@/lib/network-config";
+import { networkChain, hrefWithChain } from "@/lib/network-config";
+import { PAY_TOKENS } from "@/lib/supported-tokens";
+import { recordSubmittedTransaction } from "@/lib/transaction-activity";
+import { formatAmount } from "@/lib/utils/formatting";
+import { cn } from "@/lib/utils";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
-function ClaimRedirect() {
-  const router = useRouter();
-  const { networkId: network } = useChainEnvironment();
-  // Read from hash fragment (#note=) only. It is never sent to the server.
-  const [noteParam, setNoteParam] = useState<string | null>(null);
+function ClaimContent() {
+  const { networkId } = useChainEnvironment();
+  const ctx = useUTXOpia();
+  const wallet = useWallet();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const submitter = useJoinSplitSubmit();
+  const [phrase, setPhrase] = useState("");
+  const [note, setNote] = useState<ScannedSecretNote | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [signature, setSignature] = useState<string | null>(null);
+  const [authModalOpen, setAuthModalOpen] = useState(false);
+
+  const {
+    isSupported: passkeySupported,
+    hasCredential: hasPasskeyCredential,
+    isLoading: passkeyLoading,
+    error: passkeyError,
+    register: registerPasskey,
+    authenticate: authenticatePasskey,
+  } = usePasskey();
+  const deriveKeysFromPasskeySeed = useUTXOpiaStore((state) => state.deriveKeysFromPasskeySeed);
+  const loadViewOnlyKeys = useUTXOpiaStore((state) => state.loadViewOnlyKeys);
 
   useEffect(() => {
-    const hash = window.location.hash;
-    if (hash.includes("note=")) {
-      const match = hash.match(/note=([^&#]+)/);
-      if (match) {
-        setNoteParam(decodeURIComponent(match[1]));
-        // Clear hash from URL to prevent leaking via browser history
-        window.history.replaceState(null, "", window.location.pathname);
+    const readClaimHash = () => {
+      const match = window.location.hash.match(/(?:^#|&)note=([^&]+)/);
+      if (!match) return;
+      setNote(null);
+      setSignature(null);
+      setError(null);
+      try {
+        setPhrase(decodeURIComponent(match[1]));
+      } catch {
+        setError("This claim link is malformed.");
       }
-    }
+      window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}`);
+    };
+    readClaimHash();
+    window.addEventListener("hashchange", readClaimHash);
+    return () => window.removeEventListener("hashchange", readClaimHash);
   }, []);
 
-  // If note param present, redirect to Pay with the phrase in hash
-  useEffect(() => {
-    if (noteParam) {
-      router.replace(hrefWithChain(`/vault/pay#note=${encodeURIComponent(noteParam)}`, network));
+  const token = useMemo(
+    () => PAY_TOKENS.find((item) => item.shieldedSymbol === note?.tokenSymbol) ?? PAY_TOKENS[0],
+    [note?.tokenSymbol],
+  );
+  const {
+    relayerMeta,
+    relayerMetaLoaded,
+    effectiveRelayerFee,
+  } = useRelayerConfig(token, networkId);
+  const receiveAmount = note
+    ? BigInt(note.amount) - BigInt(effectiveRelayerFee)
+    : 0n;
+
+  const handlePasskeyRegister = async () => {
+    const seed = await registerPasskey();
+    if (!seed) return;
+    await deriveKeysFromPasskeySeed(seed, networkId);
+    setAuthModalOpen(false);
+  };
+
+  const handlePasskeyAuthenticate = async () => {
+    const seed = await authenticatePasskey();
+    if (!seed) return;
+    await deriveKeysFromPasskeySeed(seed, networkId);
+    setAuthModalOpen(false);
+  };
+
+  const inspectClaim = async () => {
+    const secret = phrase.trim();
+    if (secret.length < 8) return;
+    if (networkChain(networkId) !== "sol") {
+      setError("This claim link belongs to the Solana shielded pool. Switch to Solana and try again.");
+      return;
     }
-  }, [network, noteParam, router]);
-
-  const [phrase, setPhrase] = useState("");
-
-  const handleGo = () => {
-    if (phrase.trim().length >= 8) {
-      router.push(hrefWithChain(`/vault/pay#note=${encodeURIComponent(phrase.trim())}`, network));
+    setScanning(true);
+    setError(null);
+    setNote(null);
+    try {
+      const notes = await scanSecretPhrase(secret, networkId);
+      setNote(selectUnspentClaimNote(notes));
+    } catch (claimError) {
+      setError(claimError instanceof Error ? claimError.message : "Could not inspect this claim link.");
+    } finally {
+      setScanning(false);
     }
   };
 
-  // If redirecting, show spinner
-  if (noteParam) {
-    return (
-      <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-        <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-purple animate-spin" />
-        <p className="text-body2 text-gray mt-4">Redirecting to Pay...</p>
-      </main>
-    );
-  }
+  const claimToVault = async () => {
+    if (!note || !ctx.keys || !ctx.stealthAddress || ctx.isViewOnly) {
+      setAuthModalOpen(true);
+      return;
+    }
+    if (!relayerMetaLoaded) {
+      setError("Fee configuration is still loading. Try again in a moment.");
+      return;
+    }
+    setError(null);
+    try {
+      const netReceiveAmount = calculateClaimReceiveAmount(note.amount, effectiveRelayerFee);
+      const importedNote = {
+        amount: BigInt(note.amount),
+        ephemeralPub: note.ephemeralPub,
+        leafIndex: Number(note.leafIndex),
+        commitment: hexToBytes(note.commitment),
+        stealthPub: note.stealthPub,
+        id: `claim-${note.commitment}`,
+        createdAt: note.blockTime ? note.blockTime * 1000 : Date.now(),
+        commitmentHex: note.commitment,
+        isSpent: false,
+        tokenSymbol: note.tokenSymbol,
+      };
+      const claimMeta = createStealthMetaAddress(note.keys);
+      const params = await buildTransferParams({
+        mode: "stealth",
+        amountSats: netReceiveAmount,
+        selectedNotes: [importedNote],
+        keys: note.keys,
+        selfMeta: claimMeta,
+        relayerMeta: relayerMeta?.stealthMeta
+          ? decodeStealthMetaAddress(relayerMeta.stealthMeta)
+          : undefined,
+        relayerFee: effectiveRelayerFee,
+        boundChainId: SOLANA_BOUND_CHAIN_ID,
+        tokenMint: token.mint || undefined,
+        recipient: { stealthMeta: ctx.stealthAddress },
+      });
+      const result = await submitter.submit(params, netReceiveAmount);
+      if (!result.success || !result.signature) {
+        throw new Error("The relay did not accept this claim. Please try again.");
+      }
+      setSignature(result.signature);
+      recordSubmittedTransaction({
+        networkId,
+        kind: "claim_receive",
+        amountBaseUnits: netReceiveAmount,
+        tokenSymbol: token.shieldedSymbol,
+        signature: result.signature,
+      });
+      window.setTimeout(() => void ctx.refreshInbox(undefined, true), 1_500);
+    } catch (claimError) {
+      setError(claimError instanceof Error ? claimError.message : "Claim failed.");
+    }
+  };
 
-  // No param: show simple phrase input
+  const displayAmount = note
+    ? formatAmount(Number(note.amount), token.decimals)
+    : null;
+  const displayReceiveAmount = note && receiveAmount > 0n
+    ? formatAmount(Number(receiveAmount), token.decimals)
+    : null;
+
   return (
     <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-      <div className="w-full max-w-[480px] mb-4 flex items-center justify-between relative z-10">
+      <div className="w-full max-w-[480px] mb-4 relative z-10">
         <Link
-          href={hrefWithChain("/vault", network)}
+          href={hrefWithChain("/vault", networkId)}
           className="inline-flex items-center gap-2 text-body2 text-gray hover:text-gray-light transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -64,71 +203,139 @@ function ClaimRedirect() {
         </Link>
       </div>
 
-      <div
-        className={cn(
-          "bg-card border border-solid border-gray/30 p-6",
-          "w-[480px] max-w-[calc(100vw-32px)] rounded-[16px]",
-          "relative z-10"
-        )}
-      >
-        <div className="flex items-center gap-3 mb-4">
-          <div className="p-2 rounded-[10px] bg-privacy/10">
-            <img src="/brand/logo-transparent-64.png" alt="" className="w-5 h-5 object-contain" />
+      <div className="bg-card border border-solid border-gray/30 p-6 w-[480px] max-w-[calc(100vw-32px)] rounded-[16px] relative z-10">
+        <div className="flex items-center gap-3 mb-5">
+          <div className="p-2 rounded-[8px] bg-privacy/10">
+            <Image src="/brand/logo-transparent-64.png" alt="" width={20} height={20} />
           </div>
           <div>
-            <h1 className="text-heading6 text-foreground">Claim zkBTC</h1>
-            <p className="text-caption text-gray">
-              Enter your secret phrase to claim your note
-            </p>
+            <h1 className="text-heading6 text-foreground">Claim private funds</h1>
+            <p className="text-caption text-gray">Inspect the private note before redeeming it.</p>
           </div>
         </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="text-body2 text-gray-light pl-2 mb-2 block">
-              Secret Phrase
-            </label>
-            <div className="relative">
-              <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
-              <input
-                type="text"
-                value={phrase}
-                onChange={(e) => setPhrase(e.target.value)}
-                onKeyDown={(e) => { if (e.key === "Enter") handleGo(); }}
-                placeholder="Enter your secret phrase..."
-                className={cn(
-                  "w-full p-3 pl-10 bg-muted border border-gray/15 rounded-[12px]",
-                  "text-body2 font-mono text-foreground placeholder:text-gray",
-                  "outline-none focus:border-privacy/40 transition-colors"
-                )}
-              />
+        {signature ? (
+          <div className="space-y-4 text-center">
+            <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
+            <div>
+              <p className="text-sm font-semibold text-foreground">Funds claimed</p>
+              <p className="text-xs text-gray mt-1">The private transfer was confirmed by the relay.</p>
             </div>
+            <Link href={hrefWithChain("/vault/activity?refresh=inbox", networkId)} className="btn-primary w-full">
+              View activity
+            </Link>
           </div>
+        ) : (
+          <div className="space-y-4">
+            <div>
+              <label htmlFor="claim-secret" className="text-body2 text-gray-light pl-2 mb-2 block">
+                Secret phrase
+              </label>
+              <div className="relative">
+                <Key className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
+                <input
+                  id="claim-secret"
+                  type="text"
+                  value={phrase}
+                  onChange={(event) => {
+                    setPhrase(event.target.value);
+                    setNote(null);
+                    setError(null);
+                  }}
+                  onKeyDown={(event) => { if (event.key === "Enter") void inspectClaim(); }}
+                  placeholder="Enter your secret phrase..."
+                  autoComplete="off"
+                  spellCheck={false}
+                  className={cn(
+                    "w-full p-3 pl-10 bg-muted border rounded-[10px]",
+                    "text-body2 font-mono text-foreground placeholder:text-gray",
+                    "outline-none transition-colors",
+                    error ? "border-error/40" : "border-gray/15 focus:border-privacy/40",
+                  )}
+                />
+              </div>
+            </div>
 
-          <button
-            onClick={handleGo}
-            disabled={phrase.trim().length < 8}
-            className="btn-primary w-full"
-          >
-            <Key className="w-5 h-5" />
-            Claim Note
-          </button>
-        </div>
+            {error && (
+              <p role="alert" className="text-xs text-error bg-error/8 border border-error/20 rounded-[8px] px-3 py-2">
+                {error}
+              </p>
+            )}
+
+            {note && (
+              <div className="rounded-[8px] border border-gray/15 bg-muted/35 px-4 py-3 space-y-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-gray">Claim note</span>
+                  <span className="font-mono font-semibold text-foreground">{displayAmount} {token.shieldedSymbol}</span>
+                </div>
+                <div className="flex items-center justify-between gap-3 text-xs">
+                  <span className="text-gray/70">Relay fee</span>
+                  <span className="font-mono text-gray">{formatAmount(effectiveRelayerFee, token.decimals)} {token.shieldedSymbol}</span>
+                </div>
+                {displayReceiveAmount && (
+                  <div className="flex items-center justify-between gap-3 text-sm pt-2 border-t border-gray/10">
+                    <span className="text-gray">You receive</span>
+                    <span className="font-mono font-semibold text-privacy">{displayReceiveAmount} {token.shieldedSymbol}</span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!note ? (
+              <button
+                type="button"
+                onClick={() => void inspectClaim()}
+                disabled={phrase.trim().length < 8 || scanning}
+                className="btn-primary w-full"
+              >
+                {scanning ? <Loader2 className="w-5 h-5 animate-spin" /> : <Key className="w-5 h-5" />}
+                {scanning ? "Checking claim..." : "Inspect claim"}
+              </button>
+            ) : !ctx.keys || ctx.isViewOnly ? (
+              <button type="button" onClick={() => setAuthModalOpen(true)} className="btn-primary w-full">
+                <LockKeyhole className="w-5 h-5" />
+                Unlock destination vault
+              </button>
+            ) : (
+              <button
+                type="button"
+                onClick={() => void claimToVault()}
+                disabled={!relayerMetaLoaded || submitter.status === "processing" || submitter.status === "submitting"}
+                className="btn-primary w-full"
+              >
+                {(submitter.status === "processing" || submitter.status === "submitting") && <Loader2 className="w-5 h-5 animate-spin" />}
+                {submitter.statusMessage || "Claim to private vault"}
+              </button>
+            )}
+          </div>
+        )}
       </div>
+
+      <AuthModal
+        open={authModalOpen}
+        onOpenChange={setAuthModalOpen}
+        auth={{
+          passkeySupported,
+          hasPasskeyCredential,
+          passkeyLoading,
+          walletLoading: ctx.isLoading,
+          walletConnected: wallet.connected,
+          error: ctx.error || passkeyError,
+          onPasskeyRegister: () => void handlePasskeyRegister(),
+          onPasskeyAuthenticate: () => void handlePasskeyAuthenticate(),
+          onWalletConnect: () => { setAuthModalOpen(false); setWalletModalVisible(true); },
+          onWalletDeriveKeys: async () => { await ctx.deriveKeys(); setAuthModalOpen(false); },
+          onViewOnlyLogin: (viewingKey) => { void loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
+        }}
+      />
     </main>
   );
 }
 
 export default function ClaimPage() {
   return (
-    <Suspense
-      fallback={
-        <main className="min-h-screen bg-background flex flex-col items-center justify-center p-4">
-          <div className="w-16 h-16 rounded-full border-4 border-gray/15 border-t-purple animate-spin" />
-        </main>
-      }
-    >
-      <ClaimRedirect />
+    <Suspense fallback={<main className="min-h-screen bg-background" />}>
+      <ClaimContent />
     </Suspense>
   );
 }

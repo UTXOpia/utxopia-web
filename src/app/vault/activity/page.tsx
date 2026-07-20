@@ -14,6 +14,7 @@ import {
   Check,
   RefreshCw,
   Loader2,
+  AlertTriangle,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -305,9 +306,10 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
   );
 }
 
-const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; status: string }> = {
+const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; status: string; incoming?: boolean }> = {
   private_send: { label: "Private transfer", status: "Relay confirmed" },
   claim_link: { label: "Claim link funded", status: "Relay confirmed" },
+  claim_receive: { label: "Claim link received", status: "Relay confirmed", incoming: true },
   cashout_btc: { label: "Bitcoin withdrawal", status: "Request confirmed on-chain" },
   cashout_wallet: { label: "Wallet withdrawal", status: "Relay confirmed" },
 };
@@ -318,6 +320,56 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
   const { networkId, config } = useChainEnvironment();
   const token = getToken(activity.tokenSymbol);
   const meta = SUBMITTED_LABELS[activity.kind];
+  const [redemption, setRedemption] = useState<{
+    btcTxid: string | null;
+    localStatus: string | null;
+    trackerError: string | null;
+  } | null>(null);
+
+  useEffect(() => {
+    if (activity.kind !== "cashout_btc") return;
+    let cancelled = false;
+    const sync = async () => {
+      try {
+        const response = await fetch(`/api/explorer/redemptions?network=${encodeURIComponent(networkId)}`, {
+          cache: "no-store",
+        });
+        if (!response.ok) return;
+        const data = await response.json() as { redemptions?: Array<{
+          requestTxSignature?: string;
+          btcTxid?: string | null;
+          localStatus?: string | null;
+          trackerError?: string | null;
+        }> };
+        const match = data.redemptions?.find((item) => item.requestTxSignature === activity.signature);
+        if (!cancelled && match) {
+          setRedemption({
+            btcTxid: match.btcTxid ?? null,
+            localStatus: match.localStatus ?? null,
+            trackerError: match.trackerError ?? null,
+          });
+        }
+      } catch {
+        // Keep the on-chain request status when the tracker is temporarily unavailable.
+      }
+    };
+    void sync();
+    const timer = window.setInterval(sync, 8_000);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [activity.kind, activity.signature, networkId]);
+
+  const redemptionFailed = redemption?.localStatus?.toLowerCase() === "failed";
+  const redemptionPending = activity.kind === "cashout_btc" && !redemption?.btcTxid && !redemptionFailed;
+  const statusText = activity.kind !== "cashout_btc"
+    ? meta.status
+    : redemption?.btcTxid
+      ? "Bitcoin transaction broadcast"
+      : redemptionFailed
+        ? redemption.trackerError || "Bitcoin broadcast failed"
+        : "Waiting for Bitcoin broadcast";
 
   const copySignature = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -335,19 +387,37 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
           expanded ? "bg-muted/50" : "hover:bg-muted/40",
         )}
       >
-        <div className="w-6 h-6 rounded-full flex items-center justify-center shrink-0 bg-success/10">
-          <Check className="w-3.5 h-3.5 text-success" />
+        <div className={cn(
+          "w-6 h-6 rounded-full flex items-center justify-center shrink-0",
+          redemptionFailed ? "bg-error/10" : "bg-success/10",
+        )}>
+          {redemptionFailed ? (
+            <AlertTriangle className="w-3.5 h-3.5 text-error" />
+          ) : redemptionPending ? (
+            <Loader2 className="w-3.5 h-3.5 text-gray animate-spin" />
+          ) : (
+            <Check className="w-3.5 h-3.5 text-success" />
+          )}
         </div>
         <div className="flex-1 min-w-0">
           <span className="text-sm text-foreground font-medium">{meta.label}</span>
-          <p className="text-[11px] text-success/75">Submitted / {timeAgo(activity.createdAt)}</p>
+          <p className={cn(
+            "text-[11px]",
+            redemptionFailed ? "text-error/75" : redemptionPending ? "text-gray/60" : "text-success/75",
+          )}>Submitted / {timeAgo(activity.createdAt)}</p>
         </div>
         <div className="text-right shrink-0">
-          <p className="text-sm font-semibold font-mono tabular-nums text-gray">
-            -{formatAmt(BigInt(activity.amountBaseUnits), token)}{" "}
+          <p className={cn(
+            "text-sm font-semibold font-mono tabular-nums",
+            meta.incoming ? "text-privacy" : "text-gray",
+          )}>
+            {meta.incoming ? "+" : "-"}{formatAmt(BigInt(activity.amountBaseUnits), token)}{" "}
             <span className="text-xs font-medium">{token.shieldedSymbol}</span>
           </p>
-          <p className="hidden sm:block text-[11px] text-gray/45">{meta.status}</p>
+          <p className={cn(
+            "hidden sm:block text-[11px] max-w-52 truncate",
+            redemptionFailed ? "text-error/80" : "text-gray/45",
+          )}>{statusText}</p>
         </div>
       </div>
 
@@ -356,7 +426,9 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
           <div className="px-3.5 py-2 space-y-1.5 text-xs">
             <div className="flex justify-between gap-3">
               <span className="text-gray/40">Status</span>
-              <span className="text-success text-right">{meta.status}</span>
+              <span className={cn("text-right", redemptionFailed ? "text-error" : "text-success")}>
+                {statusText}
+              </span>
             </div>
             <div className="flex justify-between gap-3">
               <span className="text-gray/40">Time</span>

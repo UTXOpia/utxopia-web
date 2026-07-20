@@ -8,13 +8,17 @@
 import { useState } from "react";
 import { Copy, Check, FileText } from "lucide-react";
 import { formatBtc } from "@/lib/utils/formatting";
+import { detectNetwork, hrefWithChain } from "@/lib/network-config";
+
+function claimUrlForPhrase(phrase: string): string {
+  if (typeof window === "undefined") return "";
+  return `${window.location.origin}${hrefWithChain("/claim", detectNetwork())}#note=${encodeURIComponent(phrase)}`;
+}
 
 /** Inline preview of the claim URL shown while composing a Note output */
 export function NoteLinkPreview({ phrase }: { phrase: string }) {
   const [copied, setCopied] = useState(false);
-  const claimUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/claim#note=${encodeURIComponent(phrase)}`
-    : "";
+  const claimUrl = claimUrlForPhrase(phrase);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(claimUrl).then(() => {
@@ -40,9 +44,7 @@ export function NoteLinkPreview({ phrase }: { phrase: string }) {
 /** Full claim link card shown in the success step */
 export function NoteClaimLink({ phrase, amount, tokenSymbol = "zkBTC" }: { phrase: string; amount: number; tokenSymbol?: string }) {
   const [copied, setCopied] = useState(false);
-  const claimUrl = typeof window !== "undefined"
-    ? `${window.location.origin}/claim#note=${encodeURIComponent(phrase)}`
-    : "";
+  const claimUrl = claimUrlForPhrase(phrase);
 
   const handleCopy = () => {
     navigator.clipboard.writeText(claimUrl).then(() => {

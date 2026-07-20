@@ -9,8 +9,28 @@ const ALLOWED_ORIGINS = (
   .map((o) => o.trim())
   .filter(Boolean);
 
-function isAllowedOrigin(origin: string | null): boolean {
+export function isSameOrigin(origin: string | null, requestOrigin: string): boolean {
+  if (!origin) return true;
+  try {
+    return new URL(origin).origin === new URL(requestOrigin).origin;
+  } catch {
+    return false;
+  }
+}
+
+export function requestOrigin(request: NextRequest): string {
+  const forwardedHost = request.headers.get("x-forwarded-host")?.split(",")[0]?.trim();
+  const host = forwardedHost || request.headers.get("host") || request.nextUrl.host;
+  const forwardedProto = request.headers.get("x-forwarded-proto")?.split(",")[0]?.trim();
+  const protocol = forwardedProto || request.nextUrl.protocol.replace(":", "");
+  return `${protocol}://${host}`;
+}
+
+function isAllowedOrigin(origin: string | null, requestOrigin: string): boolean {
   if (!origin) return true; // Same-origin requests have no Origin header
+  // Browsers include Origin on same-origin POST requests. Trust the URL the
+  // request actually reached before consulting the cross-origin allowlist.
+  if (isSameOrigin(origin, requestOrigin)) return true;
   if (ALLOWED_ORIGINS.length === 0) {
     if (process.env.NODE_ENV === "production") return false;
     return true;
@@ -23,9 +43,10 @@ function isAllowedOrigin(origin: string | null): boolean {
 export function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const origin = request.headers.get("origin");
+  const servedOrigin = requestOrigin(request);
 
   if (pathname.startsWith("/api/")) {
-    if (!isAllowedOrigin(origin)) {
+    if (!isAllowedOrigin(origin, servedOrigin)) {
       return NextResponse.json(
         { success: false, error: "Forbidden: origin not allowed" },
         { status: 403 }
@@ -34,7 +55,7 @@ export function proxy(request: NextRequest) {
 
     if (request.method === "OPTIONS") {
       const res = new NextResponse(null, { status: 204 });
-      if (origin && isAllowedOrigin(origin)) {
+      if (origin && isAllowedOrigin(origin, servedOrigin)) {
         res.headers.set("Access-Control-Allow-Origin", origin);
         res.headers.set("Access-Control-Allow-Methods", "GET, POST, OPTIONS");
         res.headers.set("Access-Control-Allow-Headers", "Content-Type, X-API-Key");
@@ -44,7 +65,7 @@ export function proxy(request: NextRequest) {
     }
 
     const response = NextResponse.next();
-    if (origin && isAllowedOrigin(origin)) {
+    if (origin && isAllowedOrigin(origin, servedOrigin)) {
       response.headers.set("Access-Control-Allow-Origin", origin);
     }
     addSecurityHeaders(response);
