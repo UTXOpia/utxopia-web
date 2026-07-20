@@ -5,6 +5,7 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { AtSign, ArrowRight, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSnsName } from "@/hooks/use-sns-name";
+import { useSnsRegisteredCount } from "@/hooks/use-sns-name-count";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { getSnsConfig } from "@/lib/names/sns";
@@ -43,6 +44,10 @@ export function ReceiveNamePrompt() {
   const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
+
+  // Only fetched while the dialog is open, so a logged-in user who already has a
+  // name never triggers the RPC count.
+  const registeredCount = useSnsRegisteredCount(networkId, open && isSolanaNetwork && !!snsConfig);
 
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -182,6 +187,13 @@ export function ReceiveNamePrompt() {
             instead of a long address. It resolves to a private, unlinkable receive
             address — your balances stay hidden.
           </Dialog.Description>
+
+          {registeredCount != null && registeredCount > 0 && (
+            <p className="-mt-3 mb-6 text-center text-[11px] text-gray/70">
+              <span className="font-mono text-gray-light">{registeredCount.toLocaleString()}</span>{" "}
+              {registeredCount === 1 ? "name" : "names"} claimed so far
+            </p>
+          )}
 
           <div className="flex items-stretch rounded-[12px] border border-gray/25 bg-muted/40 overflow-hidden">
             <input
