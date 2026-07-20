@@ -32,6 +32,7 @@ import { formatAmount } from "@/lib/utils/formatting";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
+import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
 import { resolveSuiNsUtxopiaRecord } from "@/lib/sui/suins";
 import { recordSubmittedTransaction, type SubmittedTransactionKind } from "@/lib/transaction-activity";
@@ -347,9 +348,9 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const onSend = useCallback(async () => {
     setError(null);
     setSubmitting(true);
-    // Close the review modal as submission begins: surfaces the in-flight /
-    // error state in the form, and prevents a second hold-to-confirm.
-    dispatch({ type: "close_review" });
+    // The review modal stays open and hosts the progress / result state, so the
+    // user tracks the payment to confirmation in one place instead of being
+    // navigated away.
     try {
       if (!ctx.keys || !ctx.stealthAddress) {
         throw new Error(
@@ -479,10 +480,15 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
       });
 
       const submission = await submitter.submit(params, BigInt(amountSats));
+      // On failure the submit hook holds the error state, which the modal
+      // renders (with Try again); nothing else to do here.
       if (!submission.success || !submission.signature) return;
       scheduleInboxRefresh();
 
-      dispatch({ type: "reset" });
+      // Record to the activity log for history, but keep the user on the send
+      // page: the modal shows the confirmed result inline with an explorer link
+      // and an explicit "View activity" action. The form is reset when the user
+      // dismisses the success view (see closeReview).
       const result: SubmittedTransactionKind =
         intent.kind === "redeem"
           ? "cashout_btc"
@@ -497,10 +503,6 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         signature: submission.signature,
         recipient: state.recipient.trim(),
       });
-      router.push(hrefWithChain(
-        `/vault/activity?result=${result}&tx=${encodeURIComponent(submission.signature)}`,
-        chainEnv.networkId,
-      ));
     } catch (e: unknown) {
       setError(e instanceof Error ? e.message : "Send failed");
     } finally {
@@ -524,9 +526,48 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     submitter,
     amountSats,
     requiresBackup,
-    router,
     scheduleInboxRefresh,
   ]);
+
+  // Explorer link + activity-page target for the confirmed transaction, shown
+  // inside the review modal's success view.
+  const txHref = submitter.txSignature
+    ? getSolanaExplorerTxUrl(submitter.txSignature, chainEnv.networkId)
+    : null;
+  const activityKind: SubmittedTransactionKind =
+    recipientType === "btc"
+      ? "cashout_btc"
+      : recipientType === "spl_wallet"
+        ? "cashout_wallet"
+        : "private_send";
+
+  // Closing the review modal: blocked mid-flight (can't cancel a proof), resets
+  // the submit hook so a reopen starts clean, and wipes the form only after a
+  // successful send so the page returns to a clean slate.
+  const closeReview = useCallback(() => {
+    if (isSubmittingInFlight) return;
+    if (submitter.status === "success") dispatch({ type: "reset" });
+    submitter.reset();
+    setError(null);
+    dispatch({ type: "close_review" });
+  }, [isSubmittingInFlight, submitter]);
+
+  const onRetry = useCallback(() => {
+    submitter.reset();
+    setError(null);
+  }, [submitter]);
+
+  const onViewActivity = useCallback(() => {
+    const sig = submitter.txSignature;
+    router.push(
+      hrefWithChain(
+        sig
+          ? `/vault/activity?result=${activityKind}&tx=${encodeURIComponent(sig)}`
+          : "/vault/activity",
+        chainEnv.networkId,
+      ),
+    );
+  }, [router, submitter.txSignature, activityKind, chainEnv.networkId]);
 
   const onGenerateClaimLink = useCallback(
     async (input: {
@@ -712,9 +753,10 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
 
       <ReviewModal
         open={state.reviewOpen}
-        onOpenChange={(o) =>
-          dispatch({ type: o ? "open_review" : "close_review" })
-        }
+        onOpenChange={(o) => {
+          if (o) dispatch({ type: "open_review" });
+          else closeReview();
+        }}
         recipientLabel={state.recipient.trim()}
         amountLabel={`${state.amount} ${effectiveToken}`}
         feeLabel={formatFee(totalFee)}
@@ -726,6 +768,15 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         chainId={activeChainId}
         networkId={chainEnv.networkId}
         onConfirm={onSend}
+        status={submitter.status}
+        busy={isSubmittingInFlight}
+        statusMessage={submitter.statusMessage}
+        provingElapsed={provingElapsed}
+        errorMessage={submitter.error ?? error}
+        txHref={txHref}
+        onRetry={onRetry}
+        onDone={closeReview}
+        onViewActivity={onViewActivity}
       />
 
       <ClaimLinkModal
@@ -740,7 +791,10 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         progressMessage={submitter.statusMessage}
       />
 
-      {isSubmittingInFlight && (
+      {/* Inline status is the claim-link path's feedback only; the send/cash-out
+          path surfaces progress and errors inside the review modal, which stays
+          open through the whole lifecycle. */}
+      {!state.reviewOpen && isSubmittingInFlight && (
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Loader2 className="w-3 h-3 animate-spin" />
           {submitter.statusMessage || "Submitting…"}
@@ -750,18 +804,17 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         </div>
       )}
 
-      {submitter.status === "error" && submitter.error && (
+      {!state.reviewOpen && submitter.status === "error" && submitter.error && (
         <div className="flex flex-col items-start gap-2 px-3 py-2.5 rounded-lg border border-red-500/30 bg-red-500/5 text-xs text-red-500">
           <span className="break-words">{submitter.error}</span>
           <button
             type="button"
             onClick={() => {
               submitter.reset();
-              dispatch({ type: "open_review" });
             }}
             className="font-medium text-red-400 underline underline-offset-2 hover:text-red-300"
           >
-            Try again
+            Dismiss
           </button>
         </div>
       )}
