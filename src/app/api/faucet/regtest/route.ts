@@ -3,8 +3,7 @@
  *
  * Talks to the `utxopia-esplora-regtest` container via `docker exec`, calling
  * bitcoin-cli the same way `scripts/hybrid/send-to.ts` does. It supports:
- *   - legacy raw `bcrt1...` drips
- *   - `utxo:...` stealth-address airdrops, where the route builds the actual
+ *   - `utxo:...` private vault deposits, where the route builds the actual
  *     UTXOpia deposit tx with the compact deposit OP_RETURN.
  *
  * Guard rails:
@@ -14,7 +13,7 @@
  *   - amount capped at 0.001 BTC (100_000 sats) by default
  *   - auto-bootstraps spendable balance: if the regtest wallet has zero
  *     spendable BTC, runs `generatetoaddress 101 <miner>` once before the
- *     first drip so users don't have to manually mine after `docker compose up`
+ *     first deposit so users don't have to manually mine after `docker compose up`
  *   - returns 429 (with `retryAfterSec`) when in cooldown
  *
  * Override knobs (env):
@@ -84,7 +83,7 @@ const BOOTSTRAP_BLOCKS = 101;
 
 // File-backed daily quota. Survives Next.js process restarts so
 // a hot-reload or redeploy doesn't reset everyone's allowance to zero. The
-// map is loaded lazily on first access and written back after each drip.
+// map is loaded lazily on first access and written back after each deposit.
 //
 // Path defaults to `.faucet-limits.json` in the web project root; override
 // via REGTEST_FAUCET_LIMIT_PATH if the deployment has a writable mount.
@@ -159,7 +158,7 @@ const limitStore: LimitStore = (() => {
 })();
 
 // Once we've confirmed the wallet has spendable balance (either it always
-// did, or we just bootstrapped it), skip the balance check on future drips.
+// did, or we just bootstrapped it), skip the balance check on future deposits.
 // Held on globalThis so Next.js hot-reload doesn't clear it.
 const bootstrapState: { confirmed: boolean } = (() => {
   const g = globalThis as unknown as { __utxopiaFaucetBootstrap?: { confirmed: boolean } };
@@ -167,8 +166,7 @@ const bootstrapState: { confirmed: boolean } = (() => {
   return g.__utxopiaFaucetBootstrap;
 })();
 
-interface DripBody {
-  address?: string;
+interface DepositBody {
   stealthAddress?: string;
   amountSats?: number;
 }
@@ -265,11 +263,6 @@ async function runBitcoinCli(args: string[]): Promise<string> {
 
 function isEnoent(e: unknown): e is NodeJS.ErrnoException {
   return e instanceof Error && "code" in e && (e as NodeJS.ErrnoException).code === "ENOENT";
-}
-
-function isValidRegtestAddress(addr: string): boolean {
-  // bech32: bcrt1q… (P2WPKH/P2WSH) or bcrt1p… (P2TR). Length 42–62 covers all variants.
-  return /^bcrt1[a-z0-9]{38,90}$/.test(addr);
 }
 
 function satsToBtcDecimal(sats: number): string {
@@ -431,7 +424,7 @@ function recordLimitHit(keys: string[]): void {
  * Ensure the regtest wallet has spendable balance. If `getbalance` returns 0
  * and AUTOMINE is enabled, mine `BOOTSTRAP_BLOCKS` to a fresh address so the
  * coinbase reward is spendable. Idempotent — flips `bootstrapState.confirmed`
- * on first success so subsequent drips skip the RPC roundtrip.
+ * on first success so subsequent deposits skip the RPC roundtrip.
  *
  * Returns `null` on success; an error string on failure (caller decides
  * whether to surface or proceed).
@@ -493,19 +486,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     }
   }
 
-  let body: DripBody;
+  let body: DepositBody;
   try {
-    body = (await req.json()) as DripBody;
+    body = (await req.json()) as DepositBody;
   } catch {
     return NextResponse.json({ ok: false, error: "invalid JSON body" }, { status: 400 });
   }
 
-  const requestedAddress = (body.stealthAddress ?? body.address ?? "").trim();
-  const isStealthAirdrop = requestedAddress.startsWith("utxo:");
+  const stealthAddress = (body.stealthAddress ?? "").trim();
   const amountSats = Number(body.amountSats ?? DEFAULT_SATS);
-  if (!isStealthAirdrop && !isValidRegtestAddress(requestedAddress)) {
+  if (!/^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress)) {
     return NextResponse.json(
-      { ok: false, error: "address must be a regtest bech32 (bcrt1…) or UTXOpia stealth address (utxo:…)" },
+      { ok: false, error: "stealthAddress must be a UTXOpia private address" },
       { status: 400 },
     );
   }
@@ -518,7 +510,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const clientIp = getClientIp(req.headers);
   const quotaKeys = [
-    limitKey("recipient", requestedAddress),
+    limitKey("recipient", stealthAddress),
     limitKey("ip", clientIp),
   ];
   const quota = getLimitStatus(quotaKeys);
@@ -526,7 +518,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     return NextResponse.json(
       {
         ok: false,
-        error: `daily airdrop limit reached — max ${DAILY_LIMIT} request${DAILY_LIMIT === 1 ? "" : "s"} per day`,
+        error: `daily deposit limit reached: max ${DAILY_LIMIT} request${DAILY_LIMIT === 1 ? "" : "s"} per day`,
         retryAfterSec: quota.remaining,
         dailyLimit: DAILY_LIMIT,
       },
@@ -534,20 +526,18 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  let btcAddress = requestedAddress;
-  let opReturnHex: string | undefined;
+  let btcAddress: string;
+  let opReturnHex: string;
   let depositVout: number | undefined;
-  if (isStealthAirdrop) {
-    try {
-      const deposit = await createDepositForStealth(requestedAddress, activeConfig);
-      btcAddress = deposit.btcAddress;
-      opReturnHex = hex(deposit.opReturnPayload);
-    } catch (e) {
-      return NextResponse.json(
-        { ok: false, error: `invalid stealth address or deposit config: ${truncate(e instanceof Error ? e.message : String(e), 300)}` },
-        { status: 400 },
-      );
-    }
+  try {
+    const deposit = await createDepositForStealth(stealthAddress, activeConfig);
+    btcAddress = deposit.btcAddress;
+    opReturnHex = hex(deposit.opReturnPayload);
+  } catch (e) {
+    return NextResponse.json(
+      { ok: false, error: `invalid stealth address or deposit config: ${truncate(e instanceof Error ? e.message : String(e), 300)}` },
+      { status: 400 },
+    );
   }
 
   if (REMOTE_FAUCET_MODE === "backend") {
@@ -576,45 +566,41 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 1. Send the BTC. For `utxo:` airdrops this is a full UTXOpia deposit tx:
-  // payment output to the pool/vault plus compact OP_RETURN metadata.
+  // 1. Create and broadcast a UTXOpia deposit transaction: payment output to
+  // the pool/vault plus compact OP_RETURN metadata.
   let txid: string;
   try {
-    if (opReturnHex) {
-      const outputs = JSON.stringify([
-        { [btcAddress]: Number(satsToBtcDecimal(amountSats)) },
-        { data: opReturnHex },
-      ]);
-      const rawHex = await runBitcoinCli(["createrawtransaction", "[]", outputs]);
-      const fundedJson = await runBitcoinCli(["fundrawtransaction", rawHex]);
-      const fundedHex = JSON.parse(fundedJson).hex;
-      const signedJson = await runBitcoinCli(["signrawtransactionwithwallet", fundedHex]);
-      const signed = JSON.parse(signedJson);
-      if (!signed.complete) throw new Error(`sign failed: ${JSON.stringify(signed.errors ?? [])}`);
-      const decodedSignedJson = await runBitcoinCli(["decoderawtransaction", signed.hex]);
-      const decodedSigned = JSON.parse(decodedSignedJson);
-      const depositOutput = decodedSigned.vout?.find((out: { n?: number; value?: number; scriptPubKey?: { address?: string } }) =>
-        out.scriptPubKey?.address === btcAddress &&
-        Math.round(Number(out.value ?? 0) * 1e8) === amountSats
-      );
-      if (typeof depositOutput?.n === "number") depositVout = depositOutput.n;
-      txid = await runBitcoinCli(["sendrawtransaction", signed.hex]);
-    } else {
-      txid = await runBitcoinCli(["sendtoaddress", btcAddress, satsToBtcDecimal(amountSats)]);
-    }
+    const outputs = JSON.stringify([
+      { [btcAddress]: Number(satsToBtcDecimal(amountSats)) },
+      { data: opReturnHex },
+    ]);
+    const rawHex = await runBitcoinCli(["createrawtransaction", "[]", outputs]);
+    const fundedJson = await runBitcoinCli(["fundrawtransaction", rawHex]);
+    const fundedHex = JSON.parse(fundedJson).hex;
+    const signedJson = await runBitcoinCli(["signrawtransactionwithwallet", fundedHex]);
+    const signed = JSON.parse(signedJson);
+    if (!signed.complete) throw new Error(`sign failed: ${JSON.stringify(signed.errors ?? [])}`);
+    const decodedSignedJson = await runBitcoinCli(["decoderawtransaction", signed.hex]);
+    const decodedSigned = JSON.parse(decodedSignedJson);
+    const depositOutput = decodedSigned.vout?.find((out: { n?: number; value?: number; scriptPubKey?: { address?: string } }) =>
+      out.scriptPubKey?.address === btcAddress &&
+      Math.round(Number(out.value ?? 0) * 1e8) === amountSats
+    );
+    if (typeof depositOutput?.n === "number") depositVout = depositOutput.n;
+    txid = await runBitcoinCli(["sendrawtransaction", signed.hex]);
   } catch (e) {
     const msg = e instanceof Error ? e.message : String(e);
     return NextResponse.json(
       {
         ok: false,
-        error: `sendtoaddress failed: ${truncate(msg, 400)}. ` +
+        error: `deposit transaction failed: ${truncate(msg, 400)}. ` +
           "Check that the regtest container is running (docker compose -f docker-compose.regtest.yml up -d).",
       },
       { status: 502 },
     );
   }
 
-  // 2. Mine N blocks to a fresh miner address so the recipient sees a confirmed UTXO
+  // 2. Mine N blocks to a fresh miner address so the tracker sees a confirmed deposit.
   let minerAddr = "";
   let blocksMined = 0;
   try {
@@ -624,13 +610,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   } catch (e) {
     // Send succeeded but the mine failed — surface that explicitly so the
     // caller knows the tx is still in the mempool, just not confirmed. The
-    // faucet quota is still consumed because BTC was already sent.
+    // faucet quota is still consumed because the deposit was already broadcast.
     recordLimitHit(quotaKeys);
     return NextResponse.json(
       {
         ok: true,
         txid,
-        warning: `sent but failed to mine confirmation block: ${truncate(e instanceof Error ? e.message : String(e), 200)}`,
+        warning: `deposit broadcast but failed to mine confirmation block: ${truncate(e instanceof Error ? e.message : String(e), 200)}`,
       },
       { status: 200 },
     );
@@ -642,14 +628,12 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const shouldRelaySuiDeposit =
     process.env.REGTEST_FAUCET_AUTO_RELAY_SUI !== "0" &&
-    isStealthAirdrop &&
-    Boolean(opReturnHex) &&
     networkChain(activeNetwork) === "sui";
   const suiDeposit = shouldRelaySuiDeposit
     ? await relaySuiDeposit({
       txid,
       amountSats,
-      opReturnHex: opReturnHex!,
+      opReturnHex,
       depositAddress: btcAddress,
       depositVout,
     })
@@ -658,8 +642,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   return NextResponse.json({
     ok: true,
     txid,
-    mode: isStealthAirdrop ? "utxo_airdrop" : "btc_drip",
-    depositAddress: isStealthAirdrop ? btcAddress : undefined,
+    mode: "vault_deposit",
+    depositAddress: btcAddress,
     depositVout,
     opReturn: opReturnHex,
     amountSats,

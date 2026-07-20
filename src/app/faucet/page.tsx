@@ -2,12 +2,11 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, ArrowLeft, CheckCircle2, Droplets, Wallet, ExternalLink } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Droplets, ExternalLink, Wallet } from "lucide-react";
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { getNetworkConfig, hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
-import { recordAlphaDemoDeposit } from "@/lib/alpha-demo-ledger";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { cn } from "@/lib/utils";
 
@@ -77,13 +76,13 @@ export default function FaucetPage() {
           </div>
           <div>
             <h1 className="text-heading6 text-foreground">
-              {activeToken === "BTC" ? "Regtest zkBTC airdrop" : activeToken === "SUI" ? "Get test SUI" : activeToken === "XUSD" ? "Get test XUSD" : `Test ${activeToken} airdrop`}
+              {activeToken === "BTC" ? "Regtest BTC deposit" : activeToken === "SUI" ? "Get test SUI" : activeToken === "XUSD" ? "Get test XUSD" : `Test ${activeToken} airdrop`}
             </h1>
             <p className="text-caption text-gray">
               {activeToken === "BTC"
                 ? isSui
                   ? "Create a local BTC regtest deposit for your Sui vault."
-                  : "Deposit 0.001 regtest BTC into a UTXOpia stealth address."
+                  : "Create a 0.001 regtest BTC deposit for your private vault."
                 : activeToken === "SUI"
                   ? "Claim test SUI from the official faucet, then deposit it to your private vault."
                   : activeToken === "XUSD"
@@ -464,28 +463,14 @@ type DripResult =
   | { kind: "err"; message: string };
 
 function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: NetworkId }) {
-  const [address, setAddress] = useState("");
   const [amountSats, setAmountSats] = useState(100_000);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DripResult | null>(null);
+  const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
 
   useEffect(() => {
     setResult(null);
-  }, [address, amountSats]);
-
-  // Prefill the recipient: an explicit ?address= wins, otherwise fall back to
-  // the signed-in vault's own stealth address so a logged-in user never has to
-  // paste their own address to drip test funds.
-  const myStealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const initialAddress = params.get("address");
-    if (initialAddress) {
-      setAddress(initialAddress);
-    } else if (myStealthAddress) {
-      setAddress((cur) => (cur ? cur : myStealthAddress));
-    }
-  }, [myStealthAddress]);
+  }, [amountSats, stealthAddress]);
 
   // Live cooldown countdown so the user sees the seconds tick down.
   const [cooldownLeft, setCooldownLeft] = useState(0);
@@ -501,9 +486,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
     return () => clearInterval(iv);
   }, [result]);
 
-  const validAddress = /^utxo:[0-9a-fA-F]{192}$/.test(address.trim());
-  const hasAddress = address.trim().length > 0;
-  const addressInvalid = hasAddress && !validAddress;
+  const hasVault = Boolean(stealthAddress && /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress));
 
   async function mineMissingConfirmations(blocksAlreadyMined?: number): Promise<void> {
     const blocks = Math.max(0, 6 - Math.max(0, Number(blocksAlreadyMined ?? 0)));
@@ -520,6 +503,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
   }
 
   async function handleDrip() {
+    if (!stealthAddress) return;
     setSubmitting(true);
     setResult(null);
     try {
@@ -527,7 +511,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       const res = await fetch(`/api/faucet/regtest?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: address.trim(), amountSats }),
+        body: JSON.stringify({ stealthAddress, amountSats }),
       });
       const body = (await res.json()) as {
         ok: boolean;
@@ -559,19 +543,12 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       } else {
         recordPendingFaucetActivity({
           networkId: network,
-          stealthAddress: address.trim(),
+          stealthAddress,
           amountSats: body.amountSats ?? amountSats,
           txid: body.txid ?? "",
           opReturn: body.opReturn,
           depositAddress: body.depositAddress,
           blocksMined: body.blocksMined,
-        });
-        recordAlphaDemoDeposit({
-          networkId: network,
-          stealthAddress: address.trim(),
-          amountSats: body.amountSats ?? amountSats,
-          txid: body.txid ?? "",
-          opReturn: body.opReturn,
         });
         void mineMissingConfirmations(body.blocksMined).finally(() => {
           void useUTXOpiaStore.getState().refreshInbox(undefined, true);
@@ -596,30 +573,10 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
   }
 
   const cooldownActive = result?.kind === "cooldown" && cooldownLeft > 0;
-  const disabled = !validAddress || submitting || amountSats <= 0 || cooldownActive;
+  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive;
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="text-body2 text-gray-light pl-2 mb-2 block">
-          Recipient UTXOpia address
-        </label>
-        <div className="relative">
-          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
-          <input
-            type="text"
-            value={address}
-            onChange={(e) => setAddress(e.target.value)}
-            placeholder="utxo:..."
-            className={cn(
-              "w-full p-3 pl-10 bg-muted border border-gray/15 rounded-[12px]",
-              "text-body2 font-mono text-foreground placeholder:text-gray",
-              "outline-none focus:border-warning/40 transition-colors",
-            )}
-          />
-        </div>
-      </div>
-
       <div>
         <label className="text-body2 text-gray-light pl-2 mb-2 block">
           Amount (sats)
@@ -638,18 +595,17 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
           )}
         />
         <p className="text-caption text-gray mt-1 pl-2">
-          {(amountSats / 1e8).toFixed(8)} BTC. Limit: 3 airdrops per day.
+          {(amountSats / 1e8).toFixed(8)} BTC. Limit: 3 deposits per day.
         </p>
       </div>
 
-      {(!validAddress || cooldownActive) && (
+      {(!hasVault || cooldownActive) && (
         <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3 text-caption text-warning">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
           <div>
-            {!hasAddress ? (
+            {!hasVault ? (
               <>
-                Open your vault to create a private receive address, or paste a{" "}
-                <span className="font-mono">utxo:</span> address here.
+                Open your vault once to initialize its private deposit identity.
                 <Link
                   href={hrefWithChain("/vault", network)}
                   className="ml-1 font-semibold underline underline-offset-2"
@@ -657,8 +613,6 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
                   Open vault
                 </Link>
               </>
-            ) : addressInvalid ? (
-              <>Enter a valid UTXOpia address: <span className="font-mono">utxo:</span> plus 192 hex characters.</>
             ) : (
               <>Cooldown active. Try again in {cooldownLeft}s.</>
             )}
@@ -669,15 +623,15 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       <button
         onClick={handleDrip}
         disabled={disabled}
-        title={!hasAddress ? "Paste or create a UTXOpia receive address first" : undefined}
+        title={!hasVault ? "Initialize your private vault first" : undefined}
         className="btn-primary w-full"
       >
         <Droplets className="w-5 h-5" />
         {submitting
-          ? "Creating deposit…"
+          ? "Creating deposit..."
           : cooldownActive
             ? `Wait ${cooldownLeft}s`
-            : "Airdrop zkBTC deposit"}
+            : "Deposit regtest BTC"}
       </button>
 
       {result?.kind === "ok" && (
@@ -686,10 +640,10 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-semibold text-success">
-                Deposit confirmed{result.blocksMined != null ? ` (${result.blocksMined} block${result.blocksMined === 1 ? "" : "s"} mined)` : ""}
+                Deposit broadcast{result.blocksMined != null ? ` (${result.blocksMined} block${result.blocksMined === 1 ? "" : "s"} mined)` : ""}
               </p>
               <p className="mt-0.5 text-success/75">
-                zkBTC is ready in your private vault.
+                The tracker will add zkBTC after it indexes the Bitcoin transaction.
               </p>
             </div>
           </div>
@@ -755,12 +709,7 @@ function FaucetForm({ isSui = false, network }: { isSui?: boolean; network: Netw
       <p className="text-caption text-gray">
         {isSui
           ? "This creates a regtest BTC deposit and credits the private Sui vault when the local relayer is available."
-          : (
-            <>
-              Share this page with a tester and ask them for their <span className="font-mono">utxo:</span>{" "}
-              address. The backend creates the regtest BTC deposit and the tracker credits the note after it sees the transaction.
-            </>
-          )}
+          : "This spends from the regtest faucet wallet, creates the pool output and OP_RETURN metadata, then broadcasts the deposit on Bitcoin."}
       </p>
     </div>
   );
