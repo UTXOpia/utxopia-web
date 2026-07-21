@@ -37,6 +37,7 @@ import { useBtcDeposit } from "@/hooks/use-btc-deposit";
 import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview";
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
+import { BtcFaucetPrompt } from "@/components/shield-flow/btc-faucet-prompt";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
 
@@ -327,6 +328,17 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   if (selectedToken.isBtcNative) {
     const btcAmountSats = Math.floor(parseFloat(btcAmount || "0") * 1e8);
     const canSubmitBtc = btcAmountSats > 0 && !!resolvedMeta && !!keys;
+    const usesBtcFaucet = chainEnv.config.bitcoin.network !== "mainnet";
+
+    if (usesBtcFaucet) {
+      return (
+        <BtcFaucetPrompt
+          networkId={networkId}
+          tokenSelector={tokenSelector}
+          className={className}
+        />
+      );
+    }
 
     // PSBT preview active — show transaction details
     if (depositPreview) {
@@ -574,12 +586,12 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           <span className="text-caption text-gray">Amount</span>
           <span className="text-caption text-gray/50">
             {selectedToken.isSOL && solBalance !== null
-              ? `Balance: ${(solBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`
+              ? `Public balance: ${(solBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`
               : splBalance !== null
-                ? `Balance: ${(splBalance / (10 ** selectedToken.decimals)).toLocaleString(undefined, { maximumFractionDigits: selectedToken.decimals })} ${selectedToken.symbol}`
+                ? `Public balance: ${(splBalance / (10 ** selectedToken.decimals)).toLocaleString(undefined, { maximumFractionDigits: selectedToken.decimals })} ${selectedToken.symbol}`
                 : publicKey
-                  ? <TextShimmer>Balance: loading…</TextShimmer>
-                  : ""
+                  ? <TextShimmer>Public balance: loading…</TextShimmer>
+                  : "Public balance: Connect wallet"
             }
           </span>
         </div>
