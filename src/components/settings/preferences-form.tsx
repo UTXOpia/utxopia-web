@@ -15,6 +15,7 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
+import { ChangeNameDialog } from "@/components/change-name-dialog";
 
 /**
  * Settings — grouped into three semantic sections (Network · Identity ·
@@ -216,6 +217,7 @@ function SnsNameRow() {
   const { networkId, config } = useChainEnvironment();
   const parentDomain = getSnsConfig(config)?.parentDomain || "utxopia";
   const [editing, setEditing] = useState(false);
+  const [changeOpen, setChangeOpen] = useState(false);
   const [value, setValue] = useState("");
   const disabled = !sns.canRegister || sns.isLoading;
   const fullName = sns.hasRegisteredSnsName
@@ -273,6 +275,13 @@ function SnsNameRow() {
             <button
               type="button"
               onClick={() => {
+                // Registered names can't be renamed in place — open the
+                // change dialog (register new + release old). No name yet →
+                // inline register editor.
+                if (sns.hasRegisteredSnsName) {
+                  setChangeOpen(true);
+                  return;
+                }
                 setValue(sns.registeredSnsName ?? "");
                 setEditing(true);
               }}
@@ -338,6 +347,10 @@ function SnsNameRow() {
 
       {sns.error && (
         <p className="text-xs text-error mt-2 font-mono break-all">{sns.error}</p>
+      )}
+
+      {sns.hasRegisteredSnsName && (
+        <ChangeNameDialog open={changeOpen} onOpenChange={setChangeOpen} />
       )}
     </div>
   );

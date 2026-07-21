@@ -5,72 +5,60 @@ import * as Dialog from "@radix-ui/react-dialog";
 import { AtSign, ArrowRight, Loader2, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useSnsName } from "@/hooks/use-sns-name";
-import { useSnsRegisteredCount } from "@/hooks/use-sns-name-count";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { getChainAdapter } from "@/lib/chain-registry";
 import { getSnsConfig } from "@/lib/names/sns";
-import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 
-const SEEN_KEY = "utxopia-name-prompt-seen";
-const REGISTER_PROGRESS = [
-  "Preparing your receive name...",
-  "Approve the Solana registration if prompted.",
-  "Submitting registration...",
-  "Confirming on Solana. This can take a moment.",
+const CHANGE_PROGRESS = [
+  "Preparing your new receive name...",
+  "Approve the registration if prompted.",
+  "Registering the new name on Solana...",
+  "Releasing your old name...",
   "Still working. Keep this tab open.",
 ];
 
 /**
- * First-login nudge to claim a private receive name. Shows once, after the user
- * is logged in and able to register, only if they don't already have a name.
- * Skippable — a name is a convenience, not a requirement.
+ * Change the user's *.utxopia.sol receive name. SNS names can't be renamed in
+ * place, so this registers the NEW subdomain and then releases (deletes) the
+ * OLD one. The old name is orchestrated by `changeSnsName`; the new name wins
+ * even if the old-name release fails.
  */
-export function ReceiveNamePrompt() {
+export function ChangeNameDialog({
+  open,
+  onOpenChange,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+}) {
   const sns = useSnsName();
-  const isNameRegistered = sns.isNameRegistered;
-  const { networkId, config } = useChainEnvironment();
+  const { config } = useChainEnvironment();
   const snsConfig = getSnsConfig(config);
-  // Names are network-scoped in the UI: the .sol prompt is shown only on
-  // Solana-primary networks. (The backend can serve .sol on any network that
-  // configures SNS, but each UI view surfaces only its own chain's name.)
-  const isSolanaNetwork = getChainAdapter(config).id === "solana";
   const parentDomain = snsConfig?.parentDomain || "utxopia";
+  const oldName = sns.registeredSnsName;
 
-  // Default to "seen" so nothing flashes during SSR / before we read storage.
-  const [seen, setSeen] = useState(true);
-  const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [localError, setLocalError] = useState<string | null>(null);
   const [availability, setAvailability] = useState<"idle" | "checking" | "available" | "taken">("idle");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [progressIndex, setProgressIndex] = useState(0);
 
-  // Only fetched while the dialog is open, so a logged-in user who already has a
-  // name never triggers the RPC count.
-  const registeredCount = useSnsRegisteredCount(networkId, open && isSolanaNetwork && !!snsConfig);
-
-  useEffect(() => {
-    if (typeof window === "undefined") return;
-    setSeen(localStorage.getItem(SEEN_KEY) === "true");
-  }, []);
-
-  useEffect(() => {
-    if (isSolanaNetwork && snsConfig && !seen && sns.canRegister && !sns.hasRegisteredSnsName && !sns.isLoading) {
-      setOpen(true);
-    }
-  }, [isSolanaNetwork, seen, sns.canRegister, sns.hasRegisteredSnsName, sns.isLoading, snsConfig]);
-
-  // If a name shows up (registered here or elsewhere), close.
-  useEffect(() => {
-    if (sns.hasRegisteredSnsName) setOpen(false);
-  }, [sns.hasRegisteredSnsName]);
-
+  const isNameRegistered = sns.isNameRegistered;
   const clean = value.trim().toLowerCase();
   const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
-  const registering = sns.isRegistering || isSubmitting;
+  const sameAsOld = clean === (oldName ?? "").trim().toLowerCase();
+  const changing = sns.isRegistering || isSubmitting;
+
+  // Reset transient state whenever the dialog opens.
+  useEffect(() => {
+    if (open) {
+      setValue("");
+      setLocalError(null);
+      setAvailability("idle");
+      setProgressIndex(0);
+    }
+  }, [open]);
 
   useEffect(() => {
-    if (!open || !nameValid) {
+    if (!open || !nameValid || sameAsOld) {
       setAvailability("idle");
       return;
     }
@@ -91,10 +79,10 @@ export function ReceiveNamePrompt() {
       cancelled = true;
       window.clearTimeout(timer);
     };
-  }, [clean, isNameRegistered, nameValid, open]);
+  }, [clean, isNameRegistered, nameValid, open, sameAsOld]);
 
   useEffect(() => {
-    if (!registering) {
+    if (!changing) {
       setProgressIndex(0);
       return;
     }
@@ -102,51 +90,49 @@ export function ReceiveNamePrompt() {
     const timers = [
       window.setTimeout(() => setProgressIndex(1), 1200),
       window.setTimeout(() => setProgressIndex(2), 3500),
-      window.setTimeout(() => setProgressIndex(3), 8000),
+      window.setTimeout(() => setProgressIndex(3), 9000),
       window.setTimeout(() => setProgressIndex(4), 18000),
     ];
 
     return () => {
       timers.forEach((timer) => window.clearTimeout(timer));
     };
-  }, [registering]);
+  }, [changing]);
 
   function dismiss(force = false) {
-    if (registering && !force) return;
-    if (typeof window !== "undefined") localStorage.setItem(SEEN_KEY, "true");
-    setSeen(true);
-    setOpen(false);
+    if (changing && !force) return;
+    onOpenChange(false);
   }
 
-  async function handleRegister() {
-    const name = value.trim().toLowerCase();
-    if (!name || !nameValid || availability === "checking" || availability === "taken" || registering) return;
+  const nameTaken = availability === "taken";
+  const checkingName = availability === "checking";
+  const availabilityError = sameAsOld
+    ? "That's already your current name."
+    : nameTaken
+      ? `"${clean}.${parentDomain}.sol" is already registered`
+      : null;
+  const canChange = nameValid && !sameAsOld && !nameTaken && !checkingName && !changing;
+
+  async function handleChange() {
+    if (!canChange) return;
     setLocalError(null);
     setIsSubmitting(true);
     setProgressIndex(0);
     try {
-      await claimPrivateReceiveName({
-        chain: "solana",
-        name,
-        networkId,
-        solanaClaim: sns.registerSnsSubdomain,
-      });
-      dismiss(true);
+      const ok = await sns.changeSnsName(clean);
+      if (ok) {
+        // Success — new name is live (old-name release warnings, if any, live
+        // in sns.error and remain visible in settings).
+        dismiss(true);
+      }
     } catch (err) {
-      setLocalError(err instanceof Error ? err.message : "Could not claim Solana private name.");
+      setLocalError(err instanceof Error ? err.message : "Could not change your receive name.");
     } finally {
       setIsSubmitting(false);
     }
   }
 
-  if (!isSolanaNetwork || !snsConfig || !open) return null;
-
-  const nameTaken = availability === "taken";
-  const checkingName = availability === "checking";
-  const availabilityError = nameTaken
-    ? `"${clean}.${parentDomain}.sol" is already registered`
-    : null;
-  const canRegister = nameValid && !nameTaken && !checkingName && !registering;
+  const oldFull = oldName ? `${oldName}.${parentDomain}.sol` : null;
 
   return (
     <Dialog.Root open={open} onOpenChange={(o) => { if (!o) dismiss(); }}>
@@ -164,7 +150,7 @@ export function ReceiveNamePrompt() {
           <Dialog.Close asChild>
             <button
               onClick={() => dismiss()}
-              disabled={registering}
+              disabled={changing}
               className="absolute right-4 top-4 p-1.5 rounded-full bg-gray/10 hover:bg-gray/20 text-gray transition-colors"
               aria-label="Close"
             >
@@ -179,21 +165,20 @@ export function ReceiveNamePrompt() {
           </div>
 
           <Dialog.Title className="text-heading6 text-foreground text-center mb-2">
-            Claim your receive name
+            Change your receive name
           </Dialog.Title>
           <Dialog.Description className="text-body2 text-gray text-center mb-6">
-            Pick a name so people can pay you at{" "}
-            <span className="font-mono text-gray-light">name.{parentDomain}.sol</span>{" "}
-            instead of a long address. It resolves to a private, unlinkable receive
-            address — your balances stay hidden.
+            {oldFull ? (
+              <>
+                Your current name is{" "}
+                <span className="font-mono text-gray-light">{oldFull}</span>. Pick a
+                new one below. This registers the new name, then releases the old
+                one.
+              </>
+            ) : (
+              <>Pick a new name so people can pay you at <span className="font-mono text-gray-light">name.{parentDomain}.sol</span>.</>
+            )}
           </Dialog.Description>
-
-          {registeredCount != null && registeredCount > 0 && (
-            <p className="-mt-3 mb-6 text-center text-[11px] text-gray/70">
-              <span className="font-mono text-gray-light">{registeredCount.toLocaleString()}</span>{" "}
-              {registeredCount === 1 ? "name" : "names"} claimed so far
-            </p>
-          )}
 
           <div className="flex items-stretch rounded-[12px] border border-gray/25 bg-muted/40 overflow-hidden">
             <input
@@ -204,9 +189,9 @@ export function ReceiveNamePrompt() {
                 setValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
               }}
               onKeyDown={(e) => {
-                if (e.key === "Enter" && canRegister) handleRegister();
+                if (e.key === "Enter" && canChange) handleChange();
               }}
-              placeholder="yourname"
+              placeholder="yournewname"
               maxLength={32}
               className="flex-1 min-w-0 bg-transparent px-3 py-3 text-sm text-foreground placeholder:text-gray/50 focus:outline-none"
             />
@@ -214,34 +199,43 @@ export function ReceiveNamePrompt() {
               .{parentDomain}.sol
             </span>
           </div>
+
+          {oldFull && (
+            <p className="mt-3 px-1 text-[11px] leading-4 text-gray/80">
+              Your current name{" "}
+              <span className="font-mono text-gray-light">{oldFull}</span>{" "}
+              will be released and can be claimed by others.
+            </p>
+          )}
+
           {(availabilityError || sns.error || localError) && (
             <p className="mt-2 px-1 text-[11px] text-destructive">{availabilityError || sns.error || localError}</p>
           )}
           {checkingName && (
             <p className="mt-2 px-1 text-[11px] text-gray">Checking availability...</p>
           )}
-          {registering && (
+          {changing && (
             <div
               role="status"
               aria-live="polite"
               className="mt-3 flex items-start gap-2 rounded-[10px] border border-privacy/20 bg-privacy/10 px-3 py-2 text-[11px] leading-4 text-gray-light"
             >
               <Loader2 className="mt-0.5 h-3.5 w-3.5 shrink-0 animate-spin text-privacy" />
-              <span>{REGISTER_PROGRESS[progressIndex]}</span>
+              <span>{CHANGE_PROGRESS[progressIndex]}</span>
             </div>
           )}
 
           <div className="flex gap-3 mt-5">
             <button
               onClick={() => dismiss()}
-              disabled={registering}
-              className="flex-1 py-3 px-4 rounded-[12px] text-body2 text-gray hover:text-gray-light bg-gray/10 hover:bg-gray/15 transition-colors"
+              disabled={changing}
+              className="flex-1 py-3 px-4 rounded-[12px] text-body2 text-gray hover:text-gray-light bg-gray/10 hover:bg-gray/15 transition-colors disabled:opacity-50"
             >
-              Maybe later
+              Cancel
             </button>
             <button
-              onClick={handleRegister}
-              disabled={!canRegister}
+              onClick={handleChange}
+              disabled={!canChange}
               className={cn(
                 "flex-1 py-3 px-4 rounded-[12px] text-body2 text-background",
                 "bg-foreground hover:bg-white transition-colors",
@@ -249,14 +243,14 @@ export function ReceiveNamePrompt() {
                 "disabled:opacity-50 disabled:cursor-not-allowed",
               )}
             >
-              {registering ? (
+              {changing ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  Registering
+                  Changing
                 </>
               ) : (
                 <>
-                  Register
+                  Change name
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}

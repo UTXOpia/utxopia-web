@@ -44,23 +44,22 @@ const SPONSORED_SUBMIT_TIMEOUT_MS = 15_000;
 const SPONSORED_RECOVERY_ATTEMPTS = 8;
 const SPONSORED_RECOVERY_DELAY_MS = 1_000;
 
-type OwnedSnsRecord = {
-  name: string | null;
-  fullDomain: string | null;
-  subdomainKey: string;
-  version: number;
-  viewingPubKey: string;
-  mpk: string;
-  complianceFlags: number;
-  auditorPubkey: string | null;
-};
-
-type OwnedSnsResponse = {
-  success?: boolean;
-  registered?: boolean;
-  records?: OwnedSnsRecord[];
-  error?: string;
-};
+type SnsResolveResponse =
+  | { success: true; registered: false }
+  | {
+      success: true;
+      registered: true;
+      record: {
+        name: string | null;
+        fullDomain: string | null;
+        subdomainKey: string;
+        version: number;
+        mpk: string;
+        complianceFlags: number;
+        auditorPubkey: string | null;
+      };
+    }
+  | { success: false; error: string };
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -85,6 +84,11 @@ interface UseSnsNameReturn {
   lookupSnsName: (name: string) => Promise<SnsStealthAddress | null>;
   isNameRegistered: (name: string) => Promise<boolean>;
   registerSnsSubdomain: (name: string) => Promise<boolean>;
+  /** Release (delete) a subdomain the active authority owns, relayer-sponsored. */
+  deleteSnsSubdomain: (name: string) => Promise<boolean>;
+  /** Register `newName`, then release the current name. New name wins even if
+   *  the old-name release fails (non-fatal warning surfaced via `error`). */
+  changeSnsName: (newName: string) => Promise<boolean>;
   updateSnsStealthData: () => Promise<boolean>;
   /** Set the compliance-flag byte on the user's registered SNS subdomain. */
   setComplianceFlag: (value: number) => Promise<boolean>;
@@ -259,39 +263,42 @@ export function useSnsName(): UseSnsNameReturn {
 
   // Check if connected wallet owns a *.utxopia.sol subdomain
   const lookupMySnsName = useCallback(async () => {
-    const owner = activeAuthority?.publicKey;
-    if (!owner || !stealthAddress) return;
-
-    if (!snsConfig) return;
+    // Resolve by the stable stealth VIEWING KEY, not by the connected wallet.
+    // The on-chain owner recorded at registration can differ from the current
+    // active authority (e.g. a different Solana wallet is connected), but the
+    // viewing key is derived from the user's seed and never changes — so the
+    // name resolves regardless of which wallet, if any, is connected.
+    if (!stealthAddress || !snsConfig) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const alphaName = getAlphaDemoNameForOwner(networkId, owner.toBase58());
-      if (alphaName) {
-        setHasRegisteredSnsName(true);
-        setRegisteredSubdomainKey(null);
-        setRegisteredSnsName(alphaName.handle);
-        setComplianceFlags(0);
-        setAuditorPubkeyState(null);
-        setNeedsUpdate(false);
-        setIsLoading(false);
-        return;
-      }
-
-      const networkQuery = new URLSearchParams({
-        network: networkId,
-        owner: owner.toBase58(),
-      });
-      const response = await fetch(`/api/sns/owner?${networkQuery.toString()}`);
-      const body = await response.json().catch(() => null) as OwnedSnsResponse | null;
-      if (!response.ok || !body?.success) {
-        throw new Error(body?.error || "Failed to check SNS owner records");
+      // Alpha-demo names are keyed by the signing authority; best-effort only.
+      const owner = activeAuthority?.publicKey;
+      if (owner) {
+        const alphaName = getAlphaDemoNameForOwner(networkId, owner.toBase58());
+        if (alphaName) {
+          setHasRegisteredSnsName(true);
+          setRegisteredSubdomainKey(null);
+          setRegisteredSnsName(alphaName.handle);
+          setComplianceFlags(0);
+          setAuditorPubkeyState(null);
+          setNeedsUpdate(false);
+          setIsLoading(false);
+          return;
+        }
       }
 
       const ourViewing = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
-      const record = (body.records ?? []).find((item) => item.viewingPubKey === ourViewing);
+      const query = new URLSearchParams({ network: networkId, vk: ourViewing });
+      const response = await fetch(`/api/sns/resolve?${query.toString()}`);
+      const body = await response.json().catch(() => null) as SnsResolveResponse | null;
+      if (!response.ok || !body?.success) {
+        throw new Error((body && "error" in body && body.error) || "Failed to resolve SNS name");
+      }
+
+      const record = body.registered ? body.record : null;
       if (record) {
         setHasRegisteredSnsName(true);
         setRegisteredSubdomainKey(new PublicKey(record.subdomainKey));
@@ -319,7 +326,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, networkId, snsConfig]);
+  }, [activeAuthority, stealthAddress, networkId, snsConfig]);
 
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)
@@ -571,6 +578,119 @@ export function useSnsName(): UseSnsNameReturn {
       setIsRegistering(false);
     }
   }, [connection, isNameRegistered, networkId, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
+
+  // Release (delete) a subdomain via the relayer-sponsored delete route.
+  // The relayer pays the fee (and receives the reclaimed rent), but the name
+  // OWNER must sign the delete instruction.
+  const deleteSnsSubdomain = useCallback(async (name: string): Promise<boolean> => {
+    if (!snsConfig) {
+      setError("SNS not configured for this network");
+      return false;
+    }
+    const owner = activeAuthority?.publicKey;
+    if (!owner) {
+      setError("Connect the wallet that owns this name to release it");
+      return false;
+    }
+    const subdomain = name.trim().toLowerCase();
+    if (!subdomain) {
+      setError("Invalid name to release");
+      return false;
+    }
+
+    // Demo ledger has no on-chain account to release.
+    if (alphaDemoLedgerEnabled(networkId)) {
+      return true;
+    }
+
+    setIsRegistering(true);
+    setError(null);
+    try {
+      const networkQuery = `?network=${encodeURIComponent(networkId)}`;
+      const prepareResp = await fetch(`/api/sns/delete${networkQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "prepare",
+          name: subdomain,
+          owner: owner.toBase58(),
+        }),
+      });
+      const prepared = await prepareResp.json().catch(() => null) as
+        | {
+            success?: boolean;
+            transaction?: string;
+            error?: string;
+            relayerUnavailable?: boolean;
+            ownerMismatch?: boolean;
+            lastValidBlockHeight?: number;
+          }
+        | null;
+
+      if (prepared?.relayerUnavailable) {
+        setError("Name relayer is unavailable right now. Please try again later.");
+        return false;
+      }
+      if (prepared?.ownerMismatch) {
+        setError("This name was registered from a different wallet. Connect the original wallet to release it.");
+        return false;
+      }
+      if (!prepareResp.ok || !prepared?.success || !prepared.transaction) {
+        throw new Error(prepared?.error || "Failed to prepare name release");
+      }
+
+      const tx = Transaction.from(Buffer.from(prepared.transaction, "base64"));
+      const signed = await signAndSubmitSnsTransaction(tx, owner);
+
+      const submitResp = await fetch(`/api/sns/delete${networkQuery}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          action: "submit",
+          signedTransaction: signed.serialize().toString("base64"),
+          lastValidBlockHeight: prepared.lastValidBlockHeight,
+        }),
+      });
+      const submitted = await submitResp.json().catch(() => null) as
+        | { success?: boolean; error?: string; signature?: string }
+        | null;
+      if (!submitResp.ok || !submitted?.success || !submitted.signature) {
+        throw new Error(submitted?.error || "Failed to submit name release");
+      }
+      return true;
+    } catch (err) {
+      console.error("Failed to release SNS subdomain:", err);
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      setError(errorMessage || "Failed to release name");
+      return false;
+    } finally {
+      setIsRegistering(false);
+    }
+  }, [activeAuthority, networkId, signAndSubmitSnsTransaction, snsConfig]);
+
+  // Change the user's receive name: register the NEW subdomain, then release
+  // the OLD one. SNS names can't be renamed in place. If the old-name release
+  // fails, the change still counts as a success — the new name is live — and we
+  // surface a non-fatal warning so the user can retry the release later.
+  const changeSnsName = useCallback(async (newName: string): Promise<boolean> => {
+    const oldName = registeredSnsName;
+    const registered = await registerSnsSubdomain(newName);
+    if (!registered) {
+      // register owns the error state; old name is untouched.
+      return false;
+    }
+
+    const normalizedNew = newName.trim().toLowerCase();
+    if (oldName && oldName.trim().toLowerCase() !== normalizedNew) {
+      const released = await deleteSnsSubdomain(oldName);
+      if (!released) {
+        setError("New name registered, but couldn't release the old one — retry from settings");
+      }
+    }
+
+    await lookupMySnsName();
+    return true;
+  }, [deleteSnsSubdomain, lookupMySnsName, registerSnsSubdomain, registeredSnsName]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
@@ -831,9 +951,11 @@ export function useSnsName(): UseSnsNameReturn {
     }
   }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction, snsConfig]);
 
-  // Auto-check on mount when wallet connected
+  // Auto-check once the vault is unlocked (stealth keys derived). Resolution is
+  // keyed on the viewing key, so it no longer requires a connected wallet and
+  // won't break when a different authority is active.
   useEffect(() => {
-    if (activeAuthority?.publicKey && stealthAddress) {
+    if (stealthAddress) {
       lookupMySnsName();
     } else {
       setRegisteredSnsName(null);
@@ -841,7 +963,7 @@ export function useSnsName(): UseSnsNameReturn {
       setComplianceFlags(0);
       setAuditorPubkeyState(null);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, lookupMySnsName]);
+  }, [stealthAddress, lookupMySnsName]);
 
   useEffect(() => {
     if (!alphaDemoLedgerEnabled(networkId)) return;
@@ -867,6 +989,8 @@ export function useSnsName(): UseSnsNameReturn {
     lookupSnsName,
     isNameRegistered,
     registerSnsSubdomain,
+    deleteSnsSubdomain,
+    changeSnsName,
     updateSnsStealthData,
     setComplianceFlag,
     setAuditorPubkey,
