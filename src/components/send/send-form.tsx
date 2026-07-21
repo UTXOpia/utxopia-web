@@ -1,10 +1,10 @@
 "use client";
 
-import { useReducer, useState, useMemo, useCallback, useEffect } from "react";
+import { useReducer, useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import { Bitcoin, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
+import { Bitcoin, Check, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { detectRecipient, type RecipientType } from "./recipient-detect";
 import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
@@ -48,6 +48,7 @@ import {
 
 type Action =
   | { type: "set_recipient"; value: string }
+  | { type: "set_destination"; value: CashOutDestination }
   | { type: "set_token"; value: string }
   | { type: "set_amount"; value: string }
   | { type: "open_review" }
@@ -56,16 +57,21 @@ type Action =
 
 type State = {
   recipient: string;
+  cashOutDestination: CashOutDestination;
   sourceToken: string;
   amount: string;
   reviewOpen: boolean;
 };
+
+type CashOutDestination = "bitcoin" | "solana";
+type SendFormMode = "send" | "cashout";
 
 /** Upper bound on name resolution before we stop spinning and show not_found. */
 const NAME_RESOLVE_TIMEOUT_MS = 12_000;
 
 const initial: State = {
   recipient: "",
+  cashOutDestination: "bitcoin",
   sourceToken: "zkBTC",
   amount: "",
   reviewOpen: false,
@@ -75,6 +81,15 @@ function reducer(state: State, action: Action): State {
   switch (action.type) {
     case "set_recipient":
       return { ...state, recipient: action.value };
+    case "set_destination":
+      return {
+        ...state,
+        cashOutDestination: action.value,
+        recipient: "",
+        sourceToken: "zkBTC",
+        amount: "",
+        reviewOpen: false,
+      };
     case "set_token":
       return { ...state, sourceToken: action.value };
     case "set_amount":
@@ -86,6 +101,67 @@ function reducer(state: State, action: Action): State {
     case "reset":
       return initial;
   }
+}
+
+function CashOutDestinationPicker({
+  value,
+  onChange,
+}: {
+  value: CashOutDestination;
+  onChange: (value: CashOutDestination) => void;
+}) {
+  const options = [
+    {
+      value: "bitcoin" as const,
+      label: "Bitcoin",
+      description: "Receive BTC",
+      icon: Bitcoin,
+      selectedClass: "border-btc/50 bg-btc/10 text-btc",
+    },
+    {
+      value: "solana" as const,
+      label: "Solana",
+      description: "Receive in a wallet",
+      icon: Wallet,
+      selectedClass: "border-purple/50 bg-purple/10 text-purple",
+    },
+  ];
+
+  return (
+    <fieldset className="space-y-1.5">
+      <legend className="text-xs text-muted-foreground">Cash out to</legend>
+      <div className="grid grid-cols-2 gap-2">
+        {options.map((option) => {
+          const Icon = option.icon;
+          const selected = option.value === value;
+          return (
+            <button
+              key={option.value}
+              type="button"
+              aria-pressed={selected}
+              onClick={() => onChange(option.value)}
+              className={cn(
+                "relative flex min-h-14 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors",
+                "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-privacy/40",
+                selected
+                  ? option.selectedClass
+                  : "border-gray/15 bg-muted/25 text-foreground hover:border-gray/30 hover:bg-muted/40",
+              )}
+            >
+              <Icon className="h-4 w-4 shrink-0" />
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">{option.label}</span>
+                <span className={cn("block text-[11px]", selected ? "opacity-75" : "text-muted-foreground")}>
+                  {option.description}
+                </span>
+              </span>
+              {selected && <Check className="ml-auto h-3.5 w-3.5 shrink-0" />}
+            </button>
+          );
+        })}
+      </div>
+    </fieldset>
+  );
 }
 
 function generateClaimSecret(): string {
@@ -161,7 +237,13 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
   );
 }
 
-export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } = {}) {
+export function SendForm({
+  mode = "send",
+  showClaimLink = mode === "send",
+}: {
+  mode?: SendFormMode;
+  showClaimLink?: boolean;
+} = {}) {
   const [state, dispatch] = useReducer(reducer, initial);
   const [linkOpen, setLinkOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
@@ -178,14 +260,53 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const activeChainId = getChainAdapter(chainEnv.config).id;
   const boundChainId = SOLANA_BOUND_CHAIN_ID;
   const activeChainLabel = "Solana";
-  const detection = useMemo(
-    () => detectRecipient(state.recipient, { chain: activeChainId }),
-    [state.recipient, activeChainId],
-  );
+  const hasVaultKeys = ctx.hasKeys;
+  const refreshPrivateBalance = ctx.refreshInbox;
+  const balanceLoadKey = `${chainEnv.networkId}:${ctx.stealthAddressEncoded ?? "locked"}`;
+  const balanceLoadRequested = useRef<string | null>(null);
+  const [balanceReadyKey, setBalanceReadyKey] = useState<string | null>(null);
+  const cashOutRecipientType: RecipientType =
+    state.cashOutDestination === "bitcoin" ? "btc" : "spl_wallet";
+
+  // Cash out can render before StoreHydration begins its first inbox scan.
+  // Request it here too (the store deduplicates concurrent refreshes) and keep
+  // the balance in a loading state until that first request settles.
+  useEffect(() => {
+    if (mode !== "cashout" || !hasVaultKeys) {
+      balanceLoadRequested.current = null;
+      setBalanceReadyKey(null);
+      return;
+    }
+    if (balanceLoadRequested.current === balanceLoadKey) return;
+
+    balanceLoadRequested.current = balanceLoadKey;
+    setBalanceReadyKey(null);
+    void Promise.resolve(refreshPrivateBalance()).finally(() => {
+      if (balanceLoadRequested.current === balanceLoadKey) {
+        setBalanceReadyKey(balanceLoadKey);
+      }
+    });
+  }, [mode, hasVaultKeys, refreshPrivateBalance, balanceLoadKey]);
+  const detection = useMemo(() => {
+    const result = detectRecipient(state.recipient, { chain: activeChainId });
+    if (mode !== "cashout" || result.type === "empty") return result;
+
+    if (result.type === cashOutRecipientType) return result;
+
+    return {
+      type: "invalid" as const,
+      confidence: "high" as const,
+      reason: state.cashOutDestination === "bitcoin"
+        ? "Enter a valid Bitcoin address"
+        : "Enter a valid Solana wallet address",
+    };
+  }, [state.recipient, state.cashOutDestination, activeChainId, cashOutRecipientType, mode]);
 
   // For BTC recipient, force zkBTC source.
   const effectiveToken =
-    detection.type === "btc" ? "zkBTC" : state.sourceToken;
+    (mode === "cashout" ? cashOutRecipientType : detection.type) === "btc"
+      ? "zkBTC"
+      : state.sourceToken;
   const usdPerUnit = tokenPrices.btc ?? null;
 
   // Preview-resolve name recipients so we can block Send if the name does not
@@ -306,6 +427,14 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const totalFee = BigInt(effectiveRelayerFee) + (recipientType === "btc" ? btcServiceFee : 0n);
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
+  const balanceLabel =
+    ctx.isLoading || noteSelector.isLoading || (mode === "cashout" && ctx.hasKeys && balanceReadyKey !== balanceLoadKey)
+      ? "Loading…"
+      : !ctx.hasKeys
+        ? "Sign in to view"
+        : ctx.inboxError
+          ? "Unavailable"
+          : `${formatAmount(Number(totalAvailable), selectedPayToken.decimals)} ${selectedPayToken.shieldedSymbol}`;
   const devSignerEnabled =
     process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
     !chainEnv.networkId.includes("mainnet");
@@ -629,9 +758,27 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
 
   return (
     <div className="space-y-4">
+      {mode === "cashout" && (
+        <CashOutDestinationPicker
+          value={state.cashOutDestination}
+          onChange={(value) => dispatch({ type: "set_destination", value })}
+        />
+      )}
+
       <RecipientInput
         value={state.recipient}
         onChange={(v) => dispatch({ type: "set_recipient", value: v })}
+        detection={detection}
+        label={mode === "cashout"
+          ? state.cashOutDestination === "bitcoin"
+            ? "Bitcoin address"
+            : "Solana wallet address"
+          : "Recipient"}
+        placeholder={mode === "cashout"
+          ? state.cashOutDestination === "bitcoin"
+            ? "Paste a Bitcoin address"
+            : "Paste a Solana wallet address"
+          : undefined}
         snsStatus={snsState.kind}
       />
 
@@ -653,10 +800,10 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
         </div>
       )}
 
-      {recipientValid && (
+      {(recipientValid || mode === "cashout") && (
         <>
           <TokenSourcePicker
-            recipientType={recipientType}
+            recipientType={mode === "cashout" ? cashOutRecipientType : recipientType}
             selected={effectiveToken}
             onSelect={(s) => dispatch({ type: "set_token", value: s })}
           />
@@ -667,6 +814,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
             unit={selectedPayToken.unit}
             availableBaseUnits={totalAvailable}
             feeBufferBaseUnits={BigInt(effectiveRelayerFee)}
+            availableLabel={balanceLabel}
             usdPerUnit={usdPerUnit}
           />
           {btcAmountTooSmall && (
@@ -700,7 +848,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
           )}
         >
           <Send className="w-4 h-4" />
-          Send
+          {mode === "cashout" ? "Cash out" : "Send"}
         </button>
       )}
 

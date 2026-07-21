@@ -15,5 +15,5 @@ export function SendFlow() {
 
 /** Cash-out experience — same form with the claim-link affordance hidden. */
 export function CashOutFlow() {
-  return <SendForm showClaimLink={false} />;
+  return <SendForm mode="cashout" />;
 }

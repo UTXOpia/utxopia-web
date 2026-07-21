@@ -40,6 +40,24 @@ describe("AmountField", () => {
     expect(captured).toBe("0.99999");
   });
 
+  it("shows the balance beside the amount label without a duplicate Max action", () => {
+    render(
+      <AmountField
+        value=""
+        onChange={() => {}}
+        decimals={8}
+        unit="BTC"
+        availableBaseUnits={100_000_000n}
+        availableLabel="1 zkBTC"
+        usdPerUnit={50000}
+      />,
+    );
+    expect(screen.getByText("Balance:")).toBeDefined();
+    expect(screen.getByText("1 zkBTC")).toBeDefined();
+    expect(screen.queryByText("Max available")).toBeNull();
+    expect(screen.getAllByRole("button", { name: /max/i })).toHaveLength(1);
+  });
+
   it("rejects characters that aren't digits or a single dot", () => {
     let captured = "";
     render(

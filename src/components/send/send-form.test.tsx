@@ -105,4 +105,31 @@ describe("SendForm", () => {
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
   });
+
+  it("lets cash-out users choose Bitcoin or Solana and validates the selected network", () => {
+    render(<SendForm mode="cashout" />);
+    expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+    expect(screen.getByText("Sign in to view")).toBeDefined();
+
+    const bitcoinAddress = "bc1q9d4ywgfnd8h70q4thlsclpw0ymmqfumzgxlhpe";
+    fireEvent.change(screen.getByLabelText(/bitcoin address/i), {
+      target: { value: bitcoinAddress },
+    });
+    expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+
+    fireEvent.click(screen.getByRole("button", { name: /solana receive in a wallet/i }));
+    expect((screen.getByLabelText(/solana wallet address/i) as HTMLInputElement).value).toBe("");
+    expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText(/solana wallet address/i), {
+      target: { value: bitcoinAddress },
+    });
+    expect(screen.getByText("Enter a valid Solana wallet address")).toBeDefined();
+    expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+
+    fireEvent.change(screen.getByLabelText(/solana wallet address/i), {
+      target: { value: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM" },
+    });
+    expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+  });
 });

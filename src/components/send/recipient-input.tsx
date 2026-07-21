@@ -15,6 +15,10 @@ export type SnsStatus = "idle" | "resolving" | "found" | "not_found";
 export interface RecipientInputProps {
   value: string;
   onChange: (next: string) => void;
+  /** Optional parent-owned detection, used when a flow constrains recipient types. */
+  detection?: DetectionResult;
+  label?: string;
+  placeholder?: string;
   /** Name resolve state from the parent (only meaningful for stealth_sns). */
   snsStatus?: SnsStatus;
   className?: string;
@@ -23,12 +27,13 @@ export interface RecipientInputProps {
 function statusFor(
   value: string,
   snsStatus: SnsStatus,
+  detectionOverride?: DetectionResult,
 ): {
   detection: DetectionResult;
   tone: "neutral" | "ok" | "warn" | "bad";
   label: string;
 } {
-  const detection = detectRecipient(value);
+  const detection = detectionOverride ?? detectRecipient(value);
   // Name-specific states override the generic detection feedback, since
   // syntactically-valid names can still point to nothing.
   if (detection.type === "stealth_sns") {
@@ -70,10 +75,13 @@ function statusFor(
 export function RecipientInput({
   value,
   onChange,
+  detection,
+  label = "Recipient",
+  placeholder = "Paste an address, @handle, or name.utxopia.sol",
   snsStatus = "idle",
   className,
 }: RecipientInputProps) {
-  const { tone, label } = statusFor(value, snsStatus);
+  const { tone, label: statusLabel } = statusFor(value, snsStatus, detection);
 
   const onPasteFromClipboard = useCallback(async () => {
     try {
@@ -86,13 +94,16 @@ export function RecipientInput({
 
   return (
     <div className={cn("space-y-1.5", className)}>
+      <label htmlFor="send-recipient" className="block text-xs text-muted-foreground">
+        {label}
+      </label>
       <div className="relative">
         <input
-          aria-label="Recipient"
+          id="send-recipient"
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Paste an address, @handle, or name.utxopia.sol"
+          placeholder={placeholder}
           className={cn(
             "w-full px-3 py-3 pr-10 rounded-lg",
             "bg-muted/40 border text-sm font-mono",
@@ -114,7 +125,7 @@ export function RecipientInput({
           <Clipboard className="w-4 h-4" />
         </button>
       </div>
-      {label && (
+      {statusLabel && (
         <div
           className={cn(
             "flex items-center gap-1.5 text-xs",
@@ -126,7 +137,7 @@ export function RecipientInput({
           {tone === "ok" && <Check className="w-3 h-3" />}
           {tone === "warn" && <Loader2 className="w-3 h-3 animate-spin" />}
           {tone === "bad" && <X className="w-3 h-3" />}
-          <span>{label}</span>
+          <span>{statusLabel}</span>
         </div>
       )}
     </div>

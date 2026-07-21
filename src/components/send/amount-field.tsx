@@ -15,6 +15,8 @@ export interface AmountFieldProps {
   availableBaseUnits: bigint;
   /** Subtracted from availableBaseUnits when "Max" is pressed. */
   feeBufferBaseUnits?: bigint;
+  /** Optional formatted balance shown beside the Amount label. */
+  availableLabel?: string;
   /** USD value of one whole unit (used for the "≈ $X" preview). */
   usdPerUnit: number | null;
   className?: string;
@@ -42,6 +44,7 @@ export function AmountField({
   unit,
   availableBaseUnits,
   feeBufferBaseUnits = 0n,
+  availableLabel,
   usdPerUnit,
   className,
 }: AmountFieldProps) {
@@ -68,10 +71,17 @@ export function AmountField({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label className="block text-xs text-muted-foreground">Amount</label>
+      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+        <label htmlFor="send-amount">Amount</label>
+        {availableLabel && (
+          <span className="min-w-0 truncate text-right">
+            Balance: <span className="font-mono text-foreground/80">{availableLabel}</span>
+          </span>
+        )}
+      </div>
       <div className="relative">
         <input
-          aria-label="Amount"
+          id="send-amount"
           type="text"
           inputMode="decimal"
           value={value}
