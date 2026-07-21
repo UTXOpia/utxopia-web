@@ -33,7 +33,7 @@ const metadataBase = new URL(
 export const metadata: Metadata = {
   metadataBase,
   title: "UTXOpia | Private Bitcoin and Token Transfers",
-  description: "Shield Bitcoin and supported chain assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments across Solana and Sui.",
+  description: "Shield Bitcoin and supported assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments on Solana.",
   icons: {
     icon: [
       { url: "/brand/logo-32.png", sizes: "32x32", type: "image/png" },
@@ -44,14 +44,14 @@ export const metadata: Metadata = {
   },
   openGraph: {
     title: "UTXOpia | Private Bitcoin and Token Transfers",
-    description: "Shielded transfers for Bitcoin and supported assets across Solana and Sui.",
+    description: "Shielded transfers for Bitcoin and supported assets on Solana.",
     images: [{ url: "/brand/banner.png", width: 1200, height: 630, alt: "UTXOpia" }],
     type: "website",
   },
   twitter: {
     card: "summary_large_image",
     title: "UTXOpia",
-    description: "Private Bitcoin and token transfers across Solana and Sui.",
+    description: "Private Bitcoin and token transfers on Solana.",
     images: ["/brand/banner.png"],
   },
   manifest: "/manifest.json",

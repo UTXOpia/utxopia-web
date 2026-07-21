@@ -40,17 +40,6 @@ export function usePoolPermissioned(): PoolPermissionedInfo {
   const { config } = useChainEnvironment();
 
   return useMemo<PoolPermissionedInfo>(() => {
-    // Sui path
-    if (config.sui?.permissioned) {
-      const pkHex = config.sui.auditorViewingPubkey;
-      return {
-        permissioned: true,
-        auditorViewingPubkey: pkHex ? hexToBytes(pkHex) : undefined,
-        auditorCapId: config.sui.auditorCapId,
-      };
-    }
-
-    // Solana path
     if (config.solana?.permissioned) {
       const pkBase58 = config.solana.auditorViewingPubkey;
       let auditorViewingPubkey: Uint8Array | undefined;

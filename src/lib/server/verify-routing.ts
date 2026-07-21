@@ -2,7 +2,6 @@ import type { NextRequest } from "next/server";
 import {
   detectNetworkFromRequest,
   getNetworkConfig,
-  networkChain,
   type NetworkConfig,
 } from "@/lib/network-config";
 
@@ -14,13 +13,6 @@ export function resolveVerifyConfig(request: NextRequest): {
   bitcoinNetwork: SupportedVerifyBitcoinNetwork;
 } | { error: string; status: number } {
   const network = detectNetworkFromRequest(request);
-  if (networkChain(network) !== "sol") {
-    return {
-      error: "/api/verify is a Solana SPV verifier. Use /api/sui/relay for Sui BTC deposit completion.",
-      status: 400,
-    };
-  }
-
   const config = getNetworkConfig(network, { applyEnvOverrides: false });
   if (
     !config.solana.utxopiaProgramId ||

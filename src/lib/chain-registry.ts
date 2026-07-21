@@ -4,7 +4,7 @@ export type ChainId = NonNullable<NetworkConfig["chain"]>;
 
 export interface ChainAdapter {
   id: ChainId;
-  query: "sol" | "sui";
+  query: "sol";
   displayName: string;
   nativeToken: string;
   defaultNetwork: NetworkId;
@@ -21,15 +21,6 @@ export const CHAIN_ADAPTERS: Record<ChainId, ChainAdapter> = {
     defaultNetwork: "devnet-regtest",
     hybridNetwork: "devnet-regtest",
     networkIds: ["devnet", "devnet-regtest", "testnet", "mainnet", "localnet"],
-  },
-  sui: {
-    id: "sui",
-    query: "sui",
-    displayName: "Sui",
-    nativeToken: "SUI",
-    defaultNetwork: "sui-regtest",
-    hybridNetwork: "sui-regtest",
-    networkIds: ["sui-testnet", "sui-regtest"],
   },
 };
 
@@ -63,20 +54,6 @@ export function isChainHybridNetwork(networkId: NetworkId, chain: ChainId): bool
 }
 
 export function getNetworkConfigReadoutRows(config: NetworkConfig): Array<[string, string, string?]> {
-  if (config.sui) {
-    return [
-      ["Sui RPC", config.sui.rpcUrl, config.sui.rpcUrl],
-      ["Backend", config.backend.url, config.backend.url],
-      ["BTC network", config.bitcoin.network],
-      ["BTC explorer", config.bitcoin.explorerUrl, config.bitcoin.explorerUrl],
-      ["Package", config.sui.packageId],
-      ["Pool", config.sui.pool.objectId],
-      ["VK registry", config.sui.verifyingKeyRegistry.objectId],
-      ["Nullifiers", config.sui.nullifierRegistry.objectId],
-      ["Redemptions", config.sui.redemptionQueue.objectId],
-    ];
-  }
-
   return [
     ["Solana RPC", config.solana.rpcUrl, config.solana.rpcUrl],
     ["Program", config.solana.utxopiaProgramId],

@@ -18,7 +18,7 @@ describe("submitted transaction activity", () => {
     expect(getSubmittedTransactions("devnet-regtest")).toMatchObject([
       { kind: "private_send", amountBaseUnits: "10000", signature: "solana-signature" },
     ]);
-    expect(getSubmittedTransactions("sui-regtest")).toHaveLength(0);
+    expect(getSubmittedTransactions("testnet")).toHaveLength(0);
   });
 
   it("does not create a receipt without a relay signature", () => {

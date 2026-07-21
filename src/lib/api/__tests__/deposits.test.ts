@@ -73,13 +73,13 @@ describe("deposit network routing", () => {
       json: async () => ({ success: true, deposits: [] }),
     } as any);
 
-    await fetchAllDeposits("sui-regtest");
+    await fetchAllDeposits("devnet-regtest");
     await getDepositStatus("deposit_1", "devnet-regtest");
-    await registerDeposit("bcrt1ptest", "aa", 10_000, "bb", "sui-regtest");
+    await registerDeposit("bcrt1ptest", "aa", 10_000, "bb", "devnet-regtest");
 
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/deposits?network=sui-regtest");
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/deposits?network=devnet-regtest");
     expect(mockFetch.mock.calls[1][0]).toBe("/api/deposits/deposit_1?network=devnet-regtest");
-    expect(mockFetch.mock.calls[2][0]).toBe("/api/deposits?network=sui-regtest");
+    expect(mockFetch.mock.calls[2][0]).toBe("/api/deposits?network=devnet-regtest");
     expect(JSON.parse((mockFetch.mock.calls[2][1] as RequestInit).body as string)).toEqual({
       taproot_address: "bcrt1ptest",
       note_public_key: "aa",
@@ -108,7 +108,7 @@ describe("deposit network routing", () => {
     try {
       const subscription = subscribeToDepositStatus("deposit_1", {
         onStatusUpdate: () => {},
-      }, "sui-regtest");
+      }, "devnet-regtest");
       subscription.unsubscribe();
     } finally {
       global.WebSocket = originalWebSocket;

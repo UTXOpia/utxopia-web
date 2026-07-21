@@ -14,11 +14,8 @@ import {
 describe("network-scoped SNS helpers", () => {
   it("returns SNS config for any network that carries a complete sns block", () => {
     expect(getSnsConfig(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }))).toBeTruthy();
-    // Backend serves .sol on Sui-primary networks that also configure SNS; the
-    // UI stays network-scoped (that gating lives in the name components).
-    expect(getSnsConfig(getNetworkConfig("sui-regtest", { applyEnvOverrides: false }))).toBeTruthy();
     // Network without an sns block.
-    expect(getSnsConfig(getNetworkConfig("sui-testnet", { applyEnvOverrides: false }))).toBeNull();
+    expect(getSnsConfig(getNetworkConfig("testnet", { applyEnvOverrides: false }))).toBeNull();
   });
 
   it("resolves names using the provided SNS network config", async () => {

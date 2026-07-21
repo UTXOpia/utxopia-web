@@ -79,14 +79,13 @@ function NetworkRow({
   pending: boolean;
   onSelect: () => void;
 }) {
-  const isSui = networkChain(meta.id) === "sui";
   const locked = !!meta.comingSoon;
   return (
     <li>
       <div
         className={cn(
           "group relative py-3 px-1 transition-colors",
-          active ? (isSui ? "bg-sui/[0.04]" : "bg-privacy/[0.03]") : !locked && "hover:bg-muted/20",
+          active ? "bg-privacy/[0.03]" : !locked && "hover:bg-muted/20",
           pending && "opacity-50",
           locked && "opacity-50",
         )}
@@ -109,9 +108,7 @@ function NetworkRow({
               "shrink-0 mt-1 h-3.5 w-3.5 rounded-full transition-all duration-200",
               "flex items-center justify-center",
               active
-                ? isSui
-                  ? "bg-sui ring-2 ring-sui/30 ring-offset-2 ring-offset-background"
-                  : "bg-privacy ring-2 ring-privacy/30 ring-offset-2 ring-offset-background"
+                ? "bg-privacy ring-2 ring-privacy/30 ring-offset-2 ring-offset-background"
                 : "border border-gray/40 hover:border-foreground/60",
               locked ? "cursor-not-allowed" : pending ? "cursor-wait" : "cursor-pointer",
             )}
@@ -143,10 +140,7 @@ function NetworkRow({
                   {meta.id}
                 </span>
                 {active && (
-                  <span className={cn(
-                    "text-[9px] uppercase tracking-[0.15em] font-semibold",
-                    isSui ? "text-sui" : "text-privacy",
-                  )}>
+                  <span className="text-[9px] uppercase tracking-[0.15em] font-semibold text-privacy">
                     Active
                   </span>
                 )}

@@ -15,7 +15,7 @@ export type SnsStatus = "idle" | "resolving" | "found" | "not_found";
 export interface RecipientInputProps {
   value: string;
   onChange: (next: string) => void;
-  /** Name resolve state from the parent (only meaningful for stealth_sns / stealth_suins). */
+  /** Name resolve state from the parent (only meaningful for stealth_sns). */
   snsStatus?: SnsStatus;
   className?: string;
 }
@@ -31,8 +31,8 @@ function statusFor(
   const detection = detectRecipient(value);
   // Name-specific states override the generic detection feedback, since
   // syntactically-valid names can still point to nothing.
-  if (detection.type === "stealth_sns" || detection.type === "stealth_suins") {
-    const label = detection.type === "stealth_suins" ? "SuiNS" : ".utxopia.sol";
+  if (detection.type === "stealth_sns") {
+    const label = ".utxopia.sol";
     if (snsStatus === "resolving") {
       return { detection, tone: "warn", label: `Looking up ${label} record...` };
     }
@@ -92,7 +92,7 @@ export function RecipientInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
-          placeholder="Paste address, alice.utxopia.sui, or .utxopia.sol name"
+          placeholder="Paste an address, @handle, or name.utxopia.sol"
           className={cn(
             "w-full px-3 py-3 pr-10 rounded-lg",
             "bg-muted/40 border text-sm font-mono",

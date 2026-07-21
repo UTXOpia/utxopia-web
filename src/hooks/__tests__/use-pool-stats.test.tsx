@@ -125,12 +125,12 @@ describe("usePoolStats", () => {
       json: async () => ({ onChain: null }),
     } as any);
 
-    renderHook(() => usePoolStats("sui-regtest"), { wrapper });
+    renderHook(() => usePoolStats("devnet-regtest"), { wrapper });
 
     await waitFor(() => {
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/pool/stats?network=sui-regtest");
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/pool/stats?network=devnet-regtest");
   });
 });

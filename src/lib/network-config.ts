@@ -9,32 +9,19 @@
  */
 
 import networksJson from "./networks.json";
-import { CHAIN_ADAPTERS, type ChainId } from "@/lib/chain-registry";
+import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
 
 export type NetworkId =
   | "devnet"
   | "devnet-regtest"
-  | "sui-testnet"
-  | "sui-regtest"
   | "testnet"
   | "mainnet"
   | "localnet";
 
-export type ChainQuery = "sol" | "sui";
-
-export interface SuiObjectRef {
-  objectId: string;
-  version: string;
-  digest: string;
-}
-
-export interface SuiSharedObjectRef {
-  objectId: string;
-  initialSharedVersion: string;
-}
+export type ChainQuery = "sol";
 
 export interface NetworkConfig {
-  chain?: "solana" | "sui";
+  chain?: "solana";
   solana: {
     rpcUrl: string;
     utxopiaProgramId: string;
@@ -76,69 +63,6 @@ export interface NetworkConfig {
     reverseLookupClass: string;
     stealthDataVersion: number;
   };
-  sui?: {
-    rpcUrl: string;
-    explorerUrl: string;
-    /** If true, value-entry (deposits/shields) require the auditor's co-signature. */
-    permissioned?: boolean;
-    /** Hex-encoded auditor viewing pubkey (Sui). Absent ⇒ not permissioned. */
-    auditorViewingPubkey?: string;
-    /** Sui object ID of the AuditorCap. Required when permissioned=true on Sui. */
-    auditorCapId?: string;
-    /**
-     * Optional Sui indexer base URL (events → DB → web). When set, the explorer reads
-     * normalized data from `${indexerUrl}/api/explorer/*` and falls back to direct RPC
-     * if the indexer is unreachable. Unset → direct RPC (current behavior).
-     */
-    indexerUrl?: string;
-    packageId: string;
-    /**
-     * Original (first-publish) package id. Move event types keep the defining
-     * package's id across upgrades, so event queries (MoveEventModule filter)
-     * must use this, not the upgraded `packageId`. Falls back to `packageId`
-     * when the deployment has never been upgraded.
-     */
-    eventsPackageId?: string;
-    pool: SuiSharedObjectRef;
-    /** Poseidon commitment tree — required by transact since the hardened ABI. */
-    commitmentTree?: SuiSharedObjectRef;
-    btcDepositRegistry?: SuiSharedObjectRef;
-    /** Pool UTXO set — consumed by the SPV complete_deposit PTB. */
-    utxoSet?: SuiSharedObjectRef;
-    /** BTC SPV light client — required for trustless deposits once initialized. */
-    lightClient?: SuiSharedObjectRef;
-    nullifierRegistry: SuiSharedObjectRef;
-    redemptionQueue: SuiSharedObjectRef;
-    redemptionCap: SuiObjectRef;
-    verifyingKeyRegistry: SuiSharedObjectRef;
-    /** Admin-curated generic `Coin<T>` registry — required for SPL shield/unshield. */
-    tokenRegistry?: SuiSharedObjectRef;
-    /** Per-coin display metadata, keyed by fully-qualified Move coin type. */
-    coinMetadata?: Record<string, { symbol: string; name: string; logo?: string; priceKey?: string }>;
-    vk?: Record<string, {
-      nInputs: number;
-      nOutputs: number;
-      nPublic: number;
-      vkHash: string;
-      registerTxDigest?: string;
-    }>;
-    lastTransact?: {
-      circuit: string;
-      shieldTxDigest?: string;
-      txDigest: string;
-      nullifier: string;
-      commitmentOut: string;
-    };
-    lastRedemption?: {
-      redemptionId: string;
-      requestTxDigest: string;
-      ikaApprovalTxDigest?: string;
-      completeTxDigest?: string;
-    };
-    signing?: {
-      btcWithdrawal: "relayer" | "ika";
-    };
-  };
 }
 
 /** Display metadata for each network — surfaced in /settings so users
@@ -177,27 +101,6 @@ export const NETWORK_META: NetworkMeta[] = [
     description: "Same on-chain model as production. Blocks mine instantly — full loop in seconds.",
     caveats: [
       "Local regtest BTC; state resets with the docker stack.",
-    ],
-    enabled: true,
-  },
-  {
-    id: "sui-testnet",
-    label: "Sui Testnet",
-    tagline: "Sui testnet + Bitcoin testnet4",
-    description: "Legacy testnet4-backed Sui path. Not supported for alpha.",
-    caveats: [
-      "Unsupported: use Sui Hybrid for Sui testnet + local regtest BTC.",
-    ],
-    enabled: false,
-    comingSoon: true,
-  },
-  {
-    id: "sui-regtest",
-    label: "Sui Hybrid",
-    tagline: "Sui testnet + local regtest BTC",
-    description: "Sui testnet package with local Bitcoin regtest plumbing for faster deposit and withdraw iteration.",
-    caveats: [
-      "Uses local regtest BTC with the upgraded Sui testnet package and Ika-backed BTC redemption signing.",
     ],
     enabled: true,
   },
@@ -246,10 +149,8 @@ function isSupportedNetwork(value: NetworkId | null | undefined): value is Netwo
   return meta?.enabled === true;
 }
 
-export function networkChain(network: NetworkId): ChainQuery {
-  const chain = (Object.keys(CHAIN_ADAPTERS) as ChainId[])
-    .find((key) => CHAIN_ADAPTERS[key].networkIds.includes(network));
-  return chain ? CHAIN_ADAPTERS[chain].query : "sol";
+export function networkChain(_network: NetworkId): ChainQuery {
+  return "sol";
 }
 
 function defaultNetworkForChain(chain: ChainQuery): NetworkId {
@@ -263,17 +164,8 @@ function defaultNetworkForChain(chain: ChainQuery): NetworkId {
   return adapter.defaultNetwork;
 }
 
-/** Sui support was removed from this build. Any network that still resolves to
- *  the Sui chain (e.g. a stale cookie/localStorage value or a ?chain=sui link)
- *  is coerced to the Solana default so no session can land on an unreachable
- *  chain. The Sui type-level scaffolding stays for now; this is the runtime gate. */
-function coerceReachableNetwork(network: NetworkId): NetworkId {
-  return networkChain(network) === "sui" ? defaultNetworkForChain("sol") : network;
-}
-
 function normalizeChainQuery(value: string | null): ChainQuery | null {
   if (value === "sol" || value === "solana") return "sol";
-  if (value === "sui") return "sui";
   return null;
 }
 
@@ -283,7 +175,7 @@ function networkFromQuery(params: URLSearchParams, preferred?: NetworkId | null)
   if (isKnownNetwork(exact) && isSupportedNetwork(exact) && (!chain || networkChain(exact) === chain)) {
     return exact;
   }
-  if (chain === "sui" || chain === "sol") {
+  if (chain === "sol") {
     if (preferred && networkChain(preferred) === chain) return preferred;
     return defaultNetworkForChain(chain);
   }
@@ -292,15 +184,6 @@ function networkFromQuery(params: URLSearchParams, preferred?: NetworkId | null)
 
 export function chainQueryForNetwork(network: NetworkId): ChainQuery {
   return networkChain(network);
-}
-
-/** Map a Sui fullnode RPC URL to the network name SuiJsonRpcClient expects (v2
- *  requires it). Derived from the URL so adding a mainnet entry needs no change. */
-export function suiNetworkName(rpcUrl: string): "mainnet" | "testnet" | "devnet" | "localnet" {
-  if (rpcUrl.includes("mainnet")) return "mainnet";
-  if (rpcUrl.includes("devnet")) return "devnet";
-  if (rpcUrl.includes("127.0.0.1") || rpcUrl.includes("localhost")) return "localnet";
-  return "testnet";
 }
 
 export function hrefWithChain(href: string, network: NetworkId): string {
@@ -331,10 +214,6 @@ export function parseNetworkCookie(cookieHeader: string | null): NetworkId | nul
  *  cookies. Falls back to env-var default. Use this in API routes instead of
  *  the bare `detectNetwork()` (which only knows about the build-time env). */
 export function detectNetworkFromRequest(req: Request): NetworkId {
-  return coerceReachableNetwork(resolveNetworkFromRequest(req));
-}
-
-function resolveNetworkFromRequest(req: Request): NetworkId {
   const url = new URL(req.url);
   const cookieNet = parseNetworkCookie(req.headers.get("cookie"));
   const queryNet = networkFromQuery(url.searchParams, cookieNet);
@@ -344,10 +223,6 @@ function resolveNetworkFromRequest(req: Request): NetworkId {
 }
 
 export function detectNetwork(): NetworkId {
-  return coerceReachableNetwork(resolveActiveNetwork());
-}
-
-function resolveActiveNetwork(): NetworkId {
   // 1. localStorage (per-browser user preference, set via /settings)
   if (typeof window !== "undefined") {
     const params = new URLSearchParams(window.location.search);
@@ -376,9 +251,6 @@ function resolveActiveNetwork(): NetworkId {
     "devnet";
   if (env === "mainnet" || env === "mainnet-beta") return isSupportedNetwork("mainnet") ? "mainnet" : "devnet-regtest";
   if (env === "testnet") return isSupportedNetwork("testnet") ? "testnet" : "devnet-regtest";
-  if (env === "sui-regtest") return "sui-regtest";
-  if (env === "sui-testnet") return "sui-regtest";
-  if (env === "sui") return defaultNetworkForChain("sui");
   if (env === "localnet") return "localnet";
   if (env === "devnet-regtest" || env === "hybrid") return "devnet-regtest";
   return "devnet-regtest";
@@ -432,10 +304,6 @@ export function getNetworkConfig(
   const rpcOverride =
     process.env.NEXT_PUBLIC_SOLANA_RPC_URL || process.env.SOLANA_RPC_URL;
   if (rpcOverride) cfg.solana = { ...cfg.solana, rpcUrl: rpcOverride };
-
-  const suiRpcOverride =
-    process.env.NEXT_PUBLIC_SUI_RPC_URL || process.env.UTXOPIA_SUI_RPC_URL;
-  if (suiRpcOverride && cfg.sui) cfg.sui = { ...cfg.sui, rpcUrl: suiRpcOverride };
 
   const backendOverride =
     process.env.NEXT_PUBLIC_BACKEND_URL || process.env.BACKEND_URL || process.env.BACKEND_API_URL;

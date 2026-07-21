@@ -26,7 +26,6 @@ import { getSnsConfig } from "@/lib/names/sns";
 export function PreferencesForm() {
   const { isAdvanced } = useUiMode();
   const { config, networkId } = useChainEnvironment();
-  const isSui = config.chain === "sui";
   // Phase 1: read-only.
   const advancedDisabled = true;
 
@@ -52,16 +51,14 @@ export function PreferencesForm() {
         <RelaySelector chainId={config.chain ?? "solana"} networkId={networkId} />
       </Section>
 
-      {!isSui && (
-        <Section
-          label="Identity"
-          hint="What senders see when they enter your .utxopia.sol name."
-        >
-          <SnsNameRow />
-          <AuditorDisclosableRow />
-          <AuditorPubkeyRow />
-        </Section>
-      )}
+      <Section
+        label="Identity"
+        hint="What senders see when they enter your .utxopia.sol name."
+      >
+        <SnsNameRow />
+        <AuditorDisclosableRow />
+        <AuditorPubkeyRow />
+      </Section>
 
       <Section label="Sending">
         <ToggleRow

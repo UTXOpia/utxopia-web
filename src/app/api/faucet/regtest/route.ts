@@ -37,7 +37,6 @@ import networks from "@/lib/networks.json";
 import {
   detectNetworkFromRequest,
   getNetworkConfig,
-  networkChain,
   type NetworkConfig,
   type NetworkId,
 } from "@/lib/network-config";
@@ -184,15 +183,6 @@ interface FaucetNetworkConfig {
 const DEFAULT_REGTEST_GROUP_PUBKEY =
   "79be667ef9dcbbac55a06295ce870b07029bfcdb2dce28d959f2815b16f81798";
 
-interface SuiDepositRelayResult {
-  ok: boolean;
-  txDigest?: string;
-  error?: string;
-  depositVout?: number;
-  commitment?: string;
-  root?: string;
-}
-
 async function callBackendFaucet(
   network: NetworkId,
   payload: {
@@ -282,57 +272,6 @@ function hexToBytes(value: string): Uint8Array {
     throw new Error("invalid hex string");
   }
   return Uint8Array.from(Buffer.from(normalized, "hex"));
-}
-
-function projectRoot(): string {
-  return path.basename(process.cwd()) === "web"
-    ? path.dirname(process.cwd())
-    : process.cwd();
-}
-
-function parseJsonObjectFromStdout(stdout: string): unknown {
-  const start = stdout.indexOf("{");
-  const end = stdout.lastIndexOf("}");
-  if (start < 0 || end < start) {
-    throw new Error(`No JSON object in relay output: ${truncate(stdout, 400)}`);
-  }
-  return JSON.parse(stdout.slice(start, end + 1));
-}
-
-async function relaySuiDeposit(input: {
-  txid: string;
-  amountSats: number;
-  opReturnHex: string;
-  depositAddress?: string;
-  depositVout?: number;
-}): Promise<SuiDepositRelayResult> {
-  const root = projectRoot();
-  const script = path.join(root, "sui-programs/scripts/relay-deposit.ts");
-  const bunBin = process.env.BUN_BIN || "bun";
-  const args = [
-    script,
-    "--txid", input.txid,
-    "--amount-sats", String(input.amountSats),
-    "--op-return", input.opReturnHex,
-  ];
-  if (input.depositAddress) args.push("--deposit-address", input.depositAddress);
-  if (input.depositVout != null) args.push("--deposit-vout", String(input.depositVout));
-
-  try {
-    const { stdout } = await exec(bunBin, args, {
-      cwd: root,
-      env: process.env,
-      maxBuffer: 1024 * 1024 * 5,
-      timeout: Number(process.env.REGTEST_FAUCET_SUI_RELAY_TIMEOUT_MS || "120000"),
-    });
-    const parsed = parseJsonObjectFromStdout(stdout) as SuiDepositRelayResult;
-    return { ...parsed, ok: parsed.ok === true };
-  } catch (e) {
-    return {
-      ok: false,
-      error: truncate(e instanceof Error ? e.message : String(e), 800),
-    };
-  }
 }
 
 function getFallbackNetworkConfig(): FaucetNetworkConfig {
@@ -647,19 +586,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // can retry without burning one of the daily attempts.
   recordLimitHit(quotaKeys);
 
-  const shouldRelaySuiDeposit =
-    process.env.REGTEST_FAUCET_AUTO_RELAY_SUI !== "0" &&
-    networkChain(activeNetwork) === "sui";
-  const suiDeposit = shouldRelaySuiDeposit
-    ? await relaySuiDeposit({
-      txid,
-      amountSats,
-      opReturnHex,
-      depositAddress: btcAddress,
-      depositVout,
-    })
-    : undefined;
-
   return NextResponse.json({
     ok: true,
     txid,
@@ -671,7 +597,6 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     dailyLimit: DAILY_LIMIT,
     blocksMined,
     minerAddress: minerAddr,
-    suiDeposit,
   });
 }
 

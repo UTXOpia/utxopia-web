@@ -20,7 +20,7 @@ describe("tree API helpers", () => {
     });
     global.fetch = fetchMock as any;
 
-    await expect(getTreeStatus("sui-regtest")).resolves.toEqual({
+    await expect(getTreeStatus("devnet-regtest")).resolves.toEqual({
       root: "abc",
       next_index: 2,
       size: 2,

@@ -42,7 +42,6 @@ import {
   createStealthMetaAddress,
   isAuditorDisclosable,
   SOLANA_BOUND_CHAIN_ID,
-  SUI_BOUND_CHAIN_ID,
   type SnsStealthAddress,
   type StealthMetaAddress,
 } from "@utxopia/sdk";
@@ -130,12 +129,6 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
       description: "The recipient gets a private note. Amount and recipient stay hidden.",
       tone: "text-privacy border-privacy/20 bg-privacy/8",
     },
-    stealth_suins: {
-      icon: LockKeyhole,
-      title: "Private transfer",
-      description: "The recipient gets a private note. Amount and recipient stay hidden.",
-      tone: "text-sui border-sui/20 bg-sui/8",
-    },
     stealth_meta: {
       icon: LockKeyhole,
       title: "Private transfer",
@@ -183,8 +176,8 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const tokenPrices = useTokenPrices();
   const chainEnv = useChainEnvironment();
   const activeChainId = getChainAdapter(chainEnv.config).id;
-  const boundChainId = activeChainId === "sui" ? SUI_BOUND_CHAIN_ID : SOLANA_BOUND_CHAIN_ID;
-  const activeChainLabel = activeChainId === "sui" ? "Sui" : "Solana";
+  const boundChainId = SOLANA_BOUND_CHAIN_ID;
+  const activeChainLabel = "Solana";
   const detection = useMemo(
     () => detectRecipient(state.recipient, { chain: activeChainId }),
     [state.recipient, activeChainId],

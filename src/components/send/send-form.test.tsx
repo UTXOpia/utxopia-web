@@ -91,7 +91,7 @@ import { SendForm } from "./send-form";
 describe("SendForm", () => {
   it("renders the recipient input first; amount and review hidden until valid", () => {
     render(<SendForm />);
-    expect(screen.getByPlaceholderText(/paste address/i)).toBeDefined();
+    expect(screen.getByPlaceholderText(/paste an address/i)).toBeDefined();
     expect(screen.queryByLabelText(/^amount$/i)).toBeNull();
     expect(
       screen.queryByRole("button", { name: /^send$/i }),
@@ -100,7 +100,7 @@ describe("SendForm", () => {
 
   it("reveals the amount field after a valid recipient is entered", () => {
     render(<SendForm />);
-    fireEvent.change(screen.getByPlaceholderText(/paste address/i), {
+    fireEvent.change(screen.getByPlaceholderText(/paste an address/i), {
       target: { value: "bc1q9d4ywgfnd8h70q4thlsclpw0ymmqfumzgxlhpe" },
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();

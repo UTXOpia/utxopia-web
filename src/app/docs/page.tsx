@@ -48,7 +48,7 @@ import {
 import { useActiveSection } from "@/hooks/use-active-section";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { getChainAdapter, type ChainId } from "@/lib/chain-registry";
+import { getChainAdapter } from "@/lib/chain-registry";
 
 /* ── Simple card wrapper ── */
 
@@ -197,16 +197,15 @@ function KeyCard({ icon: Icon, title, desc, features }: { icon: LucideIcon; titl
 
 /* ── Comparison table ── */
 
-function getComparisonRows(chain: Chain) {
-  const isSui = chain === "sui";
+function getComparisonRows() {
   return [
-    { label: "Tokens", traditional: "Single asset (wBTC)", privateBtc: isSui ? "Multi-coin (BTC, SUI, USDC)" : "Multi-token (BTC, SOL, USDC, USDT)" },
+    { label: "Tokens", traditional: "Single asset (wBTC)", privateBtc: "Multi-token (BTC, SOL, USDC, USDT)" },
     { label: "Balances", traditional: "Visible on-chain", privateBtc: "Hidden as commitments" },
     { label: "Transfers", traditional: "Traceable amounts", privateBtc: "ZK-proven, zero knowledge" },
     { label: "Addresses", traditional: "Linkable & reusable", privateBtc: "One-time stealth addresses" },
     { label: "Deposits", traditional: "Public token minting", privateBtc: "Shielded Merkle insertion" },
     { label: "Withdrawals", traditional: "Traceable burn + send", privateBtc: "Unlinkable via nullifiers" },
-    { label: "Custody", traditional: "Multisig / MPC", privateBtc: isSui ? "Ika dWallet · Sui-controlled" : "Ika dWallet · Solana-controlled" },
+    { label: "Custody", traditional: "Multisig / MPC", privateBtc: "Ika dWallet · Solana-controlled" },
   ];
 }
 
@@ -249,38 +248,31 @@ function ComparisonTable({ rows }: { rows: ReturnType<typeof getComparisonRows> 
 
 /* ── Chain-aware data ── */
 
-type Chain = ChainId;
-
-function getProtocolSteps(chain: Chain) {
-  const isSui = chain === "sui";
-  const wallet = isSui ? "Sui wallet" : "Solana wallet";
-  const nativeTokens = isSui ? "SUI or any Sui coin" : "SOL/USDC/USDT";
-  const program = isSui ? "Sui Move package" : "Solana program";
+function getProtocolSteps() {
+  const wallet = "Solana wallet";
+  const nativeTokens = "SOL/USDC/USDT";
+  const program = "Solana program";
 
   return [
     {
       id: "shield-tokens", num: "01", icon: Shield, title: "Shield Any Token",
       desc: `Deposit BTC via Taproot, or shield ${nativeTokens} directly from your ${wallet}. Every token enters the same privacy pool — a shared Merkle tree where all commitments look identical regardless of token type or amount.`,
-      detail: isSui ? "BTC: Taproot · Coin: shield<T> entry call" : "BTC: Taproot + SPV · SPL: Shield (disc=12)",
+      detail: "BTC: Taproot + SPV · SPL: Shield (disc=12)",
     },
     {
       id: "spv-verification", num: "02", icon: GitBranch, title: "BTC Verification",
-      desc: isSui
-        ? "Bitcoin deposits are verified on-chain by a native Move SPV light client that tracks the BTC header chain. A single transaction block runs btc_light_client::verify_tx_inclusion and feeds the result straight into btc_deposit::complete_deposit — Merkle inclusion and confirmation depth are checked entirely on Sui, no oracle or trusted relayer."
-        : "Bitcoin deposits require a special step: the backend submits an SPV Merkle inclusion proof to the on-chain BTC light client. The Solana program independently validates the Bitcoin transaction was confirmed in a real block — trustless cross-chain verification without any oracle.",
-      detail: isSui ? "Move SPV light client · 6+ confirmations" : "On-chain header chain · 6+ confirmations",
+      desc: "Bitcoin deposits require a special step: the backend submits an SPV Merkle inclusion proof to the on-chain BTC light client. The Solana program independently validates the Bitcoin transaction was confirmed in a real block — trustless cross-chain verification without any oracle.",
+      detail: "On-chain header chain · 6+ confirmations",
     },
     {
       id: "shielded-commitment", num: "03", icon: TreePine, title: "Commitment Creation",
-      desc: `Your deposit becomes Poseidon(npk, tokenId, amount) — a cryptographic commitment. The token_id is derived from the ${isSui ? "Coin<T> type" : "SPL mint address"}: Poseidon(reduce(${isSui ? "coinType" : "mint"}), 0). All tokens share the same depth-16 Merkle tree, making deposits indistinguishable.`,
-      detail: isSui ? "Native Poseidon Merkle · Token-agnostic · 65,536 leaves" : "Poseidon hash · Token-agnostic · 65,536 leaves",
+      desc: `Your deposit becomes Poseidon(npk, tokenId, amount) — a cryptographic commitment. The token_id is derived from the SPL mint address: Poseidon(reduce(mint), 0). All tokens share the same depth-16 Merkle tree, making deposits indistinguishable.`,
+      detail: "Poseidon hash · Token-agnostic · 65,536 leaves",
     },
     {
       id: "joinsplit-transfer", num: "04", icon: Layers, title: "Private Transfer",
-      desc: isSui
-        ? "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes, verifying balance conservation, token consistency, nullifier uniqueness, and Merkle membership without revealing any values. Sui's on-chain Groth16 verifier caps public inputs at 8, so the deployed circuit catalog tops out at 2×2 — the SDK automatically splits a larger transfer into a chain of smaller proofs."
-        : "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for BTC, SOL, USDC, or any shielded token.",
-      detail: isSui ? "Groth16 · ≤ 2×2 catalog · SDK auto-splits" : "Groth16 · 256 bytes · Token-agnostic circuit",
+      desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for BTC, SOL, USDC, or any shielded token.",
+      detail: "Groth16 · 256 bytes · Token-agnostic circuit",
     },
     {
       id: "stealth-receive", num: "05", icon: Eye, title: "Stealth Receive",
@@ -289,21 +281,18 @@ function getProtocolSteps(chain: Chain) {
     },
     {
       id: "unshield-withdraw", num: "06", icon: Network, title: "Unshield or Withdraw",
-      desc: isSui
-        ? `Exit the privacy pool in two ways: unshield coins back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority lives on Sui itself — Ika runs natively on Sui, so the network and the ${program} co-sign every redemption (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof; the nullifier prevents double-spending without revealing which note you're spending.`
-        : `Exit the privacy pool in two ways: unshield SPL tokens back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
-      detail: isSui ? "Coin: instant · BTC: Ika dWallet (Sui-controlled)" : "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
+      desc: `Exit the privacy pool in two ways: unshield SPL tokens back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
+      detail: "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
   ];
 }
 
-function getCryptoItems(chain: Chain) {
-  const isSui = chain === "sui";
+function getCryptoItems() {
   return [
   {
     id: "commitment-scheme", title: "Commitment Scheme",
     formula: "Poseidon(npk, token_id, amount)",
-    desc: `Each note is a Poseidon hash of the note public key, token ID, and amount. The token_id = Poseidon(reduce(${isSui ? "coinType" : "mint"}), 0) makes commitments token-specific — the same circuit verifies BTC, ${isSui ? "SUI, USDC" : "SOL, USDC"}, or any token. Only the owner knows the preimage.`,
+    desc: `Each note is a Poseidon hash of the note public key, token ID, and amount. The token_id = Poseidon(reduce(mint), 0) makes commitments token-specific — the same circuit verifies BTC, SOL, USDC, or any token. Only the owner knows the preimage.`,
   },
   {
     id: "nullifier-generation", title: "Nullifier Generation",
@@ -318,7 +307,7 @@ function getCryptoItems(chain: Chain) {
   {
     id: "joinsplit-circuit", title: "JoinSplit Circuit",
     formula: "JoinSplit(N, M, depth=16)",
-    desc: `A single parameterized circom template handles all transfer types. Inputs: N note nullifiers + Merkle proofs. Outputs: M new commitments. The circuit verifies balance (Σin = Σout), nullifier validity, Merkle membership, and EdDSA-Poseidon signatures — all in one Groth16 proof. Each variant (1×1, 1×2, 2×1, 2×2, …) is a separate Groth16 setup; ${isSui ? "Sui's 8 public-input limit caps the deployed catalog at 2×2, and the SDK splits anything larger" : "N + M ≤ 14"}.`,
+    desc: `A single parameterized circom template handles all transfer types. Inputs: N note nullifiers + Merkle proofs. Outputs: M new commitments. The circuit verifies balance (Σin = Σout), nullifier validity, Merkle membership, and EdDSA-Poseidon signatures — all in one Groth16 proof. Each variant (1×1, 1×2, 2×1, 2×2, …) is a separate Groth16 setup; N + M ≤ 14.`,
   },
   {
     id: "eddsa-signatures", title: "EdDSA-Poseidon Signatures",
@@ -333,7 +322,7 @@ function getCryptoItems(chain: Chain) {
   {
     id: "sender-memo", title: "Sender Memo Channel",
     formula: "XChaCha20-Poly1305(ovk, plaintext, AAD = commitment || leafIdx)",
-    desc: `An opt-in second event per output, encrypted under the sender's outgoing viewing key (ovk = SHA-256(viewKey ‖ "utxopia.ovk.v1")). Lets the sender (or an auditor holding ovk) later recover their own outgoing history — recipient-only encryption alone wouldn't allow this. AAD binds each memo to its tree leaf: any tamper or re-targeting attempt fails the Poly1305 tag cleanly.${isSui ? " Shipped on Solana today; the Sui transact path is next in line." : ""}`,
+    desc: `An opt-in second event per output, encrypted under the sender's outgoing viewing key (ovk = SHA-256(viewKey ‖ "utxopia.ovk.v1")). Lets the sender (or an auditor holding ovk) later recover their own outgoing history — recipient-only encryption alone wouldn't allow this. AAD binds each memo to its tree leaf: any tamper or re-targeting attempt fails the Poly1305 tag cleanly.`,
   },
   ];
 }
@@ -361,35 +350,30 @@ interface DisclosureItem {
   detail: string;
 }
 
-function getDisclosureItems(chain: Chain): DisclosureItem[] {
-  const isSui = chain === "sui";
+function getDisclosureItems(): DisclosureItem[] {
   return [
     {
       id: "auditor-toolkit",
       icon: ScrollText,
       title: "Auditor Toolkit (DelegatedViewKey)",
-      status: isSui ? "planned" : "shipped",
-      desc: "Issue a slot-scoped, encrypted viewing key for your accountant or auditor. They drop it into the in-browser audit page, decrypt client-side, and walk away with a CSV of IN/OUT records over a chosen range. PBKDF2 + AES-GCM at rest; each issuance is tagged with a delegation ID so you keep a record of who you handed which key to."
-        + (isSui ? " Live on Solana; the Sui audit path lands alongside selective disclosure." : ""),
+      status: "shipped",
+      desc: "Issue a slot-scoped, encrypted viewing key for your accountant or auditor. They drop it into the in-browser audit page, decrypt client-side, and walk away with a CSV of IN/OUT records over a chosen range. PBKDF2 + AES-GCM at rest; each issuance is tagged with a delegation ID so you keep a record of who you handed which key to.",
       detail: "scripts/auditor/issue.ts · sdk/src/auditor.ts · /audit",
     },
     {
       id: "sender-memo-channel",
       icon: Send,
       title: "Outgoing Sender Memos",
-      status: isSui ? "planned" : "shipped",
-      desc: isSui
-        ? "Per-output XChaCha20-Poly1305 envelopes encrypted to the sender's outgoing viewing key, with AAD = commitment || leafIndex to block move-the-memo attacks. Shipped end-to-end on Solana (transact disc 13 emits them, the relay forwards them opaquely); the equivalent Sui Move transact path is not wired up yet."
-        : "Per-output XChaCha20-Poly1305 envelopes encrypted to the sender's outgoing viewing key. AAD = commitment || leafIndex prevents move-the-memo attacks. Rust transact (disc 13) emits per output when memos are attached; SDK helper buildSenderMemosForTransact composes them client-side; /api/sol/relay forwards them opaquely (viewing keys never leave the client); auditor honors ViewPermissions.INCOMING_ONLY to suppress OUT records when the delegation forbids them.",
+      status: "shipped",
+      desc: "Per-output XChaCha20-Poly1305 envelopes encrypted to the sender's outgoing viewing key. AAD = commitment || leafIndex prevents move-the-memo attacks. Rust transact (disc 13) emits per output when memos are attached; SDK helper buildSenderMemosForTransact composes them client-side; /api/sol/relay forwards them opaquely (viewing keys never leave the client); auditor honors ViewPermissions.INCOMING_ONLY to suppress OUT records when the delegation forbids them.",
       detail: "sdk/src/sender-memo.ts · web/src/app/api/sol/relay/route.ts · sdk/src/auditor.ts",
     },
     {
       id: "selective-disclosure-proofs",
       icon: ListChecks,
       title: "Selective Disclosure Proofs",
-      status: isSui ? "planned" : "shipped",
-      desc: "Prove statements about your shielded holdings without revealing values: ownership-with-threshold (you control commitment X for at least amount Y of token T) and range-sum (sum across N notes ≤ ceiling, with N ∈ {4, 8, 16}). Circuits compiled, prover wired into the SDK, CLIs ship in scripts/auditor/. range-sum N=16 uses a chunked Poseidon attestation since circomlib's hash caps at arity 16."
-        + (isSui ? " Verifier deployed on Solana; the Sui on-chain verifier is on the roadmap." : ""),
+      status: "shipped",
+      desc: "Prove statements about your shielded holdings without revealing values: ownership-with-threshold (you control commitment X for at least amount Y of token T) and range-sum (sum across N notes ≤ ceiling, with N ∈ {4, 8, 16}). Circuits compiled, prover wired into the SDK, CLIs ship in scripts/auditor/. range-sum N=16 uses a chunked Poseidon attestation since circomlib's hash caps at arity 16.",
       detail: "circuits/build/ownership · scripts/auditor/prove-ownership.ts · scripts/auditor/prove-range-sum.ts",
     },
     {
@@ -397,44 +381,33 @@ function getDisclosureItems(chain: Chain): DisclosureItem[] {
       icon: ShieldCheck,
       title: "Per-stealth-address compliance toggle (v2)",
       status: "shipped",
-      desc: isSui
-        ? "Recipients self-publish two pieces on their `.utxopia.sui` SuiNS subdomain: a `complianceFlags` byte (bit 0 = AUDITOR_DISCLOSABLE) plus an optional auditor pubkey. Senders see both in the Send wizard chip: the flag tells them disclosure is OK, the pubkey tells them who specifically. Owners set both from the Settings page. The resolver reads UTXOpia stealth records straight from SuiNS."
-        : "Recipients self-publish two pieces on their `.utxopia.sol` SNS subdomain: a `complianceFlags` byte (bit 0 = AUDITOR_DISCLOSABLE) plus an optional 32-byte auditor Solana pubkey. Senders see both in the Send wizard chip: the flag tells them disclosure is OK, the pubkey tells them who specifically. Owners flip the flag and set the pubkey via the Settings page or via `scripts/sns-set-compliance.ts <subdomain> --enable --auditor <base58>`. The reader accepts current version-2 SNS stealth records only.",
-      detail: isSui ? "sdk/src/sui/suins.ts · components/settings/preferences-form.tsx" : "sdk/src/sns-resolver.ts · scripts/sns-set-compliance.ts · components/settings/preferences-form.tsx",
+      desc: "Recipients self-publish two pieces on their `.utxopia.sol` SNS subdomain: a `complianceFlags` byte (bit 0 = AUDITOR_DISCLOSABLE) plus an optional 32-byte auditor Solana pubkey. Senders see both in the Send wizard chip: the flag tells them disclosure is OK, the pubkey tells them who specifically. Owners flip the flag and set the pubkey via the Settings page or via `scripts/sns-set-compliance.ts <subdomain> --enable --auditor <base58>`. The reader accepts current version-2 SNS stealth records only.",
+      detail: "sdk/src/sns-resolver.ts · scripts/sns-set-compliance.ts · components/settings/preferences-form.tsx",
     },
   ];
 }
 
-function getSecurityItems(chain: Chain) {
-  const isSui = chain === "sui";
+function getSecurityItems() {
   return [
     {
-      icon: ShieldCheck, title: isSui ? "Redemption Policy Gate" : "On-Chain Policy Gate",
-      desc: isSui
-        ? "Amount limits, fee bounds, paused state, and destination whitelist guard every BTC redemption on-chain: the Move `ika_policy::approve_signing` gate checks them before the Ika network is authorized to sign. A compromised backend cannot drain funds by submitting forged sighashes."
-        : "Signing policy lives in the Solana program itself: amount limits, fee bounds, paused state, and destination whitelist are checked on-chain before the program issues the Ika `approve_message` CPI. A compromised backend cannot drain funds by submitting forged sighashes.",
+      icon: ShieldCheck, title: "On-Chain Policy Gate",
+      desc: "Signing policy lives in the Solana program itself: amount limits, fee bounds, paused state, and destination whitelist are checked on-chain before the program issues the Ika `approve_message` CPI. A compromised backend cannot drain funds by submitting forged sighashes.",
     },
     {
       icon: Network, title: "Ika dWallet Custody",
-      desc: isSui
-        ? "BTC is held by an Ika dWallet. Ika runs natively on Sui, so the dWallet's authority lives on Sui itself and every signature is a 2PC-MPC between the Ika network and the UTXOpia Move package — no single key, no off-chain signer committee. Pre-alpha runs a single mock signer; real distributed MPC ships at Ika mainnet."
-        : "BTC is held by an Ika dWallet whose authority is a PDA derived from this Solana program (`[\"__ika_cpi_authority\"]`). 2PC-MPC means the Ika network and our program must both participate in every signature — no single key, no off-chain signer committee. Pre-alpha runs a single mock signer; real distributed MPC ships at Ika mainnet.",
+      desc: "BTC is held by an Ika dWallet whose authority is a PDA derived from this Solana program (`[\"__ika_cpi_authority\"]`). 2PC-MPC means the Ika network and our program must both participate in every signature — no single key, no off-chain signer committee. Pre-alpha runs a single mock signer; real distributed MPC ships at Ika mainnet.",
     },
     {
       icon: GitBranch, title: "Trustless Verification",
-      desc: isSui
-        ? "Bitcoin deposits are verified on-chain via SPV proofs against a native Move light client tracking BTC block headers. The Move package validates Merkle inclusion and confirmation depth directly in the deposit transaction block — no oracle or trusted third party."
-        : "Bitcoin deposits are verified on-chain via SPV proofs against a light client tracking BTC block headers. The Solana program validates Merkle inclusion directly — no oracle or trusted third party.",
+      desc: "Bitcoin deposits are verified on-chain via SPV proofs against a light client tracking BTC block headers. The Solana program validates Merkle inclusion directly — no oracle or trusted third party.",
     },
     {
       icon: Lock, title: "Double-Spend Prevention",
       desc: "Each note can only be spent once. Publishing a nullifier (derived from spending key + leaf index) marks the note as consumed. The on-chain program rejects duplicate nullifiers permanently.",
     },
     {
-      icon: AlertTriangle, title: isSui ? "Auditable On-Chain Trail" : "Auditable CPI Trail",
-      desc: isSui
-        ? "Every redemption is an on-chain Move call carrying the sighash, dWallet ID, and signature scheme, so the full signing history is reconstructable from Sui RPC alone — no separate audit log to operate."
-        : "Every redemption emits an `approve_message` CPI on-chain, with the sighash, dWallet ID, and signature scheme recorded as inner instructions in the Solana transaction. The full signing history is reconstructable from RPC alone — no separate audit log to operate.",
+      icon: AlertTriangle, title: "Auditable CPI Trail",
+      desc: "Every redemption emits an `approve_message` CPI on-chain, with the sighash, dWallet ID, and signature scheme recorded as inner instructions in the Solana transaction. The full signing history is reconstructable from RPC alone — no separate audit log to operate.",
     },
   ];
 }
@@ -443,19 +416,17 @@ function getSecurityItems(chain: Chain) {
 
 export default function DocsPage() {
   const { networkId: network, config } = useChainEnvironment();
-  const chainId = getChainAdapter(config).id;
   const chainName = getChainAdapter(config).displayName;
   const sectionIds = useAllSectionIds();
   const activeSection = useActiveSection(sectionIds);
 
-  const comparisonRows = useMemo(() => getComparisonRows(chainId), [chainId]);
-  const protocolSteps = useMemo(() => getProtocolSteps(chainId), [chainId]);
-  const cryptoItems = useMemo(() => getCryptoItems(chainId), [chainId]);
-  const disclosureItems = useMemo(() => getDisclosureItems(chainId), [chainId]);
-  const securityItems = useMemo(() => getSecurityItems(chainId), [chainId]);
+  const comparisonRows = useMemo(() => getComparisonRows(), []);
+  const protocolSteps = useMemo(() => getProtocolSteps(), []);
+  const cryptoItems = useMemo(() => getCryptoItems(), []);
+  const disclosureItems = useMemo(() => getDisclosureItems(), []);
+  const securityItems = useMemo(() => getSecurityItems(), []);
 
-  const isSui = chainId === "sui";
-  const tokenList = isSui ? "BTC, SUI, USDC" : "BTC, SOL, USDC";
+  const tokenList = "BTC, SOL, USDC";
 
   return (
     <main className="min-h-screen bg-background">

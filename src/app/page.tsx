@@ -391,8 +391,6 @@ export default function Home() {
                     className={`flex items-center gap-3 px-4 py-3 rounded-[12px] border backdrop-blur-sm shrink-0 transition-all ${
                       token.status === "Live"
                         ? "bg-muted/30 border-gray/10 hover:border-privacy/20 hover:bg-privacy/5"
-                        : token.name === "SUI"
-                          ? "bg-sui/5 border-sui/10 hover:border-sui/25 hover:bg-sui/10"
                         : "bg-muted/15 border-gray/5 opacity-50"
                     }`}
                   >
@@ -400,10 +398,7 @@ export default function Home() {
                       <img
                         src={token.logo}
                         alt={token.name}
-                        className={cn(
-                          "object-contain",
-                          token.name === "SUI" ? "h-6 w-5" : "h-8 w-8 rounded-full",
-                        )}
+                        className="object-contain h-8 w-8 rounded-full"
                       />
                     </span>
                     <div>
@@ -411,7 +406,7 @@ export default function Home() {
                       <p className="text-[10px] text-gray/50">{token.label}</p>
                     </div>
                     {token.status === "Live" && (
-                      <span className={cn("ml-1 h-1.5 w-1.5 rounded-full animate-pulse", token.name === "SUI" ? "bg-sui" : "bg-privacy")} />
+                      <span className="ml-1 h-1.5 w-1.5 rounded-full animate-pulse bg-privacy" />
                     )}
                   </div>
                 ))}

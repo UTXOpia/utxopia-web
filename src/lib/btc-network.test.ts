@@ -13,7 +13,6 @@ describe("btc-network URL helpers", () => {
   it("derives Esplora API URLs from the selected app network", () => {
     expect(getEsploraApiUrl("devnet")).toBe("https://mempool.space/testnet4/api");
     expect(getEsploraApiUrl("devnet-regtest")).toBe("https://btc.utxopia.com/regtest/api");
-    expect(getEsploraApiUrl("sui-regtest")).toBe("https://btc.utxopia.com/regtest/api");
   });
 
   it("keeps explorer links separate from API URLs", () => {
@@ -25,14 +24,12 @@ describe("btc-network URL helpers", () => {
     expect(getUnisatChain("devnet")).toBe("BITCOIN_TESTNET4");
     expect(getUnisatChain("devnet-regtest")).toBe("BITCOIN_REGTEST");
     expect(getUnisatFallbackNetwork("mainnet")).toBe("livenet");
-    expect(getUnisatFallbackNetwork("sui-regtest")).toBe("testnet");
   });
 
   it("maps active app networks to the BTC signer network", () => {
     expect(getBtcSignerNetwork("mainnet")).toBe("mainnet");
     expect(getBtcSignerNetwork("devnet")).toBe("testnet");
     expect(getBtcSignerNetwork("devnet-regtest")).toBe("testnet");
-    expect(getBtcSignerNetwork("sui-regtest")).toBe("testnet");
   });
 
   it("decodes witness scripts with the selected Bitcoin network HRP", () => {
@@ -40,7 +37,6 @@ describe("btc-network URL helpers", () => {
 
     expect(scriptToAddress(p2trScript, "devnet")).toMatch(/^tb1p/);
     expect(scriptToAddress(p2trScript, "devnet-regtest")).toMatch(/^bcrt1p/);
-    expect(scriptToAddress(p2trScript, "sui-regtest")).toMatch(/^bcrt1p/);
     expect(scriptToAddress(p2trScript, "mainnet")).toMatch(/^bc1p/);
   });
 });

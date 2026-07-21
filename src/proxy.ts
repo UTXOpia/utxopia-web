@@ -93,7 +93,6 @@ function addSecurityHeaders(response: NextResponse) {
     "https://*.helius-rpc.com",
     "https://api.devnet.solana.com",
     "https://api.mainnet-beta.solana.com",
-    "https://fullnode.testnet.sui.io",
     "https://mempool.space",
     "wss://mempool.space",
     "https://*.amidoggy.xyz",

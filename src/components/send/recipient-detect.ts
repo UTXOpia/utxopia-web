@@ -11,7 +11,6 @@
 export type RecipientType =
   | "btc"
   | "stealth_sns"
-  | "stealth_suins"
   | "stealth_meta"
   | "spl_wallet";
 
@@ -22,12 +21,10 @@ export type DetectionResult = {
 };
 
 export type RecipientDetectionContext = {
-  chain?: "solana" | "sui";
+  chain?: "solana";
 };
 
 const SNS_SUFFIX = ".utxopia.sol";
-const SUINS_SUFFIX = ".utxopia.sui";
-const SUINS_NAME_RE = /^[a-z0-9]{1,63}\.utxopia\.sui$/;
 const STEALTH_META_PREFIX = "utxo:";
 // 96 bytes = spendingPubKey(32) + viewingPubKey(32) + mpk(32). See
 // sdk/src/keys.ts::decodeStealthMetaAddress.
@@ -90,27 +87,12 @@ export function detectRecipient(
     };
   }
 
-  if (lower.endsWith(SUINS_SUFFIX) && SUINS_NAME_RE.test(lower)) {
-    return {
-      type: "stealth_suins",
-      confidence: "high",
-      reason: "Looks like a SuiNS name",
-    };
-  }
-
   if (/^@[a-z0-9]{1,63}$/.test(lower)) {
     if (context.chain === "solana") {
       return {
         type: "stealth_sns",
         confidence: "high",
         reason: "Looks like a .utxopia.sol handle on Solana",
-      };
-    }
-    if (context.chain === "sui") {
-      return {
-        type: "stealth_suins",
-        confidence: "high",
-        reason: "Looks like a SuiNS handle on Sui",
       };
     }
     return {
