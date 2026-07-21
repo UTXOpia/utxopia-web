@@ -53,7 +53,7 @@
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
       "wsolMint": "So11111111111111111111111111111111111111112",
-      "jupusdMint": "HLerNRsEu7HCkjkYQdHD2gLh79TWYFJW9ehCzsdGhcLG"
+      "jupusdMint": ""
     },
     "bitcoin": {
       "network": "regtest",

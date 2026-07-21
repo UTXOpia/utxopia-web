@@ -59,7 +59,6 @@ const _netCfg = getNetworkConfig();
 const ENV_USDC_MINT = _netCfg.tokens.usdcMint || process.env.NEXT_PUBLIC_USDC_MINT || "";
 const ENV_USDT_MINT = _netCfg.tokens.usdtMint || process.env.NEXT_PUBLIC_USDT_MINT || "";
 const ENV_WSOL_MINT = _netCfg.tokens.wsolMint || process.env.NEXT_PUBLIC_WSOL_MINT || "";
-const ENV_JUPUSD_MINT = (_netCfg.tokens as Record<string, string>).jupusdMint || process.env.NEXT_PUBLIC_JUPUSD_MINT || "";
 
 export const SUPPORTED_TOKENS: SupportedToken[] = [
   {
@@ -178,29 +177,6 @@ export const SUPPORTED_TOKENS: SupportedToken[] = [
     explorerLabel: "USDT",
     explorerSubtitle: "SPL Token",
     relayerFee: 5000,       // 0.005 USDT
-  },
-  {
-    symbol: "jupUSD",
-    name: "Jupiter USD",
-    decimals: 9,
-    logo: "/tokens/jupusd.png",
-    mint: ENV_JUPUSD_MINT,
-    isBtcNative: false,
-    isSOL: false,
-    enabled: true,
-    unit: "jupUSD",
-    priceKey: "usdc",
-    shieldedSymbol: "zkJupUSD",
-    shieldedLogo: "/tokens/jupusd.png",
-    explorerFilter: "usdc",
-    showRawAmount: false,
-    explorerColors: {
-      from: "text-green-400/70 bg-green-500/6 border-green-500/10",
-      to: "text-privacy/80 bg-privacy/6 border-privacy/10",
-    },
-    explorerLabel: "jupUSD",
-    explorerSubtitle: "Jupiter Stablecoin",
-    relayerFee: 5_000_000,  // 0.005 jupUSD (9 decimals)
   },
   // ---- Sui pool tokens (display-only) ----
   // enabled:false keeps them out of the Solana pickers; they exist so the explorer
