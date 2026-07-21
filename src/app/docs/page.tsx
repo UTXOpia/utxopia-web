@@ -281,7 +281,7 @@ function getProtocolSteps() {
     },
     {
       id: "unshield-withdraw", num: "06", icon: Network, title: "Unshield or Withdraw",
-      desc: `Exit the privacy pool in two ways: unshield SPL tokens back to your ${wallet} instantly, or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
+      desc: `Exit the privacy pool in two ways: unshield supported assets back to your ${wallet} instantly (zkSOL returns native SOL), or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
       detail: "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
   ];

@@ -18,7 +18,7 @@ export interface SupportedToken {
   mint: string;
   /** True for BTC (uses Taproot deposit flow, not SPL shield) */
   isBtcNative: boolean;
-  /** True for SOL (wraps to wSOL via NATIVE_MINT_2022 before shield) */
+  /** True for SOL (wraps to the configured native wSOL mint before shield) */
   isSOL: boolean;
   /** Whether this token is live (vs coming soon) */
   enabled: boolean;
@@ -49,7 +49,7 @@ export interface SupportedToken {
   relayerFee: number;
 }
 
-/** Native wSOL mint (Token program, not Token-2022) */
+/** Native wSOL mint for the legacy Token program */
 export const NATIVE_WSOL_MINT = "So11111111111111111111111111111111111111112";
 
 

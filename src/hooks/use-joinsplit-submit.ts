@@ -57,7 +57,7 @@ export function useJoinSplitSubmit() {
 
       // Extract public signals
       setStatus("submitting");
-      setStatusMessage("Submitting proof to the relay...");
+      setStatusMessage("Submitting and confirming on-chain...");
 
       const publicSignals = proofData.publicInputs;
       const nInputs = params.proofInputs.nInputs;

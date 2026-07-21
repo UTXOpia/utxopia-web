@@ -1,7 +1,7 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertCircle, Check, CheckCircle2, ExternalLink, Loader2, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ExternalLink, Loader2, LockKeyhole, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { HoldButton } from "@/components/ui/hold-button";
 import { RelayControl } from "@/components/relay/relay-control";
@@ -19,7 +19,9 @@ export interface ReviewModalProps {
   recipientLabel: string;
   amountLabel: string;
   feeLabel: string;
-  onConfirm: () => void;
+  onConfirm: () => void | Promise<void>;
+  details?: Array<{ label: string; value: string; strong?: boolean }>;
+  privacyNote?: string;
   /** Optional warning row (e.g. BTC privacy notice). */
   warning?: string;
   /** Relay registry chain id ("sol" / "sui") for the per-tx relay line. */
@@ -52,6 +54,8 @@ export function ReviewModal({
   recipientLabel,
   amountLabel,
   feeLabel,
+  details,
+  privacyNote,
   onConfirm,
   warning,
   chainId,
@@ -101,9 +105,22 @@ export function ReviewModal({
             <>
               <div className="space-y-3 text-sm">
                 <Row label="To" value={recipientLabel} />
-                <Row label="Amount" value={amountLabel} />
-                <Row label="Total fees" value={feeLabel} />
+                {details?.length ? details.map((detail) => (
+                  <Row key={detail.label} label={detail.label} value={detail.value} strong={detail.strong} />
+                )) : (
+                  <>
+                    <Row label="Amount" value={amountLabel} />
+                    <Row label="Total fees" value={feeLabel} />
+                  </>
+                )}
               </div>
+
+              {privacyNote && (
+                <div className="mt-3 flex items-start gap-2 border-t border-gray/10 pt-3 text-xs text-muted-foreground">
+                  <LockKeyhole className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                  <span>{privacyNote}</span>
+                </div>
+              )}
 
               {warning && (
                 <div className="mt-3 px-2 py-1.5 rounded bg-yellow-500/10 text-yellow-600 text-xs">
@@ -241,11 +258,11 @@ function StepIcon({ state }: { state: "done" | "active" | "pending" }) {
   );
 }
 
-function Row({ label, value }: { label: string; value: string }) {
+function Row({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
   return (
     <div className="flex items-start justify-between gap-3">
       <span className="text-xs text-muted-foreground shrink-0">{label}</span>
-      <span className="font-mono text-xs text-right break-all">{value}</span>
+      <span className={cn("font-mono text-xs text-right break-all", strong && "font-semibold text-foreground")}>{value}</span>
     </div>
   );
 }

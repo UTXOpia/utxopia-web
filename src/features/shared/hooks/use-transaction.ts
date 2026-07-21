@@ -2,6 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { Connection, Transaction } from "@solana/web3.js";
+import { confirmSubmittedSignature } from "@/lib/solana/confirm-signature";
 
 export type TransactionStatus =
   | "idle"
@@ -37,8 +38,7 @@ export function useTransaction(options?: UseTransactionOptions) {
 
       try {
         // Get recent blockhash
-        const { blockhash, lastValidBlockHeight } =
-          await connection.getLatestBlockhash();
+        const { blockhash } = await connection.getLatestBlockhash();
         transaction.recentBlockhash = blockhash;
 
         // Sign
@@ -55,16 +55,7 @@ export function useTransaction(options?: UseTransactionOptions) {
         setStatus("confirming");
 
         // Confirm
-        const confirmation = await connection.confirmTransaction(
-          { signature: sig, blockhash, lastValidBlockHeight },
-          "confirmed"
-        );
-
-        if (confirmation.value.err) {
-          throw new Error(
-            `Transaction failed: ${JSON.stringify(confirmation.value.err)}`
-          );
-        }
+        await confirmSubmittedSignature(connection, sig);
 
         setSignature(sig);
         setStatus("success");

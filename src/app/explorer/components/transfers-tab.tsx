@@ -2,7 +2,7 @@
 
 /**
  * Transfers Tab — displays shielded JoinSplit transactions.
- * Handles three transfer types: Private Send, Unshield (zkBTC → SPL),
+ * Handles three transfer types: Private Send, Unshield (shielded → public asset),
  * and Redeem (zkBTC → BTC). Each has its own expandable detail view
  * showing nullifier inputs and commitment/BTC outputs.
  */

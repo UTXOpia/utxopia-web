@@ -15,10 +15,23 @@ export interface SubmittedTransactionActivity {
   networkId: string;
   kind: SubmittedTransactionKind;
   amountBaseUnits: string;
+  netAmountBaseUnits?: string;
+  protocolFeeBaseUnits?: string;
+  relayerFeeBaseUnits?: string;
   tokenSymbol: string;
   signature: string;
   recipient?: string;
   createdAt: number;
+}
+
+/** The public asset the recipient receives for each withdrawal route. */
+export function getSubmittedActivityDisplaySymbol(
+  kind: SubmittedTransactionKind,
+  shieldedSymbol: string,
+): string {
+  if (kind === "cashout_btc") return "BTC";
+  if (kind === "cashout_wallet" && shieldedSymbol === "zkSOL") return "SOL";
+  return shieldedSymbol;
 }
 
 interface TransactionActivityLedger {
@@ -75,6 +88,9 @@ export function recordSubmittedTransaction(input: {
   networkId: string;
   kind: SubmittedTransactionKind;
   amountBaseUnits: bigint;
+  netAmountBaseUnits?: bigint;
+  protocolFeeBaseUnits?: bigint;
+  relayerFeeBaseUnits?: bigint;
   tokenSymbol: string;
   signature: string;
   recipient?: string;
@@ -87,6 +103,9 @@ export function recordSubmittedTransaction(input: {
     networkId: input.networkId,
     kind: input.kind,
     amountBaseUnits: input.amountBaseUnits.toString(),
+    netAmountBaseUnits: input.netAmountBaseUnits?.toString(),
+    protocolFeeBaseUnits: input.protocolFeeBaseUnits?.toString(),
+    relayerFeeBaseUnits: input.relayerFeeBaseUnits?.toString(),
     tokenSymbol: input.tokenSymbol,
     signature: input.signature,
     recipient: input.recipient,

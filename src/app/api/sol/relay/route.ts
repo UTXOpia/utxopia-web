@@ -3,7 +3,7 @@
  *
  * Chain-specific endpoint for Solana JoinSplit modes:
  * - mode="transfer" → TRANSACT (disc=13) — private transfer
- * - mode="unshield" → UNSHIELD (disc=14) — public withdrawal to SPL token (multi-output)
+ * - mode="unshield" → UNSHIELD (disc=14) — public withdrawal to SPL token or native SOL
  * - mode="redeem"   → REDEEM (disc=15)   — atomic JoinSplit + BTC withdrawal (multi-output)
  *
  * Flow:
@@ -51,6 +51,7 @@ import {
   type NetworkId,
 } from "@/lib/network-config";
 import { networkForChain } from "@/lib/chain-registry";
+import { isNativeSolMint } from "@/lib/solana/native-sol";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -80,7 +81,7 @@ interface RelayRequest {
   unshieldAmounts?: string[];
   /** Unshield: recipient Solana addresses (base58, one per public output) */
   recipientAddresses?: string[];
-  /** Unshield: recipient token accounts (base58, one per public output) */
+  /** Unshield: optional pre-derived SPL recipient token accounts */
   recipientTokenAccounts?: string[];
   /** Redeem: amounts in satoshis (one per public output) */
   redeemAmounts?: string[];
@@ -297,9 +298,12 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({ success: false, error: "Unshield token mint not found" }, { status: 400 });
       }
       const tokenProgramId = mintInfo.owner;
+      const nativeSol = isNativeSolMint(unshieldMint.toBase58());
 
       const recipientPubkeys = recipientAddresses.map(a => new PublicKey(a));
-      const recipientTokenPubkeys = recipientPubkeys.map(r => getAssociatedTokenAddressSync(unshieldMint, r, false, tokenProgramId));
+      const recipientOutputPubkeys = nativeSol
+        ? recipientPubkeys
+        : recipientPubkeys.map(r => getAssociatedTokenAddressSync(unshieldMint, r, false, tokenProgramId));
       const poolVault = getAssociatedTokenAddressSync(unshieldMint, poolState, true, tokenProgramId);
 
       ixData = buildUnshieldInstructionData({
@@ -326,27 +330,30 @@ export async function POST(request: NextRequest) {
         { pubkey: poolVault, isSigner: false, isWritable: true },
         { pubkey: tokenProgramId, isSigner: false, isWritable: false },
       );
-      for (const rta of recipientTokenPubkeys) keys.push({ pubkey: rta, isSigner: false, isWritable: true });
+      for (const recipient of recipientOutputPubkeys) keys.push({ pubkey: recipient, isSigner: false, isWritable: true });
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
       if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
 
-      // Ensure recipient ATAs exist
-      for (let k = 0; k < nPublicOutputs; k++) {
-        const ataInfo = await connection.getAccountInfo(recipientTokenPubkeys[k]);
-        if (!ataInfo) {
-          const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
-            relayer.publicKey,
-            recipientTokenPubkeys[k],
-            recipientPubkeys[k],
-            unshieldMint,
-            tokenProgramId,
-          );
-          const ataTx = new Transaction().add(createAtaIx);
-          const { blockhash: ataBlockhash } = await connection.getLatestBlockhash();
-          ataTx.feePayer = relayer.publicKey;
-          ataTx.recentBlockhash = ataBlockhash;
-          await sendAndConfirmTransaction(connection, ataTx, [relayer], { commitment: "confirmed" });
+      // Native SOL recipients receive lamports directly. Ordinary SPL outputs
+      // still require an ATA.
+      if (!nativeSol) {
+        for (let k = 0; k < nPublicOutputs; k++) {
+          const ataInfo = await connection.getAccountInfo(recipientOutputPubkeys[k]);
+          if (!ataInfo) {
+            const createAtaIx = createAssociatedTokenAccountIdempotentInstruction(
+              relayer.publicKey,
+              recipientOutputPubkeys[k],
+              recipientPubkeys[k],
+              unshieldMint,
+              tokenProgramId,
+            );
+            const ataTx = new Transaction().add(createAtaIx);
+            const { blockhash: ataBlockhash } = await connection.getLatestBlockhash();
+            ataTx.feePayer = relayer.publicKey;
+            ataTx.recentBlockhash = ataBlockhash;
+            await sendAndConfirmTransaction(connection, ataTx, [relayer], { commitment: "confirmed" });
+          }
         }
       }
 

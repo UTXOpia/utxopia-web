@@ -35,6 +35,8 @@ import { hrefWithChain } from "@/lib/network-config";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
 import { recordSubmittedTransaction, type SubmittedTransactionKind } from "@/lib/transaction-activity";
+import { usePoolFees } from "@/hooks/use-pool-fees";
+import { computeBpsFee, feeShareBps } from "@/lib/pool-fees";
 import {
   decodeStealthMetaAddress,
   deriveMasterKey,
@@ -257,6 +259,7 @@ export function SendForm({
   const router = useRouter();
   const tokenPrices = useTokenPrices();
   const chainEnv = useChainEnvironment();
+  const poolFees = usePoolFees();
   const activeChainId = getChainAdapter(chainEnv.config).id;
   const boundChainId = SOLANA_BOUND_CHAIN_ID;
   const activeChainLabel = "Solana";
@@ -413,6 +416,11 @@ export function SendForm({
     effectiveServiceFeeBps,
   );
   const btcNetPayout = BigInt(Math.max(0, amountSats)) - btcServiceFee;
+  const isWalletWithdrawal = recipientValid && recipientType === "spl_wallet";
+  const withdrawalFee = isWalletWithdrawal
+    ? computeBpsFee(BigInt(Math.max(0, amountSats)), poolFees.fees?.withdrawalFeeBps ?? 0)
+    : 0n;
+  const walletNetPayout = BigInt(Math.max(0, amountSats)) - withdrawalFee;
   const btcAmountTooSmall =
     recipientValid &&
     recipientType === "btc" &&
@@ -425,7 +433,8 @@ export function SendForm({
       ? `${raw.toLocaleString()} sats`
       : `${formatAmount(Number(raw), selectedPayToken.decimals)} ${selectedPayToken.shieldedSymbol}`;
   };
-  const totalFee = BigInt(effectiveRelayerFee) + (recipientType === "btc" ? btcServiceFee : 0n);
+  const totalFee = BigInt(effectiveRelayerFee) + (recipientType === "btc" ? btcServiceFee : withdrawalFee);
+  const highFeeShare = feeShareBps(totalFee, BigInt(Math.max(0, amountSats)) + BigInt(effectiveRelayerFee)) >= 500;
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
   const balanceLabel =
@@ -475,6 +484,13 @@ export function SendForm({
       }
       if (requiresBackup) {
         throw new Error("Back up your private wallet before sending funds.");
+      }
+      if (recipientType === "spl_wallet") {
+        const quotedBps = poolFees.fees?.withdrawalFeeBps;
+        const latest = await poolFees.refresh();
+        if (quotedBps == null || latest.withdrawalFeeBps !== quotedBps) {
+          throw new Error("The withdrawal fee changed. Review the updated amount and confirm again.");
+        }
       }
 
       const intent = buildSendIntent({
@@ -601,6 +617,17 @@ export function SendForm({
         networkId: chainEnv.networkId,
         kind: result,
         amountBaseUnits: BigInt(amountSats),
+        netAmountBaseUnits: result === "cashout_btc"
+          ? btcNetPayout
+          : result === "cashout_wallet"
+            ? walletNetPayout
+            : BigInt(amountSats),
+        protocolFeeBaseUnits: result === "cashout_btc"
+          ? btcServiceFee
+          : result === "cashout_wallet"
+            ? withdrawalFee
+            : 0n,
+        relayerFeeBaseUnits: BigInt(effectiveRelayerFee),
         tokenSymbol: effectiveToken,
         signature: submission.signature,
         recipient: state.recipient.trim(),
@@ -627,8 +654,13 @@ export function SendForm({
     selectedPayToken.mint,
     submitter,
     amountSats,
+    btcNetPayout,
+    btcServiceFee,
+    walletNetPayout,
+    withdrawalFee,
     requiresBackup,
     scheduleInboxRefresh,
+    poolFees,
   ]);
 
   // Explorer link + activity-page target for the confirmed transaction, shown
@@ -882,8 +914,40 @@ export function SendForm({
         recipientLabel={state.recipient.trim()}
         amountLabel={`${state.amount} ${displayToken}`}
         feeLabel={formatFee(totalFee)}
+        details={
+          recipientType === "spl_wallet"
+            ? [
+                { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
+                { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                { label: "Protocol fee", value: `${formatAmount(Number(withdrawalFee), selectedPayToken.decimals)} ${selectedPayToken.unit}` },
+                { label: "Wallet receives", value: `${formatAmount(Number(walletNetPayout), selectedPayToken.decimals)} ${selectedPayToken.unit}`, strong: true },
+                { label: "Destination", value: state.recipient.trim() },
+              ]
+            : recipientType === "btc"
+              ? [
+                  { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
+                  { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                  { label: "Bitcoin service fee", value: formatFee(btcServiceFee) },
+                  { label: "Wallet receives", value: `${btcNetPayout.toLocaleString()} sats`, strong: true },
+                  { label: "Destination", value: state.recipient.trim() },
+                ]
+              : [
+                  { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
+                  { label: "Recipient receives", value: `${state.amount} ${effectiveToken}`, strong: true },
+                  { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                ]
+        }
+        privacyNote={
+          recipientType === "spl_wallet"
+            ? `${selectedPayToken.unit} destination and received amount are public on Solana.${effectiveToken === "zkSOL" ? " You receive native SOL." : ""}`
+            : recipientType === "btc"
+              ? "Bitcoin destination and payout are public."
+              : "Sender, recipient, and amount remain private."
+        }
         warning={
-          detection.type === "btc"
+          highFeeShare
+            ? "Fees are high relative to this amount. Review the net amount carefully."
+            : detection.type === "btc"
             ? "Cashing out to Bitcoin reveals the destination address on-chain."
             : undefined
         }

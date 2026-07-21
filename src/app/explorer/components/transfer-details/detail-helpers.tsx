@@ -120,7 +120,7 @@ export function UnshieldAmountDisplay({ grossAmount, netAmount, fee, token }: { 
   const fmt = (v: number) => token.showRawAmount
     ? v.toLocaleString()
     : (v / (10 ** token.decimals)).toLocaleString(undefined, { maximumFractionDigits: token.decimals });
-  // Unshield output is the SPL token: zkBTC for BTC, USDC for USDC, etc.
+  // Unshield output is public: native SOL for zkSOL, zkBTC for BTC, and SPL for other tokens.
   const outSymbol = token.isBtcNative ? token.shieldedSymbol : token.symbol;
   const outLogo = token.isBtcNative ? token.shieldedLogo : token.logo;
   return (

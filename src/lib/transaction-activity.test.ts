@@ -1,6 +1,10 @@
 /** @happy-dom */
 import { beforeEach, describe, expect, it } from "bun:test";
-import { getSubmittedTransactions, recordSubmittedTransaction } from "./transaction-activity";
+import {
+  getSubmittedActivityDisplaySymbol,
+  getSubmittedTransactions,
+  recordSubmittedTransaction,
+} from "./transaction-activity";
 
 describe("submitted transaction activity", () => {
   beforeEach(() => localStorage.clear());
@@ -39,5 +43,11 @@ describe("submitted transaction activity", () => {
     }));
 
     expect(getSubmittedTransactions("devnet-regtest")).toHaveLength(0);
+  });
+
+  it("labels Bitcoin cash-outs as BTC and Solana wallet withdrawals as zkBTC", () => {
+    expect(getSubmittedActivityDisplaySymbol("cashout_btc", "zkBTC")).toBe("BTC");
+    expect(getSubmittedActivityDisplaySymbol("cashout_wallet", "zkBTC")).toBe("zkBTC");
+    expect(getSubmittedActivityDisplaySymbol("cashout_wallet", "zkSOL")).toBe("SOL");
   });
 });

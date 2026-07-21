@@ -4,7 +4,7 @@
  * Returns all non-deposit transactions in a unified structure with typed
  * inputs[] and outputs[] arrays. Each output is one of:
  *   - "commitment" (shielded change)
- *   - "unshield" (SPL token to wallet)
+ *   - "unshield" (public token or native SOL to wallet)
  *   - "withdraw" (BTC redemption request)
  *
  * Data flow: backend /api/transfers → transform to ExplorerTransaction[]

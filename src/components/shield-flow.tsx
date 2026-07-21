@@ -22,7 +22,7 @@ import {
 import { UTXOpiaClient } from "@utxopia/sdk";
 import { derivePoolStatePDA, deriveCommitmentTreePDA, deriveTokenConfigPDA } from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
-import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info } from "lucide-react";
+import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StealthRecipientInput } from "@/components/ui/stealth-recipient-input";
 import { TextShimmer } from "@/components/ui/text-shimmer";
@@ -40,6 +40,11 @@ import { TokenSelector } from "@/components/shield-flow/token-selector";
 import { BtcFaucetPrompt } from "@/components/shield-flow/btc-faucet-prompt";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
+import { confirmSubmittedSignature } from "@/lib/solana/confirm-signature";
+import { usePoolFees } from "@/hooks/use-pool-fees";
+import { computeBpsFee, feeShareBps } from "@/lib/pool-fees";
+import { formatAmount } from "@/lib/utils/formatting";
+import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -47,7 +52,7 @@ interface ShieldFlowProps {
   className?: string;
 }
 
-type ShieldStatus = "idle" | "processing" | "done" | "error";
+type ShieldStatus = "idle" | "processing" | "unknown" | "done" | "error";
 
 export function ShieldFlow({ className }: ShieldFlowProps) {
   const wallet = useWallet();
@@ -58,6 +63,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const { permissioned: poolPermissioned } = usePoolPermissioned();
   const { setVisible: openWalletModal } = useWalletModal();
   const { keys, stealthAddress } = useUTXOpia();
+  const poolFees = usePoolFees();
 
   // Passkey users have keys but no Solana wallet — need to connect wallet for SPL shielding
   const isPasskeyOnly = !!keys && !publicKey;
@@ -130,6 +136,12 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       setError(null);
 
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * (10 ** selectedToken.decimals)));
+      const quotedDepositFeeBps = poolFees.fees?.depositFeeBps;
+      const latestFees = await poolFees.refresh();
+      if (quotedDepositFeeBps == null || latestFees.depositFeeBps !== quotedDepositFeeBps) {
+        setStatus("idle");
+        throw new Error("The deposit fee changed. Review the updated amount and confirm again.");
+      }
 
       // Determine mint: SOL uses native wSOL, others use their configured mint
       const mintPubkey = selectedToken.isSOL
@@ -190,7 +202,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         // Read vault from TokenConfig PDA on-chain
         const tokenConfigAccount = await connection.getAccountInfo(tokenConfigPda);
         if (!tokenConfigAccount) {
-          throw new Error("SOL token not registered on-chain. Admin must register wSOL first.");
+          throw new Error("SOL is not available on this network yet.");
         }
         // vault is at offset 66..98 in TokenConfig (disc:1 + bump:1 + mint:32 + tokenId:32 = 66)
         const vaultBytes = tokenConfigAccount.data.slice(66, 98);
@@ -279,17 +291,53 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       }
 
       const sig = await sendTransaction(tx, connection);
-      await connection.confirmTransaction(sig, "confirmed");
-
       setTxSig(sig);
+      try {
+        await confirmSubmittedSignature(connection, sig);
+      } catch (confirmationError) {
+        const message = confirmationError instanceof Error ? confirmationError.message : "Confirmation is taking longer than expected.";
+        if (message.includes("still pending") || message.includes("submitted")) {
+          setError("Confirmation is taking longer than expected. The transaction may still confirm on-chain.");
+          setStatus("unknown");
+          return;
+        }
+        throw confirmationError;
+      }
+
       setStatus("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Add funds failed");
       setStatus("error");
     }
-  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction, chainEnv.config]);
+  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction, chainEnv.config, poolFees]);
 
-  const canSubmit = !!amount && parseFloat(amount) > 0 && !!resolvedMeta && !!publicKey && !!keys;
+  const amountRaw = BigInt(Math.max(0, Math.floor(parseFloat(amount || "0") * (10 ** selectedToken.decimals))));
+  const depositFee = computeBpsFee(amountRaw, poolFees.fees?.depositFeeBps ?? 0, false);
+  const privateReceives = amountRaw > depositFee ? amountRaw - depositFee : 0n;
+  const displayUnit = selectedToken.isSOL ? "SOL" : selectedToken.symbol;
+  const privateUnit = selectedToken.isSOL ? "zkSOL" : `zk${selectedToken.symbol.replace(/^zk/, "")}`;
+  const formatBaseUnits = (value: bigint) => formatAmount(Number(value), selectedToken.decimals);
+  const highDepositFee = feeShareBps(depositFee, amountRaw) >= 500;
+  const canSubmit = !!amount && parseFloat(amount) > 0 && !!resolvedMeta && !!publicKey && !!keys && !!poolFees.fees;
+
+  const checkDepositAgain = useCallback(async () => {
+    if (!txSig) return;
+    setStatus("processing");
+    setError(null);
+    try {
+      await confirmSubmittedSignature(connection, txSig);
+      setStatus("done");
+    } catch (cause) {
+      const message = cause instanceof Error ? cause.message : "Could not confirm the transaction.";
+      if (message.includes("still pending") || message.includes("submitted")) {
+        setError("Still waiting for on-chain confirmation. Your funds have not been marked as failed.");
+        setStatus("unknown");
+      } else {
+        setError(message);
+        setStatus("error");
+      }
+    }
+  }, [connection, txSig]);
 
   // Success state
   if (status === "done") {
@@ -346,7 +394,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         <BtcDepositPreview
           className={className}
           btcDeposit={btcDeposit}
-          status={status}
+          status={status === "unknown" ? "error" : status}
           error={error}
         />
       );
@@ -611,10 +659,17 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </button>
           {tokenSelector}
         </div>
-        {selectedToken.isSOL && (
-          <p className="text-[10px] text-gray/50 pl-1">
-            SOL is wrapped to wSOL for the deposit, then the wrapper account is closed.
-          </p>
+        {amountRaw > 0n && poolFees.fees && (
+          <div className="space-y-2 border-t border-gray/10 pt-3 text-xs">
+            <PreviewRow label="You deposit" value={`${formatBaseUnits(amountRaw)} ${displayUnit}`} />
+            <PreviewRow label="Deposit fee" value={`${formatBaseUnits(depositFee)} ${displayUnit}`} />
+            <PreviewRow label="Private balance receives" value={`${formatBaseUnits(privateReceives)} ${privateUnit}`} strong />
+            <p className="flex items-start gap-1.5 text-[11px] text-gray/60">
+              <Info className="mt-0.5 h-3 w-3 shrink-0" />
+              This deposit is public. Your later private transfers are not publicly linked by the app.
+            </p>
+            {highDepositFee && <p className="text-[11px] text-warning">The fee is high relative to this deposit.</p>}
+          </div>
         )}
       </div>
 
@@ -635,6 +690,30 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-[10px]">
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           <span className="text-caption text-red-400">{error}</span>
+        </div>
+      )}
+
+      {status === "unknown" && txSig && (
+        <div className="space-y-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3 text-caption">
+          <div className="flex items-start gap-2 text-warning">
+            <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{error}</span>
+          </div>
+          <div className="flex gap-2">
+            <button type="button" onClick={checkDepositAgain} className="inline-flex min-h-11 items-center gap-1.5 rounded-lg bg-foreground px-3 text-xs font-semibold text-background">
+              <RefreshCw className="h-3.5 w-3.5" /> Check again
+            </button>
+            <a href={getSolanaExplorerTxUrl(txSig, networkId)} target="_blank" rel="noreferrer" className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-gray/15 px-3 text-xs font-semibold">
+              Explorer <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          </div>
+        </div>
+      )}
+
+      {status === "processing" && txSig && (
+        <div className="flex items-center gap-2 rounded-[10px] border border-gray/15 bg-muted px-3 py-2.5 text-caption text-gray-light">
+          <Loader2 className="h-4 w-4 shrink-0 animate-spin" />
+          <span><strong className="text-foreground">Submitted.</strong> Confirming on-chain…</span>
         </div>
       )}
 
@@ -671,6 +750,15 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </>
         )}
       </button>
+    </div>
+  );
+}
+
+function PreviewRow({ label, value, strong = false }: { label: string; value: string; strong?: boolean }) {
+  return (
+    <div className="flex items-center justify-between gap-3">
+      <span className="text-gray/70">{label}</span>
+      <span className={cn("font-mono text-right", strong && "font-semibold text-foreground")}>{value}</span>
     </div>
   );
 }

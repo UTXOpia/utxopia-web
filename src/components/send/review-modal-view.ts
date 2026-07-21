@@ -11,7 +11,7 @@ export type ReviewView = "confirm" | "progress" | "success" | "error";
 export const REVIEW_STEPS: { keys: SubmitStatus[]; label: string }[] = [
   { keys: ["preparing"], label: "Preparing transaction" },
   { keys: ["processing"], label: "Generating privacy proof" },
-  { keys: ["submitting"], label: "Submitting to relay" },
+  { keys: ["submitting"], label: "Submitted and confirming" },
 ];
 
 export const REVIEW_TITLES: Record<ReviewView, string> = {
