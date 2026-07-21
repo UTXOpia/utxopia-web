@@ -10,6 +10,8 @@ export interface TokenSourcePickerProps {
   recipientType: RecipientType | "claim_link" | null;
   selected: string;
   onSelect: (symbol: string) => void;
+  /** Use native asset names when selecting from the private balance. */
+  displayPrivateAssets?: boolean;
   className?: string;
 }
 
@@ -25,6 +27,7 @@ export function TokenSourcePicker({
   recipientType,
   selected,
   onSelect,
+  displayPrivateAssets = false,
   className,
 }: TokenSourcePickerProps) {
   const [open, setOpen] = useState(false);
@@ -47,16 +50,16 @@ export function TokenSourcePicker({
         )}
         title={
           disabled
-            ? "Bitcoin addresses can only receive zkBTC. To send other tokens, use a chain wallet or private address."
+            ? "Bitcoin addresses can only receive BTC. To cash out another asset, use a Solana wallet."
             : undefined
         }
       >
         <span className="flex items-center gap-2">
           <span className="font-medium">
-            {current?.shieldedSymbol ?? "zkBTC"}
+            {displayPrivateAssets ? current?.unit : current?.shieldedSymbol ?? "zkBTC"}
           </span>
           <span className="text-muted-foreground text-xs">
-            {current?.name ?? "Bitcoin"}
+            {displayPrivateAssets ? "Private balance" : current?.name ?? "Bitcoin"}
           </span>
         </span>
         {!disabled && <ChevronDown className="w-4 h-4 text-muted-foreground" />}
@@ -78,8 +81,12 @@ export function TokenSourcePicker({
                 t.shieldedSymbol === selected && "bg-privacy/10 text-privacy",
               )}
             >
-              <span className="font-medium">{t.shieldedSymbol}</span>
-              <span className="text-muted-foreground text-xs">{t.name}</span>
+              <span className="font-medium">
+                {displayPrivateAssets ? t.unit : t.shieldedSymbol}
+              </span>
+              <span className="text-muted-foreground text-xs">
+                {displayPrivateAssets ? "Private balance" : t.name}
+              </span>
             </button>
           ))}
         </div>

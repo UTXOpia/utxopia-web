@@ -377,6 +377,7 @@ export function SendForm({
       PAY_TOKENS[0],
     [effectiveToken],
   );
+  const displayToken = mode === "cashout" ? selectedPayToken.unit : effectiveToken;
   const {
     relayerMeta,
     effectiveRelayerFee,
@@ -434,7 +435,7 @@ export function SendForm({
         ? "Sign in to view"
         : ctx.inboxError
           ? "Unavailable"
-          : `${formatAmount(Number(totalAvailable), selectedPayToken.decimals)} ${selectedPayToken.shieldedSymbol}`;
+          : `${formatAmount(Number(totalAvailable), selectedPayToken.decimals)} ${displayToken}`;
   const devSignerEnabled =
     process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
     !chainEnv.networkId.includes("mainnet");
@@ -806,6 +807,7 @@ export function SendForm({
             recipientType={mode === "cashout" ? cashOutRecipientType : recipientType}
             selected={effectiveToken}
             onSelect={(s) => dispatch({ type: "set_token", value: s })}
+            displayPrivateAssets={mode === "cashout"}
           />
           <AmountField
             value={state.amount}
@@ -878,7 +880,7 @@ export function SendForm({
           else closeReview();
         }}
         recipientLabel={state.recipient.trim()}
-        amountLabel={`${state.amount} ${effectiveToken}`}
+        amountLabel={`${state.amount} ${displayToken}`}
         feeLabel={formatFee(totalFee)}
         warning={
           detection.type === "btc"

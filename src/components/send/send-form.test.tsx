@@ -110,6 +110,9 @@ describe("SendForm", () => {
     render(<SendForm mode="cashout" />);
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
     expect(screen.getByText("Sign in to view")).toBeDefined();
+    expect(screen.getAllByText("BTC").length).toBeGreaterThan(0);
+    expect(screen.getByText("Private balance")).toBeDefined();
+    expect(screen.queryByText("zkBTC")).toBeNull();
 
     const bitcoinAddress = "bc1q9d4ywgfnd8h70q4thlsclpw0ymmqfumzgxlhpe";
     fireEvent.change(screen.getByLabelText(/bitcoin address/i), {
