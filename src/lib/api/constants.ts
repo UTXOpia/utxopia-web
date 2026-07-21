@@ -26,12 +26,13 @@ export const DEFAULT_API_URL = "http://localhost:3001";
 export const SOLANA_RPC_FALLBACK_URL = "https://api.devnet.solana.com";
 
 /**
- * Get the Solana RPC URL.
+ * Get the Solana RPC URL (server-side).
  *
- * Priority: NEXT_PUBLIC_SOLANA_RPC_URL env var > devnet fallback
+ * Priority: SOLANA_RPC_URL (server-only, keyed) > NEXT_PUBLIC_SOLANA_RPC_URL > devnet fallback.
+ * Server-only wins so a keyed backend RPC stays off the browser bundle.
  */
 export function getSolanaRpcUrl(): string {
-  return process.env.NEXT_PUBLIC_SOLANA_RPC_URL || SOLANA_RPC_FALLBACK_URL;
+  return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || SOLANA_RPC_FALLBACK_URL;
 }
 
 /**

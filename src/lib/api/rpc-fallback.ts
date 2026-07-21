@@ -38,9 +38,10 @@ export interface RpcTxMeta {
 }
 
 function getRpcUrl(config?: NetworkConfig): string {
+  // Server-only SOLANA_RPC_URL before the browser-exposed NEXT_PUBLIC_ value.
   return config?.solana.rpcUrl
-    || process.env.NEXT_PUBLIC_SOLANA_RPC_URL
     || process.env.SOLANA_RPC_URL
+    || process.env.NEXT_PUBLIC_SOLANA_RPC_URL
     || SOLANA_RPC_FALLBACK_URL;
 }
 

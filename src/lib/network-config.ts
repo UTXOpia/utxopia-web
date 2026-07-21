@@ -412,9 +412,12 @@ export function getNetworkConfig(
 
   if (!applyEnvOverrides) return cfg;
 
-  // Allow env var overrides for URLs only
+  // Allow env var overrides for URLs only. Server-only SOLANA_RPC_URL takes
+  // precedence over NEXT_PUBLIC_SOLANA_RPC_URL so a keyed backend RPC can be used
+  // server-side while the browser (where SOLANA_RPC_URL is always undefined)
+  // falls through to the public NEXT_PUBLIC_ value — keeping the key off clients.
   const rpcOverride =
-    process.env.NEXT_PUBLIC_SOLANA_RPC_URL || process.env.SOLANA_RPC_URL;
+    process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL;
   if (rpcOverride) cfg.solana = { ...cfg.solana, rpcUrl: rpcOverride };
 
   const suiRpcOverride =

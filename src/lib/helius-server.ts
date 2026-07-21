@@ -28,10 +28,11 @@ export function getHeliusRpcUrl(network: "devnet" | "mainnet" = "devnet"): strin
       : `https://devnet.helius-rpc.com/?api-key=${HELIUS_API_KEY}`;
   }
 
-  // Fallback to public RPC
+  // Fallback to configured RPC. Server-only SOLANA_RPC_URL wins over the
+  // browser-exposed NEXT_PUBLIC_ value so a keyed backend RPC is used here.
   return network === "mainnet"
     ? "https://api.mainnet-beta.solana.com"
-    : process.env.NEXT_PUBLIC_SOLANA_RPC_URL || SOLANA_RPC_FALLBACK_URL;
+    : process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || SOLANA_RPC_FALLBACK_URL;
 }
 
 /** Check if Helius is configured */
