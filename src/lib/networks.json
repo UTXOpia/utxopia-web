@@ -11,8 +11,7 @@
       "zkbtcMint": "CDqY9mTzbWma7GzCULTJMMZzyVothKEXtr7AnXdpD6v8",
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
-      "wsolMint": "So11111111111111111111111111111111111111112",
-      "jupusdMint": "HLerNRsEu7HCkjkYQdHD2gLh79TWYFJW9ehCzsdGhcLG"
+      "wsolMint": "So11111111111111111111111111111111111111112"
     },
     "bitcoin": {
       "network": "testnet4",
@@ -52,8 +51,7 @@
       "zkbtcMint": "7qSDx4sbMHqx7HbPa3irvtXRqhq24h1Ai56Qttghh3td",
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
-      "wsolMint": "So11111111111111111111111111111111111111112",
-      "jupusdMint": ""
+      "wsolMint": "So11111111111111111111111111111111111111112"
     },
     "bitcoin": {
       "network": "regtest",
@@ -148,8 +146,7 @@
       "zkbtcMint": "HjifoWPYtGndSGMS4XyNwnnwXpbVtEzHqBTXGF39W9Uo",
       "usdcMint": "8fjtrrw52tUvdenKLupmpnkQUvDcAnyCc9w3a5MEk8DR",
       "usdtMint": "",
-      "wsolMint": "",
-      "jupusdMint": ""
+      "wsolMint": ""
     },
     "bitcoin": {
       "network": "regtest",

@@ -26,8 +26,6 @@ export const KNOWN_TOKEN_IDS: Record<string, string> = {
   "0fe717580e6af5dc1051f06fd7c697e4a11e388d221640814a6eb998806abb8f": "USDC",
   // USDT mint: EpvkQMMuqHQH1HajcD74WyabzjNxjJW53xtBpnHUwgQv
   "06db61dd810e2589eb944051114416b9e99181408c52de9b73088cf19653cbb8": "USDT",
-  // jupUSD mint: 2Z82qqmoJsb5gtVzpHBYJrsmLPpV83VRG1aCqp2onG7t
-  "06013329f547d34ba63bc7dca2634fc8054748e00143db21c8865566b38bb94b": "jupUSD",
 };
 
 // ---------------------------------------------------------------------------
