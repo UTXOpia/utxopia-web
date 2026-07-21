@@ -50,10 +50,10 @@
     },
     "tokens": {
       "zkbtcMint": "7qSDx4sbMHqx7HbPa3irvtXRqhq24h1Ai56Qttghh3td",
-      "usdcMint": "",
-      "usdtMint": "",
-      "wsolMint": "",
-      "jupusdMint": ""
+      "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
+      "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
+      "wsolMint": "So11111111111111111111111111111111111111112",
+      "jupusdMint": "HLerNRsEu7HCkjkYQdHD2gLh79TWYFJW9ehCzsdGhcLG"
     },
     "bitcoin": {
       "network": "regtest",
