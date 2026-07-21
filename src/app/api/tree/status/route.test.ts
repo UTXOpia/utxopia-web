@@ -1,38 +1,8 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
-import { fetchSuiExplorerStats } from "@/test-support/sui-explorer-mock";
-
-fetchSuiExplorerStats.mockImplementation(async () => ({
-  totalShielded: 1_000n,
-  depositCount: 1,
-  totalCommitments: 7,
-  volume: 1_000n,
-}));
+import { describe, expect, it, mock } from "bun:test";
 
 const { GET } = await import("./route");
 
 describe("/api/tree/status", () => {
-  beforeEach(() => {
-    fetchSuiExplorerStats.mockClear();
-  });
-
-  it("returns event-backed tree status for Sui networks", async () => {
-    const response = await GET(new Request("https://app.utxopia.test/api/tree/status?network=sui-regtest") as any);
-    const json = await response.json();
-
-    expect(response.status).toBe(200);
-    expect(fetchSuiExplorerStats).toHaveBeenCalledTimes(1);
-    expect(json).toEqual({
-      success: true,
-      source: "sui-events",
-      synced: true,
-      root: null,
-      next_index: 7,
-      size: 7,
-      announcements: 7,
-      nullifiers: 0,
-    });
-  });
-
   it("proxies Solana network status to the selected backend", async () => {
     const originalFetch = global.fetch;
     const fetchMock = mock(async (input: RequestInfo | URL) => {

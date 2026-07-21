@@ -31,7 +31,7 @@ describe("faucet activity", () => {
 
   it("records pending faucet activity for the matching network and stealth address", () => {
     recordPendingFaucetActivity({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 100_000,
       txid: "btc-tx-1",
@@ -39,17 +39,17 @@ describe("faucet activity", () => {
     });
 
     expect(getPendingFaucetActivities({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       notes: [],
     })).toHaveLength(1);
     expect(getPendingFaucetActivities({
-      networkId: "devnet-regtest",
+      networkId: "testnet",
       stealthAddress: STEALTH_ADDRESS,
       notes: [],
     })).toHaveLength(0);
     expect(getPendingFaucetActivities({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: `utxo:${"cd".repeat(96)}`,
       notes: [],
     })).toHaveLength(0);
@@ -58,14 +58,14 @@ describe("faucet activity", () => {
   it("removes pending faucet activity once a matching zkBTC note is scanned", () => {
     const before = Date.now();
     recordPendingFaucetActivity({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 50_000,
       txid: "btc-tx-2",
     });
 
     const pending = getPendingFaucetActivities({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       notes: [makeNote(50_000n, before + 1000)],
     });
@@ -76,14 +76,14 @@ describe("faucet activity", () => {
   it("reconciles a faucet credit after the deposit service fee", () => {
     const before = Date.now();
     recordPendingFaucetActivity({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 100_000,
       txid: "btc-tx-net-credit",
     });
 
     const pending = getPendingFaucetActivities({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       notes: [makeNote(99_300n, before + 1000)],
     });
@@ -93,14 +93,14 @@ describe("faucet activity", () => {
 
   it("keeps pending faucet activity when scanned notes do not match", () => {
     recordPendingFaucetActivity({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 50_000,
       txid: "btc-tx-3",
     });
 
     const pending = getPendingFaucetActivities({
-      networkId: "sui-regtest",
+      networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       notes: [makeNote(25_000n)],
     });

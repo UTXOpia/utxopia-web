@@ -20,11 +20,11 @@ test("enabled when flag is '1'", () => {
 
 test("assertDevSignerSafe throws on any mainnet network id", () => {
   expect(() => assertDevSignerSafe("mainnet")).toThrow();
-  expect(() => assertDevSignerSafe("sui-mainnet")).toThrow();
+  expect(() => assertDevSignerSafe("mainnet")).toThrow();
 });
 
 test("assertDevSignerSafe passes on dev/test networks", () => {
   expect(() => assertDevSignerSafe("devnet")).not.toThrow();
-  expect(() => assertDevSignerSafe("sui-testnet")).not.toThrow();
+  expect(() => assertDevSignerSafe("testnet")).not.toThrow();
   expect(() => assertDevSignerSafe("devnet-regtest")).not.toThrow();
 });

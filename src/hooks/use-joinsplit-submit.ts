@@ -95,10 +95,6 @@ export function useJoinSplitSubmit() {
         console.warn("[Submit] Relay failed, retrying via another relay...", { failedUrl, nextUrl, err });
       };
 
-      if (params.relayMode === "unshield" && chainId === "sui") {
-        throw new Error("Sui public unshield is not enabled yet");
-      }
-
       if (params.relayMode === "redeem") {
         const treeStealthData = params.stealthDataArrays.slice(0, -1);
         const requestNonce = BigInt(Date.now());

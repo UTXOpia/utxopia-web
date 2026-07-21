@@ -15,8 +15,8 @@ describe("fetchAnnouncements", () => {
       json: async () => ({ success: true, announcements: [] }),
     } as any);
 
-    await fetchAnnouncements("sui-regtest");
+    await fetchAnnouncements("devnet-regtest");
 
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/announcements?network=sui-regtest");
+    expect(mockFetch.mock.calls[0][0]).toBe("/api/announcements?network=devnet-regtest");
   });
 });

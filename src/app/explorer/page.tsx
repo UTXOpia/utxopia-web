@@ -16,7 +16,7 @@ import { useTokenPrices } from "@/hooks/use-token-prices";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { cn } from "@/lib/utils";
-import { detectNetwork, NETWORK_META, networkChain, type NetworkId } from "@/lib/network-config";
+import { detectNetwork, NETWORK_META, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
 import { TypeFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState } from "./components/shared";
@@ -285,21 +285,16 @@ export default function ExplorerPage() {
 }
 
 function getExplorerTone(network: NetworkId) {
-  const isSui = networkChain(network) === "sui";
-  const networkLabel = network === "sui-regtest"
-    ? "Sui Regtest"
-    : NETWORK_META.find((item) => item.id === network)?.label ?? network;
+  const networkLabel = NETWORK_META.find((item) => item.id === network)?.label ?? network;
   return {
     networkLabel,
-    rule: isSui ? "from-sui/50" : "from-privacy/50",
-    eyebrow: isSui ? "text-sui/60" : "text-privacy/60",
-    poolPill: isSui
-      ? "bg-sui/5 border-sui/15"
-      : "bg-privacy/5 border-privacy/15",
-    icon: isSui ? "text-sui" : "text-privacy",
-    mutedText: isSui ? "text-sui/70" : "text-privacy/70",
-    text: isSui ? "text-sui" : "text-privacy",
-    noteBorder: isSui ? "border-sui/15" : "border-privacy/15",
+    rule: "from-privacy/50",
+    eyebrow: "text-privacy/60",
+    poolPill: "bg-privacy/5 border-privacy/15",
+    icon: "text-privacy",
+    mutedText: "text-privacy/70",
+    text: "text-privacy",
+    noteBorder: "border-privacy/15",
     dot: "bg-chain",
   };
 }

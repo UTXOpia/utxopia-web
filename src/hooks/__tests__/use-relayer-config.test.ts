@@ -61,13 +61,13 @@ describe("useRelayerConfig", () => {
     );
     global.fetch = fetchMock as any;
 
-    const { result } = renderHook(() => useRelayerConfig(mockToken, "sui-regtest"));
+    const { result } = renderHook(() => useRelayerConfig(mockToken, "devnet-regtest"));
 
     await waitFor(() => {
       expect(result.current.relayerMetaLoaded).toBe(true);
     });
 
-    expect(fetchMock).toHaveBeenCalledWith("/api/relayer/meta?network=sui-regtest");
+    expect(fetchMock).toHaveBeenCalledWith("/api/relayer/meta?network=devnet-regtest");
     expect(result.current.relayerMeta).toEqual({
       stealthMeta: "some-stealth-meta",
       relayerFeeSats: 3000,

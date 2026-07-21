@@ -10,7 +10,7 @@ import {
   type CommitmentTreeIndex,
 } from "@utxopia/sdk";
 import { getTreeProofFromBackend } from "@/lib/api/tree";
-import { detectNetworkFromRequest, getNetworkConfig, networkChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
+import { detectNetworkFromRequest, getNetworkConfig, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
 export const runtime = "nodejs";
@@ -202,25 +202,6 @@ export async function GET(request: NextRequest) {
         { success: false, error: "Invalid commitment format. Use hex (0x...) or decimal." },
         { status: 400 }
       );
-    }
-
-    if (networkChain(network) === "sui") {
-      const { fetchSuiMerkleProof } = await import("@/lib/sui/explorer");
-      const proof = await fetchSuiMerkleProof(
-        getNetworkConfig(network, { applyEnvOverrides: false }),
-        commitmentHex,
-      );
-      if (!proof) {
-        return NextResponse.json(
-          {
-            success: false,
-            error: "Commitment not found in Sui event tree",
-            lookingFor: commitmentHex,
-          },
-          { status: 404 },
-        );
-      }
-      return NextResponse.json(proof);
     }
 
     // =========================================================================

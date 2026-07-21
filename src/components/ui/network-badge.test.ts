@@ -15,11 +15,4 @@ describe("NetworkBadge presentation", () => {
       label: "Hybrid",
     });
   });
-
-  it("does not duplicate the Sui chain name when the network label already includes it", () => {
-    expect(getNetworkBadgePresentation("sui-regtest")).toMatchObject({
-      chain: "sui",
-      label: "Sui Hybrid",
-    });
-  });
 });

@@ -14,14 +14,7 @@ describe("detectRecipient", () => {
     expect(r.confidence).toBe("high");
   });
 
-  it("detects SuiNS names as stealth_suins", () => {
-    expect(detectRecipient("@alice", { chain: "sui" }).type).toBe("stealth_suins");
-    expect(detectRecipient("alice.utxopia.sui").type).toBe("stealth_suins");
-    expect(detectRecipient("alice.sui").type).toBe("invalid");
-  });
-
   it("maps @ handles by active chain context", () => {
-    expect(detectRecipient("@alice", { chain: "sui" }).type).toBe("stealth_suins");
     expect(detectRecipient("@alice", { chain: "solana" }).type).toBe("stealth_sns");
     expect(detectRecipient("@alice").type).toBe("ambiguous");
   });

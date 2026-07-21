@@ -7,17 +7,6 @@ import {
 import { getNetworkConfig } from "@/lib/network-config";
 
 describe("/api/verify network routing", () => {
-  it("rejects Sui requests because deposit verification is chain-specific", () => {
-    const result = resolveVerifyConfig(
-      new Request("https://app.utxopia.test/api/verify?network=sui-regtest") as any,
-    );
-
-    expect(result).toEqual({
-      error: "/api/verify is a Solana SPV verifier. Use /api/sui/relay for Sui BTC deposit completion.",
-      status: 400,
-    });
-  });
-
   it("resolves Solana hybrid verification from the selected network config", () => {
     const result = resolveVerifyConfig(
       new Request("https://app.utxopia.test/api/verify?network=devnet-regtest") as any,

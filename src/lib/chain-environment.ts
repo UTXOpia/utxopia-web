@@ -20,11 +20,6 @@ let configuredNetwork: NetworkId | null = null;
 let configurePromise: Promise<SdkNetworkConfig> | null = null;
 
 const SDK_INITIALIZERS: Record<ChainId, (env: ChainEnvironment) => Promise<void>> = {
-  sui: async () => {
-    if (!UTXOpiaClient.isInitialized) {
-      await UTXOpiaClient.init({ backendUrl: "" });
-    }
-  },
   solana: async (env) => {
     if (configuredNetwork !== env.networkId || !configurePromise) {
       configurePromise = initConfig({

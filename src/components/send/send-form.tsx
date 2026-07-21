@@ -34,7 +34,6 @@ import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
-import { resolveSuiNsUtxopiaRecord } from "@/lib/sui/suins";
 import { recordSubmittedTransaction, type SubmittedTransactionKind } from "@/lib/transaction-activity";
 import {
   decodeStealthMetaAddress,
@@ -43,7 +42,6 @@ import {
   createStealthMetaAddress,
   isAuditorDisclosable,
   SOLANA_BOUND_CHAIN_ID,
-  SUI_BOUND_CHAIN_ID,
   type SnsStealthAddress,
   type StealthMetaAddress,
 } from "@utxopia/sdk";
@@ -131,12 +129,6 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
       description: "The recipient gets a private note. Amount and recipient stay hidden.",
       tone: "text-privacy border-privacy/20 bg-privacy/8",
     },
-    stealth_suins: {
-      icon: LockKeyhole,
-      title: "Private transfer",
-      description: "The recipient gets a private note. Amount and recipient stay hidden.",
-      tone: "text-sui border-sui/20 bg-sui/8",
-    },
     stealth_meta: {
       icon: LockKeyhole,
       title: "Private transfer",
@@ -184,8 +176,8 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
   const tokenPrices = useTokenPrices();
   const chainEnv = useChainEnvironment();
   const activeChainId = getChainAdapter(chainEnv.config).id;
-  const boundChainId = activeChainId === "sui" ? SUI_BOUND_CHAIN_ID : SOLANA_BOUND_CHAIN_ID;
-  const activeChainLabel = activeChainId === "sui" ? "Sui" : "Solana";
+  const boundChainId = SOLANA_BOUND_CHAIN_ID;
+  const activeChainLabel = "Solana";
   const detection = useMemo(
     () => detectRecipient(state.recipient, { chain: activeChainId }),
     [state.recipient, activeChainId],
@@ -213,7 +205,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     | { kind: "not_found" };
   const [snsState, setSnsState] = useState<NameState>({ kind: "idle" });
   useEffect(() => {
-    if (detection.type !== "stealth_sns" && detection.type !== "stealth_suins") {
+    if (detection.type !== "stealth_sns") {
       setSnsState((prev) => (prev.kind === "idle" ? prev : { kind: "idle" }));
       return;
     }
@@ -235,28 +227,22 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
       clearTimeout(timeout);
       setSnsState(next);
     };
-    if (detection.type === "stealth_sns") {
-      let sub: string;
-      try {
-        sub = normalizePrivateNameHandle(input, "solana");
-      } catch {
-        clearTimeout(timeout);
-        setSnsState({ kind: "not_found" });
-        return;
-      }
-      void lookupSnsName(sub)
-        .then((r) => settle(r ? { kind: "found", resolved: r } : { kind: "not_found" }))
-        .catch(() => settle({ kind: "not_found" }));
-    } else {
-      void resolveSuiNsUtxopiaRecord(input, chainEnv.networkId)
-        .then((r) => settle(r?.metadata ? { kind: "found", resolved: r.metadata } : { kind: "not_found" }))
-        .catch(() => settle({ kind: "not_found" }));
+    let sub: string;
+    try {
+      sub = normalizePrivateNameHandle(input, "solana");
+    } catch {
+      clearTimeout(timeout);
+      setSnsState({ kind: "not_found" });
+      return;
     }
+    void lookupSnsName(sub)
+      .then((r) => settle(r ? { kind: "found", resolved: r } : { kind: "not_found" }))
+      .catch(() => settle({ kind: "not_found" }));
     return () => {
       cancelled = true;
       clearTimeout(timeout);
     };
-  }, [detection.type, state.recipient, lookupSnsName, chainEnv.networkId]);
+  }, [detection.type, state.recipient, lookupSnsName]);
 
   const resolvedSns = detection.type === "stealth_sns" && snsState.kind === "found" ? snsState.resolved : null;
   const showAuditorBadge =
@@ -292,7 +278,7 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
     // Name records must actually resolve on-chain before we let the rest of
     // the form unlock — otherwise the user wastes time picking notes for
     // a recipient that doesn't exist.
-    ((detection.type !== "stealth_sns" && detection.type !== "stealth_suins") || snsState.kind === "found");
+    (detection.type !== "stealth_sns" || snsState.kind === "found");
 
   // Narrowed alias used by JSX + buildSendIntent; only meaningful when
   // recipientValid is true (the JSX gates on that before reading it).
@@ -401,20 +387,6 @@ export function SendForm({ showClaimLink = true }: { showClaimLink?: boolean } =
                 spendingPubKey: new Uint8Array(32),
                 viewingPubKey: r.viewingPubKey,
                 mpk: r.mpk,
-              } as StealthMetaAddress,
-            };
-          } else if (intent.recipientType === "stealth_suins") {
-            const r = await resolveSuiNsUtxopiaRecord(intent.recipientValue, chainEnv.networkId);
-            if (!r?.metadata) {
-              throw new Error(
-                `Could not resolve UTXOpia metadata for ${intent.recipientValue}`,
-              );
-            }
-            recipientArg = {
-              stealthMeta: {
-                spendingPubKey: new Uint8Array(32),
-                viewingPubKey: r.metadata.viewingPubKey,
-                mpk: r.metadata.mpk,
               } as StealthMetaAddress,
             };
           } else {

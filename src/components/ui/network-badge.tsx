@@ -39,8 +39,8 @@ export function getNetworkBadgePresentation(active: NetworkId) {
 
 /**
  * Header badge that always surfaces the active chain and network. UTXOpia has
- * no hidden-production default yet; devnet/testnet4 and regtest users need the
- * same visible context as Sui users before signing financial actions.
+ * no hidden-production default yet; devnet/testnet4 and regtest users need
+ * clear visible context before signing financial actions.
  */
 export function NetworkBadge() {
   const active = useSyncExternalStore(
@@ -52,7 +52,6 @@ export function NetworkBadge() {
   );
 
   const badge = getNetworkBadgePresentation(active);
-  const isSui = badge.chain === "sui";
 
   return (
     <Link
@@ -60,14 +59,11 @@ export function NetworkBadge() {
       prefetch={false}
       title={badge.title}
       className={cn(
-        "inline-flex min-h-8 items-center gap-1.5 rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
-        isSui
-          ? "border-sui/20 bg-sui/10 text-sui hover:bg-sui/15 hover:border-sui/30"
-          : "border-privacy/20 bg-privacy/10 text-privacy hover:bg-privacy/15 hover:border-privacy/30",
+        "inline-flex min-h-8 items-center rounded-full border px-2.5 text-[10px] font-semibold uppercase tracking-[0.12em] transition-colors",
+        "border-privacy/20 bg-privacy/10 text-privacy hover:bg-privacy/15 hover:border-privacy/30",
       )}
     >
-      {/* eslint-disable-next-line @next/next/no-img-element */}
-      <img src={`/tokens/${badge.chain}.png`} alt="" className="h-3.5 w-3.5 rounded-full" />
+      {/* Solana-only: no chain icon; the pill just shows the network (e.g. "Hybrid"). */}
       {badge.label}
     </Link>
   );

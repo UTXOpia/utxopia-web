@@ -16,9 +16,7 @@ const TEXT_ENCODER = new TextEncoder();
 export type DepositAddressNetwork = "mainnet" | "testnet" | "regtest";
 
 export function depositOpReturnContextForNetworkConfig(cfg: NetworkConfig): DepositOpReturnContext {
-  return cfg.chain === "sui"
-    ? suiDepositOpReturnContext(cfg)
-    : solanaDepositOpReturnContext(cfg);
+  return solanaDepositOpReturnContext(cfg);
 }
 
 export function depositAddressNetworkForNetworkConfig(cfg: NetworkConfig): DepositAddressNetwork {
@@ -59,37 +57,11 @@ function solanaDepositOpReturnContext(cfg: NetworkConfig): DepositOpReturnContex
   };
 }
 
-function suiDepositOpReturnContext(cfg: NetworkConfig): DepositOpReturnContext {
-  const poolId = cfg.sui?.pool?.objectId;
-  const treeId = cfg.sui?.commitmentTree?.objectId;
-  if (!poolId || !treeId) {
-    throw new Error("Sui deposit OP_RETURN context requires pool and commitmentTree object IDs");
-  }
-
-  return {
-    destinationChain: DEPOSIT_DESTINATION_CHAIN.SUI,
-    bitcoinNetwork: bitcoinNetworkToDepositNetwork(cfg.bitcoin.network),
-    poolTag: computeDepositPoolTag([
-      TEXT_ENCODER.encode("UTXOPIA_SUI"),
-      suiAddressToBytes(poolId),
-      suiAddressToBytes(treeId),
-    ]),
-  };
-}
-
 function bitcoinNetworkToDepositNetwork(network: string): DepositBitcoinNetwork {
   if (network === "mainnet") return DEPOSIT_BITCOIN_NETWORK.MAINNET;
   if (network === "regtest") return DEPOSIT_BITCOIN_NETWORK.REGTEST;
   if (network === "testnet4" || network === "testnet") return DEPOSIT_BITCOIN_NETWORK.TESTNET4;
   throw new Error(`unsupported deposit Bitcoin network: ${network}`);
-}
-
-function suiAddressToBytes(value: string): Uint8Array {
-  const hex = value.startsWith("0x") ? value.slice(2) : value;
-  if (hex.length > 64) {
-    throw new Error(`invalid Sui address: ${value}`);
-  }
-  return hexToBytes(hex.padStart(64, "0"));
 }
 
 function hexToBytes(hex: string): Uint8Array {

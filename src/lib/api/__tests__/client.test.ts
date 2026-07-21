@@ -121,10 +121,10 @@ describe("zkBTCApiClient", () => {
         json: async () => ({ request_id: "abc", status: "pending" }),
       } as any);
 
-      await zkBTCApi.getWithdrawalStatusForNetwork("abc", "sui-regtest");
+      await zkBTCApi.getWithdrawalStatusForNetwork("abc", "devnet-regtest");
 
       const url = (mockFetch.mock.calls[0] as any[])[0];
-      expect(url).toBe("/api/withdrawal/status/abc?network=sui-regtest");
+      expect(url).toBe("/api/withdrawal/status/abc?network=devnet-regtest");
     });
   });
 });

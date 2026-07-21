@@ -49,8 +49,6 @@ import { OnboardingModal } from "@/components/onboarding-modal";
 import { ReceiveNamePrompt } from "@/components/receive-name-prompt";
 import { AuthModal } from "@/components/auth-modal";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { getChainAdapter } from "@/lib/chain-registry";
-import { SuiDashboard } from "@/components/sui/sui-dashboard";
 import { VaultActions } from "@/components/vault/vault-actions";
 import { VaultBalance } from "@/components/vault/vault-balance";
 import { VaultGuide } from "@/components/vault/vault-guide";
@@ -144,8 +142,6 @@ export default function VaultPage() {
     setHasRecoveryBackup(hasBackupForKeys(keys));
   }, [keys]);
 
-  // Must run before the Sui early return so the hook order is stable
-  // when the active chain changes between renders.
   const snsSuggestion = useMemo(() => {
     const tail = (stealthAddressEncoded ?? "")
       .replace(/[^a-z0-9]/gi, "")
@@ -153,16 +149,6 @@ export default function VaultPage() {
       .toLowerCase();
     return tail.length === 4 ? `capy-${tail}` : null;
   }, [stealthAddressEncoded]);
-
-  if (getChainAdapter(networkConfig).id === "sui") {
-    return (
-      <main className="min-h-screen bg-background flex flex-col">
-        <SiteHeader />
-        <SuiDashboard />
-        <SiteFooter />
-      </main>
-    );
-  }
 
   const parentDomain = getSnsConfig(networkConfig)?.parentDomain || "utxopia";
   const hasVaultValue =

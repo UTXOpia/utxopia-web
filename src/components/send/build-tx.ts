@@ -52,7 +52,6 @@ export function buildSendIntent(input: BuildSendIntentInput): SendIntent {
       kind = "redeem";
       break;
     case "stealth_sns":
-    case "stealth_suins":
     case "stealth_meta":
       kind = "transact";
       break;

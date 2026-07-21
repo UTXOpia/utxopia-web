@@ -9,7 +9,7 @@ describe("RecipientInput", () => {
   it("renders an empty input with placeholder", () => {
     render(<RecipientInput value="" onChange={() => {}} />);
     expect(
-      screen.getByPlaceholderText(/paste address.*utxopia\.(sui|sol)/i),
+      screen.getByPlaceholderText(/paste an address.*utxopia\.sol/i),
     ).toBeDefined();
   });
 
@@ -38,7 +38,7 @@ describe("RecipientInput", () => {
         }}
       />,
     );
-    const input = screen.getByPlaceholderText(/paste address/i);
+    const input = screen.getByPlaceholderText(/paste an address/i);
     fireEvent.change(input, { target: { value: "alice.utxopia.sol" } });
     expect(captured).toBe("alice.utxopia.sol");
   });

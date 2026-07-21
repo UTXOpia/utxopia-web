@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertTriangle, ExternalLink, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
@@ -9,7 +9,6 @@ import {
   getNetworkConfig,
   hrefWithChain,
   networkChain,
-  type ChainQuery,
   type NetworkId,
   type NetworkMeta,
 } from "@/lib/network-config";
@@ -26,16 +25,11 @@ import { getNetworkConfigReadoutRows } from "@/lib/chain-registry";
 export function NetworkSelector() {
   const { networkId: active } = useChainEnvironment();
   const [pending, setPending] = useState<NetworkId | null>(null);
-  const [selectedChain, setSelectedChain] = useState<ChainQuery>(() => networkChain(active));
   const enabledNetworks = useMemo(() => NETWORK_META.filter((n) => n.enabled), []);
   const visibleNetworks = useMemo(
-    () => enabledNetworks.filter((n) => networkChain(n.id) === selectedChain),
-    [enabledNetworks, selectedChain],
+    () => enabledNetworks.filter((n) => networkChain(n.id) === "sol"),
+    [enabledNetworks],
   );
-
-  useEffect(() => {
-    setSelectedChain(networkChain(active));
-  }, [active]);
 
   function handleSelect(id: NetworkId) {
     if (id === active) return;
@@ -49,21 +43,6 @@ export function NetworkSelector() {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-2 gap-2 px-1">
-        <ChainButton
-          label="Solana"
-          active={selectedChain === "sol"}
-          current={networkChain(active) === "sol"}
-          onClick={() => setSelectedChain("sol")}
-        />
-        <ChainButton
-          label="Sui"
-          active={selectedChain === "sui"}
-          current={networkChain(active) === "sui"}
-          onClick={() => setSelectedChain("sui")}
-        />
-      </div>
-
       <ul className="divide-y divide-gray/10 border-y border-gray/10">
         {visibleNetworks.map((meta) => (
           <NetworkRow
@@ -89,41 +68,6 @@ export function NetworkSelector() {
   );
 }
 
-function ChainButton({
-  label,
-  active,
-  current,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  current: boolean;
-  onClick: () => void;
-}) {
-  const isSui = label === "Sui";
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex min-h-10 items-center justify-between rounded-md border px-3 text-left text-sm font-semibold transition-colors",
-        active
-          ? isSui
-            ? "border-sui/30 bg-sui/10 text-sui"
-            : "border-privacy/30 bg-privacy/10 text-privacy"
-          : "border-gray/10 bg-muted/10 text-foreground/75 hover:border-gray/20 hover:text-foreground",
-      )}
-    >
-      <span>{label}</span>
-      {current && (
-        <span className="text-[9px] uppercase tracking-[0.14em] text-gray">
-          current
-        </span>
-      )}
-    </button>
-  );
-}
-
 function NetworkRow({
   meta,
   active,
@@ -135,14 +79,13 @@ function NetworkRow({
   pending: boolean;
   onSelect: () => void;
 }) {
-  const isSui = networkChain(meta.id) === "sui";
   const locked = !!meta.comingSoon;
   return (
     <li>
       <div
         className={cn(
           "group relative py-3 px-1 transition-colors",
-          active ? (isSui ? "bg-sui/[0.04]" : "bg-privacy/[0.03]") : !locked && "hover:bg-muted/20",
+          active ? "bg-privacy/[0.03]" : !locked && "hover:bg-muted/20",
           pending && "opacity-50",
           locked && "opacity-50",
         )}
@@ -165,9 +108,7 @@ function NetworkRow({
               "shrink-0 mt-1 h-3.5 w-3.5 rounded-full transition-all duration-200",
               "flex items-center justify-center",
               active
-                ? isSui
-                  ? "bg-sui ring-2 ring-sui/30 ring-offset-2 ring-offset-background"
-                  : "bg-privacy ring-2 ring-privacy/30 ring-offset-2 ring-offset-background"
+                ? "bg-privacy ring-2 ring-privacy/30 ring-offset-2 ring-offset-background"
                 : "border border-gray/40 hover:border-foreground/60",
               locked ? "cursor-not-allowed" : pending ? "cursor-wait" : "cursor-pointer",
             )}
@@ -199,10 +140,7 @@ function NetworkRow({
                   {meta.id}
                 </span>
                 {active && (
-                  <span className={cn(
-                    "text-[9px] uppercase tracking-[0.15em] font-semibold",
-                    isSui ? "text-sui" : "text-privacy",
-                  )}>
+                  <span className="text-[9px] uppercase tracking-[0.15em] font-semibold text-privacy">
                     Active
                   </span>
                 )}

@@ -11,7 +11,6 @@ import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
 import { UtxopiaPrivyProvider } from "@/lib/privy-solana";
 import { DevSigner, devSolanaAdapters } from "@/lib/dev-signer";
-import { ZkLoginCallbackHandler } from "@/components/sui/zklogin-callback-handler";
 
 // Import wallet adapter CSS
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -39,8 +38,6 @@ export function Providers({ children }: { children: React.ReactNode }) {
               {/* Hydrate Zustand stores (Bitcoin wallet, Poseidon) */}
               <StoreHydration />
               <DevSigner />
-              {/* Complete Sui zkLogin (Google) callback + restore chain=sui on any landing page */}
-              <ZkLoginCallbackHandler />
               {/* Reflect active chain onto <html data-chain> for accent tokens */}
               <ChainThemeSync />
               {children}
