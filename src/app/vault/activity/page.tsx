@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useEffect, useRef, Suspense } from "react";
+import { useState, useMemo, useEffect, useRef, useCallback, Suspense } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import {
@@ -15,6 +15,8 @@ import {
   RefreshCw,
   Loader2,
   AlertTriangle,
+  Search,
+  X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
@@ -35,10 +37,16 @@ import { Tooltip } from "@/components/ui/tooltip";
 import { getPendingFaucetActivities, type PendingFaucetActivity } from "@/lib/faucet-activity";
 import { getAlphaDemoNetworkInboxNotes } from "@/lib/alpha-demo-ledger";
 import {
+  getSubmittedActivityDisplaySymbol,
   getSubmittedTransactions,
   type SubmittedTransactionActivity,
 } from "@/lib/transaction-activity";
 import { getChainTransactionUrl } from "@/lib/chain-links";
+import {
+  reconcileSubmittedActivity,
+  recoverSelfTransferActivities,
+  type IndexedPrivateTransaction,
+} from "@/lib/activity-reconciliation";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -118,7 +126,7 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
         {/* Label + time */}
         <div className="flex-1 min-w-0">
           <span className="text-sm text-foreground font-medium">
-            {isReceived ? "Received" : "Sent"}
+            {isReceived ? "Received" : "Note spent"}
           </span>
           <p className="text-[11px] text-gray/40">{timeAgo(note.createdAt)}</p>
         </div>
@@ -169,7 +177,9 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
             <div className="px-3.5 py-2 space-y-1.5 text-xs">
               <div className="flex justify-between">
                 <span className="text-gray/40">Type</span>
-                <span className="text-foreground/80">{isReceived ? "Funds received" : "Private send"}</span>
+                <span className="text-foreground/80">
+                  {isReceived ? "Funds received" : "Spent note (transfer details unavailable)"}
+                </span>
               </div>
               <div className="flex justify-between">
                 <span className="text-gray/40">Time</span>
@@ -310,44 +320,95 @@ const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: st
   private_send: { label: "Private transfer", status: "Relay confirmed" },
   claim_link: { label: "Claim link funded", status: "Relay confirmed" },
   claim_receive: { label: "Claim link received", status: "Relay confirmed", incoming: true },
-  cashout_btc: { label: "Bitcoin withdrawal", status: "Request confirmed on-chain" },
-  cashout_wallet: { label: "Wallet withdrawal", status: "Relay confirmed" },
+  cashout_btc: { label: "BTC withdrawal", status: "Request confirmed on-chain" },
+  cashout_wallet: { label: "Solana withdrawal", status: "Relay confirmed" },
 };
 
-function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionActivity }) {
+function SubmittedTransactionRow({
+  activity,
+  isSelfTransfer = false,
+}: {
+  activity: SubmittedTransactionActivity;
+  isSelfTransfer?: boolean;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
   const { networkId, config } = useChainEnvironment();
   const token = getToken(activity.tokenSymbol);
-  const meta = SUBMITTED_LABELS[activity.kind];
+  const baseMeta = SUBMITTED_LABELS[activity.kind];
+  const meta = {
+    ...baseMeta,
+    label: activity.kind === "private_send"
+      ? (isSelfTransfer ? "Private transfer" : "Sent")
+      : activity.kind === "cashout_wallet" && activity.tokenSymbol === "zkSOL"
+        ? "SOL withdrawal"
+        : baseMeta.label,
+  };
+  const displaySymbol = getSubmittedActivityDisplaySymbol(activity.kind, token.shieldedSymbol);
   const [redemption, setRedemption] = useState<{
     btcTxid: string | null;
     localStatus: string | null;
     trackerError: string | null;
+    netAmountBaseUnits: string | null;
+    feeBaseUnits: string | null;
+  } | null>(null);
+  const [walletSettlement, setWalletSettlement] = useState<{
+    netAmountBaseUnits: string | null;
+    feeBaseUnits: string | null;
   } | null>(null);
 
   useEffect(() => {
-    if (activity.kind !== "cashout_btc") return;
+    if (activity.kind !== "cashout_btc" && activity.kind !== "cashout_wallet") return;
     let cancelled = false;
     const sync = async () => {
       try {
-        const response = await fetch(`/api/explorer/redemptions?network=${encodeURIComponent(networkId)}`, {
+        const endpoint = activity.kind === "cashout_btc"
+          ? "/api/explorer/redemptions"
+          : "/api/explorer/transactions";
+        const response = await fetch(`${endpoint}?network=${encodeURIComponent(networkId)}`, {
           cache: "no-store",
         });
         if (!response.ok) return;
-        const data = await response.json() as { redemptions?: Array<{
-          requestTxSignature?: string;
-          btcTxid?: string | null;
-          localStatus?: string | null;
-          trackerError?: string | null;
-        }> };
-        const match = data.redemptions?.find((item) => item.requestTxSignature === activity.signature);
-        if (!cancelled && match) {
-          setRedemption({
-            btcTxid: match.btcTxid ?? null,
-            localStatus: match.localStatus ?? null,
-            trackerError: match.trackerError ?? null,
-          });
+        if (activity.kind === "cashout_btc") {
+          const data = await response.json() as { redemptions?: Array<{
+            requestTxSignature?: string;
+            btcTxid?: string | null;
+            localStatus?: string | null;
+            trackerError?: string | null;
+            amountSats?: string;
+            actualReceived?: string | null;
+            serviceFee?: string | null;
+          }> };
+          const match = data.redemptions?.find((item) => item.requestTxSignature === activity.signature);
+          if (!cancelled && match) {
+            const netAmount = match.actualReceived ?? (
+              match.amountSats && match.serviceFee
+                ? (BigInt(match.amountSats) - BigInt(match.serviceFee)).toString()
+                : null
+            );
+            setRedemption({
+              btcTxid: match.btcTxid ?? null,
+              localStatus: match.localStatus ?? null,
+              trackerError: match.trackerError ?? null,
+              netAmountBaseUnits: netAmount,
+              feeBaseUnits: match.serviceFee ?? null,
+            });
+          }
+        } else {
+          const data = await response.json() as { transactions?: Array<{
+            txSignature?: string;
+            outputs?: Array<{ type?: string; payout?: number; fee?: number }>;
+          }> };
+          const match = data.transactions?.find((item) => item.txSignature === activity.signature);
+          const payout = match?.outputs?.find((output) =>
+            output.type === "unshield" || output.type === "withdraw"
+          );
+          if (!cancelled && payout) {
+            setWalletSettlement({
+              netAmountBaseUnits: payout.payout != null ? String(payout.payout) : null,
+              feeBaseUnits: payout.fee != null ? String(payout.fee) : null,
+            });
+          }
         }
       } catch {
         // Keep the on-chain request status when the tracker is temporarily unavailable.
@@ -370,6 +431,19 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
       : redemptionFailed
         ? redemption.trackerError || "Bitcoin broadcast failed"
         : "Waiting for Bitcoin broadcast";
+  const settlement = activity.kind === "cashout_btc" ? redemption : walletSettlement;
+  const netAmountBaseUnits = settlement?.netAmountBaseUnits ?? activity.netAmountBaseUnits ?? null;
+  const feeAmountBaseUnits = settlement?.feeBaseUnits ?? activity.protocolFeeBaseUnits ?? null;
+  // Legacy BTC activity stored the net payout in amountBaseUnits. Once the
+  // tracker supplies settlement data, reconstruct gross so old rows remain
+  // correctly labelled after the gross/fee/net UI upgrade.
+  const grossAmountBaseUnits = activity.kind === "cashout_btc" && settlement?.netAmountBaseUnits && settlement.feeBaseUnits
+    ? (BigInt(settlement.netAmountBaseUnits) + BigInt(settlement.feeBaseUnits)).toString()
+    : activity.amountBaseUnits;
+  const displayAmountBaseUnits = isSelfTransfer
+    ? "0"
+    : netAmountBaseUnits ?? activity.amountBaseUnits;
+  const amountPrefix = isSelfTransfer ? "" : meta.incoming ? "+" : "-";
 
   const copySignature = async (event: React.MouseEvent) => {
     event.stopPropagation();
@@ -411,8 +485,8 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
             "text-sm font-semibold font-mono tabular-nums",
             meta.incoming ? "text-privacy" : "text-gray",
           )}>
-            {meta.incoming ? "+" : "-"}{formatAmt(BigInt(activity.amountBaseUnits), token)}{" "}
-            <span className="text-xs font-medium">{token.shieldedSymbol}</span>
+            {amountPrefix}{formatAmt(BigInt(displayAmountBaseUnits), token)}{" "}
+            <span className="text-xs font-medium">{displaySymbol}</span>
           </p>
           <p className={cn(
             "hidden sm:block text-[11px] max-w-52 truncate",
@@ -434,6 +508,44 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
               <span className="text-gray/40">Time</span>
               <span className="text-gray/60 text-right">{formatFullDate(activity.createdAt)}</span>
             </div>
+            {isSelfTransfer && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Transfer</span>
+                <span className="text-foreground/80 text-right">Sent to your private address</span>
+              </div>
+            )}
+            {(activity.kind === "cashout_btc" || activity.kind === "cashout_wallet") && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Gross withdrawal</span>
+                <span className="font-mono text-foreground/80 text-right">
+                  {formatAmt(BigInt(grossAmountBaseUnits), token)} {displaySymbol}
+                </span>
+              </div>
+            )}
+            {netAmountBaseUnits && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Net received</span>
+                <span className="font-mono text-foreground/80 text-right">
+                  {formatAmt(BigInt(netAmountBaseUnits), token)} {displaySymbol}
+                </span>
+              </div>
+            )}
+            {feeAmountBaseUnits && BigInt(feeAmountBaseUnits) > 0n && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Protocol fee</span>
+                <span className="font-mono text-gray/60 text-right">
+                  {formatAmt(BigInt(feeAmountBaseUnits), token)} {displaySymbol}
+                </span>
+              </div>
+            )}
+            {activity.relayerFeeBaseUnits && BigInt(activity.relayerFeeBaseUnits) > 0n && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Relay fee</span>
+                <span className="font-mono text-gray/60 text-right">
+                  {formatAmt(BigInt(activity.relayerFeeBaseUnits), token)} {token.shieldedSymbol}
+                </span>
+              </div>
+            )}
             <div className="flex items-center justify-between gap-2">
               <span className="text-gray/40 shrink-0">Transaction</span>
               <div className="flex items-center gap-1 min-w-0">
@@ -474,7 +586,14 @@ function SubmittedTransactionRow({ activity }: { activity: SubmittedTransactionA
 type ActivityItem =
   | { kind: "note"; id: string; createdAt: number; note: InboxNote }
   | { kind: "pending-faucet"; id: string; createdAt: number; activity: PendingFaucetActivity }
-  | { kind: "submitted"; id: string; createdAt: number; activity: SubmittedTransactionActivity };
+  | {
+      kind: "submitted";
+      id: string;
+      createdAt: number;
+      activity: SubmittedTransactionActivity;
+      outputCommitments: string[];
+      isSelfTransfer: boolean;
+    };
 
 function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
@@ -485,6 +604,9 @@ function ActivityFeed() {
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
   const [submittedActivities, setSubmittedActivities] = useState<SubmittedTransactionActivity[]>([]);
+  const [indexedTransactions, setIndexedTransactions] = useState<IndexedPrivateTransaction[]>([]);
+  const [hashQuery, setHashQuery] = useState("");
+  const [isRefreshingAll, setIsRefreshingAll] = useState(false);
   const alphaDemoNotes = useMemo(() => {
     const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
     return scoped.length > 0 ? scoped : getAlphaDemoNetworkInboxNotes(networkId);
@@ -526,28 +648,130 @@ function ActivityFeed() {
     };
   }, [networkId]);
 
+  const refreshIndexedTransactions = useCallback(async () => {
+    const response = await fetch(`/api/explorer/transactions?network=${encodeURIComponent(networkId)}`, {
+      cache: "no-store",
+    });
+    if (!response.ok) throw new Error(`Activity request failed with ${response.status}`);
+    const data = await response.json() as { transactions?: Array<{
+      txSignature?: string;
+      timestamp?: number;
+      type?: string;
+      inputs?: Array<{ nullifierHash?: string }>;
+      outputs?: Array<{ commitment?: string }>;
+    }> };
+    setIndexedTransactions((data.transactions ?? []).flatMap((transaction) =>
+      transaction.txSignature && Number.isFinite(transaction.timestamp)
+        ? [{
+            txSignature: transaction.txSignature,
+            timestamp: transaction.timestamp!,
+            type: transaction.type,
+            inputs: transaction.inputs ?? [],
+            outputs: transaction.outputs ?? [],
+          }]
+        : []
+    ));
+  }, [networkId]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const sync = async () => {
+      try {
+        if (!cancelled) await refreshIndexedTransactions();
+      } catch {
+        // Local submitted activity still renders if explorer enrichment is unavailable.
+      }
+    };
+    void sync();
+    return () => { cancelled = true; };
+  }, [refreshIndexedTransactions]);
+
+  const refreshAllActivity = useCallback(async () => {
+    if (isRefreshingAll) return;
+    setIsRefreshingAll(true);
+    try {
+      const nextSubmitted = getSubmittedTransactions(networkId);
+      setSubmittedActivities(nextSubmitted);
+      await Promise.all([
+        refresh(undefined, true),
+        refreshIndexedTransactions(),
+      ]);
+    } finally {
+      setIsRefreshingAll(false);
+    }
+  }, [isRefreshingAll, networkId, refresh, refreshIndexedTransactions]);
+
   const items = useMemo<ActivityItem[]>(() => {
+    const recoveredActivities = recoverSelfTransferActivities(
+      displayNotes,
+      submittedActivities,
+      indexedTransactions,
+      networkId,
+    );
+    const allSubmittedActivities = [...submittedActivities, ...recoveredActivities];
+    const submittedSignatures = new Set(
+      allSubmittedActivities.map((activity) => activity.signature),
+    );
+    const outputsBySignature: Record<string, string[]> = {};
+    const inputsBySignature: Record<string, string[]> = {};
+    for (const transaction of indexedTransactions) {
+      if (!submittedSignatures.has(transaction.txSignature)) continue;
+      outputsBySignature[transaction.txSignature] = transaction.outputs
+        .map((output) => output.commitment?.toLowerCase())
+        .filter((commitment): commitment is string => Boolean(commitment));
+      inputsBySignature[transaction.txSignature] = transaction.inputs
+        .map((input) => input.nullifierHash?.toLowerCase())
+        .filter((nullifier): nullifier is string => Boolean(nullifier));
+    }
+    const { visibleNotes, enrichmentBySignature } = reconcileSubmittedActivity(
+      displayNotes,
+      allSubmittedActivities,
+      outputsBySignature,
+      inputsBySignature,
+    );
     return [
-      ...displayNotes.map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
+      ...visibleNotes
+        .map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
       ...pendingActivities.map((activity) => ({
         kind: "pending-faucet" as const,
         id: activity.id,
         createdAt: activity.createdAt,
         activity,
       })),
-      ...submittedActivities.map((activity) => ({
+      ...allSubmittedActivities.map((activity) => ({
         kind: "submitted" as const,
         id: activity.id,
         createdAt: activity.createdAt,
         activity,
+        outputCommitments: enrichmentBySignature[activity.signature]?.outputCommitments ?? [],
+        isSelfTransfer: enrichmentBySignature[activity.signature]?.isSelfTransfer ?? false,
       })),
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [displayNotes, pendingActivities, submittedActivities]);
+  }, [displayNotes, indexedTransactions, networkId, pendingActivities, submittedActivities]);
+
+  const filteredItems = useMemo(() => {
+    const query = hashQuery.trim().toLowerCase();
+    if (!query) return items;
+    return items.filter((item) => {
+      if (item.kind === "note") {
+        return item.note.commitmentHex.toLowerCase().includes(query)
+          || item.note.id.toLowerCase().includes(query);
+      }
+      if (item.kind === "pending-faucet") {
+        return item.id.toLowerCase().includes(query)
+          || item.activity.txid?.toLowerCase().includes(query);
+      }
+      return item.activity.signature.toLowerCase().includes(query)
+        || item.activity.recipient?.toLowerCase().includes(query)
+        || item.outputCommitments.some((commitment) => commitment.includes(query))
+        || item.id.toLowerCase().includes(query);
+    });
+  }, [hashQuery, items]);
 
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {
     const groups: { date: string; items: ActivityItem[] }[] = [];
-    for (const item of items) {
+    for (const item of filteredItems) {
       const dateKey = formatDateKey(item.createdAt);
       const last = groups[groups.length - 1];
       if (last && last.date === dateKey) {
@@ -557,19 +781,50 @@ function ActivityFeed() {
       }
     }
     return groups;
-  }, [items]);
+  }, [filteredItems]);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <span className="text-caption text-gray/50">{items.length} transaction{items.length !== 1 ? "s" : ""}</span>
+        <span className="text-caption text-gray/50">{filteredItems.length} transaction{filteredItems.length !== 1 ? "s" : ""}</span>
         <button
-          onClick={refresh}
-          disabled={isLoading}
+          type="button"
+          onClick={refreshAllActivity}
+          disabled={isLoading || isRefreshingAll}
+          aria-label="Refresh all activity"
           className="flex items-center gap-1 px-2 py-1 rounded-[6px] text-caption text-gray hover:text-gray-light hover:bg-gray/10 transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={cn("w-3.5 h-3.5", isLoading && "animate-spin")} />
+          <RefreshCw className={cn("w-3.5 h-3.5", (isLoading || isRefreshingAll) && "animate-spin")} />
         </button>
+      </div>
+
+      <div>
+        <label htmlFor="activity-hash-search" className="sr-only">
+          Find activity by transaction hash or commitment
+        </label>
+        <div className="relative">
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray/45" />
+          <input
+            id="activity-hash-search"
+            type="search"
+            value={hashQuery}
+            onChange={(event) => setHashQuery(event.target.value)}
+            placeholder="Transaction hash or commitment"
+            autoComplete="off"
+            spellCheck={false}
+            className="h-10 w-full appearance-none rounded-lg border border-gray/15 bg-muted/35 pl-9 pr-9 font-mono text-xs text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-gray/55 hover:border-gray/25 focus:border-privacy/45 focus:ring-2 focus:ring-privacy/10 [&::-webkit-search-cancel-button]:appearance-none"
+          />
+          {hashQuery && (
+            <button
+              type="button"
+              onClick={() => setHashQuery("")}
+              aria-label="Clear activity search"
+              className="absolute right-1.5 top-1/2 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md text-gray/55 transition-colors hover:bg-gray/10 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-privacy/40"
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {isLoading && items.length === 0 && (
@@ -578,11 +833,15 @@ function ActivityFeed() {
         </div>
       )}
 
-      {items.length === 0 && !isLoading && (
+      {filteredItems.length === 0 && !isLoading && (
         <div className="text-center py-6">
           <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-30 mx-auto mb-2" />
-          <p className="text-sm text-gray/50">No activity yet</p>
-          <p className="text-xs text-gray/30 mt-1">Deposits and transfers will appear here</p>
+          <p className="text-sm text-gray/50">{hashQuery.trim() ? "No matching activity" : "No activity yet"}</p>
+          <p className="text-xs text-gray/30 mt-1">
+            {hashQuery.trim()
+              ? "Check the transaction hash or commitment and try again."
+              : "Deposits and transfers will appear here"}
+          </p>
         </div>
       )}
 
@@ -595,7 +854,11 @@ function ActivityFeed() {
                 ? <ActivityRow key={item.id} note={item.note} tokenPrices={tokenPrices} />
                 : item.kind === "pending-faucet"
                   ? <PendingFaucetRow key={item.id} activity={item.activity} />
-                  : <SubmittedTransactionRow key={item.id} activity={item.activity} />
+                  : <SubmittedTransactionRow
+                      key={item.id}
+                      activity={item.activity}
+                      isSelfTransfer={item.isSelfTransfer}
+                    />
             ))}
           </div>
         </div>

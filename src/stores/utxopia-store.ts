@@ -167,6 +167,8 @@ export interface InboxNote {
   id: string;
   createdAt: number;
   commitmentHex: string;
+  /** Nullifier hash derived locally; used to reconcile spent notes with public transactions. */
+  nullifierHash?: string;
   /** True if nullifier exists on-chain (note has been spent) */
   isSpent?: boolean;
   /** Token symbol this note belongs to (e.g. "zkBTC", "SOL") */
@@ -599,12 +601,14 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           if (spentNullifiers) {
             notesWithSpentStatus = nullifierData.map((d) => ({
               ...d.note,
+              nullifierHash: d.hashHex,
               isSpent: spentNullifiers.has(d.hashHex),
             }));
           } else {
             const spentPdas = await fetchSpentNullifierPDAs(backendUrl, env.networkId);
             notesWithSpentStatus = nullifierData.map((d) => ({
               ...d.note,
+              nullifierHash: d.hashHex,
               isSpent: spentPdas.has(nullifierHashToPDA(d.hashHex)),
             }));
           }
