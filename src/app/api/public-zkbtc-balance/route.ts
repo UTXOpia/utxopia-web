@@ -21,7 +21,7 @@ async function fetchBalanceFromRpc(rpcUrl: string, owner: string, mint: string):
       ],
     }),
     cache: "no-store",
-    signal: AbortSignal.timeout(8_000),
+    signal: AbortSignal.timeout(4_000),
   });
 
   if (!rpcResponse.ok) {
@@ -64,20 +64,15 @@ export async function GET(request: NextRequest) {
     let lastError: unknown;
 
     for (const rpcUrl of rpcUrls) {
-      for (let attempt = 0; attempt < 2; attempt += 1) {
-        try {
-          const total = await fetchBalanceFromRpc(
-            rpcUrl,
-            ownerPubkey.toBase58(),
-            tokens.zkbtcMint,
-          );
-          return NextResponse.json({ amount: total.toString() });
-        } catch (error) {
-          lastError = error;
-          if (attempt === 0) {
-            await new Promise((resolve) => setTimeout(resolve, 150));
-          }
-        }
+      try {
+        const total = await fetchBalanceFromRpc(
+          rpcUrl,
+          ownerPubkey.toBase58(),
+          tokens.zkbtcMint,
+        );
+        return NextResponse.json({ amount: total.toString() });
+      } catch (error) {
+        lastError = error;
       }
     }
 

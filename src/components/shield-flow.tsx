@@ -102,7 +102,13 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     buildingPreview,
     buildTxPreview,
   } = btcDeposit;
-  const { solBalance, splBalance, handleMax } = useTokenBalance(selectedToken, publicKey, connection, btcWallet.balance);
+  const { solBalance, splBalance, handleMax } = useTokenBalance(
+    selectedToken,
+    publicKey,
+    connection,
+    btcWallet.balance,
+    chainEnv.config.tokens.zkbtcMint,
+  );
   const isMobileNoWallet = useIsMobileWithoutWallet();
 
   // Close dropdown on outside click

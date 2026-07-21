@@ -65,6 +65,12 @@ export function StoreHydration(): JSX.Element {
     }
   }, [walletPubkey]);
 
+  // One wallet-scoped public balance request. Keeping this in the singleton
+  // hydration component avoids duplicate requests from every useUTXOpia caller.
+  useEffect(() => {
+    if (walletPubkey) refreshPublicBalance(walletPubkey);
+  }, [walletPubkey, refreshPublicBalance]);
+
   // Auto-refresh inbox when keys become available (ONCE per session)
   // Covers both full keys (wallet login) and viewOnlyKeys (view-only paste)
   useEffect(() => {

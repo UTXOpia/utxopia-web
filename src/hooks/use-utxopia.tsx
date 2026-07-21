@@ -31,17 +31,9 @@ export function useUTXOpia() {
   }, [wallet.connected, wallet.signMessage, wallet.publicKey, store]);
 
   // Wrap refreshInbox to automatically use connection
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const refreshInbox = useCallback(async (_conn?: unknown, force?: boolean) => {
     await store.refreshInbox(connection, force);
   }, [connection, store]);
-
-  // Refresh public zkBTC balance when wallet is connected
-  useEffect(() => {
-    if (wallet.publicKey) {
-      store.refreshPublicBalance(wallet.publicKey);
-    }
-  }, [wallet.publicKey, store]);
 
   // Clear keys when wallet disconnects — but only if using wallet auth (not passkey)
   // Passkey-derived keys have solanaPublicKey set to all zeros

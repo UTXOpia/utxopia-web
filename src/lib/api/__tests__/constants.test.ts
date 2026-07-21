@@ -1,5 +1,13 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { getBackendUrl } from "../constants";
+import { API_ENDPOINTS, getBackendUrl } from "../constants";
+
+describe("API_ENDPOINTS", () => {
+  it("routes public zkBTC balances to the explicitly selected network", () => {
+    expect(API_ENDPOINTS.PUBLIC_ZKBTC_BALANCE("wallet/address", "devnet-regtest")).toBe(
+      "/api/public-zkbtc-balance?owner=wallet%2Faddress&network=devnet-regtest",
+    );
+  });
+});
 
 describe("getBackendUrl", () => {
   const originalEnv = { ...process.env };

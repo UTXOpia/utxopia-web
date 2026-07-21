@@ -1,3 +1,5 @@
+import { getNetworkConfig, type NetworkId } from "../network-config";
+
 /**
  * API Constants
  *
@@ -14,11 +16,12 @@ export const API_ENDPOINTS = {
 
   // Block header status (Next.js API route -> Solana RPC)
   HEADER_STATUS: (height: number) => `/api/header/status/${height}`,
-  PUBLIC_ZKBTC_BALANCE: (owner: string) =>
-    `/api/public-zkbtc-balance?owner=${encodeURIComponent(owner)}`,
+  PUBLIC_ZKBTC_BALANCE: (owner: string, network?: NetworkId) => {
+    const params = new URLSearchParams({ owner });
+    if (network) params.set("network", network);
+    return `/api/public-zkbtc-balance?${params.toString()}`;
+  },
 } as const;
-
-import { getNetworkConfig, type NetworkId } from "../network-config";
 
 export const DEFAULT_API_URL = "http://localhost:3001";
 

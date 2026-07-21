@@ -1,5 +1,5 @@
 import { describe, it, expect, mock } from "bun:test";
-import { renderHook, act } from "@testing-library/react";
+import { renderHook, act, waitFor } from "@testing-library/react";
 import { useTokenBalance } from "../use-token-balance";
 import { PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import type { SupportedToken } from "@/lib/supported-tokens";
@@ -47,6 +47,21 @@ const solToken: SupportedToken = {
   explorerSubtitle: "",
   relayerFee: 5000,
 };
+
+const zkbtcToken: SupportedToken = {
+  ...btcToken,
+  symbol: "zkBTC",
+  name: "Shielded Bitcoin",
+  mint: "",
+  isBtcNative: false,
+  showRawAmount: false,
+};
+
+function tokenAccountData(amount: bigint): Uint8Array {
+  const data = new Uint8Array(165);
+  new DataView(data.buffer).setBigUint64(64, amount, true);
+  return data;
+}
 
 function makeMockConnection(overrides: Record<string, any> = {}): any {
   return {
@@ -107,5 +122,26 @@ describe("useTokenBalance", () => {
     const expectedLamports = Math.max(0, solBalanceLamports - 0.01 * LAMPORTS_PER_SOL);
     const expected = (expectedLamports / LAMPORTS_PER_SOL).toFixed(9);
     expect(result.current.handleMax()).toBe(expected);
+  });
+
+  it("resolves an empty zkBTC mint from the active network and totals every token account", async () => {
+    const runtimeMint = "7qSDx4sbMHqx7HbPa3irvtXRqhq24h1Ai56Qttghh3td";
+    const getTokenAccountsByOwner = mock(() => Promise.resolve({
+      value: [
+        { account: { data: tokenAccountData(12_000n) } },
+        { account: { data: tokenAccountData(34_000n) } },
+      ],
+    }));
+    const conn = makeMockConnection({ getTokenAccountsByOwner });
+
+    const { result } = renderHook(() =>
+      useTokenBalance(zkbtcToken, PublicKey.default, conn, null, runtimeMint)
+    );
+
+    await waitFor(() => expect(result.current.splBalance).toBe(46_000));
+    expect(getTokenAccountsByOwner).toHaveBeenCalledTimes(1);
+    expect(getTokenAccountsByOwner.mock.calls[0][1]).toEqual({
+      mint: new PublicKey(runtimeMint),
+    });
   });
 });

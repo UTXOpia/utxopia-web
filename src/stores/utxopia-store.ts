@@ -699,9 +699,9 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       return;
     }
     try {
-      await ensureChainEnvironment();
+      const chainEnv = await ensureChainEnvironment();
       const response = await fetch(
-        API_ENDPOINTS.PUBLIC_ZKBTC_BALANCE(walletPubkey.toBase58()),
+        API_ENDPOINTS.PUBLIC_ZKBTC_BALANCE(walletPubkey.toBase58(), chainEnv.networkId),
         { cache: "no-store" }
       );
       if (!response.ok) {

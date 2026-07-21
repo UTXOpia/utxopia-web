@@ -1,10 +1,7 @@
 import { useState, useEffect, useCallback } from "react";
 import { PublicKey, LAMPORTS_PER_SOL, type Connection } from "@solana/web3.js";
-import { getConfig } from "@utxopia/sdk";
-import { BTC_MINER_FEE_ESTIMATE, TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
+import { BTC_MINER_FEE_ESTIMATE } from "@/lib/btc-constants";
 import type { SupportedToken } from "@/lib/supported-tokens";
-
-const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
 /**
  * Fetches SOL and SPL token balances based on the selected token,
@@ -15,6 +12,7 @@ export function useTokenBalance(
   publicKey: PublicKey | null,
   connection: Connection,
   btcBalance: number | null,
+  runtimeMint = "",
 ) {
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [splBalance, setSplBalance] = useState<number | null>(null);
@@ -34,25 +32,33 @@ export function useTokenBalance(
 
   // Fetch SPL token balance for non-SOL, non-BTC tokens (USDC, USDT, zkBTC)
   useEffect(() => {
-    if (!publicKey || selectedToken.isSOL || selectedToken.isBtcNative || !selectedToken.mint) {
+    const mint = selectedToken.mint || runtimeMint;
+    if (!publicKey || selectedToken.isSOL || selectedToken.isBtcNative || !mint) {
       setSplBalance(null);
       return;
     }
     let cancelled = false;
-    const mintPubkey = new PublicKey(selectedToken.mint || getConfig().zkbtcMint);
-    connection.getTokenAccountsByOwner(publicKey, {
-      mint: mintPubkey,
-      programId: TOKEN_2022_PROGRAM_ID,
-    }).then((accounts) => {
+    setSplBalance(null);
+    const mintPubkey = new PublicKey(mint);
+    connection.getTokenAccountsByOwner(publicKey, { mint: mintPubkey }).then((accounts) => {
       if (cancelled) return;
       if (accounts.value.length === 0) { setSplBalance(0); return; }
-      // Parse token amount from account data (offset 64, 8 bytes LE u64)
-      const data = accounts.value[0].account.data;
-      const view = new DataView(data.buffer, data.byteOffset + 64, 8);
-      setSplBalance(Number(view.getBigUint64(0, true)));
-    }).catch((err) => { console.error("[TokenBalance] SPL balance fetch error:", err); if (!cancelled) setSplBalance(0); });
+      // A wallet can own more than one account for the same mint. Token and
+      // Token-2022 accounts share the same amount offset.
+      const total = accounts.value.reduce((sum, tokenAccount) => {
+        const data = tokenAccount.account.data;
+        const view = new DataView(data.buffer, data.byteOffset + 64, 8);
+        return sum + view.getBigUint64(0, true);
+      }, 0n);
+      setSplBalance(Number(total));
+    }).catch((err) => {
+      console.error("[TokenBalance] SPL balance fetch error:", err);
+      // Keep the balance unknown on RPC failure. Showing zero would incorrectly
+      // tell the user that a successfully connected wallet has no funds.
+      if (!cancelled) setSplBalance(null);
+    });
     return () => { cancelled = true; };
-  }, [publicKey, selectedToken, connection]);
+  }, [publicKey, selectedToken, connection, runtimeMint]);
 
   const handleMax = useCallback((): string => {
     if (selectedToken.isBtcNative && btcBalance !== null) {
