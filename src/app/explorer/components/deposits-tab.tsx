@@ -338,7 +338,6 @@ export function getShieldType(d: DepositRecord): "btc" | "sol" | "usdc" | "usdt"
     if (sym === "SOL" || sym === "WSOL") return "sol";
     if (sym === "USDC") return "usdc";
     if (sym === "USDT") return "usdt";
-    if (sym === "JUPUSD") return "usdc"; // same decimals/display as USDC
     return "spl";
   }
   if (d.instructionDisc === 11) return "btc"; // complete_deposit
