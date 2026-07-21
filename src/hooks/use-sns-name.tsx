@@ -44,23 +44,22 @@ const SPONSORED_SUBMIT_TIMEOUT_MS = 15_000;
 const SPONSORED_RECOVERY_ATTEMPTS = 8;
 const SPONSORED_RECOVERY_DELAY_MS = 1_000;
 
-type OwnedSnsRecord = {
-  name: string | null;
-  fullDomain: string | null;
-  subdomainKey: string;
-  version: number;
-  viewingPubKey: string;
-  mpk: string;
-  complianceFlags: number;
-  auditorPubkey: string | null;
-};
-
-type OwnedSnsResponse = {
-  success?: boolean;
-  registered?: boolean;
-  records?: OwnedSnsRecord[];
-  error?: string;
-};
+type SnsResolveResponse =
+  | { success: true; registered: false }
+  | {
+      success: true;
+      registered: true;
+      record: {
+        name: string | null;
+        fullDomain: string | null;
+        subdomainKey: string;
+        version: number;
+        mpk: string;
+        complianceFlags: number;
+        auditorPubkey: string | null;
+      };
+    }
+  | { success: false; error: string };
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -259,39 +258,42 @@ export function useSnsName(): UseSnsNameReturn {
 
   // Check if connected wallet owns a *.utxopia.sol subdomain
   const lookupMySnsName = useCallback(async () => {
-    const owner = activeAuthority?.publicKey;
-    if (!owner || !stealthAddress) return;
-
-    if (!snsConfig) return;
+    // Resolve by the stable stealth VIEWING KEY, not by the connected wallet.
+    // The on-chain owner recorded at registration can differ from the current
+    // active authority (e.g. a different Solana wallet is connected), but the
+    // viewing key is derived from the user's seed and never changes — so the
+    // name resolves regardless of which wallet, if any, is connected.
+    if (!stealthAddress || !snsConfig) return;
 
     setIsLoading(true);
     setError(null);
 
     try {
-      const alphaName = getAlphaDemoNameForOwner(networkId, owner.toBase58());
-      if (alphaName) {
-        setHasRegisteredSnsName(true);
-        setRegisteredSubdomainKey(null);
-        setRegisteredSnsName(alphaName.handle);
-        setComplianceFlags(0);
-        setAuditorPubkeyState(null);
-        setNeedsUpdate(false);
-        setIsLoading(false);
-        return;
-      }
-
-      const networkQuery = new URLSearchParams({
-        network: networkId,
-        owner: owner.toBase58(),
-      });
-      const response = await fetch(`/api/sns/owner?${networkQuery.toString()}`);
-      const body = await response.json().catch(() => null) as OwnedSnsResponse | null;
-      if (!response.ok || !body?.success) {
-        throw new Error(body?.error || "Failed to check SNS owner records");
+      // Alpha-demo names are keyed by the signing authority; best-effort only.
+      const owner = activeAuthority?.publicKey;
+      if (owner) {
+        const alphaName = getAlphaDemoNameForOwner(networkId, owner.toBase58());
+        if (alphaName) {
+          setHasRegisteredSnsName(true);
+          setRegisteredSubdomainKey(null);
+          setRegisteredSnsName(alphaName.handle);
+          setComplianceFlags(0);
+          setAuditorPubkeyState(null);
+          setNeedsUpdate(false);
+          setIsLoading(false);
+          return;
+        }
       }
 
       const ourViewing = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
-      const record = (body.records ?? []).find((item) => item.viewingPubKey === ourViewing);
+      const query = new URLSearchParams({ network: networkId, vk: ourViewing });
+      const response = await fetch(`/api/sns/resolve?${query.toString()}`);
+      const body = await response.json().catch(() => null) as SnsResolveResponse | null;
+      if (!response.ok || !body?.success) {
+        throw new Error((body && "error" in body && body.error) || "Failed to resolve SNS name");
+      }
+
+      const record = body.registered ? body.record : null;
       if (record) {
         setHasRegisteredSnsName(true);
         setRegisteredSubdomainKey(new PublicKey(record.subdomainKey));
@@ -319,7 +321,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, networkId, snsConfig]);
+  }, [activeAuthority, stealthAddress, networkId, snsConfig]);
 
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)
@@ -831,9 +833,11 @@ export function useSnsName(): UseSnsNameReturn {
     }
   }, [activeAuthority?.publicKey, connection, registeredSubdomainKey, signAndSubmitSnsTransaction, snsConfig]);
 
-  // Auto-check on mount when wallet connected
+  // Auto-check once the vault is unlocked (stealth keys derived). Resolution is
+  // keyed on the viewing key, so it no longer requires a connected wallet and
+  // won't break when a different authority is active.
   useEffect(() => {
-    if (activeAuthority?.publicKey && stealthAddress) {
+    if (stealthAddress) {
       lookupMySnsName();
     } else {
       setRegisteredSnsName(null);
@@ -841,7 +845,7 @@ export function useSnsName(): UseSnsNameReturn {
       setComplianceFlags(0);
       setAuditorPubkeyState(null);
     }
-  }, [activeAuthority?.publicKey, stealthAddress, lookupMySnsName]);
+  }, [stealthAddress, lookupMySnsName]);
 
   useEffect(() => {
     if (!alphaDemoLedgerEnabled(networkId)) return;
