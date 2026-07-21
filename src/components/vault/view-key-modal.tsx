@@ -36,8 +36,8 @@ export function ViewKeyModal({
             <Eye className="w-5 h-5 text-btc" />
           </div>
           <h3 className="text-body1 font-bold text-foreground mb-1">Export Viewing Key</h3>
-          <p className="text-caption text-gray">
-            This key grants read-only access to your balances and transaction history. Do not share it publicly.
+          <p className="mb-3 text-caption text-gray">
+            This key reveals private balances and activity. It cannot sign transactions or move funds. Share it only with someone you trust.
           </p>
         </div>
 

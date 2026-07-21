@@ -51,6 +51,22 @@ export function markVaultBackupComplete(identity: string): void {
   localStorage.setItem(BACKUP_STATUS_PREFIX + identity, "1");
 }
 
+export function verifyVaultBackupPayload(raw: string, identity: string): void {
+  let payload: Partial<VaultBackupPayload>;
+  try {
+    payload = JSON.parse(raw) as Partial<VaultBackupPayload>;
+  } catch {
+    throw new Error("This is not a valid UTXOpia recovery file.");
+  }
+  if (payload.version !== 1 || payload.app !== "UTXOpia" || payload.identity !== identity || !payload.keys) {
+    throw new Error("This recovery file belongs to a different wallet or is incomplete.");
+  }
+  const currentKeys = UTXOpiaClient.instance().serializeKeys();
+  if (!currentKeys || stableJson(payload.keys) !== stableJson(currentKeys)) {
+    throw new Error("This recovery file does not match the current private wallet.");
+  }
+}
+
 export function createVaultBackupPayload(identity: string): VaultBackupPayload {
   const keys = UTXOpiaClient.instance().serializeKeys();
   if (!keys) {
@@ -86,4 +102,13 @@ function isPasskeyVault(keys: {
 }): boolean {
   const pubkey = keys.solanaPublicKey;
   return !!pubkey && Array.from(pubkey).every((byte) => byte === 0);
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }

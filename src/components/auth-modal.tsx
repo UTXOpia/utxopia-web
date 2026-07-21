@@ -193,7 +193,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                     View Only
                   </p>
                   <p className="text-caption text-gray mt-0.5">
-                    Enter a viewing key to watch balances
+                    View balances and activity. Cannot send funds.
                   </p>
                 </div>
               </button>
@@ -203,6 +203,9 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   <Eye className="w-4 h-4 text-btc shrink-0" />
                   <span className="text-body2-semibold text-btc">View Only Mode</span>
                 </div>
+                <p className="text-caption text-gray">
+                  A viewing key can reveal private balances and activity, but it cannot sign transactions or move funds. Keep it private.
+                </p>
                 <label htmlFor="viewing-key-input" className="sr-only">
                   Viewing key
                 </label>

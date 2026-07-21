@@ -14,7 +14,7 @@ export function BackupRequiredCallout({ visible }: BackupRequiredCalloutProps) {
       <div className="flex items-start gap-2">
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
         <span>
-          Back up your private wallet before sending or cashing out.
+          Verify your recovery file before sending or cashing out. Your passkey alone is not a recovery backup.
         </span>
       </div>
     </div>
