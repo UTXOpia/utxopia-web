@@ -15,7 +15,6 @@ import {
   createConnectionAdapterFromWeb3 as sdkCreateConnectionAdapterFromWeb3,
   type ConnectionAdapter,
 } from "@utxopia/sdk";
-import { HELIUS_RPC_DEVNET } from "@/lib/helius";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
 
 // Re-export ConnectionAdapter type
@@ -29,7 +28,7 @@ export type { ConnectionAdapter };
  * Get the configured RPC URL.
  */
 export function getRpcUrl(): string {
-  return HELIUS_RPC_DEVNET || getSolanaRpcUrl();
+  return getSolanaRpcUrl();
 }
 
 // =============================================================================
