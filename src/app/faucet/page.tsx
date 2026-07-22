@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Droplets, ExternalLink, Wallet } from "lucide-react";
+import { AlertCircle, ArrowLeft, CheckCircle2, Droplets, ExternalLink, Wallet } from "lucide-react";
 import { isHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { cn } from "@/lib/utils";
 
 type FaucetToken = "BTC" | "USDC" | "USDT";
@@ -24,13 +26,12 @@ const DEFAULT_FAUCET_AMOUNTS: FaucetAmounts = {
  * "not available on this network" hint instead of a working form, so the
  * route is safe to merge even before the backend wiring lands.
  *
- * Backend wiring lives at `/api/faucet/btc`.
+ * Backend wiring lives at `/api/faucet/regtest`.
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
   const [faucetToken, setFaucetToken] = useState<FaucetToken>("BTC");
   const [solanaAddress, setSolanaAddress] = useState("");
-  const [btcAddress, setBtcAddress] = useState("");
   const [amounts, setAmounts] = useState<FaucetAmounts>(DEFAULT_FAUCET_AMOUNTS);
   const { networkId: activeNetwork } = useChainEnvironment();
 
@@ -39,11 +40,9 @@ export default function FaucetPage() {
     try {
       const saved = JSON.parse(localStorage.getItem(FAUCET_PREFERENCES_KEY) || "{}") as {
         solanaAddress?: string;
-        btcAddress?: string;
         amounts?: Partial<FaucetAmounts>;
       };
       setSolanaAddress(saved.solanaAddress || "");
-      setBtcAddress(saved.btcAddress || "");
       setAmounts({
         BTC: saved.amounts?.BTC ?? DEFAULT_FAUCET_AMOUNTS.BTC,
         USDC: saved.amounts?.USDC ?? DEFAULT_FAUCET_AMOUNTS.USDC,
@@ -56,13 +55,13 @@ export default function FaucetPage() {
 
   useEffect(() => {
     if (!mounted) return;
-    localStorage.setItem(FAUCET_PREFERENCES_KEY, JSON.stringify({ solanaAddress, btcAddress, amounts }));
-  }, [amounts, btcAddress, mounted, solanaAddress]);
+    localStorage.setItem(FAUCET_PREFERENCES_KEY, JSON.stringify({ solanaAddress, amounts }));
+  }, [amounts, mounted, solanaAddress]);
 
   const network = mounted ? activeNetwork : null;
   const isHybrid = !!network && isHybridNetwork(network);
   const chainHref = (href: string) => network ? hrefWithChain(href, network) : href;
-  // SPL test tokens use Solana addresses; BTC uses a native regtest address.
+  // SPL test tokens use a Solana address; BTC credits the current private identity.
   const tokenOptions: readonly FaucetToken[] = ["BTC", "USDC", "USDT"];
   const activeToken = tokenOptions.includes(faucetToken) ? faucetToken : tokenOptions[0];
   const setAmount = (token: FaucetToken, value: number) => {
@@ -109,7 +108,7 @@ export default function FaucetPage() {
             </h1>
             <p className="text-caption text-gray">
               {activeToken === "BTC"
-                ? "Send native regtest BTC to your BTC wallet."
+                ? "Credit regtest BTC to your private UTXOpia address."
                 : `Send test ${activeToken} to your Solana wallet.`}
             </p>
           </div>
@@ -146,11 +145,9 @@ export default function FaucetPage() {
             onAmountChange={(value) => setAmount(activeToken, value)}
           />
         ) : (
-          <NativeBtcFaucetForm
+          <PrivateBtcFaucetForm
             network={network}
-            address={btcAddress}
             amountSats={amounts.BTC}
-            onAddressChange={setBtcAddress}
             onAmountChange={(value) => setAmount("BTC", value)}
           />
         )}
@@ -328,109 +325,274 @@ function SplFaucetForm({
   );
 }
 
-function NativeBtcFaucetForm({
+type DripResult =
+  | {
+      kind: "ok";
+      txid: string;
+      warning?: string;
+      credited?: boolean;
+    }
+  | { kind: "cooldown"; retryAfterSec: number; message: string }
+  | { kind: "err"; message: string };
+
+function PrivateBtcFaucetForm({
   network,
-  address,
   amountSats,
-  onAddressChange,
   onAmountChange,
 }: {
   network: NetworkId;
-  address: string;
   amountSats: number;
-  onAddressChange: (value: string) => void;
   onAmountChange: (value: number) => void;
 }) {
-  const { config } = useChainEnvironment();
   const [submitting, setSubmitting] = useState(false);
-  const [result, setResult] = useState<
-    | { kind: "ok"; txid: string; blocksMined?: number }
-    | { kind: "err"; message: string }
-    | null
-  >(null);
-  const trimmed = address.trim();
-  const validAddress = /^bcrt1[0-9a-z]{38,90}$/.test(trimmed);
+  const [result, setResult] = useState<DripResult | null>(null);
+  const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
+  const privateBtcBalance = useUTXOpiaStore((s) => s.inboxBalancesByToken.zkBTC ?? 0n);
 
-  useEffect(() => { setResult(null); }, [address, amountSats]);
+  useEffect(() => {
+    setResult(null);
+  }, [amountSats, stealthAddress]);
+
+  // Live cooldown countdown so the user sees the seconds tick down.
+  const [cooldownLeft, setCooldownLeft] = useState(0);
+  useEffect(() => {
+    if (result?.kind !== "cooldown") {
+      setCooldownLeft(0);
+      return;
+    }
+    setCooldownLeft(result.retryAfterSec);
+    const iv = setInterval(() => {
+      setCooldownLeft((s) => (s > 0 ? s - 1 : 0));
+    }, 1000);
+    return () => clearInterval(iv);
+  }, [result]);
+
+  const hasVault = Boolean(stealthAddress && /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress));
+
+  async function mineMissingConfirmations(blocksAlreadyMined?: number): Promise<void> {
+    const blocks = Math.max(0, 6 - Math.max(0, Number(blocksAlreadyMined ?? 0)));
+    if (blocks === 0) return;
+    try {
+      await fetch(`/api/regtest/mine?network=${encodeURIComponent(network)}`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ blocks }),
+      });
+    } catch (e) {
+      console.warn("[Faucet] Follow-up regtest mining failed:", e);
+    }
+  }
+
+  async function refreshUntilCredited(previousBalance: bigint): Promise<void> {
+    for (let attempt = 0; attempt < 18; attempt += 1) {
+      try {
+        await useUTXOpiaStore.getState().refreshInbox(undefined, true);
+        const currentBalance = useUTXOpiaStore.getState().inboxBalancesByToken.zkBTC ?? 0n;
+        if (currentBalance > previousBalance) {
+          setResult((current) => current?.kind === "ok" ? { ...current, credited: true } : current);
+          return;
+        }
+      } catch (error) {
+        console.warn("[Faucet] Private balance refresh failed:", error);
+      }
+      if (attempt < 17) await new Promise((resolve) => setTimeout(resolve, 5_000));
+    }
+  }
 
   async function handleDrip() {
+    if (!stealthAddress) return;
+    const previousBalance = privateBtcBalance;
     setSubmitting(true);
     setResult(null);
     try {
-      const response = await fetch(`/api/faucet/btc?network=${encodeURIComponent(network)}`, {
+      const params = new URLSearchParams({ network });
+      const res = await fetch(`/api/faucet/regtest?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ address: trimmed, amountSats }),
+        body: JSON.stringify({ stealthAddress, amountSats }),
       });
-      const body = await response.json() as {
-        ok?: boolean;
+      const body = (await res.json()) as {
+        ok: boolean;
         txid?: string;
         blocksMined?: number;
+        warning?: string;
+        depositAddress?: string;
+        opReturn?: string;
+        amountSats?: number;
+        dailyLimit?: number;
+        retryAfterSec?: number;
         error?: string;
       };
-      if (!response.ok || !body.ok) {
-        setResult({ kind: "err", message: body.error || `HTTP ${response.status}` });
+      if (res.status === 429 && typeof body.retryAfterSec === "number") {
+        setResult({
+          kind: "cooldown",
+          retryAfterSec: body.retryAfterSec,
+          message: body.error ?? `Cooldown active. Try again in ${body.retryAfterSec}s.`,
+        });
+      } else if (!res.ok || !body.ok) {
+        setResult({ kind: "err", message: body.error ?? `HTTP ${res.status}` });
       } else {
-        setResult({ kind: "ok", txid: body.txid || "", blocksMined: body.blocksMined });
+        recordPendingFaucetActivity({
+          networkId: network,
+          stealthAddress,
+          amountSats: body.amountSats ?? amountSats,
+          txid: body.txid ?? "",
+          opReturn: body.opReturn,
+          depositAddress: body.depositAddress,
+          blocksMined: body.blocksMined,
+        });
+        setResult({
+          kind: "ok",
+          txid: body.txid ?? "",
+          warning: body.warning,
+          credited: false,
+        });
+        void mineMissingConfirmations(body.blocksMined).finally(() => {
+          void refreshUntilCredited(previousBalance);
+        });
       }
-    } catch (error) {
-      setResult({ kind: "err", message: error instanceof Error ? error.message : String(error) });
+    } catch (e) {
+      setResult({ kind: "err", message: e instanceof Error ? e.message : String(e) });
     } finally {
       setSubmitting(false);
     }
   }
 
-  const txUrl = result?.kind === "ok" && result.txid
-    ? `${config.bitcoin.explorerUrl.replace(/\/$/, "")}/tx/${result.txid}`
-    : null;
+  const cooldownActive = result?.kind === "cooldown" && cooldownLeft > 0;
+  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive;
 
   return (
     <div className="space-y-4">
       <div>
-        <label className="text-body2 text-gray-light pl-2 mb-2 block">Your regtest BTC address</label>
-        <input
-          value={address}
-          onChange={(event) => onAddressChange(event.target.value)}
-          placeholder="bcrt1…"
-          spellCheck={false}
-          className={cn(
-            "w-full p-3 bg-muted border rounded-[12px] text-body2 font-mono text-foreground",
-            "placeholder:text-gray outline-none transition-colors",
-            address && !validAddress ? "border-error/40 focus:border-error/60" : "border-gray/15 focus:border-warning/40",
-          )}
-        />
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">
+          Private UTXOpia recipient
+        </label>
+        <div
+          className="w-full rounded-[12px] border border-gray/15 bg-muted p-3 font-mono text-body2 text-foreground"
+          title={stealthAddress ?? undefined}
+        >
+          {stealthAddress
+            ? `${stealthAddress.slice(0, 18)}…${stealthAddress.slice(-12)}`
+            : "Not initialized"}
+        </div>
+        <p className="text-caption text-gray mt-1 pl-2">
+          The faucet uses this private address automatically.
+        </p>
       </div>
+
       <div>
-        <label className="text-body2 text-gray-light pl-2 mb-2 block">Amount (sats)</label>
+        <label className="text-body2 text-gray-light pl-2 mb-2 block">
+          Amount (sats)
+        </label>
         <input
           type="number"
           min={1}
           max={100_000}
-          step={1_000}
+          step={1000}
           value={amountSats}
-          onChange={(event) => onAmountChange(Number(event.target.value) || 0)}
-          className="w-full p-3 bg-muted border border-gray/15 rounded-[12px] text-body2 font-mono text-foreground outline-none focus:border-warning/40"
+          onChange={(e) => onAmountChange(Number(e.target.value) || 0)}
+          className={cn(
+            "w-full p-3 bg-muted border border-gray/15 rounded-[12px]",
+            "text-body2 font-mono text-foreground",
+            "outline-none focus:border-warning/40 transition-colors",
+          )}
         />
+        <p className="text-caption text-gray mt-1 pl-2">
+          {(amountSats / 1e8).toFixed(8)} BTC. Limit: 3 deposits per day.
+        </p>
       </div>
+
+      {(!hasVault || cooldownActive) && (
+        <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3 text-caption text-warning">
+          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
+          <div>
+            {!hasVault ? (
+              <>
+                Open your vault once to initialize its private deposit identity.
+                <Link
+                  href={hrefWithChain("/vault", network)}
+                  className="ml-1 font-semibold underline underline-offset-2"
+                >
+                  Open vault
+                </Link>
+              </>
+            ) : (
+              <>Cooldown active. Try again in {cooldownLeft}s.</>
+            )}
+          </div>
+        </div>
+      )}
+
       <button
         onClick={handleDrip}
-        disabled={!validAddress || amountSats <= 0 || submitting}
+        disabled={disabled}
+        title={!hasVault ? "Initialize your private vault first" : undefined}
         className="btn-primary w-full"
       >
         <Droplets className="w-5 h-5" />
-        {submitting ? "Sending BTC…" : "Send test BTC"}
+        {submitting
+          ? "Creating Bitcoin transaction..."
+          : cooldownActive
+            ? `Wait ${cooldownLeft}s`
+            : "Send test BTC"}
       </button>
+
       {result?.kind === "ok" && (
-        <div className="rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success">
-          <p className="font-semibold">BTC sent{result.blocksMined ? ` and confirmed in ${result.blocksMined} blocks` : ""}</p>
-          {txUrl && <a href={txUrl} target="_blank" rel="noreferrer" className="mt-2 inline-flex items-center gap-1.5 hover:text-success/80">
-            View Bitcoin transaction <ExternalLink className="w-3 h-3" />
-          </a>}
+        <div className="space-y-3 rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success">
+          <div className="flex items-start gap-2">
+            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
+            <div>
+              <p className="font-semibold text-success">
+                {result.credited ? "Private BTC balance updated" : "Bitcoin transaction confirmed"}
+              </p>
+              <p className="mt-0.5 text-success/75">
+                {result.credited
+                  ? "The funds are ready in your private balance."
+                  : "Updating your private balance automatically. No second deposit is needed."}
+              </p>
+              {result.credited && (
+                <p className="mt-1 font-mono text-success">
+                  Private balance: {(Number(privateBtcBalance) / 1e8).toFixed(8)} BTC
+                </p>
+              )}
+            </div>
+          </div>
+          <div className="rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono break-all text-success/80">
+            {result.txid || "(see backend log)"}
+          </div>
+          {result.warning && (
+            <div className="text-warning pt-1 border-t border-success/10">{result.warning}</div>
+          )}
+          <div className="flex flex-wrap gap-2 pt-2">
+            <Link
+              href={hrefWithChain("/vault/activity?refresh=inbox", network)}
+              className="inline-flex items-center justify-center rounded-[8px] border border-success/25 px-3 py-2 text-[11px] font-semibold text-success transition-colors hover:bg-success/10"
+            >
+              View activity
+            </Link>
+            <Link
+              href={hrefWithChain("/vault", network)}
+              className="inline-flex items-center justify-center rounded-[8px] border border-gray/15 px-3 py-2 text-[11px] font-semibold text-gray-light transition-colors hover:border-success/25 hover:text-success"
+            >
+              Back to vault
+            </Link>
+          </div>
+        </div>
+      )}
+      {result?.kind === "cooldown" && (
+        <div className="p-3 rounded-[10px] border border-warning/30 bg-warning/5 text-caption text-warning">
+          {cooldownLeft > 0 ? `Cooldown active. Try again in ${cooldownLeft}s.` : "Cooldown cleared. Try again."}
         </div>
       )}
       {result?.kind === "err" && (
-        <div className="rounded-[10px] border border-error/30 bg-error/5 p-3 text-caption text-error">{result.message}</div>
+        <div className="p-3 rounded-[10px] border border-error/30 bg-error/5 text-caption text-error">
+          {result.message}
+        </div>
       )}
+
+      <p className="text-caption text-gray">
+        The Bitcoin transaction is routed through the current Ika vault and credited to the private recipient shown above.
+      </p>
     </div>
   );
 }
