@@ -7,7 +7,7 @@ import { cn } from "@/lib/utils";
 import { CopyButton } from "@/components/ui/copy-button";
 import { BitcoinIcon } from "@/components/bitcoin-wallet-selector";
 import type { RedemptionRecord } from "@/hooks/use-explorer";
-import { getMempoolExplorerUrl } from "@/lib/btc-network";
+import { getMempoolExplorerUrl, scriptToAddress } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { getChainIcon, getChainMutedLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
@@ -33,6 +33,9 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
   const grossAmount = r ? Number(r.amountSats) : getTxUnshieldAmount(tx);
   const netReceived = r?.actualReceived ? Number(r.actualReceived) : getTxUnshieldAmount(tx);
   const serviceFee = r?.serviceFee ? Number(r.serviceFee) : 0;
+  const indexedRecipient = getTxUnshieldRecipient(tx);
+  const btcRecipient = (r?.btcScript ? scriptToAddress(r.btcScript, network) : null)
+    ?? (indexedRecipient && /^(bc1|tb1|bcrt1)/i.test(indexedRecipient) ? indexedRecipient : null);
 
   return (
     <div className="mx-4 my-3 rounded-[10px] bg-linear-to-b from-gray/6 to-transparent border border-gray/10 overflow-hidden">
@@ -73,13 +76,13 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
                 {netReceived ? formatTokenAmount(netReceived, token) : "\u2014"}
               </span>
             </div>
-            {(getTxUnshieldRecipient(tx) ?? "") ? (
+            {btcRecipient ? (
               <div className="group flex items-center gap-2">
                 <span className="text-[10px] text-gray/50 shrink-0">&rarr;</span>
-                <code className="text-caption font-mono text-foreground/80 truncate">{truncate((getTxUnshieldRecipient(tx) ?? ""), 10, 6)}</code>
+                <code className="text-caption font-mono text-foreground/80 truncate">{truncate(btcRecipient, 10, 6)}</code>
                 <div className="flex items-center gap-1 ml-auto shrink-0 opacity-60 group-hover:opacity-100 transition-opacity">
-                  <CopyButton text={(getTxUnshieldRecipient(tx) ?? "")} label="BTC Address" variant="default" iconSize="sm" />
-                  <a href={`${getMempoolExplorerUrl(network)}/address/${(getTxUnshieldRecipient(tx) ?? "")}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
+                  <CopyButton text={btcRecipient} label="BTC Address" variant="default" iconSize="sm" />
+                  <a href={`${getMempoolExplorerUrl(network)}/address/${btcRecipient}`} target="_blank" rel="noopener noreferrer" className="text-btc hover:text-btc/80 transition-colors p-0.5">
                     <ExternalLink className="w-3 h-3" />
                   </a>
                 </div>

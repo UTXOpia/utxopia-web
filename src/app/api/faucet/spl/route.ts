@@ -1,8 +1,8 @@
 /**
  * POST /api/faucet/spl — proxy to the backend SPL faucet.
  *
- * The backend holds the relayer/mint-authority key and mints test USDC/USDT to
- * the recipient's public Solana wallet (it shells out to ops/scripts/mint-spl.ts).
+ * The backend holds the mint-authority key and mints test USDC/USDT to the
+ * recipient's public Solana wallet.
  * The web never holds the key — it only forwards, exactly like /api/faucet/regtest.
  */
 
@@ -33,7 +33,7 @@ export async function POST(req: Request) {
   const recipient = (body.recipient || "").trim();
   const token = (body.token || "").toUpperCase();
   const amount = Number(body.amount);
-  if (!recipient || (token !== "USDC" && token !== "USDT") || !Number.isFinite(amount) || amount <= 0) {
+  if (!recipient || !["USDC", "USDT"].includes(token) || !Number.isFinite(amount) || amount <= 0) {
     return NextResponse.json({ ok: false, error: "require recipient, token (USDC|USDT), amount > 0" }, { status: 400 });
   }
 

@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import useSWR from "swr";
 import { useExplorer } from "@/hooks/use-explorer";
-import type { ExplorerTransaction } from "@/hooks/use-explorer";
+import type { ExplorerTransaction, RedemptionRecord } from "@/hooks/use-explorer";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { SiteHeader } from "@/components/site-header";
@@ -52,6 +52,24 @@ function ExplorerContent({ network }: { network: NetworkId }) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const { transactions: allTransactions, refresh: refreshAll } = useExplorer(network);
+  const { data: redemptions = [] } = useSWR<RedemptionRecord[]>(
+    ["explorer-redemptions", network],
+    async () => {
+      const resp = await fetch(`/api/explorer/redemptions?network=${encodeURIComponent(network)}`);
+      if (!resp.ok) return [];
+      const json = await resp.json();
+      return json.redemptions ?? [];
+    },
+    { refreshInterval: 30_000, dedupingInterval: 5_000, revalidateOnFocus: false },
+  );
+  const redemptionByRequestTx = useMemo(
+    () => new Map(
+      redemptions
+        .filter((redemption) => redemption.requestTxSignature)
+        .map((redemption) => [redemption.requestTxSignature!, redemption]),
+    ),
+    [redemptions],
+  );
 
   const toggle = useCallback((key: string) => {
     setExpanded((prev) => {
@@ -181,6 +199,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
                       network={network}
                       expanded={expanded.has(rowKey)}
                       onToggle={() => toggle(rowKey)}
+                      redemption={redemptionByRequestTx.get(tx.txSignature)}
                     />
                   );
                 })}

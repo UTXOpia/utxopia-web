@@ -23,6 +23,17 @@ interface FaucetActivityLedger {
   pending: PendingFaucetActivity[];
 }
 
+export function isOutdatedFaucetPool(
+  activity: Pick<PendingFaucetActivity, "depositAddress">,
+  currentPoolAddress?: string,
+): boolean {
+  return Boolean(
+    activity.depositAddress
+      && currentPoolAddress
+      && activity.depositAddress !== currentPoolAddress,
+  );
+}
+
 function readLedger(): FaucetActivityLedger {
   if (typeof window === "undefined") return { pending: [] };
   try {
@@ -89,6 +100,7 @@ export function getPendingFaucetActivities(input: {
   networkId: string;
   stealthAddress: string | null;
   notes: InboxNote[];
+  currentPoolAddress?: string;
 }): PendingFaucetActivity[] {
   if (!input.stealthAddress) return [];
   const cutoff = Date.now() - MAX_AGE_MS;
@@ -97,6 +109,7 @@ export function getPendingFaucetActivities(input: {
     if (activity.updatedAt < cutoff) return false;
     if (activity.networkId !== input.networkId) return false;
     if (activity.stealthAddress !== input.stealthAddress) return false;
+    if (isOutdatedFaucetPool(activity, input.currentPoolAddress)) return false;
     return !hasMatchingScannedNote(activity, input.notes);
   });
   if (live.length !== ledger.pending.length) {

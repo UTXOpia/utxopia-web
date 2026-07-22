@@ -81,7 +81,7 @@ function transformTransfer(t: BackendTransfer, tokenMap: Map<string, string>): E
 
   // Determine tx type
   let type: ExplorerTransaction["type"] = "transfer";
-  if (t.transfer_type === "redeem") type = "withdraw";
+  if (t.instruction_disc === 15 || t.transfer_type === "redeem") type = "withdraw";
   else if (t.transfer_type === "unshield") type = "unshield";
 
   // Build inputs from nullifier arrays
@@ -111,7 +111,7 @@ function transformTransfer(t: BackendTransfer, tokenMap: Map<string, string>): E
   if (perOutputs.length > 0) {
     for (const o of perOutputs) {
       outputs.push({
-        type: o.type === "withdraw" ? "withdraw" : "unshield",
+        type: type === "withdraw" || o.type === "withdraw" ? "withdraw" : "unshield",
         amount: o.amount,
         fee: o.fee,
         payout: o.payout,

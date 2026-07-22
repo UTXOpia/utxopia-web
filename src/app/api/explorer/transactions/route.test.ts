@@ -23,4 +23,14 @@ describe("normalizeExplorerTransaction", () => {
 
     expect(tx.status).toBe("sweeping");
   });
+
+  it("normalizes legacy unshield rows with BTC outputs to withdraw", () => {
+    const tx = normalizeExplorerTransaction({
+      txSignature: "redeem-request-signature",
+      type: "unshield",
+      outputs: [{ type: "commitment" }, { type: "withdraw", btcTxid: "btc-txid" }],
+    });
+
+    expect(tx.type).toBe("withdraw");
+  });
 });

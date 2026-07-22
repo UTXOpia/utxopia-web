@@ -48,23 +48,23 @@
       "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF"
     },
     "tokens": {
-      "zkbtcMint": "7qSDx4sbMHqx7HbPa3irvtXRqhq24h1Ai56Qttghh3td",
+      "zkbtcMint": "3pa5rC4uKJa6G2WhzvRZ2JB2BNbcJs9hTmdPZfTUTvyj",
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
       "wsolMint": "So11111111111111111111111111111111111111112"
     },
     "bitcoin": {
       "network": "regtest",
-      "poolAddress": "bcrt1pyhlp56yhcfw6e94anujp22yl8vlsgxd0svqt8vmaymx8gu9lft9q0kn25t",
-      "groupPubkey": "25fe1a6897c25dac96bd9f2415289f3b3f0419af8300b3b37d26cc7470bf4aca",
+      "poolAddress": "bcrt1psuxp526rsmja6h95uaw82l3a8wqchacj9sl6cjkrgq0vc2a2xndqen72zx",
+      "groupPubkey": "870c1a2b4386e5dd5cb4e75c757e3d3b818bf7122c3fac4ac3401ecc2baa34da",
       "depositMode": "direct",
       "explorerUrl": "https://btc.utxopia.com/regtest"
     },
     "ika": {
       "programId": "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY",
       "grpcEndpoint": "pre-alpha-dev-1.ika.ika-network.net:443",
-      "dwallet": "5kbTomdQtVEA2XD6iHSxz1y51AYU2tSheB86GNwus9qW",
-      "dwalletXOnlyPubkey": "25fe1a6897c25dac96bd9f2415289f3b3f0419af8300b3b37d26cc7470bf4aca"
+      "dwallet": "QcqbhDZGyQ3AWciMHNwiAa6cw3yeJpiBiK6qGMytbn9",
+      "dwalletXOnlyPubkey": "870c1a2b4386e5dd5cb4e75c757e3d3b818bf7122c3fac4ac3401ecc2baa34da"
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"

@@ -43,6 +43,74 @@ const BONFIDA_FEE_OWNER = new PublicKey("5D2zKog251d6KPCyFyLMt3KroWwXXPWSgTPyhV2
 const SPONSORED_SUBMIT_TIMEOUT_MS = 15_000;
 const SPONSORED_RECOVERY_ATTEMPTS = 8;
 const SPONSORED_RECOVERY_DELAY_MS = 1_000;
+const SNS_RESOLVE_CACHE_TTL_MS = 30 * 60 * 1_000;
+const SNS_RESOLVE_CACHE_PREFIX = "utxopia:sns-resolve:v1";
+
+interface CachedSnsResolve {
+  savedAt: number;
+  body: SnsResolveResponse;
+}
+
+const snsResolveRequests = new Map<string, Promise<SnsResolveSuccess>>();
+
+function snsResolveCacheKey(networkId: string, viewingKey: string): string {
+  return `${SNS_RESOLVE_CACHE_PREFIX}:${networkId}:${viewingKey}`;
+}
+
+function readCachedSnsResolve(key: string): SnsResolveSuccess | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = JSON.parse(localStorage.getItem(key) || "null") as CachedSnsResolve | null;
+    if (!cached || Date.now() - cached.savedAt >= SNS_RESOLVE_CACHE_TTL_MS) return null;
+    // Cache registered names only. A negative result should not hide a name
+    // registered in another tab or device for the full TTL.
+    return cached.body.success && cached.body.registered ? cached.body : null;
+  } catch {
+    return null;
+  }
+}
+
+function writeCachedSnsResolve(key: string, body: SnsResolveResponse): void {
+  if (typeof window === "undefined" || !body.success || !body.registered) return;
+  try {
+    localStorage.setItem(key, JSON.stringify({ savedAt: Date.now(), body } satisfies CachedSnsResolve));
+  } catch {
+    // Cache is an optimization; on-chain resolution remains authoritative.
+  }
+}
+
+async function fetchSnsResolve(
+  networkId: string,
+  viewingKey: string,
+  force: boolean,
+): Promise<SnsResolveSuccess> {
+  const key = snsResolveCacheKey(networkId, viewingKey);
+  if (!force) {
+    const cached = readCachedSnsResolve(key);
+    if (cached) return cached;
+    const pending = snsResolveRequests.get(key);
+    if (pending) return pending;
+  } else if (typeof window !== "undefined") {
+    localStorage.removeItem(key);
+  }
+
+  const request: Promise<SnsResolveSuccess> = (async () => {
+    const query = new URLSearchParams({ network: networkId, vk: viewingKey });
+    const response = await fetch(`/api/sns/resolve?${query.toString()}`);
+    const body = await response.json().catch(() => null) as SnsResolveResponse | null;
+    if (!response.ok || !body?.success) {
+      throw new Error((body && "error" in body && body.error) || "Failed to resolve SNS name");
+    }
+    writeCachedSnsResolve(key, body);
+    return body;
+  })();
+  snsResolveRequests.set(key, request);
+  try {
+    return await request;
+  } finally {
+    snsResolveRequests.delete(key);
+  }
+}
 
 type SnsResolveResponse =
   | { success: true; registered: false }
@@ -60,6 +128,8 @@ type SnsResolveResponse =
       };
     }
   | { success: false; error: string };
+
+type SnsResolveSuccess = Extract<SnsResolveResponse, { success: true }>;
 
 function bytesToHex(bytes: Uint8Array): string {
   return Buffer.from(bytes).toString("hex");
@@ -80,7 +150,7 @@ interface UseSnsNameReturn {
   complianceFlags: number;
   /** Optional 32-byte auditor Solana pubkey published on the user's SNS. */
   auditorPubkey: Uint8Array | null;
-  lookupMySnsName: () => Promise<void>;
+  lookupMySnsName: (force?: boolean) => Promise<void>;
   lookupSnsName: (name: string) => Promise<SnsStealthAddress | null>;
   isNameRegistered: (name: string) => Promise<boolean>;
   registerSnsSubdomain: (name: string) => Promise<boolean>;
@@ -262,7 +332,7 @@ export function useSnsName(): UseSnsNameReturn {
   }, [connection, networkId, snsConfig]);
 
   // Check if connected wallet owns a *.utxopia.sol subdomain
-  const lookupMySnsName = useCallback(async () => {
+  const lookupMySnsName = useCallback(async (force = false) => {
     // Resolve by the stable stealth VIEWING KEY, not by the connected wallet.
     // The on-chain owner recorded at registration can differ from the current
     // active authority (e.g. a different Solana wallet is connected), but the
@@ -291,12 +361,7 @@ export function useSnsName(): UseSnsNameReturn {
       }
 
       const ourViewing = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
-      const query = new URLSearchParams({ network: networkId, vk: ourViewing });
-      const response = await fetch(`/api/sns/resolve?${query.toString()}`);
-      const body = await response.json().catch(() => null) as SnsResolveResponse | null;
-      if (!response.ok || !body?.success) {
-        throw new Error((body && "error" in body && body.error) || "Failed to resolve SNS name");
-      }
+      const body = await fetchSnsResolve(networkId, ourViewing, force);
 
       const record = body.registered ? body.record : null;
       if (record) {
@@ -688,7 +753,7 @@ export function useSnsName(): UseSnsNameReturn {
       }
     }
 
-    await lookupMySnsName();
+    await lookupMySnsName(true);
     return true;
   }, [deleteSnsSubdomain, lookupMySnsName, registerSnsSubdomain, registeredSnsName]);
 

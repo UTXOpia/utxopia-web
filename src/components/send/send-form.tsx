@@ -250,6 +250,8 @@ export function SendForm({
   const [linkOpen, setLinkOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [regtestBtcAddress, setRegtestBtcAddress] = useState<string | null>(null);
+  const [regtestAddressError, setRegtestAddressError] = useState<string | null>(null);
 
   const ctx = useUTXOpia();
   const { lookupSnsName } = useSnsName();
@@ -270,6 +272,56 @@ export function SendForm({
   const [balanceReadyKey, setBalanceReadyKey] = useState<string | null>(null);
   const cashOutRecipientType: RecipientType =
     state.cashOutDestination === "bitcoin" ? "btc" : "spl_wallet";
+  const locksRegtestBtcDestination =
+    mode === "cashout" &&
+    state.cashOutDestination === "bitcoin" &&
+    chainEnv.config.bitcoin.network === "regtest";
+
+  useEffect(() => {
+    if (!locksRegtestBtcDestination) return;
+    const controller = new AbortController();
+    setRegtestAddressError(null);
+    void (async () => {
+      // The regtest dev signer installs a UniSat-compatible wallet shim. Prefer
+      // that identity so the redemption returns to the same test user that
+      // created it. The Core-owned address is only a local-infra fallback.
+      for (let attempt = 0; attempt < 10 && !controller.signal.aborted; attempt++) {
+        const accounts = await window.unisat?.getAccounts().catch(() => []);
+        const walletAddress = accounts?.[0];
+        if (walletAddress) {
+          const validation = validateBtcAddress(walletAddress);
+          if (!validation.valid || !walletAddress.startsWith("bcrt1")) {
+            throw new Error("Connected Bitcoin wallet did not provide a valid regtest address");
+          }
+          setRegtestBtcAddress(walletAddress);
+          return;
+        }
+        await new Promise((resolve) => setTimeout(resolve, 100));
+      }
+
+      const response = await fetch(
+        `/api/regtest/redemption-address?network=${encodeURIComponent(chainEnv.networkId)}`,
+        { cache: "no-store", signal: controller.signal },
+      );
+      const result = await response.json() as { address?: string; error?: string };
+      if (!response.ok || !result.address) {
+        throw new Error(result.error || "Could not load your regtest wallet address");
+      }
+      setRegtestBtcAddress(result.address);
+    })()
+      .catch((fetchError: unknown) => {
+        if (!controller.signal.aborted) {
+          setRegtestAddressError(fetchError instanceof Error ? fetchError.message : "Could not load your regtest wallet address");
+        }
+      });
+    return () => controller.abort();
+  }, [locksRegtestBtcDestination, chainEnv.networkId]);
+
+  useEffect(() => {
+    if (locksRegtestBtcDestination && regtestBtcAddress && state.recipient !== regtestBtcAddress) {
+      dispatch({ type: "set_recipient", value: regtestBtcAddress });
+    }
+  }, [locksRegtestBtcDestination, regtestBtcAddress, state.recipient]);
 
   // Cash out can render before StoreHydration begins its first inbox scan.
   // Request it here too (the store deduplicates concurrent refreshes) and keep
@@ -813,7 +865,16 @@ export function SendForm({
             : "Paste a Solana wallet address"
           : undefined}
         snsStatus={snsState.kind}
+        readOnly={locksRegtestBtcDestination}
       />
+
+      {locksRegtestBtcDestination && (
+        <p className={cn("text-xs", regtestAddressError ? "text-red-500" : "text-muted-foreground")}>
+          {regtestAddressError ?? (regtestBtcAddress
+            ? "Regtest safety: cash-outs can only go to your connected test wallet."
+            : "Loading your connected regtest wallet address…")}
+        </p>
+      )}
 
       {recipientValid && (
         <RecipientOutcome type={recipientType} chainLabel={activeChainLabel} />

@@ -85,6 +85,9 @@ export function TransferRow({
   const btcTip = useBtcTipHeight(network);
   const liveDepositConfs = confirmationsFromHeight(tx.btcMeta?.depositBlockHeight, btcTip)
     ?? tx.btcMeta?.confirmations;
+  const btcWithdrawalTxid = kind === "withdraw"
+    ? redemption?.btcTxid ?? tx.outputs.find((output) => output.type === "withdraw")?.btcTxid
+    : undefined;
 
   return (
     <Fragment>
@@ -104,7 +107,12 @@ export function TransferRow({
           )}
         </Td>
         <Td>
-          {tx.txSignature ? (
+          {btcWithdrawalTxid ? (
+            <div className="flex items-center gap-1.5">
+              <code className="text-caption font-mono text-foreground">{truncate(btcWithdrawalTxid, 6, 4)}</code>
+              <CopyButton text={btcWithdrawalTxid} label="BTC Tx" variant="default" iconSize="sm" />
+            </div>
+          ) : tx.txSignature ? (
             <div className="flex items-center gap-1.5">
               <code className="text-caption font-mono text-foreground">{truncate(tx.txSignature, 6, 4)}</code>
               <CopyButton text={tx.txSignature} label="Tx" variant="default" iconSize="sm" />
@@ -185,7 +193,18 @@ export function TransferRow({
           <span className="text-caption text-gray">{timeAgo(tx.timestamp)}</span>
         </Td>
         <Td>
-          {tx.txSignature ? (
+          {btcWithdrawalTxid ? (
+            <a
+              href={`${getMempoolExplorerUrl(network)}/tx/${btcWithdrawalTxid}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-btc hover:text-btc/80 transition-colors"
+              onClick={(e) => e.stopPropagation()}
+              title="View Bitcoin transaction"
+            >
+              <ExternalLink className="w-3.5 h-3.5" />
+            </a>
+          ) : tx.txSignature ? (
             <ChainTxLink signature={tx.txSignature} />
           ) : tx.btcMeta?.depositTxid ? (
             <a

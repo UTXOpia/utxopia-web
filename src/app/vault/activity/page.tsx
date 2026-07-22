@@ -34,7 +34,10 @@ import type { InboxNote } from "@/stores/utxopia-store";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { Tooltip } from "@/components/ui/tooltip";
-import { getPendingFaucetActivities, type PendingFaucetActivity } from "@/lib/faucet-activity";
+import {
+  getPendingFaucetActivities,
+  type PendingFaucetActivity,
+} from "@/lib/faucet-activity";
 import { getAlphaDemoNetworkInboxNotes } from "@/lib/alpha-demo-ledger";
 import {
   getSubmittedActivityDisplaySymbol,
@@ -232,8 +235,11 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
 
 function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
   const [expanded, setExpanded] = useState(false);
-  const { networkId: network } = useChainEnvironment();
+  const { config } = useChainEnvironment();
   const token = getToken("zkBTC");
+  const btcTxUrl = activity.txid
+    ? `${config.bitcoin.explorerUrl.replace(/\/$/, "")}/tx/${activity.txid}`
+    : null;
 
   return (
     <div>
@@ -266,11 +272,11 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
 
       {expanded && (
         <div className="mx-4 mb-3">
-          <div className="rounded-[10px] bg-linear-to-b from-warning/8 to-transparent border border-warning/15 overflow-hidden">
-            <div className="px-3.5 py-2.5 border-b border-warning/10 bg-warning/5">
+          <div className="rounded-[10px] overflow-hidden border border-warning/15 bg-warning/5">
+            <div className="px-3.5 py-2.5 border-b border-warning/10">
               <div className="flex items-center gap-2">
                 <Loader2 className="h-4 w-4 text-warning animate-spin" />
-                <span className="text-sm font-semibold text-warning">Processing on testnet</span>
+                <span className="text-sm font-semibold text-warning">Processing on regtest</span>
               </div>
             </div>
 
@@ -300,14 +306,16 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
             </div>
 
             <div className="px-3.5 py-2 border-t border-warning/10">
-              <Link
-                href={hrefWithChain("/explorer", network)}
-                className="inline-flex items-center gap-1.5 text-[11px] text-warning hover:text-warning/80 transition-colors"
+              {btcTxUrl && <a
+                href={btcTxUrl}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1.5 text-[11px] text-warning transition-colors hover:text-warning/80"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="w-3 h-3" />
-                Check Explorer
-              </Link>
+                View Bitcoin transaction
+              </a>}
             </div>
           </div>
         </div>
@@ -600,7 +608,7 @@ function ActivityFeed() {
   const tokenPrices = useTokenPrices();
   const searchParams = useSearchParams();
   const forcedRefreshRef = useRef(false);
-  const { networkId } = useChainEnvironment();
+  const { networkId, config } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
   const [submittedActivities, setSubmittedActivities] = useState<SubmittedTransactionActivity[]>([]);
@@ -626,7 +634,12 @@ function ActivityFeed() {
 
   useEffect(() => {
     const sync = () => {
-      setPendingActivities(getPendingFaucetActivities({ networkId, stealthAddress, notes: displayNotes }));
+      setPendingActivities(getPendingFaucetActivities({
+        networkId,
+        stealthAddress,
+        notes: displayNotes,
+        currentPoolAddress: config.bitcoin.poolAddress,
+      }));
     };
     sync();
     window.addEventListener("storage", sync);
@@ -635,7 +648,7 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:faucet-activity", sync);
     };
-  }, [displayNotes, networkId, stealthAddress]);
+  }, [config.bitcoin.poolAddress, displayNotes, networkId, stealthAddress]);
 
   useEffect(() => {
     const sync = () => setSubmittedActivities(getSubmittedTransactions(networkId));

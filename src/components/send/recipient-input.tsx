@@ -22,6 +22,7 @@ export interface RecipientInputProps {
   /** Name resolve state from the parent (only meaningful for stealth_sns). */
   snsStatus?: SnsStatus;
   className?: string;
+  readOnly?: boolean;
 }
 
 function statusFor(
@@ -80,6 +81,7 @@ export function RecipientInput({
   placeholder = "Paste an address, @handle, or name.utxopia.sol",
   snsStatus = "idle",
   className,
+  readOnly = false,
 }: RecipientInputProps) {
   const { tone, label: statusLabel } = statusFor(value, snsStatus, detection);
 
@@ -103,11 +105,13 @@ export function RecipientInput({
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
+          readOnly={readOnly}
           placeholder={placeholder}
           className={cn(
             "w-full px-3 py-3 pr-10 rounded-lg",
             "bg-muted/40 border text-sm font-mono",
             "focus:outline-none focus:ring-2 focus:ring-privacy/40",
+            readOnly && "cursor-default bg-muted/60 pr-3 text-muted-foreground",
             tone === "bad" && "border-red-500/40",
             tone === "ok" && "border-privacy/30",
             tone === "warn" && "border-yellow-500/30",
@@ -116,14 +120,16 @@ export function RecipientInput({
           autoComplete="off"
           spellCheck={false}
         />
-        <button
-          type="button"
-          onClick={onPasteFromClipboard}
-          aria-label="Paste from clipboard"
-          className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted/60 text-muted-foreground"
-        >
-          <Clipboard className="w-4 h-4" />
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={onPasteFromClipboard}
+            aria-label="Paste from clipboard"
+            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted/60 text-muted-foreground"
+          >
+            <Clipboard className="w-4 h-4" />
+          </button>
+        )}
       </div>
       {statusLabel && (
         <div
