@@ -32,7 +32,7 @@ mock.module("@/hooks/use-utxopia", () => ({
   }),
 }));
 mock.module("@/hooks/use-token-prices", () => ({
-  useTokenPrices: () => ({ btc: 50000, sol: null, usdc: null, usdt: null }),
+  useTokenPrices: () => ({ btc: 50000, sol: 100, usdc: 1, usdt: 1 }),
 }));
 mock.module("@/hooks/use-note-auto-selector", () => ({
   useNoteAutoSelector: () => ({
@@ -134,5 +134,19 @@ describe("SendForm", () => {
       target: { value: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM" },
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+  });
+
+  it("uses the selected cash-out asset price for the USD preview", () => {
+    render(<SendForm mode="cashout" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /solana receive in a wallet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /btc private balance/i }));
+    fireEvent.click(screen.getByRole("button", { name: /sol private balance/i }));
+    fireEvent.change(screen.getByLabelText(/^amount$/i), {
+      target: { value: "0.05" },
+    });
+
+    expect(screen.getByText("≈ $5.00")).toBeDefined();
+    expect(screen.queryByText("≈ $2500.00")).toBeNull();
   });
 });

@@ -362,7 +362,6 @@ export function SendForm({
     (mode === "cashout" ? cashOutRecipientType : detection.type) === "btc"
       ? "zkBTC"
       : state.sourceToken;
-  const usdPerUnit = tokenPrices.btc ?? null;
 
   // Preview-resolve name recipients so we can block Send if the name does not
   // exist or has not published UTXOpia receive metadata.
@@ -432,6 +431,7 @@ export function SendForm({
       PAY_TOKENS[0],
     [effectiveToken],
   );
+  const usdPerUnit = tokenPrices[selectedPayToken.priceKey] ?? null;
   const displayToken = mode === "cashout" ? selectedPayToken.unit : effectiveToken;
   const {
     relayerMeta,
