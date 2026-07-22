@@ -37,9 +37,9 @@ const steps: OnboardingStep[] = [
     icon: <LockKeyhole className="w-8 h-8" />,
   },
   {
-    title: "Use it like a wallet",
+    title: "Send and withdraw funds",
     description:
-      "Receive funds, send privately, or cash out to a Bitcoin address or chain wallet when needed.",
+      "Send privately to another UTXOpia address. To leave the private pool, withdraw tokens to a Solana wallet or BTC to a Bitcoin address.",
     icon: <BadgeDollarSign className="w-8 h-8" />,
   },
 ];
