@@ -1,7 +1,5 @@
 "use client";
 
-import type { InboxNote } from "@/stores/utxopia-store";
-
 const STORAGE_KEY = "utxopia:faucet-activity:v1";
 const MAX_AGE_MS = 60 * 60 * 1000;
 
@@ -54,18 +52,6 @@ function writeLedger(ledger: FaucetActivityLedger): void {
   }
 }
 
-function hasMatchingScannedNote(activity: PendingFaucetActivity, notes: InboxNote[]): boolean {
-  const requestedAmount = BigInt(activity.amountSats);
-  const feeTolerance = requestedAmount / 20n + 1_000n;
-  return notes.some((note) => {
-    if (note.tokenSymbol !== "zkBTC") return false;
-    const creditedAmount = BigInt(note.amount ?? 0);
-    if (creditedAmount > requestedAmount) return false;
-    if (requestedAmount - creditedAmount > feeTolerance) return false;
-    return note.createdAt >= activity.createdAt - 5 * 60 * 1000;
-  });
-}
-
 export function recordPendingFaucetActivity(input: {
   networkId: string;
   stealthAddress: string;
@@ -99,7 +85,8 @@ export function recordPendingFaucetActivity(input: {
 export function getPendingFaucetActivities(input: {
   networkId: string;
   stealthAddress: string | null;
-  notes: InboxNote[];
+  /** BTC txids that the explorer has linked to a completed shield transaction. */
+  creditedBtcTxids?: ReadonlySet<string>;
   currentPoolAddress?: string;
 }): PendingFaucetActivity[] {
   if (!input.stealthAddress) return [];
@@ -110,7 +97,9 @@ export function getPendingFaucetActivities(input: {
     if (activity.networkId !== input.networkId) return false;
     if (activity.stealthAddress !== input.stealthAddress) return false;
     if (isOutdatedFaucetPool(activity, input.currentPoolAddress)) return false;
-    return !hasMatchingScannedNote(activity, input.notes);
+    // Only reconcile the pending and credited rows when both point to the
+    // exact same Bitcoin transaction. Amount/time proximity is not identity.
+    return !input.creditedBtcTxids?.has(activity.txid);
   });
   if (live.length !== ledger.pending.length) {
     writeLedger({ pending: live });

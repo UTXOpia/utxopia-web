@@ -106,7 +106,8 @@ function ActivityRow({
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(note.amount) / 10 ** token.decimals) * price : 0;
-  const isReceived = !note.isSpent;
+  const isHistoricalFunding = origin?.kind === "btc_deposit" || origin?.kind === "shield";
+  const isReceived = isHistoricalFunding || !note.isSpent;
   const receivedLabel = origin?.kind === "btc_deposit"
     ? "BTC deposit"
     : origin?.kind === "shield"
@@ -151,7 +152,9 @@ function ActivityRow({
           <span className="text-sm text-foreground font-medium">
             {isReceived ? receivedLabel : "Note spent"}
           </span>
-          <p className="text-[11px] text-gray/40">{timeAgo(note.createdAt)}</p>
+          <p className="text-[11px] text-gray/40">
+            {timeAgo(note.createdAt)}{isHistoricalFunding && note.isSpent ? " · Spent later" : ""}
+          </p>
         </div>
 
         {/* Amount + token */}
@@ -208,6 +211,12 @@ function ActivityRow({
                 <span className="text-gray/40">Time</span>
                 <span className="text-gray/60">{formatFullDate(note.createdAt)}</span>
               </div>
+              {isHistoricalFunding && note.isSpent && (
+                <div className="flex justify-between">
+                  <span className="text-gray/40">Current status</span>
+                  <span className="text-gray/60">Spent in a later transaction</span>
+                </div>
+              )}
               <div className="flex justify-between">
                 <Tooltip content="This note's position in the on-chain Merkle tree of shielded commitments. It lets you prove the note exists without revealing which one is yours.">
                   <span className="text-gray/40">Leaf Index</span>
@@ -656,10 +665,15 @@ function ActivityFeed() {
 
   useEffect(() => {
     const sync = () => {
+      const creditedBtcTxids = new Set(
+        indexedTransactions.flatMap((transaction) =>
+          transaction.btcDepositTxid ? [transaction.btcDepositTxid] : []
+        ),
+      );
       setPendingActivities(getPendingFaucetActivities({
         networkId,
         stealthAddress,
-        notes: displayNotes,
+        creditedBtcTxids,
         currentPoolAddress: config.bitcoin.poolAddress,
       }));
     };
@@ -670,7 +684,7 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:faucet-activity", sync);
     };
-  }, [config.bitcoin.poolAddress, displayNotes, networkId, stealthAddress]);
+  }, [config.bitcoin.poolAddress, indexedTransactions, networkId, stealthAddress]);
 
   useEffect(() => {
     const sync = () => setSubmittedActivities(getSubmittedTransactions(networkId));
@@ -760,13 +774,19 @@ function ActivityFeed() {
         .map((input) => input.nullifierHash?.toLowerCase())
         .filter((nullifier): nullifier is string => Boolean(nullifier));
     }
+    const originByCommitment = indexOwnedNoteOrigins(indexedTransactions);
+    const preservedSourceCommitments = new Set(
+      Object.entries(originByCommitment)
+        .filter(([, origin]) => origin.kind === "btc_deposit" || origin.kind === "shield")
+        .map(([commitment]) => commitment),
+    );
     const { visibleNotes, enrichmentBySignature } = reconcileSubmittedActivity(
       displayNotes,
       allSubmittedActivities,
       outputsBySignature,
       inputsBySignature,
+      preservedSourceCommitments,
     );
-    const originByCommitment = indexOwnedNoteOrigins(indexedTransactions);
     return [
       ...visibleNotes
         .map((note) => ({

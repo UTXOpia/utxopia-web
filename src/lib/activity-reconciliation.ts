@@ -54,6 +54,7 @@ export function reconcileSubmittedActivity<T extends ActivityNoteLike>(
   submitted: SubmittedTransactionActivity[],
   outputsBySignature: Record<string, string[]>,
   inputsBySignature: Record<string, string[]> = {},
+  preservedSourceCommitments: ReadonlySet<string> = new Set(),
 ): {
   visibleNotes: T[];
   enrichmentBySignature: Record<string, SubmittedActivityEnrichment>;
@@ -87,13 +88,17 @@ export function reconcileSubmittedActivity<T extends ActivityNoteLike>(
   }
 
   return {
-    visibleNotes: notes.filter(
-      (note) => !submittedOutputCommitments.has(note.commitmentHex.toLowerCase())
-        && !(
-          note.nullifierHash
-          && submittedInputNullifiers.has(note.nullifierHash.toLowerCase())
-        ),
-    ),
+    visibleNotes: notes.filter((note) => {
+      const commitment = note.commitmentHex.toLowerCase();
+      if (submittedOutputCommitments.has(commitment)) return false;
+      // A deposit or shield is a historical event. Spending its note later
+      // changes the balance, but must not erase the original activity row.
+      if (preservedSourceCommitments.has(commitment)) return true;
+      return !(
+        note.nullifierHash
+        && submittedInputNullifiers.has(note.nullifierHash.toLowerCase())
+      );
+    }),
     enrichmentBySignature,
   };
 }

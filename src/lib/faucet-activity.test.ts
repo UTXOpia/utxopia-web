@@ -5,24 +5,8 @@ import {
   isOutdatedFaucetPool,
   recordPendingFaucetActivity,
 } from "./faucet-activity";
-import type { InboxNote } from "@/stores/utxopia-store";
 
 const STEALTH_ADDRESS = `utxo:${"ab".repeat(96)}`;
-
-function makeNote(amount: bigint, createdAt = Date.now()): InboxNote {
-  const commitment = new Uint8Array(32).fill(7);
-  return {
-    amount,
-    ephemeralPub: new Uint8Array(32),
-    leafIndex: 1,
-    commitment,
-    id: "note-1",
-    createdAt,
-    commitmentHex: "07".repeat(32),
-    isSpent: false,
-    tokenSymbol: "zkBTC",
-  };
-}
 
 describe("faucet activity", () => {
   it("detects a faucet transaction sent to an outdated pool", () => {
@@ -49,17 +33,14 @@ describe("faucet activity", () => {
     expect(getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [],
     })).toHaveLength(1);
     expect(getPendingFaucetActivities({
       networkId: "testnet",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [],
     })).toHaveLength(0);
     expect(getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: `utxo:${"cd".repeat(96)}`,
-      notes: [],
     })).toHaveLength(0);
   });
 
@@ -75,13 +56,11 @@ describe("faucet activity", () => {
     expect(getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [],
       currentPoolAddress: "bcrt1pcurrent",
     })).toHaveLength(0);
   });
 
-  it("removes pending faucet activity once a matching zkBTC note is scanned", () => {
-    const before = Date.now();
+  it("removes pending faucet activity only when the credited BTC txid matches", () => {
     recordPendingFaucetActivity({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
@@ -92,14 +71,13 @@ describe("faucet activity", () => {
     const pending = getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [makeNote(50_000n, before + 1000)],
+      creditedBtcTxids: new Set(["btc-tx-2"]),
     });
 
     expect(pending).toHaveLength(0);
   });
 
-  it("reconciles a faucet credit after the deposit service fee", () => {
-    const before = Date.now();
+  it("does not merge a different transaction with the same expected amount", () => {
     recordPendingFaucetActivity({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
@@ -110,10 +88,10 @@ describe("faucet activity", () => {
     const pending = getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [makeNote(99_300n, before + 1000)],
+      creditedBtcTxids: new Set(["another-btc-tx"]),
     });
 
-    expect(pending).toHaveLength(0);
+    expect(pending).toHaveLength(1);
   });
 
   it("keeps pending faucet activity when scanned notes do not match", () => {
@@ -127,7 +105,7 @@ describe("faucet activity", () => {
     const pending = getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      notes: [makeNote(25_000n)],
+      creditedBtcTxids: new Set(),
     });
 
     expect(pending).toHaveLength(1);

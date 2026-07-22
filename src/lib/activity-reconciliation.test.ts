@@ -106,6 +106,20 @@ describe("reconcileSubmittedActivity", () => {
     expect(result.enrichmentBySignature.signature.isSelfTransfer).toBe(false);
   });
 
+  it("keeps deposit and shield history after their notes are spent", () => {
+    const result = reconcileSubmittedActivity(
+      [{ commitmentHex: "shielded", nullifierHash: "spent" }],
+      [activity],
+      { signature: [] },
+      { signature: ["spent"] },
+      new Set(["shielded"]),
+    );
+
+    expect(result.visibleNotes).toEqual([
+      { commitmentHex: "shielded", nullifierHash: "spent" },
+    ]);
+  });
+
   it("does not hide notes from unrelated indexed transactions", () => {
     const result = reconcileSubmittedActivity(
       [{ commitmentHex: "recipient" }, { commitmentHex: "unrelated" }],
