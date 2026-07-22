@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { reconcileSubmittedActivity, recoverSelfTransferActivities } from "./activity-reconciliation";
+import {
+  indexOwnedNoteOrigins,
+  reconcileSubmittedActivity,
+  recoverSelfTransferActivities,
+} from "./activity-reconciliation";
 import type { SubmittedTransactionActivity } from "./transaction-activity";
 
 const activity: SubmittedTransactionActivity = {
@@ -13,6 +17,37 @@ const activity: SubmittedTransactionActivity = {
 };
 
 describe("reconcileSubmittedActivity", () => {
+  it("distinguishes BTC deposits, token shields, and private transfers", () => {
+    expect(indexOwnedNoteOrigins([
+      {
+        txSignature: "btc-sig",
+        timestamp: 1,
+        type: "shield",
+        btcDepositTxid: "btc-txid",
+        inputs: [],
+        outputs: [{ commitment: "AA" }],
+      },
+      {
+        txSignature: "sol-sig",
+        timestamp: 2,
+        type: "shield",
+        inputs: [],
+        outputs: [{ commitment: "BB" }],
+      },
+      {
+        txSignature: "send-sig",
+        timestamp: 3,
+        type: "transfer",
+        inputs: [],
+        outputs: [{ commitment: "CC" }],
+      },
+    ])).toEqual({
+      aa: { kind: "btc_deposit", txSignature: "btc-sig" },
+      bb: { kind: "shield", txSignature: "sol-sig" },
+      cc: { kind: "transfer", txSignature: "send-sig" },
+    });
+  });
+
   it("collapses a private transfer to self into the submitted row", () => {
     const result = reconcileSubmittedActivity(
       [

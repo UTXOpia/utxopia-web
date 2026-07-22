@@ -51,6 +51,29 @@ describe("network-scoped SNS helpers", () => {
     expect(Array.from(resolved?.mpk ?? [])).toEqual(Array.from(mpk));
   });
 
+  it("resolves @handle shorthand against the .utxopia.sol parent", async () => {
+    const sns = getSnsConfig(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }));
+    expect(sns).toBeTruthy();
+    if (!sns) return;
+
+    const parentKey = deriveParentDomainKey(sns);
+    const subdomainKey = deriveSubdomainKey("albert0421", parentKey, sns);
+    const data = new Uint8Array(SNS_HEADER_SIZE + 65);
+    data[SNS_HEADER_SIZE] = 2;
+    data.fill(1, SNS_HEADER_SIZE + 1, SNS_HEADER_SIZE + 33);
+    data.fill(2, SNS_HEADER_SIZE + 33, SNS_HEADER_SIZE + 65);
+
+    const resolved = await resolveSnsNameForNetwork(
+      {
+        getAccountInfo: async (key: PublicKey) => key.equals(subdomainKey) ? { data } : null,
+      },
+      "@albert0421",
+      sns,
+    );
+
+    expect(resolved?.fullDomain).toBe("albert0421.utxopia.sol");
+  });
+
   it("checks registration by raw SNS account existence", async () => {
     const sns = getSnsConfig(getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }));
     expect(sns).toBeTruthy();

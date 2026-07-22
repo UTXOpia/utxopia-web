@@ -9,8 +9,39 @@ export interface IndexedPrivateTransaction {
   txSignature: string;
   timestamp: number;
   type?: string;
-  inputs: Array<{ nullifierHash?: string }>;
+  inputs: Array<{ nullifierHash?: string; btcDepositTxid?: string }>;
   outputs: Array<{ commitment?: string }>;
+  btcDepositTxid?: string;
+}
+
+export type OwnedNoteOriginKind = "btc_deposit" | "shield" | "transfer";
+
+export interface OwnedNoteOrigin {
+  kind: OwnedNoteOriginKind;
+  txSignature: string;
+}
+
+/** Attach an output note to the public transaction that created it. */
+export function indexOwnedNoteOrigins(
+  transactions: IndexedPrivateTransaction[],
+): Record<string, OwnedNoteOrigin> {
+  const origins: Record<string, OwnedNoteOrigin> = {};
+  for (const transaction of transactions) {
+    if (!transaction.txSignature) continue;
+    const kind: OwnedNoteOriginKind = transaction.type === "shield"
+      ? transaction.btcDepositTxid || transaction.inputs.some((input) => input.btcDepositTxid)
+        ? "btc_deposit"
+        : "shield"
+      : "transfer";
+    for (const output of transaction.outputs) {
+      if (!output.commitment) continue;
+      origins[output.commitment.toLowerCase()] = {
+        kind,
+        txSignature: transaction.txSignature,
+      };
+    }
+  }
+  return origins;
 }
 
 export interface SubmittedActivityEnrichment {

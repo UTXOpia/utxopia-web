@@ -46,9 +46,11 @@ import {
 } from "@/lib/transaction-activity";
 import { getChainTransactionUrl } from "@/lib/chain-links";
 import {
+  indexOwnedNoteOrigins,
   reconcileSubmittedActivity,
   recoverSelfTransferActivities,
   type IndexedPrivateTransaction,
+  type OwnedNoteOrigin,
 } from "@/lib/activity-reconciliation";
 
 function getToken(sym: string): SupportedToken {
@@ -89,14 +91,32 @@ function timeAgo(ts: number): string {
   return new Date(ts).toLocaleDateString();
 }
 
-function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: TokenPrices }) {
+function ActivityRow({
+  note,
+  tokenPrices,
+  origin,
+}: {
+  note: InboxNote;
+  tokenPrices: TokenPrices;
+  origin?: OwnedNoteOrigin;
+}) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { networkId: network } = useChainEnvironment();
+  const { networkId: network, config } = useChainEnvironment();
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(note.amount) / 10 ** token.decimals) * price : 0;
   const isReceived = !note.isSpent;
+  const receivedLabel = origin?.kind === "btc_deposit"
+    ? "BTC deposit"
+    : origin?.kind === "shield"
+      ? "Shielded"
+      : "Received";
+  const receivedType = origin?.kind === "btc_deposit"
+    ? "BTC deposited into private balance"
+    : origin?.kind === "shield"
+      ? "Asset shielded into private balance"
+      : "Private transfer received";
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -129,7 +149,7 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
         {/* Label + time */}
         <div className="flex-1 min-w-0">
           <span className="text-sm text-foreground font-medium">
-            {isReceived ? "Received" : "Note spent"}
+            {isReceived ? receivedLabel : "Note spent"}
           </span>
           <p className="text-[11px] text-gray/40">{timeAgo(note.createdAt)}</p>
         </div>
@@ -181,7 +201,7 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
               <div className="flex justify-between">
                 <span className="text-gray/40">Type</span>
                 <span className="text-foreground/80">
-                  {isReceived ? "Funds received" : "Spent note (transfer details unavailable)"}
+                  {isReceived ? receivedType : "Spent note (transfer details unavailable)"}
                 </span>
               </div>
               <div className="flex justify-between">
@@ -218,12 +238,14 @@ function ActivityRow({ note, tokenPrices }: { note: InboxNote; tokenPrices: Toke
             {/* Footer — explorer link */}
             <div className="px-3.5 py-2 border-t border-gray/8">
               <Link
-                href={hrefWithChain("/explorer", network)}
+                href={origin?.txSignature
+                  ? getChainTransactionUrl(config, origin.txSignature, network)
+                  : hrefWithChain("/explorer", network)}
                 className="inline-flex items-center gap-1.5 text-[11px] text-privacy hover:text-privacy/80 transition-colors"
                 onClick={(e) => e.stopPropagation()}
               >
                 <ExternalLink className="w-3 h-3" />
-                View in Explorer
+                {origin?.txSignature ? "View transaction" : "View in Explorer"}
               </Link>
             </div>
           </div>
@@ -592,7 +614,7 @@ function SubmittedTransactionRow({
 }
 
 type ActivityItem =
-  | { kind: "note"; id: string; createdAt: number; note: InboxNote }
+  | { kind: "note"; id: string; createdAt: number; note: InboxNote; origin?: OwnedNoteOrigin }
   | { kind: "pending-faucet"; id: string; createdAt: number; activity: PendingFaucetActivity }
   | {
       kind: "submitted";
@@ -670,8 +692,9 @@ function ActivityFeed() {
       txSignature?: string;
       timestamp?: number;
       type?: string;
-      inputs?: Array<{ nullifierHash?: string }>;
+      inputs?: Array<{ nullifierHash?: string; btcDepositTxid?: string }>;
       outputs?: Array<{ commitment?: string }>;
+      btcMeta?: { depositTxid?: string | null };
     }> };
     setIndexedTransactions((data.transactions ?? []).flatMap((transaction) =>
       transaction.txSignature && Number.isFinite(transaction.timestamp)
@@ -681,6 +704,7 @@ function ActivityFeed() {
             type: transaction.type,
             inputs: transaction.inputs ?? [],
             outputs: transaction.outputs ?? [],
+            btcDepositTxid: transaction.btcMeta?.depositTxid ?? undefined,
           }]
         : []
     ));
@@ -742,9 +766,16 @@ function ActivityFeed() {
       outputsBySignature,
       inputsBySignature,
     );
+    const originByCommitment = indexOwnedNoteOrigins(indexedTransactions);
     return [
       ...visibleNotes
-        .map((note) => ({ kind: "note" as const, id: note.id, createdAt: note.createdAt, note })),
+        .map((note) => ({
+          kind: "note" as const,
+          id: note.id,
+          createdAt: note.createdAt,
+          note,
+          origin: originByCommitment[note.commitmentHex.toLowerCase()],
+        })),
       ...pendingActivities.map((activity) => ({
         kind: "pending-faucet" as const,
         id: activity.id,
@@ -864,7 +895,7 @@ function ActivityFeed() {
           <div className="rounded-[12px] border border-gray/10 overflow-hidden divide-y divide-gray/8">
             {groupItems.map((item) => (
               item.kind === "note"
-                ? <ActivityRow key={item.id} note={item.note} tokenPrices={tokenPrices} />
+                ? <ActivityRow key={item.id} note={item.note} tokenPrices={tokenPrices} origin={item.origin} />
                 : item.kind === "pending-faucet"
                   ? <PendingFaucetRow key={item.id} activity={item.activity} />
                   : <SubmittedTransactionRow

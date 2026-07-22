@@ -60,6 +60,9 @@ export function deriveReverseLookupKey(subdomainKey: PublicKey, parentKey: Publi
 
 export function normalizeSnsSubdomain(name: string, sns: SnsNetworkConfig): string | null {
   let subdomain = name.trim().toLowerCase();
+  if (subdomain.startsWith("@")) {
+    subdomain = subdomain.slice(1);
+  }
   if (subdomain.endsWith(".sol")) {
     subdomain = subdomain.slice(0, -4);
   }

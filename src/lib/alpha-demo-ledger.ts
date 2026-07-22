@@ -154,7 +154,7 @@ export function getAlphaDemoNameForOwner(networkId: string, ownerAddress: string
 
 export function getAlphaDemoName(networkId: string, handle: string): AlphaDemoName | null {
   if (!alphaDemoLedgerEnabled(networkId)) return null;
-  const normalized = handle.trim().toLowerCase().replace(/\.utxopia\.sol$/, "");
+  const normalized = handle.trim().toLowerCase().replace(/^@/, "").replace(/\.utxopia\.sol$/, "");
   return (readLedger().names ?? []).find(
     (name) => name.networkId === networkId && name.handle === normalized,
   ) ?? null;

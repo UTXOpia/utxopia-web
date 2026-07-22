@@ -571,9 +571,7 @@ export function SendForm({
         }
         case "transact": {
           if (intent.recipientType === "stealth_sns") {
-            const sub = intent.recipientValue
-              .toLowerCase()
-              .replace(/\.utxopia\.sol$/, "");
+            const sub = normalizePrivateNameHandle(intent.recipientValue, "solana");
             const r = await lookupSnsName(sub);
             if (!r) {
               throw new Error(
