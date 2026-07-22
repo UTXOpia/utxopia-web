@@ -220,9 +220,13 @@ async function callBackendFaucet(
   try {
     body = JSON.parse(text);
   } catch {
+    const ray = res.headers.get("cf-ray");
     body = {
       ok: false,
-      error: `backend faucet returned non-JSON response: ${truncate(text, 300)}`,
+      error:
+        `BTC faucet backend is temporarily unavailable (HTTP ${res.status}). ` +
+        "The request was not retried to avoid sending BTC twice. Check Activity before trying again." +
+        (ray ? ` Reference: ${ray}.` : ""),
     };
   }
 
