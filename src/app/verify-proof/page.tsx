@@ -135,9 +135,9 @@ export default function VerifyProofPage() {
             <FileCheck className="w-5 h-5 text-success" />
           </div>
           <div>
-            <h1 className="text-heading6 text-foreground">Verify a Groth16 proof</h1>
+            <h1 className="text-heading6 text-foreground">Verify a disclosure proof</h1>
             <p className="text-caption text-gray">
-              Auditor tool for checking ownership and range-sum proofs in the browser.
+              Check an ownership or range-sum statement locally in this browser.
             </p>
           </div>
         </div>

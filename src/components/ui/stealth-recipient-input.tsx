@@ -181,7 +181,7 @@ export function StealthRecipientInput({
                   <LockKeyhole className="h-4 w-4 text-privacy" />
                 </div>
                 <div className="min-w-0">
-                  <p className="text-body2-semibold text-foreground">My private wallet</p>
+                  <p className="text-body2-semibold text-foreground">My private vault</p>
                   <p className="truncate font-mono text-[11px] text-gray/50">
                     {selfEncoded.slice(0, 12)}...{selfEncoded.slice(-8)}
                   </p>
@@ -260,7 +260,7 @@ export function StealthRecipientInput({
                   ? "bg-purple/10 hover:bg-purple/20 border-purple/20 cursor-pointer"
                   : "bg-gray/5 border-gray/15 cursor-not-allowed opacity-40"
               )}
-              title={selfMeta ? "Fill with your private address" : "Connect wallet to use your address"}
+              title={selfMeta ? "Use your private receive address" : "Unlock your private vault to use this address"}
             >
               <UserRound className={cn("w-3.5 h-3.5", selfMeta ? "text-purple" : "text-gray")} />
             </button>

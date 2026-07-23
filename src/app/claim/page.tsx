@@ -111,7 +111,7 @@ function ClaimContent() {
     const secret = phrase.trim();
     if (secret.length < 8) return;
     if (networkChain(networkId) !== "sol") {
-      setError("This claim link belongs to the Solana shielded pool. Switch to Solana and try again.");
+      setError("This claim link belongs to the Solana private-vault network. Switch to Solana and try again.");
       return;
     }
     setScanning(true);
@@ -219,7 +219,7 @@ function ClaimContent() {
             <CheckCircle2 className="w-10 h-10 text-success mx-auto" />
             <div>
               <p className="text-sm font-semibold text-foreground">Funds claimed</p>
-              <p className="text-xs text-gray mt-1">The private transfer was confirmed by the relay.</p>
+              <p className="text-xs text-gray mt-1">The private note is now available in your vault.</p>
             </div>
             <Link href={hrefWithChain("/vault/activity?refresh=inbox", networkId)} className="btn-primary w-full">
               View activity

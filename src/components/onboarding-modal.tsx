@@ -31,15 +31,15 @@ interface OnboardingStep {
 
 const steps: OnboardingStep[] = [
   {
-    title: "Create a private balance",
+    title: "Use a private vault",
     description:
-      "Add BTC or supported tokens, then keep balances and transfers hidden from public chain history.",
+      "Your private vault holds private notes. It is separate from your connected Bitcoin or Solana wallet.",
     icon: <LockKeyhole className="w-8 h-8" />,
   },
   {
-    title: "Send and withdraw funds",
+    title: "Move funds with the right flow",
     description:
-      "Send privately to another UTXOpia address. To leave the private pool, withdraw tokens to a Solana wallet or BTC to a Bitcoin address.",
+      "Deposit BTC or shield supported Solana assets, send privately, cash out to Solana, or withdraw zkBTC to a Bitcoin address.",
     icon: <BadgeDollarSign className="w-8 h-8" />,
   },
 ];
@@ -167,7 +167,7 @@ export function OnboardingModal({ forceShow, onComplete }: OnboardingModalProps)
                 "flex items-center justify-center gap-2"
               )}
             >
-              {isLastStep ? "Create private wallet" : "Next"}
+              {isLastStep ? "Open private vault" : "Next"}
               {!isLastStep && <ArrowRight className="w-4 h-4" />}
             </button>
           </div>

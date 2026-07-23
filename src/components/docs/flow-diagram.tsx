@@ -8,11 +8,11 @@ import {
 } from "lucide-react";
 
 const STEPS = [
-  { icon: Shield, label: "Shield", sub: "BTC / SOL / USDC", color: "text-privacy", border: "border-privacy/20" },
+  { icon: Shield, label: "Add funds", sub: "BTC / SOL / USDC / USDT", color: "text-privacy", border: "border-privacy/20" },
   { icon: GitBranch, label: "Verify", sub: "SPV (BTC only)", color: "text-sol", border: "border-sol/20" },
   { icon: TreePine, label: "Commit", sub: "Merkle Tree", color: "text-privacy", border: "border-privacy/20" },
-  { icon: Layers, label: "Transfer", sub: "ZK Proof", color: "text-sol", border: "border-sol/20" },
-  { icon: Unlock, label: "Unshield", sub: "SOL / SPL / BTC", color: "text-btc", border: "border-btc/20" },
+  { icon: Layers, label: "Private transfer", sub: "ZK Proof", color: "text-sol", border: "border-sol/20" },
+  { icon: Unlock, label: "Cash out", sub: "SOL / SPL / BTC", color: "text-btc", border: "border-btc/20" },
 ];
 
 function StepNode({ step }: { step: typeof STEPS[number] }) {

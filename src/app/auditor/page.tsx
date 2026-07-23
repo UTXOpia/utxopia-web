@@ -167,8 +167,8 @@ export default function AuditorPage() {
         },
       ]}
       titleIcon={<ShieldAlert className="w-full h-full" />}
-      title="Method-Y Auditor"
-      description="Decrypt permissioned-pool auditor ciphertexts using your viewing key."
+      title="Auditor workspace"
+      description="Use authorized viewing data to inspect private activity without gaining permission to spend."
       showZkBadge={false}
     >
       <div className="space-y-6">

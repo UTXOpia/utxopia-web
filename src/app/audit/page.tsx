@@ -105,17 +105,17 @@ export default function AuditPage() {
       <SiteHeader />
       <main className="mx-auto max-w-5xl px-4 py-12">
         <div className="flex items-center gap-2">
-          <h1 className="text-3xl font-semibold tracking-tight">Audit mode</h1>
-          <InfoTip label="About Audit mode">
-            Decrypt a delegated viewing key in your browser and produce a CSV report.
-            Nothing leaves your device — the key is decrypted in-browser, announcements
-            are fetched directly from the public backend.
+          <h1 className="text-3xl font-semibold tracking-tight">Open audit access</h1>
+          <InfoTip label="About audit access">
+            Decrypt a read-only audit key in this browser and create a CSV report.
+            The key stays on this device; the app fetches public announcements
+            and decrypts only the permitted records locally.
           </InfoTip>
         </div>
 
         <section className="mt-8 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
           <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
-            1. Load delegated key
+            1. Load encrypted audit key
           </h2>
           <div
             onClick={() => fileRef.current?.click()}
@@ -134,7 +134,7 @@ export default function AuditPage() {
               </>
             ) : (
               <>
-                <div>Drop encrypted key JSON here</div>
+                <div>Drop the encrypted audit-key JSON here</div>
                 <div className="mt-1 text-xs text-zinc-500">or click to browse</div>
               </>
             )}
@@ -153,7 +153,7 @@ export default function AuditPage() {
 
         <section className="mt-6 rounded-xl border border-zinc-800 bg-zinc-900/40 p-6">
           <h2 className="text-sm font-medium uppercase tracking-wider text-zinc-400">
-            2. Password & optional scope override
+            2. Enter password and optional range
           </h2>
           <div className="mt-3 grid gap-3 sm:grid-cols-3">
             <label className="flex flex-col gap-1 text-xs text-zinc-400 sm:col-span-3">

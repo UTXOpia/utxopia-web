@@ -22,8 +22,8 @@ export default function SendPage() {
         },
       ]}
       titleIcon={<Send className="w-full h-full" />}
-      title="Send"
-      description="Pay a Bitcoin address, Solana wallet, private address, or claim link."
+      title="Send privately"
+      description="Send to a UTXOpia name, private receive address, or claim link."
     >
       <SendFlow />
     </FlowPageLayout>

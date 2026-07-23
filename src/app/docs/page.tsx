@@ -21,7 +21,6 @@ import { type LucideIcon } from "lucide-react";
 import {
   Shield,
   Lock,
-  Bitcoin,
   ArrowRight,
   ShieldCheck,
   TreePine,
@@ -49,6 +48,7 @@ import { useActiveSection } from "@/hooks/use-active-section";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
+import { PRODUCT_FEATURES, PRODUCT_TERMS } from "@/lib/product-language";
 
 /* ── Simple card wrapper ── */
 
@@ -255,7 +255,7 @@ function getProtocolSteps() {
 
   return [
     {
-      id: "shield-tokens", num: "01", icon: Shield, title: "Shield Any Token",
+      id: "shield-tokens", num: "01", icon: Shield, title: "Add Funds",
       desc: `Deposit BTC via Taproot, or shield ${nativeTokens} directly from your ${wallet}. Every token enters the same privacy pool — a shared Merkle tree where all commitments look identical regardless of token type or amount.`,
       detail: "BTC: Taproot + SPV · SPL: Shield (disc=12)",
     },
@@ -271,7 +271,7 @@ function getProtocolSteps() {
     },
     {
       id: "joinsplit-transfer", num: "04", icon: Layers, title: "Private Transfer",
-      desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for BTC, SOL, USDC, or any shielded token.",
+      desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for supported assets including BTC, SOL, USDC, and USDT.",
       detail: "Groth16 · 256 bytes · Token-agnostic circuit",
     },
     {
@@ -280,8 +280,8 @@ function getProtocolSteps() {
       detail: "DKSAP · X25519 ECDH · Ed25519 viewing keys",
     },
     {
-      id: "unshield-withdraw", num: "06", icon: Network, title: "Unshield or Withdraw",
-      desc: `Exit the privacy pool in two ways: unshield supported assets back to your ${wallet} instantly (zkSOL returns native SOL), or withdraw BTC via an Ika dWallet whose authority is controlled by this ${program} (2PC-MPC, no off-chain signer committee). Both operations use a JoinSplit proof — the nullifier prevents double-spending without revealing which note you're spending.`,
+      id: "unshield-withdraw", num: "06", icon: Network, title: "Cash Out or Withdraw BTC",
+      desc: `Take funds out in two ways: cash out supported assets to your ${wallet} (zkSOL returns native SOL), or withdraw zkBTC to a native Bitcoin address through an Ika dWallet controlled by this ${program}. The protocol calls the first operation an unshield. Both operations use a JoinSplit proof, and a nullifier prevents double-spending without revealing the note being spent.`,
       detail: "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
   ];
@@ -292,7 +292,7 @@ function getCryptoItems() {
   {
     id: "commitment-scheme", title: "Commitment Scheme",
     formula: "Poseidon(npk, token_id, amount)",
-    desc: `Each note is a Poseidon hash of the note public key, token ID, and amount. The token_id = Poseidon(reduce(mint), 0) makes commitments token-specific — the same circuit verifies BTC, SOL, USDC, or any token. Only the owner knows the preimage.`,
+    desc: `Each note is a Poseidon hash of the note public key, token ID, and amount. The token_id = Poseidon(reduce(mint), 0) makes commitments token-specific, so the same circuit can verify each supported asset. Only the owner knows the preimage.`,
   },
   {
     id: "nullifier-generation", title: "Nullifier Generation",
@@ -426,7 +426,7 @@ export default function DocsPage() {
   const disclosureItems = useMemo(() => getDisclosureItems(), []);
   const securityItems = useMemo(() => getSecurityItems(), []);
 
-  const tokenList = "BTC, SOL, USDC";
+  const tokenList = "BTC, SOL, USDC, and USDT";
 
   return (
     <main className="min-h-screen bg-background">
@@ -441,7 +441,7 @@ export default function DocsPage() {
           <div className="sticky top-0 h-screen overflow-y-auto border-r border-gray/10 px-4 pb-10 pt-8">
             <div className="mb-6 flex items-center gap-2">
               <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-gray/40">
-                Documentation
+                Product Guide
               </span>
               <span className="text-[10px] font-mono uppercase tracking-wider text-chain/70">
                 {chainName}
@@ -463,26 +463,89 @@ export default function DocsPage() {
                   <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray/15 bg-muted/20">
                     <Shield className="w-3.5 h-3.5 text-gray-light" />
                     <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-gray">
-                      Privacy Documentation · {chainName}
+                      UTXOpia Guide · {chainName}
                     </span>
                   </div>
                 </div>
                 <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
-                  How Privacy Works
+                  Use UTXOpia with Confidence
                 </h1>
                 <p className="text-sm sm:text-base text-gray font-light max-w-2xl leading-relaxed">
-                  A deep dive into the cryptography, architecture, and security model
-                  that makes UTXOpia a universal shielded pool for {tokenList}, and any token on {chainName}.
+                  Start with the product workflows and shared terminology. Continue into
+                  the protocol, cryptography, and security model when you need technical detail.
                 </p>
               </div>
             </section>
 
-            {/* ── Overview ── */}
-            <DocsSection id="overview" className="pb-12 sm:pb-16">
+            {/* ── User guide ── */}
+            <DocsSection id="using-utxopia" className="pb-12 sm:pb-16">
               <SectionHeading
-                label="The Problem"
-                title="Why Tokens Need Privacy"
-                subtitle={`Every blockchain transaction is permanently public. Whether you're using ${tokenList} — your balances, transfers, and trading patterns are visible to anyone. UTXOpia shields all your tokens in a single privacy pool.`}
+                label="Product Guide"
+                title="What You Can Do"
+                subtitle="UTXOpia separates your connected wallet from your private vault. Choose a workflow based on where the funds are now and where you want them to go."
+              />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                {[
+                  ["Add funds", "Deposit native BTC as private zkBTC, or shield supported Solana assets from your connected wallet."],
+                  ["Send privately", "Send a private asset to a UTXOpia name, private receive address, or claim link."],
+                  ["Take funds out", "Cash out supported assets to a Solana wallet, or withdraw zkBTC to a native Bitcoin address."],
+                  ["Review activity", "Track deposits, transfers, cash-outs, withdrawals, relayer fees, and the chain records available for each action."],
+                  ["Receive and claim", "Share a private receive address, register a UTXOpia name, or claim a payment link."],
+                  ["Disclose selectively", "Grant read-only audit access or verify a disclosure proof without sharing permission to spend."],
+                ].map(([title, desc]) => (
+                  <Card key={title}>
+                    <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">{title}</h3>
+                    <p className="text-xs sm:text-sm text-gray font-light leading-relaxed">{desc}</p>
+                  </Card>
+                ))}
+              </div>
+
+              <DocsSection id="feature-reference" className="pt-12">
+                <h3 className="text-xl font-semibold tracking-tight text-foreground mb-3">Feature Reference</h3>
+                <p className="text-sm text-gray font-light leading-relaxed mb-6">
+                  Every user-facing area and the job it is designed to complete.
+                </p>
+                <div className="divide-y divide-gray/10 rounded-xl border border-gray/10 bg-muted/10">
+                  {PRODUCT_FEATURES.map((feature) => (
+                    <Link
+                      key={feature.route}
+                      href={hrefWithChain(feature.route, network)}
+                      className="group flex flex-col gap-1 p-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                    >
+                      <div className="min-w-0">
+                        <span className="text-sm font-medium text-foreground group-hover:text-privacy">
+                          {feature.name}
+                        </span>
+                        <p className="mt-1 text-xs leading-relaxed text-gray">{feature.purpose}</p>
+                      </div>
+                      <code className="shrink-0 text-[11px] text-gray/40">{feature.route}</code>
+                    </Link>
+                  ))}
+                </div>
+              </DocsSection>
+
+              <DocsSection id="terminology" className="pt-12">
+                <h3 className="text-xl font-semibold tracking-tight text-foreground mb-3">Terminology</h3>
+                <p className="text-sm text-gray font-light leading-relaxed mb-6">
+                  These names are used consistently throughout the app. Protocol-specific synonyms appear only where they add technical detail.
+                </p>
+                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  {PRODUCT_TERMS.map((item) => (
+                    <Card key={item.term}>
+                      <dt className="text-sm font-semibold text-foreground">{item.term}</dt>
+                      <dd className="mt-2 text-xs sm:text-sm text-gray font-light leading-relaxed">{item.meaning}</dd>
+                    </Card>
+                  ))}
+                </dl>
+              </DocsSection>
+            </DocsSection>
+
+            {/* ── Overview ── */}
+            <DocsSection id="overview" className="py-12 sm:py-16 border-t border-gray/10">
+              <SectionHeading
+                label="Privacy Model"
+                title="What the Private Vault Hides"
+                subtitle={`Public chains expose wallet balances and transaction patterns. UTXOpia represents supported assets such as ${tokenList} as private notes, while keeping the protocol state verifiable on-chain.`}
               />
               <ComparisonTable rows={comparisonRows} />
             </DocsSection>
@@ -490,9 +553,9 @@ export default function DocsPage() {
             {/* ── Protocol Flow ── */}
             <DocsSection id="protocol-flow" className="py-12 sm:py-16 border-t border-gray/10">
               <SectionHeading
-                label="Protocol Flow"
-                title="End-to-End Journey"
-                subtitle={`From shielding any token to private transfers to withdrawal — every step preserves your privacy across ${tokenList}, and more.`}
+                label="How It Works"
+                title="From Deposit to Exit"
+                subtitle={`Follow how supported assets enter the private vault, move as private notes, and return to a public destination.`}
               />
 
               <FlowDiagram />
@@ -596,10 +659,10 @@ export default function DocsPage() {
             <section className="border-t border-gray/10 py-16 sm:py-20">
               <div className="max-w-3xl mx-auto text-center">
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-4">
-                  Ready to Go Private?
+                  Open Your Private Vault
                 </h2>
                 <p className="text-gray text-xs sm:text-sm font-light mb-6 sm:mb-8 max-w-lg mx-auto leading-relaxed">
-                  Shield {tokenList}, or any token. Transfer privately. Withdraw anonymously.
+                  Deposit or shield supported assets, send privately, cash out to Solana, or withdraw zkBTC to Bitcoin.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">
                   <Link
@@ -607,7 +670,7 @@ export default function DocsPage() {
                     className="btn-privacy btn-pill inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 text-sm sm:text-base transition-shadow"
                   >
                     <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
-                    Launch App
+                    Open Private Vault
                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Link>
                   <Link

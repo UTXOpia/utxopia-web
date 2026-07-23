@@ -40,8 +40,9 @@ export function PreferencesForm() {
         label="Relay"
         hintNode={
           <InfoTip label="About relays">
-            Relays submit your transaction so your wallet address stays private.
-            They can&apos;t see your balance or move your funds.{" "}
+            Relayers submit prepared private transactions to Solana without using
+            your connected wallet as the fee payer. They can&apos;t change a proof
+            or spend your funds.{" "}
             <span className="text-gray/70">
               Permissioned-pool deposits are submitted via the pool&apos;s
               auditor; relay selection applies to all other sends.
@@ -246,7 +247,7 @@ function SnsNameRow() {
       <div className="flex items-center justify-between gap-4">
         <div className="flex items-center gap-2 min-w-0 flex-wrap">
           <span className="text-sm font-medium text-foreground">
-            Receive name
+            Private receive name
           </span>
           {!sns.canRegister && (
             <span className="text-[10px] uppercase tracking-wide text-gray bg-muted/40 px-1.5 py-0.5 rounded">
@@ -256,7 +257,7 @@ function SnsNameRow() {
           {sns.isRegistering && (
             <Loader2 className="w-3 h-3 animate-spin text-gray" />
           )}
-          <InfoTip label="About Receive name">
+          <InfoTip label="About private receive names">
             A public on-chain name that resolves to your private receive
             address, so senders can type{" "}
             <span className="font-mono">name.{parentDomain}.sol</span>{" "}
@@ -519,7 +520,7 @@ function AuditorPubkeyRow() {
 /* -------------------------------------------------------------------------- */
 
 /**
- * Low-key link to the Method-Y Auditor dashboard.
+ * Low-key link to the permissioned-pool auditor workspace.
  * Not a primary nav item — rendered in the Advanced section of Settings,
  * near the auditor pubkey configuration rows.
  */
@@ -535,15 +536,14 @@ function AuditorDashboardLinkRow() {
     >
       <div className="flex items-center gap-2 min-w-0">
         <span className="text-sm font-medium text-foreground">
-          Method-Y Auditor
+          Auditor workspace
         </span>
         <span className="text-[10px] uppercase tracking-wide text-gray bg-muted/40 px-1.5 py-0.5 rounded">
           Permissioned pools
         </span>
-        <InfoTip label="About Method-Y Auditor">
-          Decrypt auditor ciphertexts emitted by permissioned-pool deposits using
-          your Ed25519 viewing private key. The key is never stored — it lives
-          only in the browser tab for the duration of the scan.
+        <InfoTip label="About the auditor workspace">
+          Use an authorized viewing key to decrypt permissioned-pool records.
+          The key is not stored and remains only in this browser tab during the scan.
         </InfoTip>
       </div>
       <ChevronRight

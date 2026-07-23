@@ -43,9 +43,9 @@ const TOKEN_LIST = EXPLORER_FILTER_TOKENS.map((t) => ({
 
 const FILTER_PILLS: { id: FilterType; label: string; icon: React.ReactNode; color: string; hasTokens: boolean }[] = [
   { id: "all", label: "All", icon: null, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
-  { id: "shield", label: "Shield", icon: <ArrowDownToLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
-  { id: "transfer", label: "Transfer", icon: <ArrowUpDown className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
-  { id: "unshield", label: "Unshield", icon: <ArrowUpFromLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
+  { id: "shield", label: "Deposit", icon: <ArrowDownToLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
+  { id: "transfer", label: "Private transfer", icon: <ArrowUpDown className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
+  { id: "unshield", label: "Cash out", icon: <ArrowUpFromLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
 ];
 
 export function TypeFilterBar({
@@ -198,7 +198,7 @@ function TokenCheckboxDropdown({
 // --- Type Badge (unified row first column) ---
 
 export function TypeBadge({ kind }: { kind: "shield" | "transfer" | "unshield" | "withdraw" }) {
-  const label = { shield: "Shield", transfer: "Transfer", unshield: "Unshield", withdraw: "Withdraw" }[kind];
+  const label = { shield: "Deposit", transfer: "Private transfer", unshield: "Cash out", withdraw: "Withdraw BTC" }[kind];
   return <span className="text-[13px] text-gray-light font-medium">{label}</span>;
 }
 
@@ -324,7 +324,7 @@ export function EmptyState({ label }: { label: string }) {
       </div>
       <p className="text-body2 text-gray-light mb-1">No {label} yet</p>
       <p className="text-caption text-gray/50 max-w-[280px]">
-        The shielded pool is quiet. Shield some tokens to see activity here.
+        No protocol activity yet. Add funds or send privately to create the first record.
       </p>
     </div>
   );

@@ -40,12 +40,12 @@ export function SiteFooter() {
         </Link>
 
         <div className="text-caption text-gray">
-          ZK Privacy for Every Token on {chainName}
+          Private transfers for supported assets on {chainName}
         </div>
 
         <div className="flex items-center gap-4">
           <span className="text-caption text-gray/60">
-            Alpha software — unaudited, testnet only. Use test funds.
+            Public alpha · Testnet only · Unaudited
           </span>
           <a
             href="https://github.com/UTXOpia"

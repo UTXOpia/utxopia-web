@@ -59,7 +59,7 @@ const BackedViz = () => (
         <div className="w-14 h-14 rounded-2xl border border-privacy/25 bg-background/40 flex items-center justify-center">
           <Layers className="w-7 h-7 text-privacy/70" />
         </div>
-        <span className="text-[10px] font-mono text-privacy/50">Any Token</span>
+        <span className="text-[10px] font-mono text-privacy/50">Supported Assets</span>
       </div>
       <div className="flex flex-col items-center gap-1">
         <div className="flex items-center gap-1">
@@ -198,7 +198,7 @@ FeatureCard.displayName = "FeatureCard";
 const FEATURE_CARDS = [
   { icon: EyeOff, title: "Private Transfers", description: "Proofs verify transfers without revealing sender, recipient, or amount.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "01", visualization: PrivacyViz },
   { icon: Layers, title: "Shielded Assets", description: "Bitcoin and supported tokens become private commitments.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "02", visualization: BackedViz },
-  { icon: Zap, title: "Fast Flow", description: "Shield, send, and unshield through a guided testnet flow.", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
+  { icon: Zap, title: "Guided Flows", description: "Add funds, send privately, cash out, or withdraw BTC with clear transaction progress.", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
   { icon: ShieldCheck, title: "Viewing Keys", description: "Share read-only activity with an auditor when needed.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
 ];
 
@@ -316,7 +316,7 @@ export default function Home() {
 
             <ScrollReveal delay={0.15}>
               <p className="mt-6 text-base md:text-lg text-gray font-light max-w-lg mx-auto leading-relaxed">
-                One shielded pool for Bitcoin and supported {chainName} assets. Privacy by default, auditable on demand.
+                One private vault for Bitcoin and supported {chainName} assets. Privacy by default, auditable on demand.
               </p>
             </ScrollReveal>
 
@@ -346,7 +346,7 @@ export default function Home() {
                     className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-2.5 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                   >
                     <Rocket className="w-5 h-5" />
-                    Launch App
+                    Open Private Vault
                     <ArrowRight className="w-5 h-5" />
                   </Link>
                 </motion.div>
@@ -357,7 +357,7 @@ export default function Home() {
                     className="btn-tertiary btn-pill inline-flex items-center gap-2 px-5 py-2.5 border border-gray/10 backdrop-blur-md hover:bg-muted/50 hover:border-gray/20 transition-all"
                   >
                     <Shield className="w-4 h-4" />
-                    Learn More
+                    Read the Guide
                   </Link>
                 </motion.div>
               </div>
@@ -403,14 +403,14 @@ export default function Home() {
               <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-8 gap-4">
                 <div>
               <h2 className="section-title text-3xl md:text-4xl text-foreground mb-2">
-                    Shield <span className="text-privacy">Supported Assets</span>
+                    Add <span className="text-privacy">Supported Assets</span>
                   </h2>
                   <p className="text-sm text-gray font-light">
-                    Deposit Bitcoin and supported tokens into private commitments.
+                    Deposit Bitcoin or shield supported Solana assets into your private vault.
                   </p>
                 </div>
                 <Link href={chainHref("/vault")} prefetch={false} className="text-sm text-privacy/70 hover:text-privacy transition-colors flex items-center gap-1 shrink-0">
-                  Start shielding <ArrowRight className="w-3.5 h-3.5" />
+                  Add funds <ArrowRight className="w-3.5 h-3.5" />
                 </Link>
               </div>
             </ScrollReveal>
@@ -480,10 +480,10 @@ export default function Home() {
               <div className="rounded-[20px] border border-privacy/15 bg-gradient-to-br from-privacy/5 via-transparent to-purple/5 p-8 md:p-12 text-center relative overflow-hidden">
                 <div className="relative z-10">
                   <h2 className="section-title text-3xl md:text-4xl text-foreground mb-3">
-                    Start <span className="text-privacy">Shielding</span>
+                    Open Your <span className="text-privacy">Private Vault</span>
                   </h2>
                 <p className="text-base text-gray font-light mb-8 max-w-md mx-auto">
-                    Shield assets, transfer privately, and disclose activity only when you choose.
+                    Add supported assets, send privately, and disclose activity only when you choose.
                   </p>
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
                     <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
@@ -493,7 +493,7 @@ export default function Home() {
                         className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-3 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
                       >
                         <Rocket className="w-5 h-5" />
-                        Launch App
+                        Open Private Vault
                         <ArrowRight className="w-5 h-5" />
                       </Link>
                     </motion.div>

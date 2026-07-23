@@ -143,10 +143,10 @@ function ExplorerContent({ network }: { network: NetworkId }) {
     <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Shield" value={counts.shield} color="bg-muted/30 border-gray/15" />
-        <StatCard label="Transfer" value={counts.transfer} color="bg-muted/30 border-gray/15" />
-        <StatCard label="Unshield" value={counts.unshield} color="bg-muted/30 border-gray/15" />
-        <StatCard label="Total Shielded" value={totalShieldedDisplay} color="bg-muted/30 border-gray/15" />
+        <StatCard label="Deposits" value={counts.shield} color="bg-muted/30 border-gray/15" />
+        <StatCard label="Private transfers" value={counts.transfer} color="bg-muted/30 border-gray/15" />
+        <StatCard label="Cash-outs" value={counts.unshield} color="bg-muted/30 border-gray/15" />
+        <StatCard label="Private value" value={totalShieldedDisplay} color="bg-muted/30 border-gray/15" />
       </div>
 
       {/* Filter Bar */}
@@ -233,12 +233,12 @@ function ExplorerBody({ network }: { network: NetworkId }) {
           <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
             <div>
               <h1 className="text-3xl md:text-4xl font-semibold tracking-tight text-foreground mb-1.5">Explorer</h1>
-              <p className="text-sm text-gray font-light">Browse all shielded pool activity</p>
+              <p className="text-sm text-gray font-light">Inspect public protocol records without revealing private transaction details.</p>
             </div>
             <div className="flex items-center gap-2 shrink-0">
               <div className={cn("flex items-center gap-1.5 px-2.5 py-1 rounded-full border", tone.poolPill)}>
                 <Shield className={cn("w-3 h-3", tone.icon)} />
-                <span className={cn("text-[10px] font-mono", tone.mutedText)}>Shielded Pool</span>
+                <span className={cn("text-[10px] font-mono", tone.mutedText)}>Private vault protocol</span>
               </div>
               <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-muted/30 border border-gray/10">
                 <span className={cn("w-1.5 h-1.5 rounded-full animate-pulse", tone.dot)} />

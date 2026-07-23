@@ -11,17 +11,25 @@ export interface NavItem {
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  { id: "overview", label: "Overview" },
+  {
+    id: "using-utxopia",
+    label: "Using UTXOpia",
+    children: [
+      { id: "feature-reference", label: "Feature Reference" },
+      { id: "terminology", label: "Terminology" },
+    ],
+  },
+  { id: "overview", label: "Privacy Model" },
   {
     id: "protocol-flow",
-    label: "Protocol Flow",
+    label: "How It Works",
     children: [
-      { id: "shield-tokens", label: "Shield Any Token" },
+      { id: "shield-tokens", label: "Add Funds" },
       { id: "spv-verification", label: "BTC SPV Verification" },
       { id: "shielded-commitment", label: "Commitment Creation" },
       { id: "joinsplit-transfer", label: "Private Transfer" },
       { id: "stealth-receive", label: "Stealth Receive" },
-      { id: "unshield-withdraw", label: "Unshield / Withdraw" },
+      { id: "unshield-withdraw", label: "Cash Out / Withdraw BTC" },
     ],
   },
   {

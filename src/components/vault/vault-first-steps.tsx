@@ -101,7 +101,7 @@ export function VaultFirstSteps({
     if (!identity) return;
     const payload = createVaultBackupPayload(identity);
     copy(JSON.stringify(payload, null, 2));
-    notifyCopied("Private wallet recovery backup");
+    notifyCopied("Private vault recovery backup");
   };
 
   const handleVerifyBackup = async (file: File | undefined) => {
@@ -197,7 +197,7 @@ export function VaultFirstSteps({
               <ShieldCheck className={cn("mt-0.5 h-4 w-4 shrink-0", hasBackup ? tone.icon : "text-gray/60")} />
               <div className="min-w-0">
                 <p className={cn("text-caption font-semibold", hasBackup ? tone.icon : "text-foreground")}>
-                  Back up private wallet
+                  Back up private vault
                 </p>
                 <p className="text-[11px] text-gray/60">
                   Your passkey unlocks this device. Only this recovery file can restore private funds if access is lost.

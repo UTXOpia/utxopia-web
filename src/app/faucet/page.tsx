@@ -108,7 +108,7 @@ export default function FaucetPage() {
             </h1>
             <p className="text-caption text-gray">
               {activeToken === "BTC"
-                ? "Credit regtest BTC to your private UTXOpia address."
+                ? "Send regtest BTC directly to your private receive address."
                 : `Send test ${activeToken} to your Solana wallet.`}
             </p>
           </div>

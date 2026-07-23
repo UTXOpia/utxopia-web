@@ -23,7 +23,7 @@ export default function SettingsPage() {
       ]}
       titleIcon={<SettingsIcon className="w-full h-full" />}
       title="Preferences"
-      description="Account-level preferences. Stored locally."
+      description="Choose a network, manage your receive name, select a relayer, and configure disclosure."
     >
       <PreferencesForm />
     </FlowPageLayout>

@@ -17,9 +17,9 @@ export function EmptyInbox({ hasKeys, onUnlock, onRefresh, isLoading }: EmptyInb
         <div className="rounded-full bg-privacy/10 p-4 mb-4">
           <Shield className="h-10 w-10 text-privacy" />
         </div>
-        <p className="text-heading6 text-foreground mb-2">Unlock private wallet</p>
+        <p className="text-heading6 text-foreground mb-2">Unlock private vault</p>
         <p className="text-body2 text-gray mb-1.5">
-          Use a passkey or wallet to access your funds
+          Use a passkey or connected wallet to derive your vault keys
         </p>
         <p className="text-caption text-gray/60 mb-5">
           Your keys never leave your device
@@ -35,7 +35,7 @@ export function EmptyInbox({ hasKeys, onUnlock, onRefresh, isLoading }: EmptyInb
           )}
         >
           <Key className="w-4 h-4" />
-          {isLoading ? "Unlocking..." : "Unlock wallet"}
+          {isLoading ? "Unlocking..." : "Unlock private vault"}
         </button>
       </div>
     );

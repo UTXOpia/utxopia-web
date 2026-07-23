@@ -17,7 +17,7 @@ export default function WithdrawPage() {
       badges={[{ icon: <ArrowUpFromLine className="w-full h-full" />, label: "Cash out", color: "privacy" }]}
       titleIcon={<ArrowUpFromLine className="w-full h-full" />}
       title="Cash out"
-      description="Choose Bitcoin or Solana, then enter the destination address."
+      description="Cash out supported assets to Solana, or withdraw zkBTC to a native Bitcoin address."
     >
       <CashOutFlow />
     </FlowPageLayout>

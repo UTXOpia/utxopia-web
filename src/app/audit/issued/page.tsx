@@ -75,13 +75,11 @@ export default function IssuedDelegationsPage() {
       <main className="mx-auto max-w-5xl px-4 py-12">
         <div className="flex items-baseline justify-between gap-4">
           <div className="flex items-center gap-2">
-            <h1 className="text-3xl font-semibold tracking-tight">Issued delegations</h1>
-            <InfoTip label="About Issued delegations">
-              Your record of every delegated viewing key you&apos;ve handed out — the
-              secret key material itself is never stored here, only public
-              metadata. Revoke is local-only (it just marks the record; the
-              recipient&apos;s copy of the key still works until the wall-clock
-              expiry).
+            <h1 className="text-3xl font-semibold tracking-tight">Issued audit access</h1>
+            <InfoTip label="About issued audit access">
+              This browser stores metadata for each read-only audit key you create,
+              not the secret key itself. Marking a record as revoked changes only
+              this local list; a recipient&apos;s copy continues to work until it expires.
             </InfoTip>
           </div>
           <div className="flex gap-2">
@@ -97,7 +95,7 @@ export default function IssuedDelegationsPage() {
               onClick={() => setIssueOpen(true)}
               className="rounded-md bg-emerald-500 px-3 py-1.5 text-xs font-medium text-black hover:bg-emerald-400"
             >
-              New delegation
+              Issue audit access
             </button>
             <input
               ref={importRef}

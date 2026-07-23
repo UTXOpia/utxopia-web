@@ -360,7 +360,7 @@ export default function VaultPage() {
                 )}
               >
                 <Key className="w-4 h-4" />
-                Create private wallet
+                Create private vault
               </button>
             </div>
           ) : (

@@ -29,8 +29,8 @@ function SolanaDepositPage({ networkId }: ChainDepositRouteProps) {
         },
       ]}
       titleIcon={<PlusCircle className="w-full h-full" />}
-      title="Add Funds"
-      description="Move BTC, SOL, or supported tokens into your private balance"
+      title="Add funds"
+      description="Deposit native BTC or shield supported Solana assets into your private vault."
     >
       <ShieldFlow />
     </FlowPageLayout>

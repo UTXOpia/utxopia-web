@@ -97,7 +97,7 @@ export function SiteHeader() {
                 className="inline-flex items-center gap-1.5 text-xs font-semibold px-4 py-2.5 rounded-full transition-all bg-foreground text-background hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
               >
                 <Wallet className="w-3 h-3" />
-                Wallet
+                Private vault
               </Link>
             </motion.div>
           </div>
@@ -135,7 +135,7 @@ export function SiteHeader() {
             >
               <div className="space-y-1">
                 {[
-                  { href: "/vault", label: "Wallet" },
+                  { href: "/vault", label: "Private vault" },
                   ...(isHybrid ? [{ href: "/faucet", label: "Faucet" }] : []),
                   { href: "/explorer", label: "Explorer" },
                   { href: "/docs", label: "Docs" },

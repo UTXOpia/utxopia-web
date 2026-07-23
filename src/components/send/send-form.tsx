@@ -116,14 +116,14 @@ function CashOutDestinationPicker({
     {
       value: "bitcoin" as const,
       label: "Bitcoin",
-      description: "Receive BTC",
+      description: "Withdraw BTC",
       icon: Bitcoin,
       selectedClass: "border-btc/50 bg-btc/10 text-btc",
     },
     {
       value: "solana" as const,
       label: "Solana",
-      description: "Receive in a wallet",
+      description: "Cash out to a wallet",
       icon: Wallet,
       selectedClass: "border-purple/50 bg-purple/10 text-purple",
     },
@@ -197,7 +197,7 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
   const config = {
     btc: {
       icon: Bitcoin,
-      title: "Cash out to Bitcoin",
+      title: "Withdraw BTC",
       description: "The Bitcoin destination address will be visible on-chain.",
       tone: "text-btc border-btc/20 bg-btc/8",
     },
@@ -216,7 +216,7 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
     spl_wallet: {
       icon: Wallet,
       title: `Cash out to ${chainLabel} wallet`,
-      description: "Funds leave the private wallet and arrive at a public wallet address.",
+      description: "Funds leave the private vault and arrive at a public wallet address.",
       tone: "text-purple border-purple/20 bg-purple/8",
     },
   } satisfies Record<RecipientType, {
@@ -537,7 +537,7 @@ export function SendForm({
         );
       }
       if (requiresBackup) {
-        throw new Error("Back up your private wallet before sending funds.");
+        throw new Error("Back up your private vault before sending funds.");
       }
       if (recipientType === "spl_wallet") {
         const quotedBps = poolFees.fees?.withdrawalFeeBps;
@@ -608,14 +608,14 @@ export function SendForm({
 
       if (noteSelector.selectedNotes.length === 0) {
         throw new Error(
-          "No shielded notes available to cover this amount.",
+          "No available private notes can cover this amount.",
         );
       }
 
       // Withdrawing to the Bitcoin chain (redeem) only makes sense for the
       // BTC-pegged zkBTC. Private send and wallet cash-out work for any token.
       if (effectiveToken !== "zkBTC" && mode === "btc") {
-        throw new Error("Withdrawing to Bitcoin is only available for zkBTC.");
+        throw new Error("Only zkBTC can be withdrawn to a Bitcoin address.");
       }
 
       // For BTC redeem, the proof binds the on-chain signer (the relayer) as requester. Fetch
@@ -766,7 +766,7 @@ export function SendForm({
         );
       }
       if (requiresBackup) {
-        throw new Error("Back up your private wallet before creating a claim link.");
+        throw new Error("Back up your private vault before creating a claim link.");
       }
       const linkToken = PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken) ?? selectedPayToken;
       const sats = parseDecimalToBaseUnits(input.amount, linkToken.decimals);
@@ -791,7 +791,7 @@ export function SendForm({
       const linkSelected = linkAvail.filter((n) => ids.has(n.id));
       if (linkSelected.length === 0) {
         throw new Error(
-          "No shielded notes available to cover this amount.",
+          "No available private notes can cover this amount.",
         );
       }
 

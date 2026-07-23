@@ -168,7 +168,7 @@ export default function CompliancePage() {
             Back to vault
           </Link>
           <span className="text-caption text-gray font-mono">
-            {liveCount}/4 signals live
+            {liveCount}/4 items configured
           </span>
         </div>
 
@@ -176,17 +176,16 @@ export default function CompliancePage() {
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray/15 bg-muted/20 mb-4">
             <ShieldCheck className="w-3.5 h-3.5 text-gray-light" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-gray">
-              Compliance posture
+              Disclosure settings
             </span>
           </div>
           <h1 className="text-2xl sm:text-3xl font-semibold tracking-tight text-foreground mb-2">
-            Your auditor surface area
+            Your disclosure setup
           </h1>
           <p className="text-sm text-gray font-light max-w-2xl leading-relaxed">
-            Every signal you publish or share gives auditors more visibility
-            into your shielded activity, and you control each independently.
-            Nothing here is set by default; you opt into each layer when you
-            want it.
+            Review the public signals and read-only access records associated
+            with your account. Each item is optional and does not grant
+            permission to spend from your private vault.
           </p>
         </div>
 
@@ -194,8 +193,8 @@ export default function CompliancePage() {
           {/* 1. SNS registration */}
           <CheckRow
             icon={<KeyRound className="w-4 h-4 text-gray-light" />}
-            title="SNS subdomain registered"
-            desc="Senders can resolve a memorable name (e.g. alice.utxopia.sol) to your stealth address. Without this, only people who copy-paste your `utxo:` string can pay you."
+            title="Private receive name"
+            desc="A name such as alice.utxopia.sol resolves to your private receive address. Without one, senders must use the full utxo: address."
             status={sns.hasRegisteredSnsName ? "ok" : "off"}
             statusLabel={sns.hasRegisteredSnsName ? "Registered" : "Not set"}
             detail={sns.registeredSnsName ? `${sns.registeredSnsName}.utxopia.sol` : undefined}
@@ -206,8 +205,8 @@ export default function CompliancePage() {
           {/* 2. Auditor-disclosable bit */}
           <CheckRow
             icon={<Eye className="w-4 h-4 text-gray-light" />}
-            title="Auditor-disclosable bit"
-            desc="Public signal on your SNS record that you're OK receiving outgoing audit memos. Senders see an 'auditor-disclosable' chip when they enter your name."
+            title="Disclosure signal"
+            desc="A public setting on your receive-name record that tells senders you accept audit-compatible outgoing records."
             status={isAuditorDisclosable ? "ok" : "off"}
             statusLabel={isAuditorDisclosable ? "On" : "Off"}
             ctaLabel="Toggle"
@@ -217,14 +216,14 @@ export default function CompliancePage() {
           {/* 3. Auditor pubkey hint */}
           <CheckRow
             icon={<Send className="w-4 h-4 text-gray-light" />}
-            title="Designated auditor pubkey"
-            desc="Optional 32-byte Solana pubkey on your SNS record, telling senders who you've granted read-only access to. It is a hint; the actual viewing key share is still out-of-band."
+            title="Designated auditor address"
+            desc="An optional Solana public key on your receive-name record. It identifies the intended auditor but does not itself grant viewing access."
             status={auditorBase58 ? "ok" : isAuditorDisclosable ? "warn" : "off"}
             statusLabel={
               auditorBase58
                 ? "Published"
                 : isAuditorDisclosable
-                  ? "Bit set, pubkey missing"
+                  ? "Signal on, address missing"
                   : "Not set"
             }
             detail={auditorBase58 ?? undefined}
@@ -235,8 +234,8 @@ export default function CompliancePage() {
           {/* 4. Delegated view keys issued */}
           <CheckRow
             icon={<ShieldCheck className="w-4 h-4 text-gray-light" />}
-            title="Delegated view keys issued"
-            desc="Encrypted, slot-scoped viewing keys you've handed to specific auditors. Each one lets the recipient scan your IN (+ OUT, once sender memos populate) records over the chosen slot range, but never spend."
+            title="Read-only audit access issued"
+            desc="Encrypted, time-scoped viewing data shared with specific auditors. A recipient can scan the permitted activity range but cannot spend funds."
             status={delegations.length > 0 ? "ok" : "off"}
             statusLabel={
               delegations.length === 0
@@ -264,12 +263,12 @@ export default function CompliancePage() {
             <h3 className="text-sm font-medium mb-2">Next step</h3>
             <p className="text-xs text-gray leading-relaxed">
               {!sns.hasRegisteredSnsName
-                ? "Register an SNS subdomain first. Every other signal hangs off it. Head to Settings."
+                ? "Register a private receive name in Settings."
                 : !isAuditorDisclosable
-                  ? "Flip the auditor-disclosable bit if you want senders to know you're OK receiving audit memos. Head to Settings."
+                  ? "Turn on the disclosure signal in Settings if you want senders to create audit-compatible records."
                   : !auditorBase58
-                    ? "You've published the bit but not the auditor pubkey. Either set one in Settings, or leave it blank (and senders treat it as a generic disclosability signal)."
-                    : "Issue at least one DelegatedViewKey so an auditor can actually scan your activity. Head to /audit/issued."}
+                    ? "The disclosure signal is on, but no auditor address is published. Add one in Settings or leave it blank as a general disclosure signal."
+                    : "Issue read-only audit access if an auditor needs to scan a permitted range of your activity."}
             </p>
           </div>
         )}

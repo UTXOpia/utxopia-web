@@ -122,12 +122,12 @@ function ActivityRow({
   const receivedLabel = origin?.kind === "btc_deposit"
     ? "BTC deposit"
     : origin?.kind === "shield"
-      ? "Shielded"
+      ? "Added privately"
       : "Received";
   const receivedType = origin?.kind === "btc_deposit"
     ? "BTC deposited into private balance"
     : origin?.kind === "shield"
-      ? "Asset shielded into private balance"
+      ? "Asset shielded into private vault"
       : "Private transfer received";
   const originTxUrl = origin?.txSignature
     ? getChainTransactionUrl(config, origin.txSignature, network)
@@ -427,8 +427,8 @@ const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: st
   private_send: { label: "Private transfer" },
   claim_link: { label: "Claim link funded" },
   claim_receive: { label: "Claim link received", incoming: true },
-  cashout_btc: { label: "BTC withdrawal" },
-  cashout_wallet: { label: "Solana withdrawal" },
+  cashout_btc: { label: "Withdraw BTC" },
+  cashout_wallet: { label: "Cash out to Solana" },
 };
 
 function SubmittedTransactionRow({
@@ -454,7 +454,7 @@ function SubmittedTransactionRow({
     label: activity.kind === "private_send"
       ? (isSelfTransfer ? "Private transfer" : "Sent")
       : activity.kind === "cashout_wallet" && activity.tokenSymbol === "zkSOL"
-        ? "SOL withdrawal"
+        ? "Cash out SOL"
         : baseMeta.label,
   };
   const displaySymbol = getSubmittedActivityDisplaySymbol(activity.kind, token.shieldedSymbol);

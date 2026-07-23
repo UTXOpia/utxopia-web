@@ -73,7 +73,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
               id="auth-modal-description"
               className="text-body2 text-gray"
             >
-              Choose how to access your wallet
+              Choose how to access your private vault
             </Dialog.Description>
           </div>
 
@@ -155,10 +155,10 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                     ? "Unlocking..."
                     : walletConnected
                       ? "Sign to Unlock"
-                      : "Connect Wallet"}
+                      : "Connect Solana Wallet"}
                 </p>
                 <p className="text-caption text-gray mt-0.5">
-                  Phantom, Solflare, Backpack
+                  Connect and sign to derive your vault keys
                 </p>
               </div>
             </button>
