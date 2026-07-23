@@ -31,7 +31,6 @@ import {
   ScrollText,
 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
-import { SiteFooter } from "@/components/site-footer";
 import { DocsSection } from "@/components/docs/docs-section";
 import { FlowDiagram } from "@/components/docs/flow-diagram";
 import {
@@ -682,8 +681,6 @@ export default function DocsPage() {
           </div>
         </div>
       </div>
-
-      <SiteFooter />
     </main>
   );
 }
