@@ -35,14 +35,14 @@ async function fetchPoolStats(network: NetworkId): Promise<PoolStats> {
   });
 
   if (!resp.ok) {
-    return { totalShielded: 0n, depositCount: 0, totalCommitments: 0, volume: 0n, tokenTVL: [] };
+    throw new Error(`Pool stats request failed (${resp.status})`);
   }
 
   const data = await resp.json();
   const oc = data.onChain;
 
   if (!oc) {
-    return { totalShielded: 0n, depositCount: 0, totalCommitments: 0, volume: 0n, tokenTVL: [] };
+    throw new Error("Pool stats returned an invalid response");
   }
 
   const totalShielded = BigInt(oc.totalShielded ?? 0);

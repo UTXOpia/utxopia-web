@@ -3,7 +3,7 @@
 import React, { memo } from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Shield, Zap, Lock, ArrowRight, EyeOff, ShieldCheck, Loader2, ChevronRight, Layers, Rocket } from "lucide-react";
+import { Shield, Zap, Lock, ArrowRight, EyeOff, ShieldCheck, ChevronRight, Layers, Rocket } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { tvlToUsd } from "@/lib/supported-tokens";
@@ -202,6 +202,53 @@ const FEATURE_CARDS = [
   { icon: ShieldCheck, title: "Viewing Keys", description: "Share read-only activity with an auditor when needed.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
 ];
 
+function HomeMetric({
+  label,
+  value,
+  loading,
+  unavailable,
+  color,
+}: {
+  label: string;
+  value: number | string;
+  loading: boolean;
+  unavailable?: boolean;
+  color: string;
+}) {
+  return (
+    <div className="text-center min-w-0 px-1 first:border-l-0 border-l border-gray/15">
+      <div className="h-7 flex items-center justify-center">
+        {loading ? (
+          <span
+            className="block h-5 w-12 rounded-[6px] bg-gray/10 animate-pulse"
+            aria-label={`Loading ${label.toLowerCase()}`}
+            role="status"
+          />
+        ) : unavailable ? (
+          <span
+            className="text-xl sm:text-2xl font-semibold text-gray/35"
+            aria-label={`${label} unavailable`}
+            title="Temporarily unavailable"
+          >
+            —
+          </span>
+        ) : typeof value === "number" ? (
+          <AnimatedCounter
+            value={value}
+            decimals={0}
+            className={`text-xl sm:text-2xl font-semibold tracking-normal ${color}`}
+          />
+        ) : (
+          <span className={`text-xl sm:text-2xl font-semibold tracking-normal whitespace-nowrap ${color}`}>
+            {value}
+          </span>
+        )}
+      </div>
+      <div className="text-xs text-gray">{label}</div>
+    </div>
+  );
+}
+
 function FeatureCarousel() {
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -215,9 +262,13 @@ function FeatureCarousel() {
 /* ── Main Page ── */
 
 export default function Home() {
-  const { stats, isLoading } = usePoolStats();
+  const { stats, isLoading: isLoadingStats, error: statsError } = usePoolStats();
   const prices = useTokenPrices();
-  const { transactions } = useExplorer();
+  const {
+    transactions,
+    isLoading: isLoadingTransactions,
+    error: transactionsError,
+  } = useExplorer();
   const { networkId, config } = useChainEnvironment();
   const chain = getChainAdapter(config);
   const chainName = chain.displayName;
@@ -229,6 +280,13 @@ export default function Home() {
   };
   const chainHref = (href: string) => hrefWithChain(href, networkId);
   const txCount = transactions.length;
+  const tvlDisplay = (() => {
+    if (!stats?.tokenTVL?.length) return "No TVL";
+    const usd = tvlToUsd(stats.tokenTVL, prices);
+    return usd > 0
+      ? `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+      : "No TVL";
+  })();
 
   return (
     <main className="min-h-screen bg-background overflow-x-hidden">
@@ -245,7 +303,7 @@ export default function Home() {
                   Public Alpha
                 </span>
                 <span className="text-[11px] text-gray/70">
-                  testnet only · test funds, not real BTC
+                  testnet only
                 </span>
               </div>
             </ScrollReveal>
@@ -307,52 +365,32 @@ export default function Home() {
 
             <ScrollReveal delay={0.3}>
               <div className="pt-8 border-t border-gray/10 mt-8">
-                {isLoading ? (
-                  <div className="flex items-center justify-center py-2">
-                    <Loader2 className="w-5 h-5 animate-spin text-gray/40" />
-                  </div>
-                ) : (
-                  <div className="grid grid-cols-3 items-stretch w-full max-w-md mx-auto">
-                    {[
-                      { label: "Transactions", value: txCount ?? 0, decimals: 0, color: "text-privacy" },
-                      { label: "Commitments", value: stats?.totalCommitments ?? 0, decimals: 0, color: "text-foreground" },
-                    ].map(({ label, value, decimals, color }, i) => (
-                      <React.Fragment key={label}>
-                        <div className={cn("text-center min-w-0 px-1", i > 0 && "border-l border-gray/15")}>
-                          <div className="flex items-center justify-center gap-1.5">
-                            <AnimatedCounter value={value} decimals={decimals} className={`text-xl sm:text-2xl font-semibold tracking-normal ${color}`} />
-                          </div>
-                          <div className="text-xs text-gray">{label}</div>
-                        </div>
-                      </React.Fragment>
-                    ))}
-                    {/* TVL: total value locked across all tokens */}
-                    {(stats?.tokenTVL?.length ?? 0) > 0 && (
-                      <>
-                        <div className="text-center min-w-0 px-1 border-l border-gray/15">
-                          <div className="flex items-center justify-center gap-1.5">
-                            {(() => {
-                              const usd = tvlToUsd(stats!.tokenTVL, prices);
-                              if (usd > 0) {
-                                return (
-                                  <span className="text-xl sm:text-2xl font-semibold tracking-normal text-foreground whitespace-nowrap">
-                                    ${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                                  </span>
-                                );
-                              }
-                              return (
-                                <span className="text-xl sm:text-2xl font-semibold tracking-normal text-foreground/60">
-                                  No TVL
-                                </span>
-                              );
-                            })()}
-                          </div>
-                          <div className="text-xs text-gray">Total Value Locked</div>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
+                <div
+                  className="grid grid-cols-3 items-stretch w-full max-w-md mx-auto"
+                  aria-label="Network statistics"
+                >
+                  <HomeMetric
+                    label="Transactions"
+                    value={txCount}
+                    loading={isLoadingTransactions}
+                    unavailable={Boolean(transactionsError)}
+                    color="text-privacy"
+                  />
+                  <HomeMetric
+                    label="Commitments"
+                    value={stats?.totalCommitments ?? 0}
+                    loading={isLoadingStats}
+                    unavailable={Boolean(statsError) || !stats}
+                    color="text-foreground"
+                  />
+                  <HomeMetric
+                    label="Total Value Locked"
+                    value={tvlDisplay}
+                    loading={isLoadingStats}
+                    unavailable={Boolean(statsError) || !stats}
+                    color={tvlDisplay === "No TVL" ? "text-foreground/60" : "text-foreground"}
+                  />
+                </div>
               </div>
             </ScrollReveal>
           </div>

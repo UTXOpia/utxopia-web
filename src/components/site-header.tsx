@@ -6,7 +6,6 @@ import Image from "next/image";
 import { Droplets, Menu, Wallet, X, Settings as SettingsIcon } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { AdvancedModeBadge } from "@/components/ui/advanced-mode-badge";
-import { NetworkBadge } from "@/components/ui/network-badge";
 import { isHybridNetwork } from "@/lib/chain-registry";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
@@ -70,7 +69,6 @@ export function SiteHeader() {
 
           {/* Desktop CTA */}
           <div className="hidden md:flex items-center gap-2 shrink-0">
-            <NetworkBadge />
             <AdvancedModeBadge />
             {isHybrid && (
               <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}>

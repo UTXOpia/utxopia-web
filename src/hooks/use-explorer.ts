@@ -224,9 +224,14 @@ export function useExplorer(networkId?: NetworkId) {
     ["explorer-unified", network],
     async () => {
       const resp = await fetch(`/api/explorer/transactions?network=${encodeURIComponent(network)}`);
-      if (!resp.ok) return [];
+      if (!resp.ok) {
+        throw new Error(`Explorer request failed (${resp.status})`);
+      }
       const json = await resp.json();
-      return (json.transactions ?? []) as ExplorerTransaction[];
+      if (!Array.isArray(json.transactions)) {
+        throw new Error("Explorer returned an invalid response");
+      }
+      return json.transactions as ExplorerTransaction[];
     },
     {
       ...SWR_OPTIONS,
