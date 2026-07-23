@@ -2,74 +2,26 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { ChevronDown, Menu, X } from "lucide-react";
+import { Menu, X } from "lucide-react";
 
 export interface NavItem {
   id: string;
   label: string;
-  children?: { id: string; label: string }[];
 }
 
 export const NAV_ITEMS: NavItem[] = [
-  {
-    id: "using-utxopia",
-    label: "Using UTXOpia",
-    children: [
-      { id: "feature-reference", label: "Feature Reference" },
-      { id: "terminology", label: "Terminology" },
-    ],
-  },
+  { id: "using-utxopia", label: "Quick Guide" },
+  { id: "feature-reference", label: "All Features" },
+  { id: "terminology", label: "Key Terms" },
   { id: "overview", label: "Privacy Model" },
-  {
-    id: "protocol-flow",
-    label: "How It Works",
-    children: [
-      { id: "shield-tokens", label: "Add Funds" },
-      { id: "spv-verification", label: "BTC SPV Verification" },
-      { id: "shielded-commitment", label: "Commitment Creation" },
-      { id: "joinsplit-transfer", label: "Private Transfer" },
-      { id: "stealth-receive", label: "Stealth Receive" },
-      { id: "unshield-withdraw", label: "Cash Out / Withdraw BTC" },
-    ],
-  },
-  {
-    id: "cryptography",
-    label: "Cryptography",
-    children: [
-      { id: "commitment-scheme", label: "Commitment Scheme" },
-      { id: "nullifier-generation", label: "Nullifier Generation" },
-      { id: "master-public-key", label: "Master Public Key" },
-      { id: "joinsplit-circuit", label: "JoinSplit Circuit" },
-      { id: "eddsa-signatures", label: "EdDSA Signatures" },
-      { id: "stealth-key-agreement", label: "Stealth Key Agreement" },
-      { id: "sender-memo", label: "Sender Memo Channel" },
-    ],
-  },
-  { id: "key-model", label: "Key Model" },
-  {
-    id: "disclosure",
-    label: "Auditable Disclosure",
-    children: [
-      { id: "auditor-toolkit", label: "Auditor Toolkit" },
-      { id: "sender-memo-channel", label: "Sender Memos" },
-      { id: "selective-disclosure-proofs", label: "Selective Disclosure" },
-      { id: "compliance-toggle", label: "Compliance Toggle" },
-    ],
-  },
-  { id: "security", label: "Security & Compliance" },
+  { id: "protocol-flow", label: "How It Works" },
+  { id: "cryptography", label: "Cryptography & Keys" },
+  { id: "disclosure", label: "Audit & Disclosure" },
+  { id: "security", label: "Security" },
 ];
 
 function getAllSectionIds(): string[] {
-  const ids: string[] = [];
-  for (const item of NAV_ITEMS) {
-    ids.push(item.id);
-    if (item.children) {
-      for (const child of item.children) {
-        ids.push(child.id);
-      }
-    }
-  }
-  return ids;
+  return NAV_ITEMS.map((item) => item.id);
 }
 
 export function useAllSectionIds() {
@@ -81,86 +33,19 @@ export function useAllSectionIds() {
 interface NavListProps {
   activeSection: string;
   onNavigate: (id: string) => void;
-  /** Whether to animate collapsible groups (desktop uses framer-motion, mobile uses plain toggle) */
-  animated?: boolean;
 }
 
-function NavList({ activeSection, onNavigate, animated = true }: NavListProps) {
-  const [collapsed, setCollapsed] = useState<Record<string, boolean>>({});
-
-  const isActive = (id: string) => activeSection === id;
-  const isParentActive = (item: NavItem) =>
-    item.children?.some((c) => activeSection === c.id) ?? false;
-
+function NavList({ activeSection, onNavigate }: NavListProps) {
   return (
     <nav className="space-y-1">
       {NAV_ITEMS.map((item) => (
-        <div key={item.id}>
-          {item.children ? (
-            <>
-              <button
-                onClick={() =>
-                  setCollapsed((prev) => ({ ...prev, [item.id]: !prev[item.id] }))
-                }
-                className={`w-full flex items-center justify-between px-3 py-2 rounded-md text-[11px] font-mono uppercase tracking-[0.2em] transition-colors ${
-                  isParentActive(item) || isActive(item.id)
-                    ? "text-foreground"
-                    : "text-gray/40 hover:text-gray-light"
-                }`}
-              >
-                {item.label}
-                <ChevronDown
-                  className={`w-3 h-3 transition-transform ${
-                    collapsed[item.id] ? "-rotate-90" : ""
-                  }`}
-                />
-              </button>
-              {animated ? (
-                <AnimatePresence initial={false}>
-                  {!collapsed[item.id] && (
-                    <motion.div
-                      initial={{ height: 0, opacity: 0 }}
-                      animate={{ height: "auto", opacity: 1 }}
-                      exit={{ height: 0, opacity: 0 }}
-                      transition={{ duration: 0.2 }}
-                      className="overflow-hidden"
-                    >
-                      {item.children.map((child) => (
-                        <NavButton
-                          key={child.id}
-                          id={child.id}
-                          label={child.label}
-                          isActive={isActive(child.id)}
-                          isChild
-                          onNavigate={onNavigate}
-                        />
-                      ))}
-                    </motion.div>
-                  )}
-                </AnimatePresence>
-              ) : (
-                !collapsed[item.id] &&
-                item.children.map((child) => (
-                  <NavButton
-                    key={child.id}
-                    id={child.id}
-                    label={child.label}
-                    isActive={isActive(child.id)}
-                    isChild
-                    onNavigate={onNavigate}
-                  />
-                ))
-              )}
-            </>
-          ) : (
-            <NavButton
-              id={item.id}
-              label={item.label}
-              isActive={isActive(item.id)}
-              onNavigate={onNavigate}
-            />
-          )}
-        </div>
+        <NavButton
+          key={item.id}
+          id={item.id}
+          label={item.label}
+          isActive={activeSection === item.id}
+          onNavigate={onNavigate}
+        />
       ))}
     </nav>
   );
@@ -170,21 +55,17 @@ function NavButton({
   id,
   label,
   isActive,
-  isChild,
   onNavigate,
 }: {
   id: string;
   label: string;
   isActive: boolean;
-  isChild?: boolean;
   onNavigate: (id: string) => void;
 }) {
   return (
     <button
       onClick={() => onNavigate(id)}
-      className={`w-full text-left ${
-        isChild ? "pl-8 pr-3 py-1.5" : "px-3 py-2"
-      } text-[13px] font-medium rounded-md transition-colors border-l-2 ${
+      className={`w-full px-3 py-2 text-left text-[13px] font-medium rounded-md transition-colors border-l-2 ${
         isActive
           ? "border-privacy text-foreground bg-privacy/5"
           : "border-transparent text-gray hover:text-foreground hover:bg-muted/30"
@@ -201,16 +82,26 @@ interface DocsSidebarProps {
   activeSection: string;
 }
 
+function revealSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+
+  const disclosure =
+    el instanceof HTMLDetailsElement ? el : el.closest("details");
+  if (disclosure) disclosure.open = true;
+
+  window.requestAnimationFrame(() => {
+    el.scrollIntoView({ behavior: "smooth" });
+    window.history.replaceState(null, "", `#${id}`);
+  });
+}
+
 export function DocsSidebar({ activeSection }: DocsSidebarProps) {
   const handleClick = useCallback((id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-      window.history.replaceState(null, "", `#${id}`);
-    }
+    revealSection(id);
   }, []);
 
-  return <NavList activeSection={activeSection} onNavigate={handleClick} animated />;
+  return <NavList activeSection={activeSection} onNavigate={handleClick} />;
 }
 
 /* ── Mobile sidebar bar + drawer ── */
@@ -222,23 +113,8 @@ interface MobileSidebarProps {
 export function MobileSidebarBar({ activeSection }: MobileSidebarProps) {
   const [open, setOpen] = useState(false);
 
-  const activeLabel = (() => {
-    for (const item of NAV_ITEMS) {
-      if (item.id === activeSection) return item.label;
-      if (item.children) {
-        const child = item.children.find((c) => c.id === activeSection);
-        if (child) return child.label;
-      }
-    }
-    return "Overview";
-  })();
-
   const handleClick = (id: string) => {
-    const el = document.getElementById(id);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth" });
-      window.history.replaceState(null, "", `#${id}`);
-    }
+    revealSection(id);
     setOpen(false);
   };
 
@@ -277,7 +153,7 @@ export function MobileSidebarBar({ activeSection }: MobileSidebarProps) {
             >
               <div className="flex items-center justify-between px-4 py-4 border-b border-gray/10">
                 <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-gray/40">
-                  Documentation
+                  Product Guide
                 </span>
                 <button
                   onClick={() => setOpen(false)}
@@ -290,7 +166,6 @@ export function MobileSidebarBar({ activeSection }: MobileSidebarProps) {
                 <NavList
                   activeSection={activeSection}
                   onNavigate={handleClick}
-                  animated={false}
                 />
               </div>
             </motion.div>

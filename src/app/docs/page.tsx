@@ -1,22 +1,16 @@
 "use client";
 
 /**
- * DocsPage — technical documentation for the UTXOpia protocol.
+ * DocsPage — concise product guide with progressive technical disclosure.
  *
  * Sections:
- * - Overview: comparison table (traditional bridges vs UTXOpia)
- * - Protocol Flow: 6-step journey with FlowDiagram visualization
- * - Cryptography: commitments, nullifiers, MPK, JoinSplit, EdDSA, DKSAP,
- *   sender memo
- * - Key Model: dual-key — spending (Baby Jubjub) + viewing (Ed25519);
- *   nullifier secret is derived from the spending key
- * - Auditable Disclosure: Phase 1–4 compliance layers with deployment status
- *   (auditor toolkit, sender memos, selective disclosure)
- * - Security & Compliance: policy gate, custody, SPV, double-spend, audit trail
+ * - Start here: four primary user workflows
+ * - Expandable reference: features, terms, privacy model, protocol flow
+ * - Advanced reference: cryptography, keys, audit, disclosure, and security
  */
 
 import Link from "next/link";
-import { useMemo } from "react";
+import { useEffect, useMemo } from "react";
 import { type LucideIcon } from "lucide-react";
 import {
   Shield,
@@ -29,6 +23,7 @@ import {
   Eye,
   Network,
   GitBranch,
+  ChevronDown,
   ChevronRight,
   AlertTriangle,
   Send,
@@ -60,26 +55,39 @@ function Card({ children, className = "" }: { children: React.ReactNode; classNa
   );
 }
 
-/* ── Section heading ── */
-
-function SectionHeading({ label, title, subtitle }: { label: string; title: React.ReactNode; subtitle?: React.ReactNode }) {
+function ExpandableSection({
+  id,
+  title,
+  summary,
+  children,
+}: {
+  id: string;
+  title: string;
+  summary: string;
+  children: React.ReactNode;
+}) {
   return (
-    <div className="mb-8">
-      <div className="flex items-center gap-3 mb-4">
-        <div className="h-px w-8 bg-gray/20" />
-        <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-gray/50">
-          {label}
+    <details
+      id={id}
+      className="group border-t border-gray/10 scroll-mt-24"
+    >
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-5 py-6 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-privacy/40 [&::-webkit-details-marker]:hidden">
+        <span className="min-w-0">
+          <span className="block text-base font-semibold text-foreground sm:text-lg">
+            {title}
+          </span>
+          <span className="mt-1 block max-w-2xl text-xs leading-relaxed text-gray sm:text-sm">
+            {summary}
+          </span>
         </span>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-gray/15 text-gray transition-colors group-hover:border-gray/30 group-hover:text-foreground">
+          <ChevronDown className="h-4 w-4 transition-transform duration-200 group-open:rotate-180" />
+        </span>
+      </summary>
+      <div className="pb-10 pt-2">
+        {children}
       </div>
-      <h2 className="text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-3">
-        {title}
-      </h2>
-      {subtitle && (
-        <p className="text-gray text-sm max-w-2xl font-light leading-relaxed">
-          {subtitle}
-        </p>
-      )}
-    </div>
+    </details>
   );
 }
 
@@ -428,6 +436,15 @@ export default function DocsPage() {
 
   const tokenList = "BTC, SOL, USDC, and USDT";
 
+  useEffect(() => {
+    const id = window.location.hash.slice(1);
+    if (!id) return;
+    const target = document.getElementById(id);
+    const disclosure =
+      target instanceof HTMLDetailsElement ? target : target?.closest("details");
+    if (disclosure) disclosure.open = true;
+  }, []);
+
   return (
     <main className="min-h-screen bg-background">
       <SiteHeader />
@@ -455,128 +472,116 @@ export default function DocsPage() {
         <div className="flex-1 min-w-0">
           <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
 
-            {/* ── Hero ── */}
-            {/* Top padding clears the fixed `top-4` nav pill (~64px tall). */}
-            <section className="pt-24 sm:pt-28 lg:pt-32 pb-8 sm:pb-10">
-              <div className="space-y-3 sm:space-y-4">
-                <div className="flex">
-                  <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full border border-gray/15 bg-muted/20">
-                    <Shield className="w-3.5 h-3.5 text-gray-light" />
-                    <span className="text-[9px] sm:text-[10px] font-medium uppercase tracking-wider text-gray">
-                      UTXOpia Guide · {chainName}
-                    </span>
-                  </div>
-                </div>
-                <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold tracking-tight text-foreground">
-                  Use UTXOpia with Confidence
-                </h1>
-                <p className="text-sm sm:text-base text-gray font-light max-w-2xl leading-relaxed">
-                  Start with the product workflows and shared terminology. Continue into
-                  the protocol, cryptography, and security model when you need technical detail.
-                </p>
-              </div>
+            <section className="pb-8 pt-24 sm:pb-10 sm:pt-28 lg:pt-32">
+              <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
+                UTXOpia Guide
+              </h1>
+              <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray sm:text-base">
+                Choose a task below. Open the reference topics only when you need more detail.
+              </p>
             </section>
 
-            {/* ── User guide ── */}
-            <DocsSection id="using-utxopia" className="pb-12 sm:pb-16">
-              <SectionHeading
-                label="Product Guide"
-                title="What You Can Do"
-                subtitle="UTXOpia separates your connected wallet from your private vault. Choose a workflow based on where the funds are now and where you want them to go."
-              />
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <DocsSection id="using-utxopia" className="pb-12">
+              <h2 className="mb-2 text-lg font-semibold text-foreground">Start here</h2>
+              <p className="mb-5 max-w-2xl text-sm leading-relaxed text-gray">
+                Your private vault is separate from your connected Bitcoin or Solana wallet.
+              </p>
+              <div className="divide-y divide-gray/10 rounded-xl border border-gray/10">
                 {[
-                  ["Add funds", "Deposit native BTC as private zkBTC, or shield supported Solana assets from your connected wallet."],
-                  ["Send privately", "Send a private asset to a UTXOpia name, private receive address, or claim link."],
-                  ["Take funds out", "Cash out supported assets to a Solana wallet, or withdraw zkBTC to a native Bitcoin address."],
-                  ["Review activity", "Track deposits, transfers, cash-outs, withdrawals, relayer fees, and the chain records available for each action."],
-                  ["Receive and claim", "Share a private receive address, register a UTXOpia name, or claim a payment link."],
-                  ["Disclose selectively", "Grant read-only audit access or verify a disclosure proof without sharing permission to spend."],
-                ].map(([title, desc]) => (
-                  <Card key={title}>
-                    <h3 className="text-sm sm:text-base font-semibold text-foreground mb-2">{title}</h3>
-                    <p className="text-xs sm:text-sm text-gray font-light leading-relaxed">{desc}</p>
-                  </Card>
+                  ["/vault/deposit", "Add funds", "Deposit BTC or shield a supported Solana asset."],
+                  ["/send", "Send privately", "Pay a UTXOpia name, private receive address, or claim link."],
+                  ["/vault/withdraw", "Take funds out", "Cash out to Solana or withdraw zkBTC to Bitcoin."],
+                  ["/vault/activity", "Review activity", "See deposits, transfers, fees, cash-outs, and withdrawals."],
+                ].map(([route, title, description]) => (
+                  <Link
+                    key={route}
+                    href={hrefWithChain(route, network)}
+                    className="group flex items-center justify-between gap-4 px-4 py-4 transition-colors hover:bg-muted/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-privacy/40"
+                  >
+                    <span>
+                      <span className="block text-sm font-medium text-foreground group-hover:text-privacy">
+                        {title}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-gray">
+                        {description}
+                      </span>
+                    </span>
+                    <ChevronRight className="h-4 w-4 shrink-0 text-gray/50 transition-transform group-hover:translate-x-0.5 group-hover:text-foreground" />
+                  </Link>
                 ))}
               </div>
-
-              <DocsSection id="feature-reference" className="pt-12">
-                <h3 className="text-xl font-semibold tracking-tight text-foreground mb-3">Feature Reference</h3>
-                <p className="text-sm text-gray font-light leading-relaxed mb-6">
-                  Every user-facing area and the job it is designed to complete.
-                </p>
-                <div className="divide-y divide-gray/10 rounded-xl border border-gray/10 bg-muted/10">
-                  {PRODUCT_FEATURES.map((feature) => (
-                    <Link
-                      key={feature.route}
-                      href={hrefWithChain(feature.route, network)}
-                      className="group flex flex-col gap-1 p-4 transition-colors hover:bg-muted/30 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
-                    >
-                      <div className="min-w-0">
-                        <span className="text-sm font-medium text-foreground group-hover:text-privacy">
-                          {feature.name}
-                        </span>
-                        <p className="mt-1 text-xs leading-relaxed text-gray">{feature.purpose}</p>
-                      </div>
-                      <code className="shrink-0 text-[11px] text-gray/40">{feature.route}</code>
-                    </Link>
-                  ))}
-                </div>
-              </DocsSection>
-
-              <DocsSection id="terminology" className="pt-12">
-                <h3 className="text-xl font-semibold tracking-tight text-foreground mb-3">Terminology</h3>
-                <p className="text-sm text-gray font-light leading-relaxed mb-6">
-                  These names are used consistently throughout the app. Protocol-specific synonyms appear only where they add technical detail.
-                </p>
-                <dl className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                  {PRODUCT_TERMS.map((item) => (
-                    <Card key={item.term}>
-                      <dt className="text-sm font-semibold text-foreground">{item.term}</dt>
-                      <dd className="mt-2 text-xs sm:text-sm text-gray font-light leading-relaxed">{item.meaning}</dd>
-                    </Card>
-                  ))}
-                </dl>
-              </DocsSection>
             </DocsSection>
 
-            {/* ── Overview ── */}
-            <DocsSection id="overview" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="Privacy Model"
-                title="What the Private Vault Hides"
-                subtitle={`Public chains expose wallet balances and transaction patterns. UTXOpia represents supported assets such as ${tokenList} as private notes, while keeping the protocol state verifiable on-chain.`}
-              />
+            <ExpandableSection
+              id="feature-reference"
+              title="All features"
+              summary="A complete route-by-route map of the app."
+            >
+              <div className="divide-y divide-gray/10 rounded-xl border border-gray/10">
+                {PRODUCT_FEATURES.map((feature) => (
+                  <Link
+                    key={feature.route}
+                    href={hrefWithChain(feature.route, network)}
+                    className="group flex flex-col gap-1 p-4 transition-colors hover:bg-muted/20 sm:flex-row sm:items-start sm:justify-between sm:gap-6"
+                  >
+                    <span className="min-w-0">
+                      <span className="text-sm font-medium text-foreground group-hover:text-privacy">
+                        {feature.name}
+                      </span>
+                      <span className="mt-1 block text-xs leading-relaxed text-gray">
+                        {feature.purpose}
+                      </span>
+                    </span>
+                    <code className="shrink-0 text-[11px] text-gray/40">{feature.route}</code>
+                  </Link>
+                ))}
+              </div>
+            </ExpandableSection>
+
+            <ExpandableSection
+              id="terminology"
+              title="Key terms"
+              summary="Plain-language definitions for the names used in the app."
+            >
+              <dl className="divide-y divide-gray/10">
+                {PRODUCT_TERMS.map((item) => (
+                  <div key={item.term} className="py-4 sm:grid sm:grid-cols-[160px_1fr] sm:gap-6">
+                    <dt className="text-sm font-medium text-foreground">{item.term}</dt>
+                    <dd className="mt-1 text-sm leading-relaxed text-gray sm:mt-0">{item.meaning}</dd>
+                  </div>
+                ))}
+              </dl>
+            </ExpandableSection>
+
+            <ExpandableSection
+              id="overview"
+              title="Privacy model"
+              summary={`What UTXOpia hides and what remains public for ${tokenList}.`}
+            >
               <ComparisonTable rows={comparisonRows} />
-            </DocsSection>
+            </ExpandableSection>
 
-            {/* ── Protocol Flow ── */}
-            <DocsSection id="protocol-flow" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="How It Works"
-                title="From Deposit to Exit"
-                subtitle={`Follow how supported assets enter the private vault, move as private notes, and return to a public destination.`}
-              />
-
+            <ExpandableSection
+              id="protocol-flow"
+              title="How it works"
+              summary="The path from deposit to private note, transfer, and exit."
+            >
               <FlowDiagram />
-
-              <div className="mt-8 sm:mt-10 space-y-4">
+              <div className="mt-8 space-y-4">
                 {protocolSteps.map((step) => (
                   <DocsSection key={step.id} id={step.id}>
                     <StepCard {...step} />
                   </DocsSection>
                 ))}
               </div>
-            </DocsSection>
+            </ExpandableSection>
 
-            {/* ── Cryptography ── */}
-            <DocsSection id="cryptography" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="Cryptography"
-                title="Under the Hood"
-                subtitle="The cryptographic primitives that make shielded transactions possible."
-              />
-
+            <ExpandableSection
+              id="cryptography"
+              title="Cryptography and keys"
+              summary="Commitments, nullifiers, proofs, stealth addresses, spending keys, and viewing keys."
+            >
+              <h3 className="mb-4 text-base font-semibold text-foreground">Cryptography</h3>
               <div className="space-y-4">
                 {cryptoItems.map((item) => (
                   <DocsSection key={item.id} id={item.id}>
@@ -584,76 +589,67 @@ export default function DocsPage() {
                   </DocsSection>
                 ))}
               </div>
-            </DocsSection>
+              <DocsSection id="key-model" className="pt-10">
+                <h3 className="mb-2 text-base font-semibold text-foreground">Key model</h3>
+                <p className="mb-5 max-w-2xl text-sm leading-relaxed text-gray">
+                  The spending key authorizes transactions. The viewing key finds activity without granting permission to spend.
+                </p>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  <KeyCard
+                    icon={KeyRound}
+                    title="Spending Key"
+                    desc="Baby Jubjub elliptic curve keypair. Signs all JoinSplit transactions using EdDSA-Poseidon. The nullifier secret is derived from this key, so one 32-byte seed backs up the vault."
+                    features={[
+                      "Signs transactions (EdDSA-Poseidon)",
+                      "Derives the nullifier secret",
+                      "Generates the Master Public Key (MPK)",
+                    ]}
+                  />
+                  <KeyCard
+                    icon={Eye}
+                    title="Viewing Key"
+                    desc="Ed25519 keypair used to scan stealth announcements and recover incoming and outgoing history. Sharing it allows read-only access, never spending."
+                    features={[
+                      "Scans stealth announcements",
+                      "Derives the outgoing-viewing key",
+                      "Supports selective disclosure",
+                    ]}
+                  />
+                </div>
+              </DocsSection>
+            </ExpandableSection>
 
-            {/* ── Key Model ── */}
-            <DocsSection id="key-model" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="Key Architecture"
-                title="Dual-Key Model"
-                subtitle="Two keys give you full control: one to spend, one to observe. The nullifier secret used during proving is derived automatically from your spending key — you never see it, copy it, or back it up separately."
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <KeyCard
-                  icon={KeyRound}
-                  title="Spending Key"
-                  desc="Baby Jubjub elliptic curve keypair. Signs all JoinSplit transactions using EdDSA-Poseidon. The nullifier secret used inside the circuit is deterministically derived from this key, so a single 32-byte seed is enough to back up the entire wallet."
-                  features={[
-                    "Signs transactions (EdDSA-Poseidon)",
-                    "Derives the nullifier secret",
-                    "Generates the Master Public Key (MPK)",
-                  ]}
-                />
-                <KeyCard
-                  icon={Eye}
-                  title="Viewing Key"
-                  desc="Ed25519 keypair used exclusively for scanning stealth announcements. Detects incoming notes by matching the note public key (NPK). Derives the outgoing-viewing key (ovk) used for sender-memo decryption, so a single export key recovers both incoming and outgoing history. Share with auditors or compliance officers — they can read your transaction history but never spend your funds."
-                  features={[
-                    "Scans stealth announcements (incoming)",
-                    "Derives ovk for sender-memo (outgoing)",
-                    "Shareable for selective disclosure",
-                  ]}
-                />
-              </div>
-            </DocsSection>
-
-            {/* ── Auditable Disclosure ── */}
-            <DocsSection id="disclosure" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="Auditable Disclosure"
-                title="Privacy with Receipts"
-                subtitle={
-                  <>
-                    UTXOpia isn&apos;t an unaccountable mixer. Compliance tooling is built into the protocol &mdash; across four layers &mdash; so users can prove what they need to prove without surrendering custody. Each layer has its own deployment status; check your own posture at{" "}
-                    <Link href={hrefWithChain("/compliance", network)} className="text-privacy hover:underline">/compliance</Link>.
-                  </>
-                }
-              />
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <ExpandableSection
+              id="disclosure"
+              title="Audit and disclosure"
+              summary="Read-only audit access, sender memos, disclosure proofs, and account settings."
+            >
+              <p className="mb-5 max-w-2xl text-sm leading-relaxed text-gray">
+                Each capability is optional. Review your current setup in{" "}
+                <Link href={hrefWithChain("/compliance", network)} className="text-privacy hover:underline">
+                  Disclosure status
+                </Link>.
+              </p>
+              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                 {disclosureItems.map((item) => (
                   <DocsSection key={item.id} id={item.id}>
                     <DisclosureCard {...item} />
                   </DocsSection>
                 ))}
               </div>
-            </DocsSection>
+            </ExpandableSection>
 
-            {/* ── Security & Compliance ── */}
-            <DocsSection id="security" className="py-12 sm:py-16 border-t border-gray/10">
-              <SectionHeading
-                label="Security"
-                title="Security & Compliance"
-                subtitle="Privacy doesn't mean unaccountable. Multiple layers of security and compliance are built into the protocol."
-              />
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <ExpandableSection
+              id="security"
+              title="Security"
+              summary="Custody, Bitcoin verification, double-spend prevention, and the on-chain audit trail."
+            >
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                 {securityItems.map((item) => (
                   <SecurityCard key={item.title} {...item} />
                 ))}
               </div>
-            </DocsSection>
+            </ExpandableSection>
 
             {/* ── CTA ── */}
             <section className="border-t border-gray/10 py-16 sm:py-20">
