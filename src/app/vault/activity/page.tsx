@@ -634,8 +634,44 @@ type ActivityItem =
       isSelfTransfer: boolean;
     };
 
+const INDEXED_ACTIVITY_CACHE_PREFIX = "utxopia:indexed-activity:v1";
+const INDEXED_ACTIVITY_CACHE_TTL_MS = 5 * 60 * 1000;
+
+function readIndexedActivityCache(networkId: string): IndexedPrivateTransaction[] | null {
+  if (typeof window === "undefined") return null;
+  try {
+    const cached = JSON.parse(
+      sessionStorage.getItem(`${INDEXED_ACTIVITY_CACHE_PREFIX}:${networkId}`) || "null",
+    ) as { savedAt?: number; transactions?: IndexedPrivateTransaction[] } | null;
+    if (
+      !cached?.savedAt
+      || Date.now() - cached.savedAt > INDEXED_ACTIVITY_CACHE_TTL_MS
+      || !Array.isArray(cached.transactions)
+    ) {
+      return null;
+    }
+    return cached.transactions;
+  } catch {
+    return null;
+  }
+}
+
+function writeIndexedActivityCache(
+  networkId: string,
+  transactions: IndexedPrivateTransaction[],
+): void {
+  try {
+    sessionStorage.setItem(
+      `${INDEXED_ACTIVITY_CACHE_PREFIX}:${networkId}`,
+      JSON.stringify({ savedAt: Date.now(), transactions }),
+    );
+  } catch {
+    // Public explorer enrichment is an optimization; live fetch remains authoritative.
+  }
+}
+
 function ActivityFeed() {
-  const { notes, isLoading, refresh } = useStealthInbox();
+  const { notes, isLoading, error: inboxError, refresh } = useStealthInbox();
   const tokenPrices = useTokenPrices();
   const searchParams = useSearchParams();
   const { networkId, config } = useChainEnvironment();
@@ -645,7 +681,8 @@ function ActivityFeed() {
   const [indexedTransactions, setIndexedTransactions] = useState<IndexedPrivateTransaction[]>([]);
   const [hashQuery, setHashQuery] = useState("");
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
-  const [historyReadyKey, setHistoryReadyKey] = useState<string | null>(null);
+  const [isLoadingIndexed, setIsLoadingIndexed] = useState(true);
+  const [hasIndexedSnapshot, setHasIndexedSnapshot] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
   const historySyncKey = `${networkId}:${stealthAddress ?? "locked"}`;
@@ -694,7 +731,7 @@ function ActivityFeed() {
     };
   }, [networkId]);
 
-  const refreshIndexedTransactions = useCallback(async () => {
+  const fetchIndexedTransactions = useCallback(async (): Promise<IndexedPrivateTransaction[]> => {
     const response = await fetch(`/api/explorer/transactions?network=${encodeURIComponent(networkId)}`, {
       cache: "no-store",
     });
@@ -707,7 +744,7 @@ function ActivityFeed() {
       outputs?: Array<{ commitment?: string }>;
       btcMeta?: { depositTxid?: string | null };
     }> };
-    setIndexedTransactions((data.transactions ?? []).flatMap((transaction) =>
+    return (data.transactions ?? []).flatMap((transaction) =>
       transaction.txSignature && Number.isFinite(transaction.timestamp)
         ? [{
             txSignature: transaction.txSignature,
@@ -718,44 +755,72 @@ function ActivityFeed() {
             btcDepositTxid: transaction.btcMeta?.depositTxid ?? undefined,
           }]
         : []
-    ));
+    );
   }, [networkId]);
 
   useEffect(() => {
     let cancelled = false;
+    const cached = readIndexedActivityCache(networkId);
+    setIndexedTransactions(cached ?? []);
+    setHasIndexedSnapshot(cached !== null);
+    setIsLoadingIndexed(true);
+    setHistoryLoadError(null);
+
     const sync = async () => {
-      setHistoryLoadError(null);
       try {
-        await Promise.all([
-          refresh(undefined, searchParams.get("refresh") === "inbox"),
-          refreshIndexedTransactions(),
-        ]);
+        const transactions = await fetchIndexedTransactions();
+        if (cancelled) return;
+        setIndexedTransactions(transactions);
+        setHasIndexedSnapshot(true);
+        writeIndexedActivityCache(networkId, transactions);
       } catch (error) {
         if (!cancelled) {
           setHistoryLoadError(error instanceof Error ? error.message : "Could not load complete history");
         }
       } finally {
-        if (!cancelled) setHistoryReadyKey(historySyncKey);
+        if (!cancelled) setIsLoadingIndexed(false);
       }
     };
+
+    // Inbox scanning and public explorer enrichment are independent. Let each
+    // source become visible when it is trustworthy instead of blocking the
+    // whole feed on the slower request.
+    void refresh(undefined, searchParams.get("refresh") === "inbox");
     void sync();
     return () => { cancelled = true; };
-  }, [historyRetry, historySyncKey, refresh, refreshIndexedTransactions, searchParams]);
+  }, [fetchIndexedTransactions, historyRetry, historySyncKey, networkId, refresh, searchParams]);
 
   const refreshAllActivity = useCallback(async () => {
     if (isRefreshingAll) return;
     setIsRefreshingAll(true);
+    setIsLoadingIndexed(true);
+    setHistoryLoadError(null);
     try {
       const nextSubmitted = getSubmittedTransactions(networkId);
       setSubmittedActivities(nextSubmitted);
-      await Promise.all([
+      const [inboxResult, indexedResult] = await Promise.allSettled([
         refresh(undefined, true),
-        refreshIndexedTransactions(),
+        fetchIndexedTransactions(),
       ]);
+      if (indexedResult.status === "fulfilled") {
+        setIndexedTransactions(indexedResult.value);
+        setHasIndexedSnapshot(true);
+        writeIndexedActivityCache(networkId, indexedResult.value);
+      } else {
+        setHistoryLoadError(
+          indexedResult.reason instanceof Error
+            ? indexedResult.reason.message
+            : "Could not refresh complete history",
+        );
+      }
+      if (inboxResult.status === "rejected") {
+        console.warn("Could not refresh private inbox:", inboxResult.reason);
+      }
     } finally {
+      setIsLoadingIndexed(false);
       setIsRefreshingAll(false);
     }
-  }, [isRefreshingAll, networkId, refresh, refreshIndexedTransactions]);
+  }, [fetchIndexedTransactions, isRefreshingAll, networkId, refresh]);
 
   const items = useMemo<ActivityItem[]>(() => {
     const recoveredActivities = recoverSelfTransferActivities(
@@ -765,8 +830,14 @@ function ActivityFeed() {
       networkId,
     );
     const allSubmittedActivities = [...submittedActivities, ...recoveredActivities];
+    // Private sends need explorer enrichment to determine whether they were
+    // self-transfers and to merge their output notes. Other locally submitted
+    // rows already contain authoritative amount and destination data.
+    const displaySubmittedActivities = hasIndexedSnapshot
+      ? allSubmittedActivities
+      : allSubmittedActivities.filter((activity) => activity.kind !== "private_send");
     const submittedSignatures = new Set(
-      allSubmittedActivities.map((activity) => activity.signature),
+      displaySubmittedActivities.map((activity) => activity.signature),
     );
     const outputsBySignature: Record<string, string[]> = {};
     const inputsBySignature: Record<string, string[]> = {};
@@ -787,7 +858,7 @@ function ActivityFeed() {
     );
     const { visibleNotes, enrichmentBySignature } = reconcileSubmittedActivity(
       displayNotes,
-      allSubmittedActivities,
+      displaySubmittedActivities,
       outputsBySignature,
       inputsBySignature,
       preservedSourceCommitments,
@@ -807,7 +878,7 @@ function ActivityFeed() {
         createdAt: activity.createdAt,
         activity,
       })),
-      ...allSubmittedActivities.map((activity) => ({
+      ...displaySubmittedActivities.map((activity) => ({
         kind: "submitted" as const,
         id: activity.id,
         createdAt: activity.createdAt,
@@ -816,7 +887,7 @@ function ActivityFeed() {
         isSelfTransfer: enrichmentBySignature[activity.signature]?.isSelfTransfer ?? false,
       })),
     ].sort((a, b) => (b.createdAt || 0) - (a.createdAt || 0));
-  }, [displayNotes, indexedTransactions, networkId, pendingActivities, submittedActivities]);
+  }, [displayNotes, hasIndexedSnapshot, indexedTransactions, networkId, pendingActivities, submittedActivities]);
 
   const filteredItems = useMemo(() => {
     const query = hashQuery.trim().toLowerCase();
@@ -852,49 +923,29 @@ function ActivityFeed() {
     return groups;
   }, [filteredItems]);
 
-  if (historyReadyKey !== historySyncKey) {
-    return (
-      <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground" role="status">
-        <Loader2 className="h-4 w-4 animate-spin text-privacy" />
-        Loading complete history…
-      </div>
-    );
-  }
-
-  if (historyLoadError) {
-    return (
-      <div className="flex flex-col items-center gap-3 py-10 text-center">
-        <AlertTriangle className="h-5 w-5 text-warning" />
-        <div>
-          <p className="text-sm text-foreground">Could not load complete history</p>
-          <p className="mt-1 text-xs text-muted-foreground">No partial results are shown.</p>
-        </div>
-        <button
-          type="button"
-          onClick={() => {
-            setHistoryReadyKey(null);
-            setHistoryRetry((value) => value + 1);
-          }}
-          className="rounded-md bg-privacy/10 px-3 py-1.5 text-xs text-privacy hover:bg-privacy/15"
-        >
-          Try again
-        </button>
-      </div>
-    );
-  }
+  const isUpdatingHistory = isLoading || isLoadingIndexed || isRefreshingAll;
+  const hasHistoryError = Boolean(historyLoadError || inboxError);
 
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <span className="text-caption text-gray/50">{filteredItems.length} transaction{filteredItems.length !== 1 ? "s" : ""}</span>
+        <div className="flex items-center gap-2 text-caption text-gray/50">
+          <span>{filteredItems.length} transaction{filteredItems.length !== 1 ? "s" : ""}</span>
+          {isUpdatingHistory && (
+            <span className="inline-flex items-center gap-1 text-gray/40" role="status">
+              <Loader2 className="h-3 w-3 animate-spin" />
+              Updating…
+            </span>
+          )}
+        </div>
         <button
           type="button"
           onClick={refreshAllActivity}
-          disabled={isLoading || isRefreshingAll}
+          disabled={isUpdatingHistory}
           aria-label="Refresh all activity"
           className="flex items-center gap-1 px-2 py-1 rounded-[6px] text-caption text-gray hover:text-gray-light hover:bg-gray/10 transition-colors disabled:opacity-50"
         >
-          <RefreshCw className={cn("w-3.5 h-3.5", (isLoading || isRefreshingAll) && "animate-spin")} />
+          <RefreshCw className={cn("w-3.5 h-3.5", isUpdatingHistory && "animate-spin")} />
         </button>
       </div>
 
@@ -927,13 +978,42 @@ function ActivityFeed() {
         </div>
       </div>
 
-      {isLoading && items.length === 0 && (
-        <div className="flex items-center justify-center py-6">
-          <div className="w-6 h-6 border-2 border-privacy border-t-transparent rounded-full animate-spin" />
+      {hasHistoryError && items.length > 0 && (
+        <div className="flex items-center justify-between gap-3 rounded-[8px] border border-warning/15 bg-warning/5 px-3 py-2 text-xs">
+          <span className="inline-flex items-center gap-1.5 text-warning/80">
+            <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+            Showing available activity. Some history could not be refreshed.
+          </span>
+          <button
+            type="button"
+            onClick={() => setHistoryRetry((value) => value + 1)}
+            className="shrink-0 font-medium text-warning hover:text-warning/80"
+          >
+            Try again
+          </button>
         </div>
       )}
 
-      {filteredItems.length === 0 && !isLoading && (
+      {items.length === 0 && isUpdatingHistory && <ActivityFeedSkeleton />}
+
+      {items.length === 0 && !isUpdatingHistory && hasHistoryError && (
+        <div className="flex flex-col items-center gap-3 py-8 text-center">
+          <AlertTriangle className="h-5 w-5 text-warning" />
+          <div>
+            <p className="text-sm text-foreground">Could not refresh activity</p>
+            <p className="mt-1 text-xs text-muted-foreground">Your transaction data has not been changed.</p>
+          </div>
+          <button
+            type="button"
+            onClick={() => setHistoryRetry((value) => value + 1)}
+            className="rounded-md bg-privacy/10 px-3 py-1.5 text-xs text-privacy hover:bg-privacy/15"
+          >
+            Try again
+          </button>
+        </div>
+      )}
+
+      {filteredItems.length === 0 && !isUpdatingHistory && !hasHistoryError && (
         <div className="text-center py-6">
           <img src="/brand/logo-transparent-96.png" alt="" className="w-8 h-8 object-contain opacity-30 mx-auto mb-2" />
           <p className="text-sm text-gray/50">{hashQuery.trim() ? "No matching activity" : "No activity yet"}</p>
@@ -960,6 +1040,29 @@ function ActivityFeed() {
                       isSelfTransfer={item.isSelfTransfer}
                     />
             ))}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function ActivityFeedSkeleton() {
+  return (
+    <div className="space-y-2" aria-label="Loading activity" role="status">
+      {[0, 1, 2].map((row) => (
+        <div
+          key={row}
+          className="flex h-[58px] items-center gap-3 rounded-[10px] border border-gray/8 px-4 animate-pulse"
+        >
+          <div className="h-6 w-6 shrink-0 rounded-full bg-gray/10" />
+          <div className="flex-1 space-y-1.5">
+            <div className="h-3 w-24 rounded bg-gray/10" />
+            <div className="h-2.5 w-16 rounded bg-gray/8" />
+          </div>
+          <div className="space-y-1.5">
+            <div className="ml-auto h-3 w-20 rounded bg-gray/10" />
+            <div className="ml-auto h-2.5 w-14 rounded bg-gray/8" />
           </div>
         </div>
       ))}

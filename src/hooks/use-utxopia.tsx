@@ -18,6 +18,7 @@ export function useUTXOpia() {
   const wallet = useWallet();
   const { connection } = useConnection();
   const store = useUTXOpiaStore();
+  const refreshInboxAction = store.refreshInbox;
 
   // Wrap deriveKeys to automatically use wallet
   const deriveKeys = useCallback(async () => {
@@ -32,8 +33,8 @@ export function useUTXOpia() {
 
   // Wrap refreshInbox to automatically use connection
   const refreshInbox = useCallback(async (_conn?: unknown, force?: boolean) => {
-    await store.refreshInbox(connection, force);
-  }, [connection, store]);
+    await refreshInboxAction(connection, force);
+  }, [connection, refreshInboxAction]);
 
   // Clear keys when wallet disconnects — but only if using wallet auth (not passkey)
   // Passkey-derived keys have solanaPublicKey set to all zeros
