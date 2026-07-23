@@ -671,7 +671,7 @@ export default function DocsPage() {
                       alt=""
                       width={20}
                       height={20}
-                      className="h-5 w-5 object-contain"
+                      className="h-5 w-5 object-contain brightness-0"
                     />
                     Open Private Vault
                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
