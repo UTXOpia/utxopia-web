@@ -20,7 +20,7 @@ export function SiteHeader() {
     <>
       <nav className="fixed top-4 left-0 w-full z-50 flex justify-center px-4">
         <motion.div
-          className="nav-pill px-4 py-2 flex items-center transition-all duration-300"
+          className="nav-pill px-2 py-2 sm:px-4 flex items-center transition-all duration-300"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -105,9 +105,11 @@ export function SiteHeader() {
           {/* Mobile hamburger */}
           <button
             onClick={() => setMobileOpen(!mobileOpen)}
-            className="md:hidden ml-auto p-1.5 rounded-md text-gray hover:text-foreground transition-colors"
+            aria-label={mobileOpen ? "Close site navigation" : "Open site navigation"}
+            aria-expanded={mobileOpen}
+            className="md:hidden ml-auto flex h-11 w-11 items-center justify-center rounded-lg text-gray hover:text-foreground transition-colors"
           >
-            {mobileOpen ? <X className="w-4 h-4" /> : <Menu className="w-4 h-4" />}
+            {mobileOpen ? <X className="h-5 w-5" /> : <Menu className="h-5 w-5" />}
           </button>
         </motion.div>
       </nav>

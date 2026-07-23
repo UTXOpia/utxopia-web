@@ -2,7 +2,7 @@
 
 import { useState, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Menu, X } from "lucide-react";
+import { ListTree, X } from "lucide-react";
 
 export interface NavItem {
   id: string;
@@ -65,7 +65,8 @@ function NavButton({
   return (
     <button
       onClick={() => onNavigate(id)}
-      className={`w-full px-3 py-2 text-left text-[13px] font-medium rounded-md transition-colors border-l-2 ${
+      aria-current={isActive ? "location" : undefined}
+      className={`min-h-11 w-full px-3 py-2 text-left text-[13px] font-medium rounded-md transition-colors border-l-2 ${
         isActive
           ? "border-privacy text-foreground bg-privacy/5"
           : "border-transparent text-gray hover:text-foreground hover:bg-muted/30"
@@ -122,12 +123,14 @@ export function MobileSidebarBar({ activeSection }: MobileSidebarProps) {
     <>
       {/* Mobile menu button — aligned with nav pill */}
       {!open && (
-        <div className="lg:hidden fixed top-[18px] left-4 z-50">
+        <div className="lg:hidden fixed top-4 left-0.5 z-50">
           <button
             onClick={() => setOpen(true)}
-            className="p-2 rounded-lg border border-gray/10 bg-background/80 backdrop-blur-md hover:bg-muted/30 transition-colors shadow-sm"
+            aria-label="Open guide navigation"
+            title="Guide navigation"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-gray/10 bg-background/80 backdrop-blur-md hover:bg-muted/30 transition-colors shadow-sm"
           >
-            <Menu className="w-4 h-4 text-gray" />
+            <ListTree className="h-5 w-5 text-gray" />
           </button>
         </div>
       )}
@@ -157,9 +160,10 @@ export function MobileSidebarBar({ activeSection }: MobileSidebarProps) {
                 </span>
                 <button
                   onClick={() => setOpen(false)}
-                  className="p-1 rounded-md hover:bg-muted/30 transition-colors"
+                  aria-label="Close guide navigation"
+                  className="flex h-11 w-11 items-center justify-center rounded-lg hover:bg-muted/30 transition-colors"
                 >
-                  <X className="w-4 h-4 text-gray" />
+                  <X className="h-5 w-5 text-gray" />
                 </button>
               </div>
               <div className="p-4">
