@@ -638,7 +638,6 @@ function ActivityFeed() {
   const { notes, isLoading, refresh } = useStealthInbox();
   const tokenPrices = useTokenPrices();
   const searchParams = useSearchParams();
-  const forcedRefreshRef = useRef(false);
   const { networkId, config } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
@@ -646,6 +645,10 @@ function ActivityFeed() {
   const [indexedTransactions, setIndexedTransactions] = useState<IndexedPrivateTransaction[]>([]);
   const [hashQuery, setHashQuery] = useState("");
   const [isRefreshingAll, setIsRefreshingAll] = useState(false);
+  const [historyReadyKey, setHistoryReadyKey] = useState<string | null>(null);
+  const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
+  const [historyRetry, setHistoryRetry] = useState(0);
+  const historySyncKey = `${networkId}:${stealthAddress ?? "locked"}`;
   const alphaDemoNotes = useMemo(() => {
     const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
     return scoped.length > 0 ? scoped : getAlphaDemoNetworkInboxNotes(networkId);
@@ -656,12 +659,6 @@ function ActivityFeed() {
     for (const note of alphaDemoNotes) byId.set(note.id, note);
     return Array.from(byId.values());
   }, [alphaDemoNotes, notes]);
-
-  useEffect(() => {
-    if (forcedRefreshRef.current || searchParams.get("refresh") !== "inbox") return;
-    forcedRefreshRef.current = true;
-    refresh(undefined, true);
-  }, [refresh, searchParams]);
 
   useEffect(() => {
     const sync = () => {
@@ -727,15 +724,23 @@ function ActivityFeed() {
   useEffect(() => {
     let cancelled = false;
     const sync = async () => {
+      setHistoryLoadError(null);
       try {
-        if (!cancelled) await refreshIndexedTransactions();
-      } catch {
-        // Local submitted activity still renders if explorer enrichment is unavailable.
+        await Promise.all([
+          refresh(undefined, searchParams.get("refresh") === "inbox"),
+          refreshIndexedTransactions(),
+        ]);
+      } catch (error) {
+        if (!cancelled) {
+          setHistoryLoadError(error instanceof Error ? error.message : "Could not load complete history");
+        }
+      } finally {
+        if (!cancelled) setHistoryReadyKey(historySyncKey);
       }
     };
     void sync();
     return () => { cancelled = true; };
-  }, [refreshIndexedTransactions]);
+  }, [historyRetry, historySyncKey, refresh, refreshIndexedTransactions, searchParams]);
 
   const refreshAllActivity = useCallback(async () => {
     if (isRefreshingAll) return;
@@ -846,6 +851,37 @@ function ActivityFeed() {
     }
     return groups;
   }, [filteredItems]);
+
+  if (historyReadyKey !== historySyncKey) {
+    return (
+      <div className="flex items-center justify-center gap-2 py-10 text-xs text-muted-foreground" role="status">
+        <Loader2 className="h-4 w-4 animate-spin text-privacy" />
+        Loading complete history…
+      </div>
+    );
+  }
+
+  if (historyLoadError) {
+    return (
+      <div className="flex flex-col items-center gap-3 py-10 text-center">
+        <AlertTriangle className="h-5 w-5 text-warning" />
+        <div>
+          <p className="text-sm text-foreground">Could not load complete history</p>
+          <p className="mt-1 text-xs text-muted-foreground">No partial results are shown.</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => {
+            setHistoryReadyKey(null);
+            setHistoryRetry((value) => value + 1);
+          }}
+          className="rounded-md bg-privacy/10 px-3 py-1.5 text-xs text-privacy hover:bg-privacy/15"
+        >
+          Try again
+        </button>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-3">
