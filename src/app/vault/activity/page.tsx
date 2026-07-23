@@ -129,6 +129,9 @@ function ActivityRow({
     : origin?.kind === "shield"
       ? "Asset shielded into private balance"
       : "Private transfer received";
+  const originTxUrl = origin?.txSignature
+    ? getChainTransactionUrl(config, origin.txSignature, network)
+    : null;
 
   const handleCopy = async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -163,27 +166,40 @@ function ActivityRow({
           <span className="text-sm text-foreground font-medium">
             {annotation?.label ?? (isReceived ? receivedLabel : "Note spent")}
           </span>
-          <p className="text-[11px] text-gray/40">
-            {annotation?.label && `${isReceived ? receivedLabel : "Note spent"} · `}
-            {timeAgo(note.createdAt)}
-            {annotation?.note && !annotation.label ? " · Personal note" : ""}
-            {isHistoricalFunding && note.isSpent ? " · Spent later" : ""}
-          </p>
+          <p className="text-[11px] text-gray/40">{timeAgo(note.createdAt)}</p>
         </div>
 
         {/* Amount + token */}
-        <div className="text-right shrink-0">
-          <p className={cn(
-            "text-sm font-semibold font-mono tabular-nums",
-            isReceived ? "text-privacy" : "text-gray"
-          )}>
-            {isReceived ? "+" : "-"}{formatAmt(note.amount, token)}{" "}
-            <span className="text-xs font-medium">{token.shieldedSymbol}</span>
-          </p>
-          {usdValue > 0 && (
-            <p className="text-[11px] text-gray/45 font-mono tabular-nums">
-              ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="text-right">
+            <p className={cn(
+              "text-sm font-semibold font-mono tabular-nums",
+              isReceived ? "text-privacy" : "text-gray"
+            )}>
+              {isReceived ? "+" : "-"}{formatAmt(note.amount, token)}{" "}
+              <span className="text-xs font-medium">{token.shieldedSymbol}</span>
             </p>
+            {usdValue > 0 && (
+              <p
+                className="text-[11px] text-gray/45 font-mono tabular-nums"
+                title="Estimated using the current market price"
+              >
+                ≈ ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} now
+              </p>
+            )}
+          </div>
+          {originTxUrl && (
+            <a
+              href={originTxUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Solana transaction"
+              title="View Solana transaction"
+              onClick={(event) => event.stopPropagation()}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray/45 transition-colors hover:bg-gray/8 hover:text-privacy focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-privacy/40"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
           )}
         </div>
       </div>
@@ -207,7 +223,7 @@ function ActivityRow({
                 </span>
                 {usdValue > 0 && (
                   <span className="text-[11px] text-gray/40 font-mono ml-auto">
-                    ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    ≈ ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} now
                   </span>
                 )}
               </div>
@@ -282,16 +298,20 @@ function ActivityRow({
 
 function PendingFaucetRow({
   activity,
+  tokenPrices,
   annotation,
   onSaveAnnotation,
 }: {
   activity: PendingFaucetActivity;
+  tokenPrices: TokenPrices;
   annotation?: ActivityAnnotation;
   onSaveAnnotation: (input: { label?: string; note?: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { config } = useChainEnvironment();
   const token = getToken("zkBTC");
+  const price = tokenPrices[token.priceKey];
+  const usdValue = price ? (Number(activity.amountSats) / 10 ** token.decimals) * price : 0;
   const btcTxUrl = activity.txid
     ? `${config.bitcoin.explorerUrl.replace(/\/$/, "")}/tx/${activity.txid}`
     : null;
@@ -313,20 +333,37 @@ function PendingFaucetRow({
           <span className="text-sm text-foreground font-medium">
             {annotation?.label ?? "Faucet deposit"}
           </span>
-          <p className="text-[11px] text-warning/75">
-            {annotation?.label && "Faucet deposit · "}Processing / {timeAgo(activity.createdAt)}
-            {annotation?.note && !annotation.label ? " · Personal note" : ""}
-          </p>
+          <p className="text-[11px] text-warning/75">Processing · {timeAgo(activity.createdAt)}</p>
         </div>
 
-        <div className="text-right shrink-0">
-          <p className="text-sm font-semibold font-mono tabular-nums text-warning">
-            +{formatAmt(activity.amountSats, token)}{" "}
-            <span className="text-xs font-medium">{token.shieldedSymbol}</span>
-          </p>
-          <p className="text-[11px] text-gray/45">
-            waiting for vault credit
-          </p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="text-right">
+            <p className="text-sm font-semibold font-mono tabular-nums text-warning">
+              +{formatAmt(activity.amountSats, token)}{" "}
+              <span className="text-xs font-medium">{token.shieldedSymbol}</span>
+            </p>
+            {usdValue > 0 && (
+              <p
+                className="text-[11px] text-gray/45 font-mono tabular-nums"
+                title="Estimated using the current market price"
+              >
+                ≈ ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} now
+              </p>
+            )}
+          </div>
+          {btcTxUrl && (
+            <a
+              href={btcTxUrl}
+              target="_blank"
+              rel="noreferrer"
+              aria-label="View Bitcoin transaction"
+              title="View Bitcoin transaction"
+              onClick={(event) => event.stopPropagation()}
+              className="flex h-8 w-8 items-center justify-center rounded-md text-gray/45 transition-colors hover:bg-gray/8 hover:text-warning focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-warning/40"
+            >
+              <ExternalLink className="h-3.5 w-3.5" />
+            </a>
+          )}
         </div>
       </div>
 
@@ -386,21 +423,23 @@ function PendingFaucetRow({
   );
 }
 
-const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; status: string; incoming?: boolean }> = {
-  private_send: { label: "Private transfer", status: "Relay confirmed" },
-  claim_link: { label: "Claim link funded", status: "Relay confirmed" },
-  claim_receive: { label: "Claim link received", status: "Relay confirmed", incoming: true },
-  cashout_btc: { label: "BTC withdrawal", status: "Request confirmed on-chain" },
-  cashout_wallet: { label: "Solana withdrawal", status: "Relay confirmed" },
+const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; incoming?: boolean }> = {
+  private_send: { label: "Private transfer" },
+  claim_link: { label: "Claim link funded" },
+  claim_receive: { label: "Claim link received", incoming: true },
+  cashout_btc: { label: "BTC withdrawal" },
+  cashout_wallet: { label: "Solana withdrawal" },
 };
 
 function SubmittedTransactionRow({
   activity,
+  tokenPrices,
   isSelfTransfer = false,
   annotation,
   onSaveAnnotation,
 }: {
   activity: SubmittedTransactionActivity;
+  tokenPrices: TokenPrices;
   isSelfTransfer?: boolean;
   annotation?: ActivityAnnotation;
   onSaveAnnotation: (input: { label?: string; note?: string }) => void;
@@ -498,13 +537,11 @@ function SubmittedTransactionRow({
 
   const redemptionFailed = redemption?.localStatus?.toLowerCase() === "failed";
   const redemptionPending = activity.kind === "cashout_btc" && !redemption?.btcTxid && !redemptionFailed;
-  const statusText = activity.kind !== "cashout_btc"
-    ? meta.status
-    : redemption?.btcTxid
-      ? "Bitcoin transaction broadcast"
-      : redemptionFailed
-        ? redemption.trackerError || "Bitcoin broadcast failed"
-        : "Waiting for Bitcoin broadcast";
+  const statusText = redemption?.btcTxid
+    ? "Bitcoin transaction broadcast"
+    : redemptionFailed
+      ? redemption.trackerError || "Bitcoin broadcast failed"
+      : "Waiting for Bitcoin broadcast";
   const settlement = activity.kind === "cashout_btc" ? redemption : walletSettlement;
   const netAmountBaseUnits = settlement?.netAmountBaseUnits ?? activity.netAmountBaseUnits ?? null;
   const feeAmountBaseUnits = settlement?.feeBaseUnits ?? activity.protocolFeeBaseUnits ?? null;
@@ -517,6 +554,10 @@ function SubmittedTransactionRow({
   const displayAmountBaseUnits = isSelfTransfer
     ? "0"
     : netAmountBaseUnits ?? activity.amountBaseUnits;
+  const price = tokenPrices[token.priceKey];
+  const usdValue = price
+    ? (Number(displayAmountBaseUnits) / 10 ** token.decimals) * price
+    : 0;
   const amountPrefix = isSelfTransfer ? "" : meta.incoming ? "+" : "-";
 
   const copySignature = async (event: React.MouseEvent) => {
@@ -555,22 +596,42 @@ function SubmittedTransactionRow({
             "text-[11px]",
             redemptionFailed ? "text-error/75" : redemptionPending ? "text-gray/60" : "text-success/75",
           )}>
-            {annotation?.label && `${meta.label} · `}Submitted / {timeAgo(activity.createdAt)}
-            {annotation?.note && !annotation.label ? " · Personal note" : ""}
+            {redemptionFailed
+              ? `Failed · ${timeAgo(activity.createdAt)}`
+              : redemptionPending
+                ? `Processing · ${timeAgo(activity.createdAt)}`
+                : timeAgo(activity.createdAt)}
           </p>
         </div>
-        <div className="text-right shrink-0">
-          <p className={cn(
-            "text-sm font-semibold font-mono tabular-nums",
-            meta.incoming ? "text-privacy" : "text-gray",
-          )}>
-            {amountPrefix}{formatAmt(BigInt(displayAmountBaseUnits), token)}{" "}
-            <span className="text-xs font-medium">{displaySymbol}</span>
-          </p>
-          <p className={cn(
-            "hidden sm:block text-[11px] max-w-52 truncate",
-            redemptionFailed ? "text-error/80" : "text-gray/45",
-          )}>{statusText}</p>
+        <div className="flex shrink-0 items-center gap-1.5">
+          <div className="text-right">
+            <p className={cn(
+              "text-sm font-semibold font-mono tabular-nums",
+              meta.incoming ? "text-privacy" : "text-gray",
+            )}>
+              {amountPrefix}{formatAmt(BigInt(displayAmountBaseUnits), token)}{" "}
+              <span className="text-xs font-medium">{displaySymbol}</span>
+            </p>
+            {usdValue > 0 && (
+              <p
+                className="text-[11px] text-gray/45 font-mono tabular-nums"
+                title="Estimated using the current market price"
+              >
+                ≈ ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} now
+              </p>
+            )}
+          </div>
+          <a
+            href={getChainTransactionUrl(config, activity.signature, networkId)}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="View Solana transaction"
+            title="View Solana transaction"
+            onClick={(event) => event.stopPropagation()}
+            className="flex h-8 w-8 items-center justify-center rounded-md text-gray/45 transition-colors hover:bg-gray/8 hover:text-success focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-success/40"
+          >
+            <ExternalLink className="h-3.5 w-3.5" />
+          </a>
         </div>
       </div>
 
@@ -578,15 +639,29 @@ function SubmittedTransactionRow({
         <div className="mx-4 mb-3 rounded-[10px] border border-success/15 bg-success/4 overflow-hidden">
           <div className="px-3.5 py-2 space-y-1.5 text-xs">
             <div className="flex justify-between gap-3">
-              <span className="text-gray/40">Status</span>
-              <span className={cn("text-right", redemptionFailed ? "text-error" : "text-success")}>
-                {statusText}
-              </span>
+              <span className="text-gray/40">Type</span>
+              <span className="text-foreground/80 text-right">{meta.label}</span>
             </div>
+            {(activity.kind === "cashout_btc" || redemptionFailed) && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Status</span>
+                <span className={cn("text-right", redemptionFailed ? "text-error" : "text-success")}>
+                  {statusText}
+                </span>
+              </div>
+            )}
             <div className="flex justify-between gap-3">
               <span className="text-gray/40">Time</span>
               <span className="text-gray/60 text-right">{formatFullDate(activity.createdAt)}</span>
             </div>
+            {usdValue > 0 && (
+              <div className="flex justify-between gap-3">
+                <span className="text-gray/40">Current value</span>
+                <span className="font-mono text-gray/60 text-right">
+                  ≈ ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                </span>
+              </div>
+            )}
             {isSelfTransfer && (
               <div className="flex justify-between gap-3">
                 <span className="text-gray/40">Transfer</span>
@@ -1116,12 +1191,14 @@ function ActivityFeed() {
                   ? <PendingFaucetRow
                       key={item.id}
                       activity={item.activity}
+                      tokenPrices={tokenPrices}
                       annotation={annotations[annotationIdForActivity(item)]}
                       onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
                     />
                   : <SubmittedTransactionRow
                       key={item.id}
                       activity={item.activity}
+                      tokenPrices={tokenPrices}
                       isSelfTransfer={item.isSelfTransfer}
                       annotation={annotations[annotationIdForActivity(item)]}
                       onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
