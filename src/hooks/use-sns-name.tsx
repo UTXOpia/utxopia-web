@@ -45,6 +45,14 @@ const SPONSORED_RECOVERY_ATTEMPTS = 8;
 const SPONSORED_RECOVERY_DELAY_MS = 1_000;
 const SNS_RESOLVE_CACHE_TTL_MS = 30 * 60 * 1_000;
 const SNS_RESOLVE_CACHE_PREFIX = "utxopia:sns-resolve:v1";
+const SNS_NAME_REGISTERED_EVENT = "utxopia:sns-name-registered";
+
+interface SnsNameRegisteredEventDetail {
+  networkId: string;
+  viewingKey: string;
+  name: string;
+  subdomainKey: string | null;
+}
 
 interface CachedSnsResolve {
   savedAt: number;
@@ -393,6 +401,71 @@ export function useSnsName(): UseSnsNameReturn {
     }
   }, [activeAuthority, stealthAddress, networkId, snsConfig]);
 
+  const rememberRegisteredSnsName = useCallback((
+    name: string,
+    subdomainKey: PublicKey | null,
+    broadcast = true,
+  ) => {
+    if (!stealthAddress) return;
+
+    const viewingKey = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
+    setRegisteredSnsName(name);
+    setHasRegisteredSnsName(true);
+    setRegisteredSubdomainKey(subdomainKey);
+    setNeedsUpdate(false);
+    setComplianceFlags(0);
+    setAuditorPubkeyState(null);
+
+    // A confirmed registration is authoritative. Seed the same positive cache
+    // used by lookupMySnsName so a remount or route transition cannot briefly
+    // fall back to the pre-registration state while the reverse lookup catches up.
+    if (subdomainKey && snsConfig) {
+      writeCachedSnsResolve(snsResolveCacheKey(networkId, viewingKey), {
+        success: true,
+        registered: true,
+        record: {
+          name,
+          fullDomain: `${name}.${snsConfig.parentDomain}.sol`,
+          subdomainKey: subdomainKey.toBase58(),
+          version: STEALTH_DATA_VERSION,
+          mpk: Buffer.from(stealthAddress.mpk).toString("hex"),
+          complianceFlags: 0,
+          auditorPubkey: null,
+        },
+      });
+    }
+
+    if (broadcast && typeof window !== "undefined") {
+      window.dispatchEvent(new CustomEvent<SnsNameRegisteredEventDetail>(SNS_NAME_REGISTERED_EVENT, {
+        detail: {
+          networkId,
+          viewingKey,
+          name,
+          subdomainKey: subdomainKey?.toBase58() ?? null,
+        },
+      }));
+    }
+  }, [networkId, snsConfig, stealthAddress]);
+
+  // useSnsName is intentionally used by several independent surfaces (the
+  // onboarding prompt, vault identity chip, and settings). Keep those hook
+  // instances consistent after any one of them completes a registration.
+  useEffect(() => {
+    if (!stealthAddress) return;
+    const viewingKey = Buffer.from(stealthAddress.viewingPubKey).toString("hex");
+    const handleRegisteredName = (event: Event) => {
+      const detail = (event as CustomEvent<SnsNameRegisteredEventDetail>).detail;
+      if (!detail || detail.networkId !== networkId || detail.viewingKey !== viewingKey) return;
+      rememberRegisteredSnsName(
+        detail.name,
+        detail.subdomainKey ? new PublicKey(detail.subdomainKey) : null,
+        false,
+      );
+    };
+    window.addEventListener(SNS_NAME_REGISTERED_EVENT, handleRegisteredName);
+    return () => window.removeEventListener(SNS_NAME_REGISTERED_EVENT, handleRegisteredName);
+  }, [networkId, rememberRegisteredSnsName, stealthAddress]);
+
   // Register a new subdomain + write stealth data (2-transaction flow)
   // TX1: Register via Bonfida sub-registrar (creates subdomain + reverse lookup)
   // TX2: Realloc + write stealth data (combined into one TX)
@@ -446,12 +519,7 @@ export function useSnsName(): UseSnsNameReturn {
           viewingPubKey: stealthAddress.viewingPubKey,
           mpk: stealthAddress.mpk,
         });
-        setRegisteredSnsName(subdomain);
-        setHasRegisteredSnsName(true);
-        setRegisteredSubdomainKey(null);
-        setNeedsUpdate(false);
-        setComplianceFlags(0);
-        setAuditorPubkeyState(null);
+        rememberRegisteredSnsName(subdomain, null);
         return true;
       }
 
@@ -459,12 +527,7 @@ export function useSnsName(): UseSnsNameReturn {
       if (sponsoredResult === "success") {
         const parentPubkey = deriveParentDomainKey(snsConfig);
         const subdomainKey = deriveSubdomainKey(subdomain, parentPubkey, snsConfig);
-        setRegisteredSnsName(subdomain);
-        setHasRegisteredSnsName(true);
-        setRegisteredSubdomainKey(subdomainKey);
-        setNeedsUpdate(false);
-        setComplianceFlags(0);
-        setAuditorPubkeyState(null);
+        rememberRegisteredSnsName(subdomain, subdomainKey);
         return true;
       }
 
@@ -631,8 +694,7 @@ export function useSnsName(): UseSnsNameReturn {
         preflightCommitment: "confirmed",
       });
       await connection.confirmTransaction({ signature: txid, blockhash, lastValidBlockHeight }, "confirmed");
-      setRegisteredSnsName(subdomain);
-      setHasRegisteredSnsName(true);
+      rememberRegisteredSnsName(subdomain, subdomainKey);
       return true;
     } catch (err) {
       console.error("Failed to register SNS subdomain:", err);
@@ -642,7 +704,7 @@ export function useSnsName(): UseSnsNameReturn {
     } finally {
       setIsRegistering(false);
     }
-  }, [connection, isNameRegistered, networkId, passkeyAuthority, privySolana, registerViaRelayer, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
+  }, [connection, isNameRegistered, networkId, passkeyAuthority, privySolana, registerViaRelayer, rememberRegisteredSnsName, signAndSubmitSnsTransaction, snsConfig, stealthAddress, walletAuthority]);
 
   // Release (delete) a subdomain via the relayer-sponsored delete route.
   // The relayer pays the fee (and receives the reclaimed rent), but the name
