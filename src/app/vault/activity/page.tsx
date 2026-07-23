@@ -52,6 +52,13 @@ import {
   type IndexedPrivateTransaction,
   type OwnedNoteOrigin,
 } from "@/lib/activity-reconciliation";
+import {
+  activityAnnotationsEventName,
+  getActivityAnnotations,
+  saveActivityAnnotation,
+  type ActivityAnnotation,
+} from "@/lib/activity-annotations";
+import { PersonalAnnotationEditor } from "@/components/activity/personal-annotation-editor";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -95,10 +102,14 @@ function ActivityRow({
   note,
   tokenPrices,
   origin,
+  annotation,
+  onSaveAnnotation,
 }: {
   note: InboxNote;
   tokenPrices: TokenPrices;
   origin?: OwnedNoteOrigin;
+  annotation?: ActivityAnnotation;
+  onSaveAnnotation: (input: { label?: string; note?: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -150,10 +161,13 @@ function ActivityRow({
         {/* Label + time */}
         <div className="flex-1 min-w-0">
           <span className="text-sm text-foreground font-medium">
-            {isReceived ? receivedLabel : "Note spent"}
+            {annotation?.label ?? (isReceived ? receivedLabel : "Note spent")}
           </span>
           <p className="text-[11px] text-gray/40">
-            {timeAgo(note.createdAt)}{isHistoricalFunding && note.isSpent ? " · Spent later" : ""}
+            {annotation?.label && `${isReceived ? receivedLabel : "Note spent"} · `}
+            {timeAgo(note.createdAt)}
+            {annotation?.note && !annotation.label ? " · Personal note" : ""}
+            {isHistoricalFunding && note.isSpent ? " · Spent later" : ""}
           </p>
         </div>
 
@@ -244,6 +258,8 @@ function ActivityRow({
               </div>
             </div>
 
+            <PersonalAnnotationEditor annotation={annotation} onSave={onSaveAnnotation} />
+
             {/* Footer — explorer link */}
             <div className="px-3.5 py-2 border-t border-gray/8">
               <Link
@@ -264,7 +280,15 @@ function ActivityRow({
   );
 }
 
-function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
+function PendingFaucetRow({
+  activity,
+  annotation,
+  onSaveAnnotation,
+}: {
+  activity: PendingFaucetActivity;
+  annotation?: ActivityAnnotation;
+  onSaveAnnotation: (input: { label?: string; note?: string }) => void;
+}) {
   const [expanded, setExpanded] = useState(false);
   const { config } = useChainEnvironment();
   const token = getToken("zkBTC");
@@ -286,8 +310,13 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
         </div>
 
         <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground font-medium">Faucet deposit</span>
-          <p className="text-[11px] text-warning/75">Processing / {timeAgo(activity.createdAt)}</p>
+          <span className="text-sm text-foreground font-medium">
+            {annotation?.label ?? "Faucet deposit"}
+          </span>
+          <p className="text-[11px] text-warning/75">
+            {annotation?.label && "Faucet deposit · "}Processing / {timeAgo(activity.createdAt)}
+            {annotation?.note && !annotation.label ? " · Personal note" : ""}
+          </p>
         </div>
 
         <div className="text-right shrink-0">
@@ -336,6 +365,8 @@ function PendingFaucetRow({ activity }: { activity: PendingFaucetActivity }) {
               )}
             </div>
 
+            <PersonalAnnotationEditor annotation={annotation} onSave={onSaveAnnotation} />
+
             <div className="px-3.5 py-2 border-t border-warning/10">
               {btcTxUrl && <a
                 href={btcTxUrl}
@@ -366,9 +397,13 @@ const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: st
 function SubmittedTransactionRow({
   activity,
   isSelfTransfer = false,
+  annotation,
+  onSaveAnnotation,
 }: {
   activity: SubmittedTransactionActivity;
   isSelfTransfer?: boolean;
+  annotation?: ActivityAnnotation;
+  onSaveAnnotation: (input: { label?: string; note?: string }) => void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
@@ -513,11 +548,16 @@ function SubmittedTransactionRow({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground font-medium">{meta.label}</span>
+          <span className="text-sm text-foreground font-medium">
+            {annotation?.label ?? meta.label}
+          </span>
           <p className={cn(
             "text-[11px]",
             redemptionFailed ? "text-error/75" : redemptionPending ? "text-gray/60" : "text-success/75",
-          )}>Submitted / {timeAgo(activity.createdAt)}</p>
+          )}>
+            {annotation?.label && `${meta.label} · `}Submitted / {timeAgo(activity.createdAt)}
+            {annotation?.note && !annotation.label ? " · Personal note" : ""}
+          </p>
         </div>
         <div className="text-right shrink-0">
           <p className={cn(
@@ -604,6 +644,7 @@ function SubmittedTransactionRow({
               </div>
             </div>
           </div>
+          <PersonalAnnotationEditor annotation={annotation} onSave={onSaveAnnotation} />
           <div className="px-3.5 py-2 border-t border-success/10">
             <a
               href={getChainTransactionUrl(config, activity.signature, networkId)}
@@ -633,6 +674,12 @@ type ActivityItem =
       outputCommitments: string[];
       isSelfTransfer: boolean;
     };
+
+function annotationIdForActivity(item: ActivityItem): string {
+  if (item.kind === "note") return `note:${item.note.commitmentHex.toLowerCase()}`;
+  if (item.kind === "submitted") return `tx:${item.activity.signature}`;
+  return `pending:${item.activity.id}`;
+}
 
 const INDEXED_ACTIVITY_CACHE_PREFIX = "utxopia:indexed-activity:v1";
 const INDEXED_ACTIVITY_CACHE_TTL_MS = 5 * 60 * 1000;
@@ -685,6 +732,7 @@ function ActivityFeed() {
   const [hasIndexedSnapshot, setHasIndexedSnapshot] = useState(false);
   const [historyLoadError, setHistoryLoadError] = useState<string | null>(null);
   const [historyRetry, setHistoryRetry] = useState(0);
+  const [annotations, setAnnotations] = useState<Record<string, ActivityAnnotation>>({});
   const historySyncKey = `${networkId}:${stealthAddress ?? "locked"}`;
   const alphaDemoNotes = useMemo(() => {
     const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
@@ -729,6 +777,24 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:transaction-activity", sync);
     };
+  }, [networkId]);
+
+  useEffect(() => {
+    const sync = () => setAnnotations(getActivityAnnotations(networkId));
+    sync();
+    window.addEventListener("storage", sync);
+    window.addEventListener(activityAnnotationsEventName(), sync);
+    return () => {
+      window.removeEventListener("storage", sync);
+      window.removeEventListener(activityAnnotationsEventName(), sync);
+    };
+  }, [networkId]);
+
+  const updateAnnotation = useCallback((
+    activityId: string,
+    input: { label?: string; note?: string },
+  ) => {
+    setAnnotations(saveActivityAnnotation(networkId, activityId, input));
   }, [networkId]);
 
   const fetchIndexedTransactions = useCallback(async (): Promise<IndexedPrivateTransaction[]> => {
@@ -893,6 +959,13 @@ function ActivityFeed() {
     const query = hashQuery.trim().toLowerCase();
     if (!query) return items;
     return items.filter((item) => {
+      const annotation = annotations[annotationIdForActivity(item)];
+      if (
+        annotation?.label?.toLowerCase().includes(query)
+        || annotation?.note?.toLowerCase().includes(query)
+      ) {
+        return true;
+      }
       if (item.kind === "note") {
         return item.note.commitmentHex.toLowerCase().includes(query)
           || item.note.id.toLowerCase().includes(query);
@@ -906,7 +979,7 @@ function ActivityFeed() {
         || item.outputCommitments.some((commitment) => commitment.includes(query))
         || item.id.toLowerCase().includes(query);
     });
-  }, [hashQuery, items]);
+  }, [annotations, hashQuery, items]);
 
   // Sort by createdAt descending, then group by date
   const grouped = useMemo(() => {
@@ -951,7 +1024,7 @@ function ActivityFeed() {
 
       <div>
         <label htmlFor="activity-hash-search" className="sr-only">
-          Find activity by transaction hash or commitment
+          Find activity by label, note, transaction hash or commitment
         </label>
         <div className="relative">
           <Search className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-gray/45" />
@@ -960,7 +1033,7 @@ function ActivityFeed() {
             type="search"
             value={hashQuery}
             onChange={(event) => setHashQuery(event.target.value)}
-            placeholder="Transaction hash or commitment"
+            placeholder="Label, note, transaction hash or commitment"
             autoComplete="off"
             spellCheck={false}
             className="h-10 w-full appearance-none rounded-lg border border-gray/15 bg-muted/35 pl-9 pr-9 font-mono text-xs text-foreground outline-none transition-colors placeholder:font-sans placeholder:text-gray/55 hover:border-gray/25 focus:border-privacy/45 focus:ring-2 focus:ring-privacy/10 [&::-webkit-search-cancel-button]:appearance-none"
@@ -1019,7 +1092,7 @@ function ActivityFeed() {
           <p className="text-sm text-gray/50">{hashQuery.trim() ? "No matching activity" : "No activity yet"}</p>
           <p className="text-xs text-gray/30 mt-1">
             {hashQuery.trim()
-              ? "Check the transaction hash or commitment and try again."
+              ? "Check the label, note, transaction hash or commitment and try again."
               : "Deposits and transfers will appear here"}
           </p>
         </div>
@@ -1031,13 +1104,27 @@ function ActivityFeed() {
           <div className="rounded-[12px] border border-gray/10 overflow-hidden divide-y divide-gray/8">
             {groupItems.map((item) => (
               item.kind === "note"
-                ? <ActivityRow key={item.id} note={item.note} tokenPrices={tokenPrices} origin={item.origin} />
+                ? <ActivityRow
+                    key={item.id}
+                    note={item.note}
+                    tokenPrices={tokenPrices}
+                    origin={item.origin}
+                    annotation={annotations[annotationIdForActivity(item)]}
+                    onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
+                  />
                 : item.kind === "pending-faucet"
-                  ? <PendingFaucetRow key={item.id} activity={item.activity} />
+                  ? <PendingFaucetRow
+                      key={item.id}
+                      activity={item.activity}
+                      annotation={annotations[annotationIdForActivity(item)]}
+                      onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
+                    />
                   : <SubmittedTransactionRow
                       key={item.id}
                       activity={item.activity}
                       isSelfTransfer={item.isSelfTransfer}
+                      annotation={annotations[annotationIdForActivity(item)]}
+                      onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
                     />
             ))}
           </div>
