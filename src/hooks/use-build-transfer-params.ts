@@ -198,9 +198,13 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   // 3. Add relayer fee output (before special output if applicable)
   let relayerFeeOutputIndex: number | undefined;
   if (relayerFee > 0) {
+    if (!relayerMeta) {
+      throw new Error(
+        "Relayer fee address is unavailable. Please wait for relay configuration and try again.",
+      );
+    }
     const feeAmount = BigInt(relayerFee);
-    const feeMeta = relayerMeta || selfMeta;
-    const feeResult = await createStealthDepositWithKeys(feeMeta, feeAmount, tokenId);
+    const feeResult = await createStealthDepositWithKeys(relayerMeta, feeAmount, tokenId);
 
     if (isSpecialOutput) {
       const insertIdx = sendAmounts.length - 1;

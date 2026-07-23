@@ -435,6 +435,7 @@ export function SendForm({
   const displayToken = mode === "cashout" ? selectedPayToken.unit : effectiveToken;
   const {
     relayerMeta,
+    relayerMetaLoaded,
     effectiveRelayerFee,
     effectiveServiceFee,
     effectiveServiceFeeBps,
@@ -442,6 +443,7 @@ export function SendForm({
     useRelayerConfig(selectedPayToken, chainEnv.networkId);
 
   const amountSats = parseDecimalToBaseUnits(state.amount, selectedPayToken.decimals) ?? 0;
+  const relayerReady = relayerMetaLoaded && Boolean(relayerMeta?.stealthMeta);
   const totalNeeded = amountSats + effectiveRelayerFee;
   const noteSelector = useNoteAutoSelector(
     selectedPayToken.shieldedSymbol,
@@ -928,13 +930,21 @@ export function SendForm({
 
       {error && <div className="text-xs text-red-500">{error}</div>}
 
+      {(recipientValid || mode === "cashout") && !relayerReady && (
+        <div className="text-xs text-amber-600">
+          {relayerMetaLoaded
+            ? "Relay fee configuration is unavailable. Sending is temporarily disabled."
+            : "Loading relay fee configuration…"}
+        </div>
+      )}
+
       <BackupRequiredCallout visible={requiresBackup} />
 
       {amountValid && (
         <button
           type="button"
           onClick={() => dispatch({ type: "open_review" })}
-          disabled={requiresBackup}
+          disabled={requiresBackup || !relayerReady}
           className={cn(
             "w-full px-4 py-3 rounded-lg bg-foreground text-background text-sm font-medium flex items-center justify-center gap-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -952,7 +962,7 @@ export function SendForm({
           <button
             type="button"
             onClick={() => setLinkOpen(true)}
-            disabled={requiresBackup}
+            disabled={requiresBackup || !relayerReady}
             className={cn(
               "w-full px-4 py-3 rounded-lg bg-muted/40 border border-gray/15 text-sm font-medium flex items-center justify-center gap-2 hover:border-privacy/30",
               "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray/15",
