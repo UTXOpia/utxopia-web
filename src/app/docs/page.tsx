@@ -10,6 +10,7 @@
  */
 
 import Link from "next/link";
+import Image from "next/image";
 import { useEffect, useMemo } from "react";
 import { type LucideIcon } from "lucide-react";
 import {
@@ -29,6 +30,7 @@ import {
   Send,
   ListChecks,
   ScrollText,
+  Github,
 } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { DocsSection } from "@/components/docs/docs-section";
@@ -653,8 +655,8 @@ export default function DocsPage() {
             {/* ── CTA ── */}
             <section className="border-t border-gray/10 py-16 sm:py-20">
               <div className="max-w-3xl mx-auto text-center">
-                <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-4">
-                  Open Your Private Vault
+                <h2 className="mb-4 text-xl font-semibold tracking-tight text-foreground sm:text-2xl md:text-3xl">
+                  Open your private vault
                 </h2>
                 <p className="mb-6 max-w-lg text-sm font-light leading-relaxed text-gray sm:mb-8">
                   Deposit or shield supported assets, send privately, cash out to Solana, or withdraw zkBTC to Bitcoin.
@@ -664,7 +666,13 @@ export default function DocsPage() {
                     href={hrefWithChain("/vault", network)}
                     className="btn-privacy btn-pill inline-flex items-center gap-2 px-5 sm:px-7 py-2.5 text-sm sm:text-base transition-shadow"
                   >
-                    <Shield className="w-4 h-4 sm:w-5 sm:h-5" />
+                    <Image
+                      src="/brand/logo-transparent-128.png"
+                      alt=""
+                      width={20}
+                      height={20}
+                      className="h-5 w-5 object-contain"
+                    />
                     Open Private Vault
                     <ArrowRight className="w-4 h-4 sm:w-5 sm:h-5" />
                   </Link>
@@ -675,6 +683,43 @@ export default function DocsPage() {
                     View Explorer
                     <ChevronRight className="w-4 h-4" />
                   </Link>
+                </div>
+              </div>
+
+              <div className="mt-12 flex flex-col items-center gap-4 border-t border-gray/10 pt-6 text-center sm:mt-16 sm:flex-row sm:justify-between sm:text-left">
+                <Link
+                  href={hrefWithChain("/", network)}
+                  className="group flex min-h-11 items-center gap-2 rounded-lg px-2 transition-colors hover:bg-muted/30"
+                >
+                  <Image
+                    src="/brand/logo-transparent-128.png"
+                    alt=""
+                    width={24}
+                    height={24}
+                    className="h-6 w-6 object-contain transition-transform group-hover:scale-105"
+                  />
+                  <span className="text-sm font-medium text-foreground transition-colors group-hover:text-privacy">
+                    UTXOpia
+                  </span>
+                </Link>
+
+                <p className="text-sm leading-relaxed text-gray sm:max-w-56 sm:text-center sm:text-xs">
+                  Private transfers for supported assets on {chainName}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-gray/60 sm:text-xs">
+                    Public alpha · Testnet only · Unaudited
+                  </span>
+                  <a
+                    href="https://github.com/UTXOpia"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    aria-label="Open UTXOpia on GitHub"
+                    className="flex h-11 w-11 items-center justify-center rounded-full text-gray transition-colors hover:bg-muted/50 hover:text-foreground"
+                  >
+                    <Github className="h-4 w-4" />
+                  </a>
                 </div>
               </div>
             </section>
