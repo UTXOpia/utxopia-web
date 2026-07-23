@@ -120,7 +120,7 @@ describe("SendForm", () => {
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
 
-    fireEvent.click(screen.getByRole("button", { name: /solana cash out to a wallet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /solana cash out/i }));
     expect((screen.getByLabelText(/solana wallet address/i) as HTMLInputElement).value).toBe("");
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
 
@@ -139,7 +139,7 @@ describe("SendForm", () => {
   it("uses the selected cash-out asset price for the USD preview", () => {
     render(<SendForm mode="cashout" />);
 
-    fireEvent.click(screen.getByRole("button", { name: /solana cash out to a wallet/i }));
+    fireEvent.click(screen.getByRole("button", { name: /solana cash out/i }));
     fireEvent.click(screen.getByRole("button", { name: /btc private balance/i }));
     fireEvent.click(screen.getByRole("button", { name: /sol private balance/i }));
     fireEvent.change(screen.getByLabelText(/^amount$/i), {

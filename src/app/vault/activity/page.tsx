@@ -59,6 +59,7 @@ import {
   type ActivityAnnotation,
 } from "@/lib/activity-annotations";
 import { PersonalAnnotationEditor } from "@/components/activity/personal-annotation-editor";
+import { PRODUCT_COPY } from "@/lib/product-language";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -424,11 +425,11 @@ function PendingFaucetRow({
 }
 
 const SUBMITTED_LABELS: Record<SubmittedTransactionActivity["kind"], { label: string; incoming?: boolean }> = {
-  private_send: { label: "Private transfer" },
+  private_send: { label: PRODUCT_COPY.transactions.privateTransfer },
   claim_link: { label: "Claim link funded" },
   claim_receive: { label: "Claim link received", incoming: true },
-  cashout_btc: { label: "Withdraw BTC" },
-  cashout_wallet: { label: "Cash out to Solana" },
+  cashout_btc: { label: PRODUCT_COPY.transactions.withdrawBtc },
+  cashout_wallet: { label: PRODUCT_COPY.transactions.cashOut },
 };
 
 function SubmittedTransactionRow({
@@ -452,9 +453,9 @@ function SubmittedTransactionRow({
   const meta = {
     ...baseMeta,
     label: activity.kind === "private_send"
-      ? (isSelfTransfer ? "Private transfer" : "Sent")
-      : activity.kind === "cashout_wallet" && activity.tokenSymbol === "zkSOL"
-        ? "Cash out SOL"
+      ? PRODUCT_COPY.transactions.privateTransfer
+      : activity.kind === "cashout_wallet"
+        ? PRODUCT_COPY.transactions.cashOut
         : baseMeta.label,
   };
   const displaySymbol = getSubmittedActivityDisplaySymbol(activity.kind, token.shieldedSymbol);
@@ -670,7 +671,7 @@ function SubmittedTransactionRow({
             )}
             {(activity.kind === "cashout_btc" || activity.kind === "cashout_wallet") && (
               <div className="flex justify-between gap-3">
-                <span className="text-gray/40">Gross withdrawal</span>
+                <span className="text-gray/40">Amount before fees</span>
                 <span className="font-mono text-foreground/80 text-right">
                   {formatAmt(BigInt(grossAmountBaseUnits), token)} {displaySymbol}
                 </span>
@@ -694,7 +695,7 @@ function SubmittedTransactionRow({
             )}
             {activity.relayerFeeBaseUnits && BigInt(activity.relayerFeeBaseUnits) > 0n && (
               <div className="flex justify-between gap-3">
-                <span className="text-gray/40">Relay fee</span>
+                <span className="text-gray/40">{PRODUCT_COPY.protocol.relayerFee}</span>
                 <span className="font-mono text-gray/60 text-right">
                   {formatAmt(BigInt(activity.relayerFeeBaseUnits), token)} {token.shieldedSymbol}
                 </span>

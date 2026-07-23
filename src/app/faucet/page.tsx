@@ -268,7 +268,7 @@ function SplFaucetForm({
           />
         </div>
         <p className={cn("text-caption mt-1 pl-2", invalid ? "text-red-400" : "text-gray")}>
-          {invalid ? "Enter a valid Solana address." : `Test ${token} is sent here; then deposit it to go private.`}
+          {invalid ? "Enter a valid Solana address." : `Test ${token} is sent here; then shield it to go private.`}
         </p>
       </div>
 
@@ -300,7 +300,7 @@ function SplFaucetForm({
             <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
             <div>
               <p className="font-semibold text-success">{amount} {token} sent to your wallet</p>
-              <p className="mt-0.5 text-success/75">Now deposit it to move it into your private vault.</p>
+              <p className="mt-0.5 text-success/75">Now shield it to move it into your private vault.</p>
             </div>
           </div>
           {result.signature && (

@@ -23,6 +23,11 @@ import { cn } from "@/lib/utils";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 import { EXPLORER_FILTER_TOKENS, type TokenFilterId } from "@/lib/supported-tokens";
+import {
+  getProductTransactionLabel,
+  PRODUCT_COPY,
+  type ProductTransactionKind,
+} from "@/lib/product-language";
 
 // --- Types ---
 
@@ -43,9 +48,9 @@ const TOKEN_LIST = EXPLORER_FILTER_TOKENS.map((t) => ({
 
 const FILTER_PILLS: { id: FilterType; label: string; icon: React.ReactNode; color: string; hasTokens: boolean }[] = [
   { id: "all", label: "All", icon: null, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
-  { id: "shield", label: "Deposit", icon: <ArrowDownToLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
-  { id: "transfer", label: "Private transfer", icon: <ArrowUpDown className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
-  { id: "unshield", label: "Cash out", icon: <ArrowUpFromLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
+  { id: "shield", label: PRODUCT_COPY.actions.addFunds, icon: <ArrowDownToLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
+  { id: "transfer", label: PRODUCT_COPY.transactions.privateTransfer, icon: <ArrowUpDown className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: false },
+  { id: "unshield", label: PRODUCT_COPY.actions.takeFundsOut, icon: <ArrowUpFromLine className="w-3.5 h-3.5" />, color: "bg-gray/15 text-foreground border-gray/20", hasTokens: true },
 ];
 
 export function TypeFilterBar({
@@ -197,9 +202,18 @@ function TokenCheckboxDropdown({
 
 // --- Type Badge (unified row first column) ---
 
-export function TypeBadge({ kind }: { kind: "shield" | "transfer" | "unshield" | "withdraw" }) {
-  const label = { shield: "Deposit", transfer: "Private transfer", unshield: "Cash out", withdraw: "Withdraw BTC" }[kind];
-  return <span className="text-[13px] text-gray-light font-medium">{label}</span>;
+export function TypeBadge({
+  kind,
+  isBtcDeposit = false,
+}: {
+  kind: ProductTransactionKind;
+  isBtcDeposit?: boolean;
+}) {
+  return (
+    <span className="text-[13px] text-gray-light font-medium">
+      {getProductTransactionLabel(kind, { isBtcDeposit })}
+    </span>
+  );
 }
 
 // --- Status Dot ---

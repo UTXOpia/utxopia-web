@@ -146,7 +146,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       const latestFees = await poolFees.refresh();
       if (quotedDepositFeeBps == null || latestFees.depositFeeBps !== quotedDepositFeeBps) {
         setStatus("idle");
-        throw new Error("The deposit fee changed. Review the updated amount and confirm again.");
+        throw new Error("The shield fee changed. Review the updated amount and confirm again.");
       }
 
       // Determine mint: SOL uses native wSOL, others use their configured mint
@@ -582,7 +582,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           <div className="text-center space-y-1">
             <p className="text-body2-semibold text-foreground">Connect wallet to add {selectedToken.symbol}</p>
             <p className="text-caption text-gray max-w-[280px]">
-              Adding {selectedToken.symbol} requires a Solana wallet to sign the deposit transaction. After that, private sends can use your passkey.
+              Shielding {selectedToken.symbol} requires a Solana wallet to sign the shield transaction. After that, private transfers can use your passkey.
             </p>
           </div>
           <button
@@ -667,14 +667,14 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         </div>
         {amountRaw > 0n && poolFees.fees && (
           <div className="space-y-2 border-t border-gray/10 pt-3 text-xs">
-            <PreviewRow label="You deposit" value={`${formatBaseUnits(amountRaw)} ${displayUnit}`} />
-            <PreviewRow label="Deposit fee" value={`${formatBaseUnits(depositFee)} ${displayUnit}`} />
+            <PreviewRow label="You shield" value={`${formatBaseUnits(amountRaw)} ${displayUnit}`} />
+            <PreviewRow label="Shield fee" value={`${formatBaseUnits(depositFee)} ${displayUnit}`} />
             <PreviewRow label="Private balance receives" value={`${formatBaseUnits(privateReceives)} ${privateUnit}`} strong />
             <p className="flex items-start gap-1.5 text-[11px] text-gray/60">
               <Info className="mt-0.5 h-3 w-3 shrink-0" />
-              This deposit is public. Your later private transfers are not publicly linked by the app.
+              This shield transaction is public. Your later private transfers are not publicly linked by the app.
             </p>
-            {highDepositFee && <p className="text-[11px] text-warning">The fee is high relative to this deposit.</p>}
+            {highDepositFee && <p className="text-[11px] text-warning">The fee is high relative to this shield amount.</p>}
           </div>
         )}
       </div>

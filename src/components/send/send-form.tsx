@@ -37,6 +37,7 @@ import { normalizePrivateNameHandle } from "@/lib/names/private-name-claim";
 import { recordSubmittedTransaction, type SubmittedTransactionKind } from "@/lib/transaction-activity";
 import { usePoolFees } from "@/hooks/use-pool-fees";
 import { computeBpsFee, feeShareBps } from "@/lib/pool-fees";
+import { PRODUCT_COPY } from "@/lib/product-language";
 import {
   decodeStealthMetaAddress,
   deriveMasterKey,
@@ -116,14 +117,14 @@ function CashOutDestinationPicker({
     {
       value: "bitcoin" as const,
       label: "Bitcoin",
-      description: "Withdraw BTC",
+      description: PRODUCT_COPY.transactions.withdrawBtc,
       icon: Bitcoin,
       selectedClass: "border-btc/50 bg-btc/10 text-btc",
     },
     {
       value: "solana" as const,
       label: "Solana",
-      description: "Cash out to a wallet",
+      description: PRODUCT_COPY.transactions.cashOut,
       icon: Wallet,
       selectedClass: "border-purple/50 bg-purple/10 text-purple",
     },
@@ -131,7 +132,7 @@ function CashOutDestinationPicker({
 
   return (
     <fieldset className="space-y-1.5">
-      <legend className="text-xs text-muted-foreground">Cash out to</legend>
+      <legend className="text-xs text-muted-foreground">Destination network</legend>
       <div className="grid grid-cols-2 gap-2">
         {options.map((option) => {
           const Icon = option.icon;
@@ -197,25 +198,25 @@ function RecipientOutcome({ type, chainLabel }: { type: RecipientType; chainLabe
   const config = {
     btc: {
       icon: Bitcoin,
-      title: "Withdraw BTC",
+      title: PRODUCT_COPY.transactions.withdrawBtc,
       description: "The Bitcoin destination address will be visible on-chain.",
       tone: "text-btc border-btc/20 bg-btc/8",
     },
     stealth_sns: {
       icon: LockKeyhole,
-      title: "Private transfer",
+      title: PRODUCT_COPY.transactions.privateTransfer,
       description: "The recipient gets a private note. Amount and recipient stay hidden.",
       tone: "text-privacy border-privacy/20 bg-privacy/8",
     },
     stealth_meta: {
       icon: LockKeyhole,
-      title: "Private transfer",
+      title: PRODUCT_COPY.transactions.privateTransfer,
       description: "The recipient gets a private note. Amount and recipient stay hidden.",
       tone: "text-privacy border-privacy/20 bg-privacy/8",
     },
     spl_wallet: {
       icon: Wallet,
-      title: `Cash out to ${chainLabel} wallet`,
+      title: `${PRODUCT_COPY.transactions.cashOut} to ${chainLabel}`,
       description: "Funds leave the private vault and arrive at a public wallet address.",
       tone: "text-purple border-purple/20 bg-purple/8",
     },
@@ -871,7 +872,7 @@ export function SendForm({
       {locksRegtestBtcDestination && (
         <p className={cn("text-xs", regtestAddressError ? "text-red-500" : "text-muted-foreground")}>
           {regtestAddressError ?? (regtestBtcAddress
-            ? "Regtest safety: cash-outs can only go to your connected test wallet."
+            ? "Regtest safety: BTC withdrawals can only go to your connected test wallet."
             : "Loading your connected regtest wallet address…")}
         </p>
       )}
@@ -933,8 +934,8 @@ export function SendForm({
       {(recipientValid || mode === "cashout") && !relayerReady && (
         <div className="text-xs text-amber-600">
           {relayerMetaLoaded
-            ? "Relay fee configuration is unavailable. Sending is temporarily disabled."
-            : "Loading relay fee configuration…"}
+            ? "Relayer fee configuration is unavailable. Sending is temporarily disabled."
+            : "Loading relayer fee configuration…"}
         </div>
       )}
 
@@ -951,7 +952,11 @@ export function SendForm({
           )}
         >
           <Send className="w-4 h-4" />
-          {mode === "cashout" ? "Cash out" : "Send"}
+          {mode === "cashout"
+            ? state.cashOutDestination === "bitcoin"
+              ? "Review BTC withdrawal"
+              : "Review cash out"
+            : "Review private transfer"}
         </button>
       )}
 
@@ -987,7 +992,7 @@ export function SendForm({
           recipientType === "spl_wallet"
             ? [
                 { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
-                { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                { label: PRODUCT_COPY.protocol.relayerFee, value: formatFee(effectiveRelayerFee) },
                 { label: "Protocol fee", value: `${formatAmount(Number(withdrawalFee), selectedPayToken.decimals)} ${selectedPayToken.unit}` },
                 { label: "Wallet receives", value: `${formatAmount(Number(walletNetPayout), selectedPayToken.decimals)} ${selectedPayToken.unit}`, strong: true },
                 { label: "Destination", value: state.recipient.trim() },
@@ -995,7 +1000,7 @@ export function SendForm({
             : recipientType === "btc"
               ? [
                   { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
-                  { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                  { label: PRODUCT_COPY.protocol.relayerFee, value: formatFee(effectiveRelayerFee) },
                   { label: "Bitcoin service fee", value: formatFee(btcServiceFee) },
                   { label: "Wallet receives", value: `${btcNetPayout.toLocaleString()} sats`, strong: true },
                   { label: "Destination", value: state.recipient.trim() },
@@ -1003,7 +1008,7 @@ export function SendForm({
               : [
                   { label: "Private balance deducted", value: formatFee(BigInt(amountSats) + BigInt(effectiveRelayerFee)) },
                   { label: "Recipient receives", value: `${state.amount} ${effectiveToken}`, strong: true },
-                  { label: "Relay fee", value: formatFee(effectiveRelayerFee) },
+                  { label: PRODUCT_COPY.protocol.relayerFee, value: formatFee(effectiveRelayerFee) },
                 ]
         }
         privacyNote={
@@ -1017,7 +1022,7 @@ export function SendForm({
           highFeeShare
             ? "Fees are high relative to this amount. Review the net amount carefully."
             : detection.type === "btc"
-            ? "Cashing out to Bitcoin reveals the destination address on-chain."
+            ? "Withdrawing BTC reveals the destination address on-chain."
             : undefined
         }
         chainId={activeChainId}

@@ -433,12 +433,12 @@ export function DepositRow({
           )}
         </Td>
         <Td>
-          <TypeBadge kind="shield" />
+          <TypeBadge kind="shield" isBtcDeposit={isBtcDeposit} />
         </Td>
         <Td>
           <FlowCell
             from={{ icon: config.from.logo, label: config.from.label }}
-            to={{ icon: "shield", label: "Shielded" }}
+            to={{ icon: "shield", label: "Private vault" }}
           />
         </Td>
         <Td>
@@ -498,7 +498,9 @@ export function DepositsTab() {
   return (
     <div className="space-y-3">
       <div className="flex items-center justify-between px-1">
-        <span className="text-caption text-gray">{deposits.length} deposit(s)</span>
+        <span className="text-caption text-gray">
+          {deposits.length} {deposits.length === 1 ? "transaction" : "transactions"}
+        </span>
         <RefreshButton onClick={refresh} />
       </div>
       <div className="overflow-x-auto rounded-[12px] border border-gray/15 backdrop-blur-sm bg-muted/30">

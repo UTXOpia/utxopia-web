@@ -13,6 +13,7 @@ import { useExplorer } from "@/hooks/use-explorer";
 import type { ExplorerTransaction, RedemptionRecord } from "@/hooks/use-explorer";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
+import { PRODUCT_COPY } from "@/lib/product-language";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { cn } from "@/lib/utils";
@@ -143,9 +144,9 @@ function ExplorerContent({ network }: { network: NetworkId }) {
     <>
       {/* Stats */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
-        <StatCard label="Deposits" value={counts.shield} color="bg-muted/30 border-gray/15" />
+        <StatCard label={PRODUCT_COPY.actions.addFunds} value={counts.shield} color="bg-muted/30 border-gray/15" />
         <StatCard label="Private transfers" value={counts.transfer} color="bg-muted/30 border-gray/15" />
-        <StatCard label="Cash-outs" value={counts.unshield} color="bg-muted/30 border-gray/15" />
+        <StatCard label={PRODUCT_COPY.actions.takeFundsOut} value={counts.unshield} color="bg-muted/30 border-gray/15" />
         <StatCard label="Private value" value={totalShieldedDisplay} color="bg-muted/30 border-gray/15" />
       </div>
 

@@ -33,7 +33,7 @@ const metadataBase = new URL(
 export const metadata: Metadata = {
   metadataBase,
   title: "UTXOpia | Private Bitcoin and Token Transfers",
-  description: "Shield Bitcoin and supported assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments on Solana.",
+  description: "Deposit Bitcoin and shield supported assets with zero-knowledge proofs. Private transfers, stealth addresses, and auditable commitments on Solana.",
   icons: {
     icon: [
       { url: "/brand/logo-32.png", sizes: "32x32", type: "image/png" },

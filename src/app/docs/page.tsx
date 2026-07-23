@@ -43,7 +43,7 @@ import { useActiveSection } from "@/hooks/use-active-section";
 import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
-import { PRODUCT_FEATURES, PRODUCT_TERMS } from "@/lib/product-language";
+import { PRODUCT_COPY, PRODUCT_FEATURES, PRODUCT_TERMS } from "@/lib/product-language";
 
 /* ── Simple card wrapper ── */
 
@@ -263,7 +263,7 @@ function getProtocolSteps() {
 
   return [
     {
-      id: "shield-tokens", num: "01", icon: Shield, title: "Add Funds",
+      id: "shield-tokens", num: "01", icon: Shield, title: PRODUCT_COPY.actions.addFunds,
       desc: `Deposit BTC via Taproot, or shield ${nativeTokens} directly from your ${wallet}. Every token enters the same privacy pool — a shared Merkle tree where all commitments look identical regardless of token type or amount.`,
       detail: "BTC: Taproot + SPV · SPL: Shield (disc=12)",
     },
@@ -278,7 +278,7 @@ function getProtocolSteps() {
       detail: "Poseidon hash · Token-agnostic · 65,536 leaves",
     },
     {
-      id: "joinsplit-transfer", num: "04", icon: Layers, title: "Private Transfer",
+      id: "joinsplit-transfer", num: "04", icon: Layers, title: PRODUCT_COPY.transactions.privateTransfer,
       desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for supported assets including BTC, SOL, USDC, and USDT.",
       detail: "Groth16 · 256 bytes · Token-agnostic circuit",
     },
@@ -288,7 +288,7 @@ function getProtocolSteps() {
       detail: "DKSAP · X25519 ECDH · Ed25519 viewing keys",
     },
     {
-      id: "unshield-withdraw", num: "06", icon: Network, title: "Cash Out or Withdraw BTC",
+      id: "unshield-withdraw", num: "06", icon: Network, title: PRODUCT_COPY.actions.takeFundsOut,
       desc: `Take funds out in two ways: cash out supported assets to your ${wallet} (zkSOL returns native SOL), or withdraw zkBTC to a native Bitcoin address through an Ika dWallet controlled by this ${program}. The protocol calls the first operation an unshield. Both operations use a JoinSplit proof, and a nullifier prevents double-spending without revealing the note being spent.`,
       detail: "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
@@ -488,10 +488,10 @@ export default function DocsPage() {
               </p>
               <div className="divide-y divide-gray/10 rounded-xl border border-gray/10">
                 {[
-                  ["/vault/deposit", "Add funds", "Deposit BTC or shield a supported Solana asset."],
-                  ["/send", "Send privately", "Pay a UTXOpia name, private receive address, or claim link."],
-                  ["/vault/withdraw", "Take funds out", "Cash out to Solana or withdraw zkBTC to Bitcoin."],
-                  ["/vault/activity", "Review activity", "See deposits, transfers, fees, cash-outs, and withdrawals."],
+                  ["/vault/deposit", PRODUCT_COPY.actions.addFunds, "Deposit BTC or shield a supported Solana asset."],
+                  ["/send", PRODUCT_COPY.actions.sendPrivately, "Pay a UTXOpia name, private receive address, or claim link."],
+                  ["/vault/withdraw", PRODUCT_COPY.actions.takeFundsOut, "Cash out to Solana or withdraw zkBTC to Bitcoin."],
+                  ["/vault/activity", PRODUCT_COPY.actions.reviewActivity, "See BTC deposits, shields, private transfers, cash outs, and BTC withdrawals."],
                 ].map(([route, title, description]) => (
                   <Link
                     key={route}

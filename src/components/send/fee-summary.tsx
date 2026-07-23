@@ -2,6 +2,7 @@
 
 import { AlertTriangle } from "lucide-react";
 import type { RecipientType } from "./recipient-detect";
+import { PRODUCT_COPY } from "@/lib/product-language";
 
 export interface FeeSummaryProps {
   recipientType: RecipientType | "claim_link" | null;
@@ -17,7 +18,7 @@ export function FeeSummary({
   return (
     <div className="space-y-2 text-xs">
       <div className="flex items-center justify-between">
-        <span className="text-muted-foreground">Relay fee</span>
+        <span className="text-muted-foreground">{PRODUCT_COPY.protocol.relayerFee}</span>
         <span className="font-mono">{relayFeeLabel}</span>
       </div>
       {serviceFeeLabel && (
@@ -30,7 +31,7 @@ export function FeeSummary({
         <div className="mt-2 flex items-start gap-1.5 px-2 py-1.5 rounded bg-yellow-500/10 text-yellow-600 dark:text-yellow-400">
           <AlertTriangle className="w-3.5 h-3.5 shrink-0 mt-0.5" />
           <span className="text-[11px]">
-            Cashing out to Bitcoin reveals the destination address on-chain.
+            Withdrawing BTC reveals the destination address on-chain.
           </span>
         </div>
       )}

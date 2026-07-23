@@ -107,7 +107,7 @@ export function RelayControl({
     >
       <span className="inline-flex min-w-0 items-center gap-1.5 text-gray">
         <HealthDot status={statusKey} />
-        <span className="shrink-0 text-gray">Relay</span>
+        <span className="shrink-0 text-gray">Relayer</span>
         <span className="text-gray/40" aria-hidden>
           ·
         </span>

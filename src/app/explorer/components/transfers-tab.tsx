@@ -88,6 +88,13 @@ export function TransferRow({
   const btcWithdrawalTxid = kind === "withdraw"
     ? redemption?.btcTxid ?? tx.outputs.find((output) => output.type === "withdraw")?.btcTxid
     : undefined;
+  const normalizedTokenSymbol = tokenSym?.toUpperCase();
+  const isBtcDeposit = kind === "shield" && (
+    normalizedTokenSymbol === "BTC" ||
+    normalizedTokenSymbol === "ZKBTC" ||
+    Boolean(tx.btcMeta?.depositTxid) ||
+    tx.btcMeta?.depositBlockHeight != null
+  );
 
   return (
     <Fragment>
@@ -127,25 +134,25 @@ export function TransferRow({
           )}
         </Td>
         <Td>
-          <TypeBadge kind={kind} />
+          <TypeBadge kind={kind} isBtcDeposit={isBtcDeposit} />
         </Td>
         <Td>
           {kind === "shield" ? (
             <FlowCell
               from={{ icon: token.isBtcNative ? "/tokens/btc.png" : token.logo, label: token.symbol }}
-              to={{ icon: "shield", label: "Shielded" }}
+              to={{ icon: "shield", label: "Private vault" }}
               meta={liveDepositConfs != null ? `${liveDepositConfs} conf` : undefined}
             />
           ) : isUnshieldOrWithdraw ? (
             <FlowCell
-              from={{ icon: "shield", label: "Shielded" }}
+              from={{ icon: "shield", label: "Private vault" }}
               to={{ icon: kind === "withdraw" ? "/tokens/btc.png" : (token.isBtcNative ? token.shieldedLogo : token.logo), label: kind === "withdraw" ? "BTC" : token.symbol }}
               meta={`${getTxInputCount(tx)} in, ${tx.outputs.length} out`}
             />
           ) : (
             <FlowCell
-              from={{ icon: "shield", label: "Shielded" }}
-              to={{ icon: "shield", label: "Shielded" }}
+              from={{ icon: "shield", label: "Private vault" }}
+              to={{ icon: "shield", label: "Private vault" }}
               meta={`${getTxInputCount(tx)} in, ${tx.outputs.length} out`}
             />
           )}

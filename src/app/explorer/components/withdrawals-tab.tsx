@@ -438,7 +438,7 @@ export function WithdrawalRow({
         </Td>
         <Td>
           <FlowCell
-            from={{ icon: "shield", label: "Shielded" }}
+            from={{ icon: "shield", label: "Private vault" }}
             to={{ icon: "/tokens/btc.png", label: "BTC" }}
             meta={`${r.inputCount} in, ${r.outputCount} out`}
           />

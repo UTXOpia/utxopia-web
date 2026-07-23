@@ -15,7 +15,7 @@ export function calculateClaimReceiveAmount(
   const fee = BigInt(Math.max(0, Math.floor(relayFeeBaseUnits)));
   const receiveAmount = BigInt(amountBaseUnits) - fee;
   if (receiveAmount <= 0n) {
-    throw new Error("This note is too small to cover the relay fee.");
+    throw new Error("This note is too small to cover the relayer fee.");
   }
   return receiveAmount;
 }

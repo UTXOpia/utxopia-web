@@ -200,7 +200,7 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   if (relayerFee > 0) {
     if (!relayerMeta) {
       throw new Error(
-        "Relayer fee address is unavailable. Please wait for relay configuration and try again.",
+        "Relayer fee address is unavailable. Please wait for relayer configuration and try again.",
       );
     }
     const feeAmount = BigInt(relayerFee);

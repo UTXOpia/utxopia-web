@@ -6,6 +6,7 @@ import { ArrowUpFromLine, ChevronRight, Droplets, PlusCircle, Send } from "lucid
 import { cn } from "@/lib/utils";
 import { isChainHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { PRODUCT_COPY } from "@/lib/product-language";
 
 interface VaultActionsProps {
   networkId: NetworkId;
@@ -19,22 +20,27 @@ export function VaultActions({
   depositCount,
 }: VaultActionsProps) {
   const actions = [
-    { icon: <PlusCircle className="w-5 h-5" />, label: "Add funds", href: "/vault/deposit", color: "text-green-400" },
+    { icon: <PlusCircle className="w-5 h-5" />, label: PRODUCT_COPY.actions.addFunds, href: "/vault/deposit", color: "text-green-400" },
     ...(isChainHybridNetwork(networkId, "solana")
       ? [{ icon: <Droplets className="w-5 h-5" />, label: "Faucet", href: "/faucet", color: "text-warning" }]
       : []),
-    { icon: <Send className="w-5 h-5" />, label: "Send", href: "/send", color: "text-purple-400" },
-    { icon: <ArrowUpFromLine className="w-5 h-5" />, label: "Cash out", href: "/vault/withdraw", color: "text-chain" },
-  ].filter((action) => !isViewOnly || action.label === "Send");
+    { icon: <Send className="w-5 h-5" />, label: PRODUCT_COPY.actions.sendPrivately, href: "/send", color: "text-purple-400" },
+    { icon: <ArrowUpFromLine className="w-5 h-5" />, label: PRODUCT_COPY.actions.takeFundsOut, href: "/vault/withdraw", color: "text-chain" },
+  ].filter((action) => !isViewOnly || action.label === PRODUCT_COPY.actions.sendPrivately);
 
   return (
     <>
-      <div className="flex items-center justify-center gap-5 sm:gap-8 mb-6">
+      <div
+        className={cn(
+          "grid items-start justify-center gap-2 sm:gap-6 mb-6",
+          actions.length >= 4 ? "grid-cols-4" : "grid-cols-3",
+        )}
+      >
         {actions.map((action) => (
           <Link
             key={action.label}
             href={hrefWithChain(action.href, networkId)}
-            className="flex flex-col items-center gap-1.5 group cursor-pointer"
+            className="group flex min-w-0 flex-col items-center gap-1.5 cursor-pointer"
           >
             <motion.div
               className={cn(
@@ -50,7 +56,7 @@ export function VaultActions({
             >
               {action.icon}
             </motion.div>
-            <span className="text-[11px] text-gray group-hover:text-foreground transition-colors">
+            <span className="text-center text-[11px] leading-tight text-gray group-hover:text-foreground transition-colors">
               {action.label}
             </span>
           </Link>

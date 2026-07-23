@@ -6,13 +6,14 @@ import {
   Unlock,
   ChevronRight,
 } from "lucide-react";
+import { PRODUCT_COPY } from "@/lib/product-language";
 
 const STEPS = [
-  { icon: Shield, label: "Add funds", sub: "BTC / SOL / USDC / USDT", color: "text-privacy", border: "border-privacy/20" },
+  { icon: Shield, label: PRODUCT_COPY.actions.addFunds, sub: "BTC / SOL / USDC / USDT", color: "text-privacy", border: "border-privacy/20" },
   { icon: GitBranch, label: "Verify", sub: "SPV (BTC only)", color: "text-sol", border: "border-sol/20" },
   { icon: TreePine, label: "Commit", sub: "Merkle Tree", color: "text-privacy", border: "border-privacy/20" },
-  { icon: Layers, label: "Private transfer", sub: "ZK Proof", color: "text-sol", border: "border-sol/20" },
-  { icon: Unlock, label: "Cash out", sub: "SOL / SPL / BTC", color: "text-btc", border: "border-btc/20" },
+  { icon: Layers, label: PRODUCT_COPY.transactions.privateTransfer, sub: "ZK Proof", color: "text-sol", border: "border-sol/20" },
+  { icon: Unlock, label: PRODUCT_COPY.actions.takeFundsOut, sub: "Solana / Bitcoin", color: "text-btc", border: "border-btc/20" },
 ];
 
 function StepNode({ step }: { step: typeof STEPS[number] }) {

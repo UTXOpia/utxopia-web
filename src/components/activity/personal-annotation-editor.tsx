@@ -65,7 +65,7 @@ export function PersonalAnnotationEditor({
               value={label}
               onChange={(event) => setLabel(event.target.value)}
               maxLength={ACTIVITY_LABEL_MAX_LENGTH}
-              placeholder="e.g. Relay fee"
+              placeholder="e.g. Relayer fee"
               autoFocus
               className="h-9 w-full rounded-md border border-gray/15 bg-muted/35 px-2.5 text-xs text-foreground outline-none transition-colors placeholder:text-gray/45 focus:border-privacy/45 focus:ring-2 focus:ring-privacy/10"
             />

@@ -5,6 +5,7 @@ import { PlusCircle } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { ShieldFlow } from "@/components/shield-flow";
 import { hrefWithChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
+import { PRODUCT_COPY } from "@/lib/product-language";
 
 interface ChainDepositRouteProps {
   networkId: NetworkId;
@@ -24,12 +25,12 @@ function SolanaDepositPage({ networkId }: ChainDepositRouteProps) {
       badges={[
         {
           icon: <PlusCircle className="w-full h-full" />,
-          label: "Add funds",
+          label: PRODUCT_COPY.actions.addFunds,
           color: "privacy",
         },
       ]}
       titleIcon={<PlusCircle className="w-full h-full" />}
-      title="Add funds"
+      title={PRODUCT_COPY.actions.addFunds}
       description="Deposit native BTC or shield supported Solana assets into your private vault."
     >
       <ShieldFlow />

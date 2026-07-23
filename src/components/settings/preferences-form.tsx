@@ -37,7 +37,7 @@ export function PreferencesForm() {
       </Section>
 
       <Section
-        label="Relay"
+        label="Relayer"
         hintNode={
           <InfoTip label="About relays">
             Relayers submit prepared private transactions to Solana without using
@@ -45,7 +45,7 @@ export function PreferencesForm() {
             or spend your funds.{" "}
             <span className="text-gray/70">
               Permissioned-pool deposits are submitted via the pool&apos;s
-              auditor; relay selection applies to all other sends.
+              auditor; relayer selection applies to all other sends.
             </span>
           </InfoTip>
         }

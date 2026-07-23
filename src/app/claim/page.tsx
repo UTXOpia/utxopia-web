@@ -35,6 +35,7 @@ import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { recordSubmittedTransaction } from "@/lib/transaction-activity";
 import { formatAmount } from "@/lib/utils/formatting";
 import { cn } from "@/lib/utils";
+import { PRODUCT_COPY } from "@/lib/product-language";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 function ClaimContent() {
@@ -210,7 +211,7 @@ function ClaimContent() {
           </div>
           <div>
             <h1 className="text-heading6 text-foreground">Claim private funds</h1>
-            <p className="text-caption text-gray">Inspect the private note before redeeming it.</p>
+            <p className="text-caption text-gray">Inspect the private note before claiming it.</p>
           </div>
         </div>
 
@@ -269,7 +270,7 @@ function ClaimContent() {
                   <span className="font-mono font-semibold text-foreground">{displayAmount} {token.shieldedSymbol}</span>
                 </div>
                 <div className="flex items-center justify-between gap-3 text-xs">
-                  <span className="text-gray/70">Relay fee</span>
+                  <span className="text-gray/70">{PRODUCT_COPY.protocol.relayerFee}</span>
                   <span className="font-mono text-gray">{formatAmount(effectiveRelayerFee, token.decimals)} {token.shieldedSymbol}</span>
                 </div>
                 {displayReceiveAmount && (

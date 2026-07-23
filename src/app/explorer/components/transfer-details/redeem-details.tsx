@@ -54,7 +54,7 @@ export function RedeemDetails({ tx, redemption, network }: { tx: TransferTx; red
                 {grossAmount ? formatTokenAmount(grossAmount, token) : "\u2014"}
               </span>
             </div>
-            <span className="text-[10px] text-gray/50">Shielded note (burned)</span>
+            <span className="text-[10px] text-gray/50">Private note (spent)</span>
           </div>
           {/* Nullifier */}
           {getTxNullifierPdas(tx).length > 0 && getTxNullifierPdas(tx).map((pda, i) => (
