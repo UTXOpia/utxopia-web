@@ -76,7 +76,7 @@ function ExpandableSection({
           <span className="block text-base font-semibold text-foreground sm:text-lg">
             {title}
           </span>
-          <span className="mt-1 block max-w-2xl text-xs leading-relaxed text-gray sm:text-sm">
+          <span className="mt-1 block max-w-2xl text-sm leading-relaxed text-gray">
             {summary}
           </span>
         </span>
@@ -455,7 +455,7 @@ export default function DocsPage() {
         {/* Desktop sidebar — spans full height (border runs top→bottom); only
             the nav content is padded down so it clears the floating header. */}
         <aside className="hidden lg:block w-[240px] xl:w-[268px] shrink-0">
-          <div className="sticky top-0 h-screen overflow-y-auto border-r border-gray/10 px-4 pb-10 pt-8">
+          <div className="sticky top-0 h-screen overflow-y-auto border-r border-gray/10 px-4 pb-10 pt-32">
             <div className="mb-6 flex items-center gap-2">
               <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-gray/40">
                 Product Guide
@@ -502,7 +502,7 @@ export default function DocsPage() {
                       <span className="block text-sm font-medium text-foreground group-hover:text-privacy">
                         {title}
                       </span>
-                      <span className="mt-1 block text-xs leading-relaxed text-gray">
+                      <span className="mt-1 block text-sm leading-relaxed text-gray">
                         {description}
                       </span>
                     </span>
@@ -528,7 +528,7 @@ export default function DocsPage() {
                       <span className="text-sm font-medium text-foreground group-hover:text-privacy">
                         {feature.name}
                       </span>
-                      <span className="mt-1 block text-xs leading-relaxed text-gray">
+                      <span className="mt-1 block text-sm leading-relaxed text-gray">
                         {feature.purpose}
                       </span>
                     </span>
@@ -657,7 +657,7 @@ export default function DocsPage() {
                 <h2 className="text-xl sm:text-2xl md:text-3xl font-semibold tracking-tight text-foreground mb-4">
                   Open Your Private Vault
                 </h2>
-                <p className="text-gray text-xs sm:text-sm font-light mb-6 sm:mb-8 max-w-lg mx-auto leading-relaxed">
+                <p className="mb-6 max-w-lg text-sm font-light leading-relaxed text-gray sm:mb-8">
                   Deposit or shield supported assets, send privately, cash out to Solana, or withdraw zkBTC to Bitcoin.
                 </p>
                 <div className="flex flex-col sm:flex-row items-center justify-center gap-3 sm:gap-4">

@@ -66,10 +66,10 @@ function NavButton({
     <button
       onClick={() => onNavigate(id)}
       aria-current={isActive ? "location" : undefined}
-      className={`min-h-11 w-full px-3 py-2 text-left text-[13px] font-medium rounded-md transition-colors border-l-2 ${
+      className={`min-h-11 w-full rounded-lg border px-3 py-2 text-left text-[13px] font-medium transition-colors ${
         isActive
-          ? "border-privacy text-foreground bg-privacy/5"
-          : "border-transparent text-gray hover:text-foreground hover:bg-muted/30"
+          ? "border-privacy/20 bg-privacy/8 text-foreground"
+          : "border-transparent text-gray hover:border-gray/10 hover:bg-muted/30 hover:text-foreground"
       }`}
     >
       {label}
