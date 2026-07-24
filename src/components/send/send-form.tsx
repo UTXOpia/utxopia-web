@@ -18,6 +18,7 @@ import { useUTXOpia } from "@/hooks/use-utxopia";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { useNoteAutoSelector } from "@/hooks/use-note-auto-selector";
 import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
+import { estimateJoinSplitDimensions } from "@/lib/prover/join-split-dimensions";
 import { useElapsedSeconds } from "@/hooks/use-elapsed-seconds";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useRelayerConfig } from "@/hooks/use-relayer-config";
@@ -744,6 +745,32 @@ export function SendForm({
     setError(null);
   }, [submitter]);
 
+  const openReview = useCallback(() => {
+    dispatch({ type: "open_review" });
+
+    const dimensions = estimateJoinSplitDimensions(
+      noteSelector.selectedNotes.map((note) => BigInt(note.amount || 0)),
+      BigInt(amountSats),
+      BigInt(effectiveRelayerFee),
+    );
+    if (!dimensions) return;
+
+    // Start downloading the exact wasm/zkey pair while the user reviews the
+    // transaction. Confirmation queues behind this preload if it is still in
+    // flight, so the same artifacts are never downloaded twice.
+    void submitter.preloadCircuit(
+      dimensions.nInputs,
+      dimensions.nOutputs,
+    ).catch((preloadError) => {
+      console.warn("[Prover] Circuit preload failed; proof generation will retry on confirm.", preloadError);
+    });
+  }, [
+    amountSats,
+    effectiveRelayerFee,
+    noteSelector.selectedNotes,
+    submitter,
+  ]);
+
   const onViewActivity = useCallback(() => {
     const sig = submitter.txSignature;
     router.push(
@@ -944,7 +971,7 @@ export function SendForm({
       {amountValid && (
         <button
           type="button"
-          onClick={() => dispatch({ type: "open_review" })}
+          onClick={openReview}
           disabled={requiresBackup || !relayerReady}
           className={cn(
             "w-full px-4 py-3 rounded-lg bg-foreground text-background text-sm font-medium flex items-center justify-center gap-2",
@@ -982,7 +1009,7 @@ export function SendForm({
       <ReviewModal
         open={state.reviewOpen}
         onOpenChange={(o) => {
-          if (o) dispatch({ type: "open_review" });
+          if (o) openReview();
           else closeReview();
         }}
         recipientLabel={state.recipient.trim()}

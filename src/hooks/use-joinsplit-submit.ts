@@ -233,5 +233,13 @@ export function useJoinSplitSubmit() {
     setError(null);
   }, []);
 
-  return { status, statusMessage, txSignature, error, submit, reset };
+  return {
+    status,
+    statusMessage,
+    txSignature,
+    error,
+    submit,
+    reset,
+    preloadCircuit: prover.preloadCircuit,
+  };
 }

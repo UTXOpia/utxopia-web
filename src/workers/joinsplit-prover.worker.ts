@@ -1,11 +1,14 @@
 import type { JoinSplitProofInputs, ProofData } from "@utxopia/sdk";
+import { preloadJoinSplitArtifacts } from "@/lib/prover/circuit-artifacts";
 
 type WorkerRequest =
   | { id: number; type: "init"; circuitPath?: string }
+  | { id: number; type: "preload"; nInputs: number; nOutputs: number; circuitPath?: string }
   | { id: number; type: "generate"; inputs: JoinSplitProofInputs; circuitPath?: string };
 
 type WorkerResponse =
   | { id: number; ok: true; type: "init" }
+  | { id: number; ok: true; type: "preload" }
   | { id: number; ok: true; type: "generate"; proof: ProofData; proofBytes: Uint8Array }
   | { id: number; ok: false; error: string };
 
@@ -46,6 +49,20 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
         initialized = true;
       }
       self.postMessage({ id, ok: true, type: "init" } satisfies WorkerResponse);
+      return;
+    }
+
+    if (type === "preload") {
+      if (!initialized) {
+        await mod.initProver();
+        initialized = true;
+      }
+      await preloadJoinSplitArtifacts(
+        circuitPath || "/circuits/groth16",
+        event.data.nInputs,
+        event.data.nOutputs,
+      );
+      self.postMessage({ id, ok: true, type: "preload" } satisfies WorkerResponse);
       return;
     }
 

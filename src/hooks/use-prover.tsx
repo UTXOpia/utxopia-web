@@ -10,6 +10,7 @@
 import { useRef, useState, useCallback } from "react";
 import type { JoinSplitProofInputs, ProofData } from "@utxopia/sdk";
 import { resolveCircuitPath } from "@/lib/prover/circuit-path";
+import { preloadJoinSplitArtifacts } from "@/lib/prover/circuit-artifacts";
 
 const circuitPath = resolveCircuitPath(process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL);
 const PROVER_WORKER_TIMEOUT_MS = 120_000;
@@ -20,6 +21,7 @@ const useProverWorker =
 
 type WorkerResponse =
   | { id: number; ok: true; type: "init" }
+  | { id: number; ok: true; type: "preload" }
   | { id: number; ok: true; type: "generate"; proof: ProofData; proofBytes: Uint8Array }
   | { id: number; ok: false; error: string };
 
@@ -48,6 +50,7 @@ interface ProverState {
   progress: string | null;
   error: string | null;
   initialize: () => Promise<void>;
+  preloadCircuit: (nInputs: number, nOutputs: number) => Promise<void>;
   generateProof: (inputs: JoinSplitProofInputs) => Promise<{
     proof: ProofData;
     proofBytes: Uint8Array;
@@ -61,6 +64,7 @@ export function useProver(): ProverState {
   const [error, setError] = useState<string | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const requestIdRef = useRef(0);
+  const workerQueueRef = useRef<Promise<void>>(Promise.resolve());
 
   const resetWorker = useCallback(() => {
     workerRef.current?.terminate();
@@ -78,33 +82,40 @@ export function useProver(): ProverState {
 
   const callWorker = useCallback(
     <T,>(message: Record<string, unknown>): Promise<T> => {
-      const worker = getWorker();
-      const id = ++requestIdRef.current;
+      const task = workerQueueRef.current
+        .catch(() => {})
+        .then(() => {
+          const worker = getWorker();
+          const id = ++requestIdRef.current;
 
-      return new Promise<T>((resolve, reject) => {
-        const timer = setTimeout(() => {
-          resetWorker();
-          reject(new Error("Proof generation timed out. This can happen on slower devices or with large transfers — please try again."));
-        }, PROVER_WORKER_TIMEOUT_MS);
+          return new Promise<T>((resolve, reject) => {
+            const timer = setTimeout(() => {
+              resetWorker();
+              reject(new Error("Proof generation timed out. This can happen on slower devices or with large transfers — please try again."));
+            }, PROVER_WORKER_TIMEOUT_MS);
 
-        worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-          if (event.data.id !== id) return;
-          clearTimeout(timer);
-          if (!event.data.ok) {
-            reject(new Error(event.data.error));
-            return;
-          }
-          resolve(event.data as T);
-        };
+            worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
+              if (event.data.id !== id) return;
+              clearTimeout(timer);
+              if (!event.data.ok) {
+                reject(new Error(event.data.error));
+                return;
+              }
+              resolve(event.data as T);
+            };
 
-        worker.onerror = (event) => {
-          clearTimeout(timer);
-          resetWorker();
-          reject(new Error(event.message || "Prover worker failed"));
-        };
+            worker.onerror = (event) => {
+              clearTimeout(timer);
+              resetWorker();
+              reject(new Error(event.message || "Prover worker failed"));
+            };
 
-        worker.postMessage({ id, circuitPath, ...message });
-      });
+            worker.postMessage({ id, circuitPath, ...message });
+          });
+        });
+
+      workerQueueRef.current = task.then(() => undefined, () => undefined);
+      return task;
     },
     [getWorker, resetWorker],
   );
@@ -129,6 +140,21 @@ export function useProver(): ProverState {
       throw error;
     }
   }, [callWorker]);
+
+  const preloadCircuit = useCallback(
+    async (nInputs: number, nOutputs: number) => {
+      if (useProverWorker) {
+        await callWorker<{ id: number; ok: true; type: "preload" }>({
+          type: "preload",
+          nInputs,
+          nOutputs,
+        });
+        return;
+      }
+      await preloadJoinSplitArtifacts(circuitPath, nInputs, nOutputs);
+    },
+    [callWorker],
+  );
 
   const generateProof = useCallback(
     async (inputs: JoinSplitProofInputs) => {
@@ -171,6 +197,7 @@ export function useProver(): ProverState {
     progress,
     error,
     initialize,
+    preloadCircuit,
     generateProof,
   };
 }
