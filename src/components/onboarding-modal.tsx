@@ -97,7 +97,6 @@ export function OnboardingModal({ forceShow, onComplete }: OnboardingModalProps)
             "animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%]",
             "focus:outline-none"
           )}
-          aria-describedby="onboarding-description"
         >
           {/* Close button */}
           <Dialog.Close asChild>
@@ -137,10 +136,7 @@ export function OnboardingModal({ forceShow, onComplete }: OnboardingModalProps)
           <Dialog.Title className="text-heading6 text-foreground text-center mb-3">
             {step.title}
           </Dialog.Title>
-          <Dialog.Description
-            id="onboarding-description"
-            className="text-body2 text-gray text-center mb-8"
-          >
+          <Dialog.Description className="text-body2 text-gray text-center mb-8">
             {step.description}
           </Dialog.Description>
 

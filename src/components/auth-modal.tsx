@@ -49,7 +49,6 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
             "animate-in fade-in-0 zoom-in-95 duration-200",
             "focus:outline-none",
           )}
-          aria-describedby="auth-modal-description"
         >
           {/* Close */}
           <Dialog.Close asChild>
@@ -69,10 +68,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
             <Dialog.Title className="text-[20px] font-bold text-foreground mb-1">
               Sign In
             </Dialog.Title>
-            <Dialog.Description
-              id="auth-modal-description"
-              className="text-body2 text-gray"
-            >
+            <Dialog.Description className="text-body2 text-gray">
               Choose how to access your private vault
             </Dialog.Description>
           </div>
