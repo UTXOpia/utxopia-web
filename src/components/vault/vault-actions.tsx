@@ -2,9 +2,8 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowUpFromLine, ChevronRight, Droplets, PlusCircle, Send } from "lucide-react";
+import { ArrowUpFromLine, ChevronRight, PlusCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { isChainHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
 
@@ -21,9 +20,6 @@ export function VaultActions({
 }: VaultActionsProps) {
   const actions = [
     { icon: <PlusCircle className="w-5 h-5" />, label: PRODUCT_COPY.actions.addFunds, href: "/vault/deposit", color: "text-green-400" },
-    ...(isChainHybridNetwork(networkId, "solana")
-      ? [{ icon: <Droplets className="w-5 h-5" />, label: "Faucet", href: "/faucet", color: "text-warning" }]
-      : []),
     { icon: <Send className="w-5 h-5" />, label: PRODUCT_COPY.actions.sendPrivately, href: "/send", color: "text-purple-400" },
     { icon: <ArrowUpFromLine className="w-5 h-5" />, label: PRODUCT_COPY.actions.takeFundsOut, href: "/vault/withdraw", color: "text-chain" },
   ].filter((action) => !isViewOnly || action.label === PRODUCT_COPY.actions.sendPrivately);
@@ -33,7 +29,7 @@ export function VaultActions({
       <div
         className={cn(
           "grid items-start justify-center gap-2 sm:gap-6 mb-6",
-          actions.length >= 4 ? "grid-cols-4" : "grid-cols-3",
+          "grid-cols-3",
         )}
       >
         {actions.map((action) => (

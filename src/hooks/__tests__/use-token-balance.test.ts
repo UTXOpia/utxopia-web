@@ -57,6 +57,18 @@ const zkbtcToken: SupportedToken = {
   showRawAmount: false,
 };
 
+const usdcToken: SupportedToken = {
+  ...zkbtcToken,
+  symbol: "USDC",
+  name: "USD Coin",
+  mint: "7qSDx4sbMHqx7HbPa3irvtXRqhq24h1Ai56Qttghh3td",
+  decimals: 6,
+  unit: "USDC",
+  priceKey: "usdc",
+  shieldedSymbol: "zkUSDC",
+  explorerFilter: "usdc",
+};
+
 function tokenAccountData(amount: bigint): Uint8Array {
   const data = new Uint8Array(165);
   new DataView(data.buffer).setBigUint64(64, amount, true);
@@ -143,5 +155,23 @@ describe("useTokenBalance", () => {
     expect(getTokenAccountsByOwner.mock.calls[0][1]).toEqual({
       mint: new PublicKey(runtimeMint),
     });
+  });
+
+  it("refreshes the selected public token balance on demand", async () => {
+    let balance = 0n;
+    const getTokenAccountsByOwner = mock(() => Promise.resolve({
+      value: balance === 0n ? [] : [{ account: { data: tokenAccountData(balance) } }],
+    }));
+    const conn = makeMockConnection({ getTokenAccountsByOwner });
+    const { result } = renderHook(() =>
+      useTokenBalance(usdcToken, PublicKey.default, conn, null)
+    );
+
+    await waitFor(() => expect(result.current.splBalance).toBe(0));
+    balance = 10_000_000n;
+    act(() => result.current.refreshBalance());
+
+    await waitFor(() => expect(result.current.splBalance).toBe(10_000_000));
+    expect(getTokenAccountsByOwner).toHaveBeenCalledTimes(2);
   });
 });

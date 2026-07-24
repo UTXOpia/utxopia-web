@@ -28,9 +28,9 @@ export function BtcFaucetPrompt({
             <Droplets className="h-4 w-4 text-warning" />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-body2-semibold text-foreground">Get test BTC from the faucet</p>
+            <p className="text-body2-semibold text-foreground">Get private test BTC</p>
             <p className="mt-1 text-caption text-gray">
-              Open the faucet for the active Bitcoin test network and follow the deposit instructions there.
+              Test BTC goes through the regtest deposit flow and is credited directly to your private vault. No second deposit is needed.
             </p>
           </div>
         </div>
@@ -39,7 +39,7 @@ export function BtcFaucetPrompt({
           className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-warning px-4 text-body2 font-semibold text-background transition-opacity hover:opacity-90"
         >
           <Droplets className="h-4 w-4" />
-          Go to BTC faucet
+          Get private test BTC
         </Link>
       </div>
     </div>

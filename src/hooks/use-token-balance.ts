@@ -16,6 +16,11 @@ export function useTokenBalance(
 ) {
   const [solBalance, setSolBalance] = useState<number | null>(null);
   const [splBalance, setSplBalance] = useState<number | null>(null);
+  const [refreshNonce, setRefreshNonce] = useState(0);
+
+  const refreshBalance = useCallback(() => {
+    setRefreshNonce((current) => current + 1);
+  }, []);
 
   // Fetch SOL balance when SOL is selected
   useEffect(() => {
@@ -28,7 +33,7 @@ export function useTokenBalance(
       if (!cancelled) setSolBalance(bal);
     }).catch((err) => console.error("[TokenBalance] SOL balance fetch error:", err));
     return () => { cancelled = true; };
-  }, [publicKey, selectedToken.isSOL, connection]);
+  }, [publicKey, selectedToken.isSOL, connection, refreshNonce]);
 
   // Fetch SPL token balance for non-SOL, non-BTC tokens (USDC, USDT, zkBTC)
   useEffect(() => {
@@ -58,7 +63,7 @@ export function useTokenBalance(
       if (!cancelled) setSplBalance(null);
     });
     return () => { cancelled = true; };
-  }, [publicKey, selectedToken, connection, runtimeMint]);
+  }, [publicKey, selectedToken, connection, runtimeMint, refreshNonce]);
 
   const handleMax = useCallback((): string => {
     if (selectedToken.isBtcNative && btcBalance !== null) {
@@ -74,5 +79,5 @@ export function useTokenBalance(
     return "0";
   }, [selectedToken, solBalance, splBalance, btcBalance]);
 
-  return { solBalance, splBalance, handleMax };
+  return { solBalance, splBalance, handleMax, refreshBalance };
 }

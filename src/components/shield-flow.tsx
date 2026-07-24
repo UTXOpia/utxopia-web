@@ -38,7 +38,9 @@ import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview"
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
 import { BtcFaucetPrompt } from "@/components/shield-flow/btc-faucet-prompt";
+import { SolTestFundsHelper, SplTestFundsHelper } from "@/components/shield-flow/test-funds-helper";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { isChainHybridNetwork } from "@/lib/chain-registry";
 import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
 import { confirmSubmittedSignature } from "@/lib/solana/confirm-signature";
 import { usePoolFees } from "@/hooks/use-pool-fees";
@@ -102,7 +104,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     buildingPreview,
     buildTxPreview,
   } = btcDeposit;
-  const { solBalance, splBalance, handleMax } = useTokenBalance(
+  const { solBalance, splBalance, handleMax, refreshBalance } = useTokenBalance(
     selectedToken,
     publicKey,
     connection,
@@ -324,7 +326,32 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const privateUnit = selectedToken.isSOL ? "zkSOL" : `zk${selectedToken.symbol.replace(/^zk/, "")}`;
   const formatBaseUnits = (value: bigint) => formatAmount(Number(value), selectedToken.decimals);
   const highDepositFee = feeShareBps(depositFee, amountRaw) >= 500;
-  const canSubmit = !!amount && parseFloat(amount) > 0 && !!resolvedMeta && !!publicKey && !!keys && !!poolFees.fees;
+  const publicBalance = selectedToken.isSOL ? solBalance : splBalance;
+  const publicBalanceRaw = publicBalance === null
+    ? null
+    : BigInt(Math.max(0, Math.floor(publicBalance)));
+  const hasEnoughPublicBalance = publicBalanceRaw !== null && amountRaw <= publicBalanceRaw;
+  const needsTestFunds = publicBalanceRaw !== null
+    && (publicBalanceRaw === 0n || (amountRaw > 0n && amountRaw > publicBalanceRaw));
+  const splFaucetToken = selectedToken.symbol === "USDC" || selectedToken.symbol === "USDT"
+    ? selectedToken.symbol
+    : null;
+  const showSplTestFunds = !!publicKey
+    && !!splFaucetToken
+    && isChainHybridNetwork(networkId, "solana")
+    && needsTestFunds;
+  const showSolTestFunds = !!publicKey
+    && selectedToken.isSOL
+    && networkId !== "mainnet"
+    && networkId !== "localnet"
+    && needsTestFunds;
+  const canSubmit = !!amount
+    && parseFloat(amount) > 0
+    && !!resolvedMeta
+    && !!publicKey
+    && !!keys
+    && !!poolFees.fees
+    && hasEnoughPublicBalance;
 
   const checkDepositAgain = useCallback(async () => {
     if (!txSig) return;
@@ -665,6 +692,15 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </button>
           {tokenSelector}
         </div>
+        {showSplTestFunds && splFaucetToken && publicKey && (
+          <SplTestFundsHelper
+            token={splFaucetToken}
+            networkId={networkId}
+            recipient={publicKey.toBase58()}
+            onBalanceRefresh={refreshBalance}
+          />
+        )}
+        {showSolTestFunds && <SolTestFundsHelper />}
         {amountRaw > 0n && poolFees.fees && (
           <div className="space-y-2 border-t border-gray/10 pt-3 text-xs">
             <PreviewRow label="You shield" value={`${formatBaseUnits(amountRaw)} ${displayUnit}`} />
