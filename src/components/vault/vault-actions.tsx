@@ -19,16 +19,16 @@ export function VaultActions({
   depositCount,
 }: VaultActionsProps) {
   const actions = [
-    { icon: <PlusCircle className="w-5 h-5" />, label: PRODUCT_COPY.actions.addFunds, href: "/vault/deposit", color: "text-green-400" },
-    { icon: <Send className="w-5 h-5" />, label: PRODUCT_COPY.actions.sendPrivately, href: "/send", color: "text-purple-400" },
-    { icon: <ArrowUpFromLine className="w-5 h-5" />, label: PRODUCT_COPY.actions.takeFundsOut, href: "/vault/withdraw", color: "text-chain" },
+    { icon: <PlusCircle className="w-5 h-5" />, label: PRODUCT_COPY.actions.addFunds, href: "/vault/deposit", color: "text-warning" },
+    { icon: <Send className="w-5 h-5" />, label: PRODUCT_COPY.actions.sendPrivately, href: "/send", color: "text-green-400" },
+    { icon: <ArrowUpFromLine className="w-5 h-5" />, label: PRODUCT_COPY.actions.takeFundsOut, href: "/vault/withdraw", color: "text-purple-400" },
   ].filter((action) => !isViewOnly || action.label === PRODUCT_COPY.actions.sendPrivately);
 
   return (
     <>
       <div
         className={cn(
-          "grid items-start justify-center gap-2 sm:gap-6 mb-6",
+          "mx-auto grid w-full max-w-[300px] items-start gap-3 sm:gap-5 mb-6",
           "grid-cols-3",
         )}
       >

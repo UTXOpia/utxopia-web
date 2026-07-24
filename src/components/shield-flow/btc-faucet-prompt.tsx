@@ -1,10 +1,10 @@
 "use client";
 
-import Link from "next/link";
 import type { ReactNode } from "react";
 import { Droplets } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { hrefWithChain, type NetworkId } from "@/lib/network-config";
+import type { NetworkId } from "@/lib/network-config";
+import { PrivateBtcFaucetForm } from "@/components/shield-flow/private-btc-faucet-form";
 
 export function BtcFaucetPrompt({
   networkId,
@@ -34,13 +34,7 @@ export function BtcFaucetPrompt({
             </p>
           </div>
         </div>
-        <Link
-          href={hrefWithChain("/faucet", networkId)}
-          className="inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-[10px] bg-warning px-4 text-body2 font-semibold text-background transition-opacity hover:opacity-90"
-        >
-          <Droplets className="h-4 w-4" />
-          Get private test BTC
-        </Link>
+        <PrivateBtcFaucetForm network={networkId} />
       </div>
     </div>
   );

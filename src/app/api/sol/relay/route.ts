@@ -402,7 +402,7 @@ export async function POST(request: NextRequest) {
         { pubkey: vkRegistryPDA, isSigner: false, isWritable: false },
         { pubkey: relayer.publicKey, isSigner: true, isWritable: true },
         { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
-        { pubkey: tokenConfigPDA, isSigner: false, isWritable: false },
+        { pubkey: tokenConfigPDA, isSigner: false, isWritable: true },
       );
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
       for (const rpda of redemptionRequestPDAs) keys.push({ pubkey: rpda, isSigner: false, isWritable: true });
