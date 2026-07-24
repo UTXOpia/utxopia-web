@@ -316,7 +316,7 @@ function getCryptoItems() {
   {
     id: "joinsplit-circuit", title: "JoinSplit Circuit",
     formula: "JoinSplit(N, M, depth=16)",
-    desc: `A single parameterized circom template handles all transfer types. Inputs: N note nullifiers + Merkle proofs. Outputs: M new commitments. The circuit verifies balance (Σin = Σout), nullifier validity, Merkle membership, and EdDSA-Poseidon signatures — all in one Groth16 proof. Each variant (1×1, 1×2, 2×1, 2×2, …) is a separate Groth16 setup; N + M ≤ 14.`,
+    desc: `A single parameterized circom template handles all transfer types. Inputs: N note nullifiers + Merkle proofs. Outputs: M new commitments. The circuit verifies balance (Σin = Σout), nullifier validity, Merkle membership, and EdDSA-Poseidon signatures — all in one Groth16 proof. Each variant (1×1, 1×2, 2×1, 2×2, …) is a separate Groth16 setup; the audited Solana scope is N + M ≤ 10.`,
   },
   {
     id: "eddsa-signatures", title: "EdDSA-Poseidon Signatures",

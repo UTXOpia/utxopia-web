@@ -14,7 +14,7 @@ import { getActiveTokenId } from "@/lib/token-context";
 // Token ID is now computed dynamically from the active token's mint address.
 // This is a function call, not a constant — use ZKBTC_TOKEN_ID() in all call sites.
 export const ZKBTC_TOKEN_ID = getActiveTokenId;
-export const MAX_OUTPUTS = 12; // N+M<=14, need at least 1 input + 1 change
+export const MAX_OUTPUTS = 8; // N+M<=10, need at least 1 input + 1 change
 export const SERVICE_FEE_SATS = 2000;
 export const RELAYER_FEE_SATS = 2000;
 export const SOLANA_MAX_TX_SIZE = 1232;
@@ -28,12 +28,12 @@ const BN254_FR_MODULUS = [
 ];
 
 /**
- * Available JoinSplit circuit variants (N+M <= 14).
+ * Available JoinSplit circuit variants (N+M <= 10).
  * Constrained to what's actually compiled and has on-chain VK registered.
  */
 export const AVAILABLE_CIRCUITS = new Set(
-  Array.from({ length: 13 }, (_, n) =>
-    Array.from({ length: 14 - n - 1 }, (_, m) => `${n + 1}x${m + 1}`)
+  Array.from({ length: 9 }, (_, n) =>
+    Array.from({ length: 10 - n - 1 }, (_, m) => `${n + 1}x${m + 1}`)
   ).flat()
 );
 

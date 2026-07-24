@@ -8,10 +8,10 @@ export function getJoinSplitArtifactUrls(
     !Number.isInteger(nOutputs) ||
     nInputs < 1 ||
     nOutputs < 1 ||
-    nInputs + nOutputs > 14
+    nInputs + nOutputs > 10
   ) {
     throw new Error(
-      `Invalid JoinSplit dimensions: ${nInputs}x${nOutputs} (N+M must be 2..14)`,
+      `Invalid JoinSplit dimensions: ${nInputs}x${nOutputs} (N+M must be 2..10)`,
     );
   }
 
