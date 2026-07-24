@@ -5,6 +5,15 @@
   "installCommand": "bun install --frozen-lockfile",
   "headers": [
     {
+      "source": "/circuit-assets/(.*)",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=31536000, immutable"
+        }
+      ]
+    },
+    {
       "source": "/circuits/(.*)",
       "headers": [
         {

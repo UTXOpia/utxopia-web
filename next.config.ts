@@ -1,6 +1,15 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  async rewrites() {
+    return [
+      {
+        source: "/circuit-assets/groth16/:path*",
+        destination:
+          "https://circuit.utxopia.com/circuits/v2/groth16/:path*",
+      },
+    ];
+  },
   experimental: {
     optimizePackageImports: ["lucide-react"],
     webpackMemoryOptimizations: true,
