@@ -18,7 +18,6 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
-  Connection,
   Keypair,
   PublicKey,
   Transaction,
@@ -52,6 +51,14 @@ import {
 } from "@/lib/network-config";
 import { networkForChain } from "@/lib/chain-registry";
 import { isNativeSolMint } from "@/lib/solana/native-sol";
+import { getMagicBlockClientConfig } from "@/lib/magicblock-config";
+import {
+  assertDelegatedExecutionCluster,
+  buildMagicBlockAtomicCommitInstruction,
+  createMagicBlockExecutionConnections,
+  sendMagicBlockAwareTransaction,
+} from "@/lib/server/magicblock-route";
+import { ConnectionMagicRouter } from "@magicblock-labs/ephemeral-rollups-sdk";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -89,16 +96,7 @@ interface RelayRequest {
   btcScripts?: string[];
   /** Redeem: unique request nonces (one per public output) */
   requestNonces?: string[];
-  /**
-   * Transfer mode (optional): per-output XChaCha20-Poly1305 sender memo
-   * envelopes, 80-byte hex each (`nonce(24) || ciphertext_and_tag(56)`).
-   * The client computes these via `buildSenderMemosForTransact`, predicting
-   * leaf indices from the commitment tree's `next_leaf_index` before signing.
-   * The relay forwards the bytes opaquely — viewing keys never leave the client.
-   * If the client's leaf-index prediction races a concurrent transact, the
-   * memo lands on-chain but decrypts to `null` (AAD mismatch); the caller's
-   * outgoing-history simply has a gap. Omit to skip the channel entirely.
-   */
+  /** Reserved; rejected until sender memos are proof-bound. */
   senderMemos?: string[];
   /**
    * Optional frozen source-tree PDA (base58). Only set when a spent note was committed in a
@@ -229,7 +227,30 @@ export async function POST(request: NextRequest) {
     console.log(`[Relay] Processing Solana ${mode} JoinSplit(${nInputs}x${nOutputs}) on ${solanaNetwork}...`);
 
     const relayer = getRelayerKeypair();
-    const connection = new Connection(cfg.solana.rpcUrl, "confirmed");
+    const magicBlockConfig = getMagicBlockClientConfig();
+    if (magicBlockConfig.executionMode !== "solana" && mode !== "transfer") {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ER/PER alpha supports private transfer only; unshield and redeem remain on Solana",
+        },
+        { status: 400 }
+      );
+    }
+    if (magicBlockConfig.executionMode !== "solana" && nInputs > 10) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: "ER/PER transfers support at most 10 inputs per atomic commit",
+        },
+        { status: 400 }
+      );
+    }
+    const executionConnections = createMagicBlockExecutionConnections(
+      cfg.solana.rpcUrl,
+      magicBlockConfig
+    );
+    const connection = executionConnections.base;
     const programId = new PublicKey(cfg.solana.utxopiaProgramId);
     const chadbufferProgramId = new PublicKey(cfg.solana.chadbufferId);
     const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
@@ -253,6 +274,14 @@ export async function POST(request: NextRequest) {
     const [vkRegistryPDA] = deriveVkRegistryPDA(nInputs, nOutputs, programId);
     const [poolState] = derivePoolStatePDA(programId);
     const [commitmentTree] = deriveCommitmentTreePDA(programId);
+    if (executionConnections.execution instanceof ConnectionMagicRouter) {
+      await assertDelegatedExecutionCluster(
+        executionConnections.execution,
+        poolState,
+        commitmentTree,
+        magicBlockConfig.executionMode
+      );
+    }
 
     // ── Relayer fee check (transfer mode only) ─────────────────────────
     if (mode === "transfer" && RELAYER_FEE_SATS > 0) {
@@ -411,24 +440,11 @@ export async function POST(request: NextRequest) {
 
     } else {
       // ── TRANSFER (disc=13) ─────────────────────────────────────────
-      // Optional Phase 2 sender memos: client encrypts per-output (80B each)
-      // with viewingPrivKey and predicted leaf index; relay just forwards.
-      let senderMemoBytes: Uint8Array[] | undefined;
-      if (body.senderMemos) {
-        if (body.senderMemos.length !== nOutputs) {
-          return NextResponse.json(
-            { success: false, error: `Expected ${nOutputs} senderMemos, got ${body.senderMemos.length}` },
-            { status: 400 },
-          );
-        }
-        senderMemoBytes = body.senderMemos.map((s, i) => {
-          const bytes = hexToBytes(s);
-          if (bytes.length !== 80) {
-            throw new Error(`senderMemos[${i}]: expected 80 bytes, got ${bytes.length}`);
-          }
-          return bytes;
-        });
-        console.log(`[Relay] Attaching ${senderMemoBytes.length} sender memos`);
+      if (body.senderMemos != null) {
+        return NextResponse.json(
+          { success: false, error: "senderMemos are disabled until they are proof-bound" },
+          { status: 400 },
+        );
       }
 
       ixData = buildTransactInstructionData({
@@ -438,7 +454,6 @@ export async function POST(request: NextRequest) {
         nullifiers: nullifierBytes,
         commitmentsOut: commitmentBytes,
         stealthData: stealthDataBytes,
-        senderMemos: senderMemoBytes,
         proofSource: 1,
       });
 
@@ -465,13 +480,24 @@ export async function POST(request: NextRequest) {
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
       mainIx
     );
+    if (mode === "transfer" && magicBlockConfig.executionMode !== "solana") {
+      tx.add(buildMagicBlockAtomicCommitInstruction({
+        programId,
+        payer: relayer.publicKey,
+        poolState,
+        commitmentTree,
+        nullifierAccounts: nullifierPDAs,
+        nullifierHashes: nullifierBytes,
+      }));
+    }
 
     console.log(`[Relay] Submitting ${mode} transaction...`);
-    const { blockhash } = await connection.getLatestBlockhash();
     tx.feePayer = relayer.publicKey;
-    tx.recentBlockhash = blockhash;
-
-    const signature = await sendAndConfirmTransaction(connection, tx, [relayer], { commitment: "confirmed" });
+    const signature = await sendMagicBlockAwareTransaction(
+      executionConnections,
+      tx,
+      [relayer]
+    );
     console.log(`[Relay] Transaction confirmed: ${signature}`);
 
     // Close buffer and reclaim rent
@@ -484,7 +510,12 @@ export async function POST(request: NextRequest) {
     const duration = ((Date.now() - startTime) / 1000).toFixed(2);
     console.log(`[Relay] ${mode} complete in ${duration}s`);
 
-    return NextResponse.json({ success: true, signature, bufferAddress: bufferPubkey.toBase58() });
+    return NextResponse.json({
+      success: true,
+      signature,
+      bufferAddress: bufferPubkey.toBase58(),
+      executionMode: magicBlockConfig.executionMode,
+    });
   } catch (error) {
     console.error("[Relay] Error:", error);
     const errObj = error as Record<string, unknown> | null;

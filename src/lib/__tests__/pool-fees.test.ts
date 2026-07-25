@@ -17,8 +17,8 @@ describe("pool fees", () => {
     expect(feeShareBps(19_960n, 9_980_000n)).toBe(20);
   });
 
-  it("allows deposit fees to floor to zero", () => {
-    expect(computeBpsFee(1n, 20, false)).toBe(0n);
-    expect(computeBpsFee(10_000n, 20, false)).toBe(20n);
+  it("charges at least one base unit for configured deposit fees", () => {
+    expect(computeBpsFee(1n, 20)).toBe(1n);
+    expect(computeBpsFee(10_000n, 20)).toBe(20n);
   });
 });

@@ -230,7 +230,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           keys: [
             { pubkey: publicKey, isSigner: true, isWritable: true },
             { pubkey: userTokenAccount, isSigner: false, isWritable: true },
-            { pubkey: poolStatePda, isSigner: false, isWritable: false },
+            { pubkey: poolStatePda, isSigner: false, isWritable: true },
             { pubkey: tokenConfigPda, isSigner: false, isWritable: true },
             { pubkey: vaultPubkey, isSigner: false, isWritable: true },
             { pubkey: commitmentTreePda, isSigner: false, isWritable: true },
@@ -289,7 +289,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           keys: [
             { pubkey: publicKey, isSigner: true, isWritable: true },
             { pubkey: userTokenAccount, isSigner: false, isWritable: true },
-            { pubkey: poolStatePda, isSigner: false, isWritable: false },
+            { pubkey: poolStatePda, isSigner: false, isWritable: true },
             { pubkey: tokenConfigPda, isSigner: false, isWritable: true },
             { pubkey: vaultPubkey, isSigner: false, isWritable: true },
             { pubkey: commitmentTreePda, isSigner: false, isWritable: true },
@@ -320,7 +320,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction, chainEnv.config, poolFees]);
 
   const amountRaw = BigInt(Math.max(0, Math.floor(parseFloat(amount || "0") * (10 ** selectedToken.decimals))));
-  const depositFee = computeBpsFee(amountRaw, poolFees.fees?.depositFeeBps ?? 0, false);
+  const depositFee = computeBpsFee(amountRaw, poolFees.fees?.depositFeeBps ?? 0);
   const privateReceives = amountRaw > depositFee ? amountRaw - depositFee : 0n;
   const displayUnit = selectedToken.isSOL ? "SOL" : selectedToken.symbol;
   const privateUnit = selectedToken.isSOL ? "zkSOL" : `zk${selectedToken.symbol.replace(/^zk/, "")}`;

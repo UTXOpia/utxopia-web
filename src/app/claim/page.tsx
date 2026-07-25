@@ -35,6 +35,7 @@ import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { recordSubmittedTransaction } from "@/lib/transaction-activity";
 import { formatAmount } from "@/lib/utils/formatting";
 import { cn } from "@/lib/utils";
+import { normalizePrivacyDomain } from "@/lib/magicblock-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
@@ -44,6 +45,9 @@ function ClaimContent() {
   const wallet = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const submitter = useJoinSplitSubmit();
+  const privacyDomain = normalizePrivacyDomain(
+    process.env.NEXT_PUBLIC_UTXOPIA_PRIVACY_DOMAIN,
+  );
   const [phrase, setPhrase] = useState("");
   const [note, setNote] = useState<ScannedSecretNote | null>(null);
   const [scanning, setScanning] = useState(false);
@@ -164,6 +168,7 @@ function ClaimContent() {
           : undefined,
         relayerFee: effectiveRelayerFee,
         boundChainId: SOLANA_BOUND_CHAIN_ID,
+        privacyDomain,
         tokenMint: token.mint || undefined,
         recipient: { stealthMeta: ctx.stealthAddress },
       });
