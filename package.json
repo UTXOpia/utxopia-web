@@ -16,6 +16,7 @@
     "@farcaster/miniapp-sdk": "^0.3.0",
     "@mysten/sui": "^2.17.0",
     "@mysten/suins": "^1.1.4",
+    "@magicblock-labs/ephemeral-rollups-sdk": "0.16.2",
     "@noble/hashes": "^1.8.0",
     "@privy-io/react-auth": "^3.28.0",
     "@radix-ui/react-dialog": "^1.1.15",
@@ -43,7 +44,7 @@
     "ffjavascript": "^0.3.1",
     "framer-motion": "^12.36.0",
     "lucide-react": "^0.562.0",
-    "next": "16.2.9",
+    "next": "16.2.11",
     "qrcode.react": "^4.2.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
@@ -70,6 +71,20 @@
     "jsdom": "^27.4.0",
     "tailwindcss": "^4",
     "typescript": "^5"
+  },
+  "overrides": {
+    "axios": "1.18.1",
+    "brace-expansion": "5.0.8",
+    "form-data": "4.0.6",
+    "hono": "4.12.32",
+    "js-yaml": "4.3.0",
+    "postcss": "8.5.23",
+    "sharp": "0.35.3",
+    "shell-quote": "1.10.0",
+    "underscore": "1.13.8",
+    "uuid": "11.1.1",
+    "valibot": "1.4.2",
+    "ws": "8.21.1"
   },
   "ignoreScripts": [
     "sharp",

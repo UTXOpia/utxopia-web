@@ -8,6 +8,7 @@
  */
 
 import { toHex64 } from "@/lib/utils/hex";
+import { computeSolanaDomainBoundParamsHash } from "@/lib/solana-domain-binding";
 import { PublicKey } from "@solana/web3.js";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { JoinSplitProofInputs, UTXOpiaKeys, StealthMetaAddress, ScannedNote } from "@utxopia/sdk";
@@ -31,6 +32,8 @@ export interface TransferUserInputs {
   serviceFeeBps?: number;
   /** Chain id folded into bound params (Solana 103, Sui 784). */
   boundChainId: bigint;
+  /** Privacy domain bound into the proof's public boundParamsHash. */
+  privacyDomain: "public" | "institution";
   /** Source token mint. Omit/empty for zkBTC (resolves to config.zkbtcMint);
    *  for an SPL cash-out, the underlying mint. Drives the proof token_id and,
    *  for unshield, the recipient ATA + pool vault on the relay. */
@@ -87,7 +90,6 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     parseMerkleProofResponse,
     computeJoinSplitCommitmentSync,
     createStealthDepositWithKeys,
-    computeBoundParamsHash,
     createUnshieldBoundParams,
     createRedeemBoundParams,
     createTransferBoundParams,
@@ -121,6 +123,11 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
   // derivation the notes were scanned with, so inputs/outputs/proof all agree.
   const tokenMintAddress = inputs.tokenMint || utxopiaClient.config.zkbtcMint;
   const tokenId = utxopiaClient.getTokenId(tokenMintAddress);
+  const domainContext = {
+    programId: new PublicKey(utxopiaClient.config.utxopiaProgramId).toBytes(),
+    poolState: new PublicKey(utxopiaClient.config.poolStatePda).toBytes(),
+    kind: inputs.privacyDomain,
+  } as const;
 
   const merkleProofs = await utxopiaClient.fetchMerkleProofs(
     selectedNotes.map((n) => n.commitmentHex),
@@ -275,14 +282,14 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
       inputs.requesterPubkey,
       boundChainId,
     );
-    boundParamsHash = computeBoundParamsHash(redeemParams);
+    boundParamsHash = computeSolanaDomainBoundParamsHash(redeemParams, domainContext);
   } else if (mode === "public") {
     unshieldRecipientAddress = new PublicKey(recipient.solanaAddress!).toBytes();
     const unshieldParams = createUnshieldBoundParams(unshieldRecipientAddress, stealthDataHash, boundChainId);
-    boundParamsHash = computeBoundParamsHash(unshieldParams);
+    boundParamsHash = computeSolanaDomainBoundParamsHash(unshieldParams, domainContext);
   } else {
     const transferParams = createTransferBoundParams(stealthDataHash, boundChainId);
-    boundParamsHash = computeBoundParamsHash(transferParams);
+    boundParamsHash = computeSolanaDomainBoundParamsHash(transferParams, domainContext);
   }
 
   // 7. Sign
