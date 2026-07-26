@@ -42,16 +42,16 @@ export function useEffectiveRelay(chainId: string): RelayConfig | null {
  * Falls back to the first builtin's URL when nothing can be resolved
  * (no health data yet), so the submit path always has a value.
  */
-export function useEffectiveRelayUrl(chainId: string, networkId: string): string {
+export function useEffectiveRelayUrl(chainId: string, networkId: string, vaultId = "open"): string {
   const effective = useEffectiveRelay(chainId);
   const relays = useRelays(chainId);
 
   return useMemo(() => {
-    if (effective) return effective.url(networkId);
+    if (effective) return effective.url(networkId, vaultId);
     // No health data yet — use first builtin as cold-start default.
     // relays[0] is always defined for known chains (builtins are non-empty).
-    return relays[0].url(networkId);
-  }, [effective, relays, chainId, networkId]);
+    return relays[0].url(networkId, vaultId);
+  }, [effective, relays, chainId, networkId, vaultId]);
 }
 
 /**
@@ -62,8 +62,8 @@ export function useEffectiveRelayUrl(chainId: string, networkId: string): string
  * Today the registry has one relay per chain, so this yields a 1-element array.
  * The loop in submitWithFailover handles any length correctly.
  */
-export function useRelayCandidates(chainId: string, networkId: string): string[] {
-  const primaryUrl = useEffectiveRelayUrl(chainId, networkId);
+export function useRelayCandidates(chainId: string, networkId: string, vaultId = "open"): string[] {
+  const primaryUrl = useEffectiveRelayUrl(chainId, networkId, vaultId);
   const relays = useRelays(chainId);
   const health = useRelayStore((s) => s.health);
 
@@ -73,7 +73,7 @@ export function useRelayCandidates(chainId: string, networkId: string): string[]
     const fallbacks = relays
       .map((r) => ({ relay: r, h: health[r.id] as RelayHealth | undefined }))
       .filter(({ relay, h }) => {
-        const url = relay.url(networkId);
+        const url = relay.url(networkId, vaultId);
         if (url === primaryUrl) return false;
         return h?.status === "online" || h?.status === "slow";
       })
@@ -82,8 +82,8 @@ export function useRelayCandidates(chainId: string, networkId: string): string[]
         const lb = b.h?.latencyMs ?? Infinity;
         return la - lb;
       })
-      .map(({ relay }) => relay.url(networkId));
+      .map(({ relay }) => relay.url(networkId, vaultId));
 
     return [primaryUrl, ...fallbacks];
-  }, [primaryUrl, relays, health, networkId]);
+  }, [primaryUrl, relays, health, networkId, vaultId]);
 }

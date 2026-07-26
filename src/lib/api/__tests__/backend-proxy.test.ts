@@ -31,6 +31,26 @@ describe("backend proxy", () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
   });
 
+  it("routes an explicit verified vault to its fixed backend path", async () => {
+    const fetchMock = mock(async (input: RequestInfo | URL) => {
+      expect(String(input)).toBe(
+        "https://api-hybrid.utxopia.com/verified/api/announcements?network=devnet-regtest&vault=verified",
+      );
+      return Response.json({ announcements: [] });
+    });
+    global.fetch = fetchMock as any;
+
+    const response = await proxyToBackend(
+      new Request(
+        "https://app.utxopia.test/api/announcements?network=devnet-regtest&vault=verified",
+      ),
+      "/api/announcements",
+    );
+
+    expect(response.status).toBe(200);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
   it("returns a structured timeout instead of hanging", async () => {
     process.env.BACKEND_PROXY_TIMEOUT_MS = "5";
     global.fetch = mock((_input: RequestInfo | URL, init?: RequestInit) => {

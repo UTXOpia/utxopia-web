@@ -62,12 +62,21 @@ function cacheForNetwork(network: NetworkId): TreeCacheEntry {
   return entry;
 }
 
-async function deriveCommitmentTreePda(programId: string): Promise<string> {
-  const { getProgramDerivedAddress, address } = await import("@solana/kit");
+async function deriveCommitmentTreePda(programId: string, poolMint: string): Promise<string> {
+  const { getProgramDerivedAddress, address, getAddressEncoder } = await import("@solana/kit");
+  const encoder = getAddressEncoder();
+  const [poolState] = await getProgramDerivedAddress({
+    programAddress: address(programId),
+    seeds: [new TextEncoder().encode("pool_state"), encoder.encode(address(poolMint))],
+  });
   const treeIndex = new Uint8Array(4);
   const [pda] = await getProgramDerivedAddress({
     programAddress: address(programId),
-    seeds: [new TextEncoder().encode("commitment_tree"), treeIndex],
+    seeds: [
+      new TextEncoder().encode("commitment_tree"),
+      encoder.encode(poolState),
+      treeIndex,
+    ],
   });
   return pda;
 }
@@ -97,7 +106,12 @@ async function getTreeAndRootForNetwork(
 
   cache.buildPromise = (async () => {
     const connection = new Connection(cfg.solana.rpcUrl, "confirmed");
-    const commitmentTreePda = new PublicKey(await deriveCommitmentTreePda(cfg.solana.utxopiaProgramId));
+    const commitmentTreePda = new PublicKey(
+      await deriveCommitmentTreePda(
+        cfg.solana.utxopiaProgramId,
+        cfg.tokens.zkbtcMint,
+      )
+    );
 
     // Fetch on-chain tree state (root + nextIndex) in one RPC call
     const treeAccountInfo = await connection.getAccountInfo(commitmentTreePda);

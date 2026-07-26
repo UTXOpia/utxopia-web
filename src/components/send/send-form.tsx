@@ -6,7 +6,6 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { Bitcoin, Check, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { normalizePrivacyDomain } from "@/lib/magicblock-config";
 import { detectRecipient, type RecipientType } from "./recipient-detect";
 import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
@@ -267,9 +266,8 @@ export function SendForm({
   const poolFees = usePoolFees();
   const activeChainId = getChainAdapter(chainEnv.config).id;
   const boundChainId = SOLANA_BOUND_CHAIN_ID;
-  const privacyDomain = normalizePrivacyDomain(
-    process.env.NEXT_PUBLIC_UTXOPIA_PRIVACY_DOMAIN,
-  );
+  const privacyDomain =
+    chainEnv.vaultId === "verified" ? "institution" : "public";
   const activeChainLabel = "Solana";
   const hasVaultKeys = ctx.hasKeys;
   const refreshPrivateBalance = ctx.refreshInbox;
@@ -674,6 +672,7 @@ export function SendForm({
             : "private_send";
       recordSubmittedTransaction({
         networkId: chainEnv.networkId,
+        vaultId: chainEnv.vaultId,
         kind: result,
         amountBaseUnits: BigInt(amountSats),
         netAmountBaseUnits: result === "cashout_btc"

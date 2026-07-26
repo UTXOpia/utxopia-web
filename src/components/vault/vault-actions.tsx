@@ -6,17 +6,20 @@ import { ArrowUpFromLine, ChevronRight, PlusCircle, Send } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
+import { hrefWithVault, type VaultId } from "@/lib/vault-config";
 
 interface VaultActionsProps {
   networkId: NetworkId;
   isViewOnly: boolean;
   depositCount: number;
+  vaultId: VaultId;
 }
 
 export function VaultActions({
   networkId,
   isViewOnly,
   depositCount,
+  vaultId,
 }: VaultActionsProps) {
   const actions = [
     { icon: <PlusCircle className="w-5 h-5" />, label: PRODUCT_COPY.actions.addFunds, href: "/vault/deposit", color: "text-warning" },
@@ -35,7 +38,7 @@ export function VaultActions({
         {actions.map((action) => (
           <Link
             key={action.label}
-            href={hrefWithChain(action.href, networkId)}
+            href={hrefWithVault(hrefWithChain(action.href, networkId), vaultId)}
             className="group flex min-w-0 flex-col items-center gap-1.5 cursor-pointer"
           >
             <motion.div
@@ -62,7 +65,7 @@ export function VaultActions({
       {depositCount > 0 && (
         <div className="flex justify-center mb-5">
           <Link
-            href={hrefWithChain("/vault/activity", networkId)}
+            href={hrefWithVault(hrefWithChain("/vault/activity", networkId), vaultId)}
             className="flex items-center gap-1 text-[11px] text-gray/40 hover:text-gray/60 transition-colors cursor-pointer"
           >
             View activity <ChevronRight className="w-3 h-3" />

@@ -18,7 +18,7 @@
  * - View-only mode (viewing key import)
  */
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Key,
@@ -57,6 +57,7 @@ import { VaultTokenList } from "@/components/vault/vault-token-list";
 import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
+import { VaultSwitcher } from "@/components/vault/vault-switcher";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
@@ -104,7 +105,14 @@ export default function VaultPage() {
   } = usePasskey();
 
   const tokenPrices = useTokenPrices();
-  const { networkId, config: networkConfig } = useChainEnvironment();
+  const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
+  const previousVaultId = useRef(vaultId);
+  useEffect(() => {
+    if (previousVaultId.current !== vaultId) {
+      clearKeys();
+      previousVaultId.current = vaultId;
+    }
+  }, [clearKeys, vaultId]);
   const bitcoinNetworkLabel =
     networkConfig.bitcoin.network.charAt(0).toUpperCase() +
     networkConfig.bitcoin.network.slice(1);
@@ -208,6 +216,8 @@ export default function VaultPage() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
+          <VaultSwitcher networkId={networkId} vaultId={vaultId} />
+
           {/* Wallet Header — identity bar */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -404,6 +414,7 @@ export default function VaultPage() {
                 networkId={networkId}
                 isViewOnly={isViewOnly}
                 depositCount={depositCount}
+                vaultId={vaultId}
               />
 
               <VaultTokenList

@@ -10,7 +10,8 @@
  */
 
 import { getBackendUrl } from "@/lib/api/constants";
-import { detectNetworkFromRequest } from "@/lib/network-config";
+import { detectNetworkFromRequest, getNetworkConfig } from "@/lib/network-config";
+import { getVaultNetworkConfig, parseVaultId } from "@/lib/vault-config";
 
 const BACKEND_API_KEY =
   process.env.BACKEND_API_KEY || "";
@@ -32,7 +33,14 @@ export async function proxyToBackend(
 ): Promise<Response> {
   const url = new URL(request.url);
   const network = detectNetworkFromRequest(request);
-  const backendUrl = getBackendUrl(network);
+  const vaultParam = url.searchParams.get("vault");
+  const backendUrl = vaultParam
+    ? getVaultNetworkConfig(
+        network,
+        getNetworkConfig(network, { applyEnvOverrides: false }),
+        parseVaultId(vaultParam),
+      ).backend.url
+    : getBackendUrl(network);
   const target = `${backendUrl}${backendPath}${url.search}`;
 
   const headers: Record<string, string> = {

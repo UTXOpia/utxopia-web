@@ -797,7 +797,7 @@ function ActivityFeed() {
   const { notes, isLoading, error: inboxError, refresh } = useStealthInbox();
   const tokenPrices = useTokenPrices();
   const searchParams = useSearchParams();
-  const { networkId, config } = useChainEnvironment();
+  const { networkId, vaultId, config } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
   const [submittedActivities, setSubmittedActivities] = useState<SubmittedTransactionActivity[]>([]);
@@ -845,7 +845,8 @@ function ActivityFeed() {
   }, [config.bitcoin.poolAddress, indexedTransactions, networkId, stealthAddress]);
 
   useEffect(() => {
-    const sync = () => setSubmittedActivities(getSubmittedTransactions(networkId));
+    const sync = () =>
+      setSubmittedActivities(getSubmittedTransactions(networkId, vaultId));
     sync();
     window.addEventListener("storage", sync);
     window.addEventListener("utxopia:transaction-activity", sync);
@@ -853,7 +854,7 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:transaction-activity", sync);
     };
-  }, [networkId]);
+  }, [networkId, vaultId]);
 
   useEffect(() => {
     const sync = () => setAnnotations(getActivityAnnotations(networkId));
@@ -902,7 +903,8 @@ function ActivityFeed() {
 
   useEffect(() => {
     let cancelled = false;
-    const cached = readIndexedActivityCache(networkId);
+    const activityIdentity = `${networkId}:${vaultId}`;
+    const cached = readIndexedActivityCache(activityIdentity);
     setIndexedTransactions(cached ?? []);
     setHasIndexedSnapshot(cached !== null);
     setIsLoadingIndexed(true);
@@ -914,7 +916,7 @@ function ActivityFeed() {
         if (cancelled) return;
         setIndexedTransactions(transactions);
         setHasIndexedSnapshot(true);
-        writeIndexedActivityCache(networkId, transactions);
+        writeIndexedActivityCache(activityIdentity, transactions);
       } catch (error) {
         if (!cancelled) {
           setHistoryLoadError(error instanceof Error ? error.message : "Could not load complete history");
@@ -930,7 +932,7 @@ function ActivityFeed() {
     void refresh(undefined, searchParams.get("refresh") === "inbox");
     void sync();
     return () => { cancelled = true; };
-  }, [fetchIndexedTransactions, historyRetry, historySyncKey, networkId, refresh, searchParams]);
+  }, [fetchIndexedTransactions, historyRetry, historySyncKey, networkId, refresh, searchParams, vaultId]);
 
   const refreshAllActivity = useCallback(async () => {
     if (isRefreshingAll) return;
@@ -938,7 +940,7 @@ function ActivityFeed() {
     setIsLoadingIndexed(true);
     setHistoryLoadError(null);
     try {
-      const nextSubmitted = getSubmittedTransactions(networkId);
+      const nextSubmitted = getSubmittedTransactions(networkId, vaultId);
       setSubmittedActivities(nextSubmitted);
       const [inboxResult, indexedResult] = await Promise.allSettled([
         refresh(undefined, true),
@@ -947,7 +949,7 @@ function ActivityFeed() {
       if (indexedResult.status === "fulfilled") {
         setIndexedTransactions(indexedResult.value);
         setHasIndexedSnapshot(true);
-        writeIndexedActivityCache(networkId, indexedResult.value);
+        writeIndexedActivityCache(`${networkId}:${vaultId}`, indexedResult.value);
       } else {
         setHistoryLoadError(
           indexedResult.reason instanceof Error
@@ -962,7 +964,7 @@ function ActivityFeed() {
       setIsLoadingIndexed(false);
       setIsRefreshingAll(false);
     }
-  }, [fetchIndexedTransactions, isRefreshingAll, networkId, refresh]);
+  }, [fetchIndexedTransactions, isRefreshingAll, networkId, refresh, vaultId]);
 
   const items = useMemo<ActivityItem[]>(() => {
     const recoveredActivities = recoverSelfTransferActivities(

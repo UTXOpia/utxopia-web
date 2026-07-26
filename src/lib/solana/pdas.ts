@@ -57,22 +57,24 @@ export function getChadbufferProgramId(): PublicKey {
 // =============================================================================
 
 export function derivePoolStatePDA(
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  poolId: PublicKey = getZkbtcMint(),
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.POOL_STATE)],
+    [Buffer.from(PDA_SEEDS.POOL_STATE), poolId.toBuffer()],
     programId
   );
 }
 
 export function deriveCommitmentTreePDA(
   programId: PublicKey = getUTXOpiaProgramId(),
-  treeIndex = 0
+  treeIndex = 0,
+  poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
   const idx = Buffer.alloc(4);
   idx.writeUInt32LE(treeIndex, 0);
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), idx],
+    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), poolState.toBuffer(), idx],
     programId
   );
 }
@@ -153,10 +155,21 @@ export function deriveDepositReceiptPDA(
 
 export function deriveTokenConfigPDA(
   mint: PublicKey,
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
   return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.TOKEN_CONFIG), mint.toBuffer()],
+    [Buffer.from(PDA_SEEDS.TOKEN_CONFIG), poolState.toBuffer(), mint.toBuffer()],
+    programId
+  );
+}
+
+export function derivePoolConfigPDA(
+  programId: PublicKey = getUTXOpiaProgramId(),
+  poolState: PublicKey = derivePoolStatePDA(programId)[0],
+): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_config"), poolState.toBuffer()],
     programId
   );
 }

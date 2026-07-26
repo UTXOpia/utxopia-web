@@ -5,5 +5,9 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 
 export default function DepositPage() {
   const env = useChainEnvironment();
-  return renderChainDeposit({ networkId: env.networkId, config: env.config });
+  return renderChainDeposit({
+    networkId: env.networkId,
+    vaultId: env.vaultId,
+    config: env.config,
+  });
 }

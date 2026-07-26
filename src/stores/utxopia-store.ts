@@ -21,7 +21,12 @@ import {
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { API_ENDPOINTS } from "@/lib/api/constants";
 import { detectNetwork, networkChain, type NetworkId } from "@/lib/network-config";
-import { ensureChainEnvironment, getChainEnvironment } from "@/lib/chain-environment";
+import {
+  detectVault,
+  ensureChainEnvironment,
+  getChainEnvironment,
+} from "@/lib/chain-environment";
+import type { VaultId } from "@/lib/vault-config";
 import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
 import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
 import { getAlphaDemoInboxNotes } from "@/lib/alpha-demo-ledger";
@@ -126,18 +131,39 @@ async function loadKeys(walletPubkey: string, solanaPublicKey: Uint8Array): Prom
 
 // Per-chain storage owner id for a passkey identity (so each chain's encrypted
 // keys live under their own localStorage key).
-function passkeyStorageOwner(credentialId: string, networkId: NetworkId): string {
-  return sdkPasskeyStorageOwner(credentialId, {
+function passkeyStorageOwner(
+  credentialId: string,
+  networkId: NetworkId,
+  vaultId: VaultId,
+): string {
+  const scopedCredential = vaultId === "open"
+    ? credentialId
+    : `${credentialId}:vault:${vaultId}`;
+  return sdkPasskeyStorageOwner(scopedCredential, {
     chain: networkChain(networkId),
     network: networkId,
   });
 }
 
-function chainScopedPasskeySeed(seed: Uint8Array, networkId: NetworkId): Uint8Array {
-  return deriveChainScopedPasskeySeed(seed, {
+async function chainScopedPasskeySeed(
+  seed: Uint8Array,
+  networkId: NetworkId,
+  vaultId: VaultId,
+): Promise<Uint8Array> {
+  const chainSeed = deriveChainScopedPasskeySeed(seed, {
     chain: networkChain(networkId),
     network: networkId,
   });
+  if (vaultId === "open") return chainSeed;
+  const domain = new TextEncoder().encode(`utxopia:vault-identity:v1:${vaultId}`);
+  const material = new Uint8Array(chainSeed.length + domain.length);
+  material.set(chainSeed);
+  material.set(domain, chainSeed.length);
+  return new Uint8Array(await crypto.subtle.digest("SHA-256", material));
+}
+
+function walletStorageOwner(walletPubkey: string, vaultId: VaultId): string {
+  return vaultId === "open" ? walletPubkey : `${walletPubkey}:vault:${vaultId}`;
 }
 
 function removeKeys(walletPubkey: string): void {
@@ -153,6 +179,7 @@ let inboxFetchPromise: Promise<void> | null = null;
 
 // Cache last announcement count to skip re-scan when nothing changed
 let lastAnnouncementCount = -1;
+let lastInboxIdentity = "";
 
 // ============================================================================
 // Types
@@ -285,17 +312,35 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     try {
       await ensureChainEnvironment();
       const client = UTXOpiaClient.instance();
-      const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
-        await client.loginWithWallet({
+      const vaultId = detectVault();
+      const walletPubkey = wallet.publicKey.toBase58();
+      const login = vaultId === "open"
+        ? await client.loginWithWallet({
           publicKey: wallet.publicKey,
           signMessage: wallet.signMessage,
-        });
+        })
+        : await (async () => {
+            const signature = await wallet.signMessage(
+              new TextEncoder().encode(
+                `utxopia:vault-identity:v1:${detectNetwork()}:${vaultId}`,
+              ),
+            );
+            const seed = new Uint8Array(
+              await crypto.subtle.digest("SHA-256", signature as BufferSource),
+            );
+            return client.loginWithSeed(seed);
+          })();
+      const {
+        keys: derivedKeys,
+        stealthAddress: meta,
+        stealthAddressEncoded: encoded,
+      } = login;
 
       // Persist encrypted under a wallet-signature secret (unlocks the session).
       const unlockSecret = await wallet.signMessage(
         new TextEncoder().encode("utxopia:storage-unlock:v1"),
       );
-      await persistKeys(wallet.publicKey.toBase58(), unlockSecret);
+      await persistKeys(walletStorageOwner(walletPubkey, vaultId), unlockSecret);
 
       set({
         keys: derivedKeys,
@@ -330,7 +375,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   hydrateKeys: async (walletPubkey: PublicKey) => {
     await ensureChainEnvironment();
     const pubkeyStr = walletPubkey.toBase58();
-    const restored = await loadKeys(pubkeyStr, walletPubkey.toBytes());
+    const storageId = walletStorageOwner(pubkeyStr, detectVault());
+    const restored = await loadKeys(storageId, walletPubkey.toBytes());
     if (!restored) return false;
 
     // Sync the UTXOpiaClient singleton with the restored keys
@@ -338,8 +384,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     // restoreKeys needs serialized form — re-serialize via loadKeys result
     // Since loadKeys already deserialized, we re-read raw from localStorage
     try {
-      const raw = localStorage.getItem(KEYS_STORAGE_PREFIX + pubkeyStr);
-      const storageKey = cachedStorageKey(pubkeyStr);
+      const raw = localStorage.getItem(KEYS_STORAGE_PREFIX + storageId);
+      const storageKey = cachedStorageKey(storageId);
       if (raw && storageKey) {
         const decrypted = await decryptData(storageKey, raw);
         const data = JSON.parse(decrypted);
@@ -390,7 +436,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       const client = UTXOpiaClient.instance();
       // One passkey → a separate private identity per chain+network (see chainScopedPasskeySeed).
       const net = networkId ?? detectNetwork();
-      const scopedSeed = chainScopedPasskeySeed(seed, net);
+      const vaultId = detectVault();
+      const scopedSeed = await chainScopedPasskeySeed(seed, net, vaultId);
       const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
         await client.loginWithSeed(scopedSeed);
 
@@ -398,7 +445,10 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       const credentialId = typeof window !== "undefined"
         ? localStorage.getItem("utxo:passkey_credential_id") || "default"
         : "default";
-      await persistKeys(passkeyStorageOwner(credentialId, net), scopedSeed);
+      await persistKeys(
+        passkeyStorageOwner(credentialId, net, vaultId),
+        scopedSeed,
+      );
 
       // Derive + hold the in-memory name-owner Solana key (non-fund; for .utxopia.sol).
       const nameOwner = deriveNameOwnerKeypair(scopedSeed);
@@ -427,7 +477,11 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         : null;
       if (!credentialId) return false;
 
-      const storageId = passkeyStorageOwner(credentialId, networkId ?? detectNetwork());
+      const storageId = passkeyStorageOwner(
+        credentialId,
+        networkId ?? detectNetwork(),
+        detectVault(),
+      );
       const restored = await loadKeys(storageId, new Uint8Array(32));
       if (!restored) return false;
 
@@ -481,7 +535,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
 
   clearKeys: (walletPubkey?: string) => {
     if (walletPubkey) {
-      removeKeys(walletPubkey);
+      removeKeys(walletStorageOwner(walletPubkey, detectVault()));
     }
     // Clear UTXOpiaClient state
     if (UTXOpiaClient.isInitialized) {
@@ -528,6 +582,17 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       try {
         await ensureChainEnvironment();
         const env = getChainEnvironment();
+        const inboxIdentity = `${env.networkId}:${env.vaultId}`;
+        if (lastInboxIdentity !== inboxIdentity) {
+          lastAnnouncementCount = -1;
+          lastInboxIdentity = inboxIdentity;
+          set({
+            inboxNotes: [],
+            inboxTotalSats: 0n,
+            inboxBalancesByToken: {},
+            inboxDepositCount: 0,
+          });
+        }
         if (viewOnlyKeys) {
           UTXOpiaClient.instance().loginViewOnly(viewOnlyKeys);
         }

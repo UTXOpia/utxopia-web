@@ -81,10 +81,13 @@ describe("fetchInboxSource", () => {
 
     const source = await fetchInboxSource({
       networkId: "devnet-regtest",
+      vaultId: "open",
       config: getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }),
     });
 
-    expect(mockFetch.mock.calls[0][0]).toBe("/api/announcements?network=devnet-regtest");
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "/api/announcements?network=devnet-regtest&vault=open",
+    );
     expect(source.announcements).toHaveLength(1);
     expect(source.announcements[0].leafIndex).toBe(7);
     expect(source.announcements[0].blockTime).toBe(1_700_000_000);

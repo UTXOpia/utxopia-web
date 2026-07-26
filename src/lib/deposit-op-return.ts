@@ -42,8 +42,11 @@ export function parseDepositOpReturnHex(opReturnHex: string): {
 
 function solanaDepositOpReturnContext(cfg: NetworkConfig): DepositOpReturnContext {
   const programId = new PublicKey(cfg.solana.utxopiaProgramId);
-  const [poolStatePda] = PublicKey.findProgramAddressSync([Buffer.from("pool_state")], programId);
   const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
+  const [poolStatePda] = PublicKey.findProgramAddressSync(
+    [Buffer.from("pool_state"), zkbtcMint.toBuffer()],
+    programId
+  );
 
   return {
     destinationChain: DEPOSIT_DESTINATION_CHAIN.SOLANA,

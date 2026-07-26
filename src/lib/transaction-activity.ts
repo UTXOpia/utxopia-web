@@ -13,6 +13,7 @@ export type SubmittedTransactionKind =
 export interface SubmittedTransactionActivity {
   id: string;
   networkId: string;
+  vaultId?: "open" | "verified";
   kind: SubmittedTransactionKind;
   amountBaseUnits: string;
   netAmountBaseUnits?: string;
@@ -86,6 +87,7 @@ function writeLedger(ledger: TransactionActivityLedger): void {
 
 export function recordSubmittedTransaction(input: {
   networkId: string;
+  vaultId?: "open" | "verified";
   kind: SubmittedTransactionKind;
   amountBaseUnits: bigint;
   netAmountBaseUnits?: bigint;
@@ -101,6 +103,7 @@ export function recordSubmittedTransaction(input: {
   submitted.push({
     id: `${input.networkId}:${input.signature}`,
     networkId: input.networkId,
+    vaultId: input.vaultId ?? "open",
     kind: input.kind,
     amountBaseUnits: input.amountBaseUnits.toString(),
     netAmountBaseUnits: input.netAmountBaseUnits?.toString(),
@@ -114,12 +117,18 @@ export function recordSubmittedTransaction(input: {
   writeLedger({ submitted: submitted.slice(-50) });
 }
 
-export function getSubmittedTransactions(networkId: string): SubmittedTransactionActivity[] {
+export function getSubmittedTransactions(
+  networkId: string,
+  vaultId: "open" | "verified" = "open",
+): SubmittedTransactionActivity[] {
   const cutoff = Date.now() - MAX_AGE_MS;
   const ledger = readLedger();
   const live = ledger.submitted.filter((item) => item.createdAt >= cutoff);
   if (live.length !== ledger.submitted.length) writeLedger({ submitted: live });
   return live
-    .filter((item) => item.networkId === networkId)
+    .filter(
+      (item) =>
+        item.networkId === networkId && (item.vaultId ?? "open") === vaultId,
+    )
     .sort((a, b) => b.createdAt - a.createdAt);
 }

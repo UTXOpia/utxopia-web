@@ -5,6 +5,10 @@ import {
   hrefWithChain,
   NETWORK_META,
 } from "./network-config";
+import {
+  getVaultNetworkConfig,
+  getVaultRuntimeConfig,
+} from "./vault-config";
 
 describe("network-config query routing", () => {
   const originalEnv = { ...process.env };
@@ -53,6 +57,25 @@ describe("network-config query routing", () => {
       expect(cfg.sns?.subRegistrarProgramId, `${meta.id} sns.subRegistrarProgramId`).toBeTruthy();
       expect(cfg.sns?.parentDomain, `${meta.id} sns.parentDomain`).toBe("utxopia");
     }
+  });
+
+  it("keeps both vault identities available without a global deployment switch", () => {
+    const base = getNetworkConfig("devnet-regtest", { applyEnvOverrides: false });
+    const open = getVaultNetworkConfig("devnet-regtest", base, "open");
+    const verified = getVaultNetworkConfig("devnet-regtest", base, "verified");
+
+    expect(open.solana.permissioned).toBe(false);
+    expect(open.solana.poolState).toBe(
+      "9xeWc39r3Z176MUpMpaqCGJGneHMj4pfMRv9u6dp2Qgd",
+    );
+    expect(verified.solana.permissioned).toBe(true);
+    expect(verified.solana.poolState).toBe(
+      "7mS4wHAV24YSHZ5wzrUZkMBSSa2jywEMCJa6bLyDRKbh",
+    );
+    expect(open.tokens.zkbtcMint).not.toBe(verified.tokens.zkbtcMint);
+    expect(open.backend.url).toBe("https://api-hybrid.utxopia.com/open");
+    expect(verified.backend.url).toBe("https://api-hybrid.utxopia.com/verified");
+    expect(getVaultRuntimeConfig("devnet-regtest", "verified").policyMode).toBe("per");
   });
 
   it("keeps SNS deployment config request-scoped by network", () => {

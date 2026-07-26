@@ -9,6 +9,7 @@ describe("VaultActions", () => {
     render(
       <VaultActions
         networkId="devnet-regtest"
+        vaultId="open"
         isViewOnly={false}
         depositCount={0}
       />,

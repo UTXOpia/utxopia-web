@@ -10,7 +10,7 @@ export interface RelayConfig {
   id: string;
   name: string;
   /** Returns the full relay submission URL for a given networkId. */
-  url: (networkId: string) => string;
+  url: (networkId: string, vaultId?: string) => string;
   region?: string;
   /** True for user-added custom relays (not in the static registry). */
   custom?: boolean;
@@ -33,7 +33,10 @@ export function serializableToConfig(r: SerializableRelay): RelayConfig {
   return {
     id: r.id,
     name: r.name,
-    url: (networkId: string) => r.urlTemplate.replace("{network}", encodeURIComponent(networkId)),
+    url: (networkId: string, vaultId = "open") =>
+      r.urlTemplate
+        .replace("{network}", encodeURIComponent(networkId))
+        .replace("{vault}", encodeURIComponent(vaultId)),
     region: r.region,
     custom: r.custom,
   };
@@ -57,7 +60,7 @@ const BUILTIN_RELAYS: Record<string, SerializableRelay[]> = {
       id: "default",
       name: "Utxopia relay",
       // Reproduces: `/api/sol/relay?network=${encodeURIComponent(networkId)}`
-      urlTemplate: "/api/sol/relay?network={network}",
+      urlTemplate: "/api/sol/relay?network={network}&vault={vault}",
     },
   ],
 };

@@ -37,6 +37,22 @@ describe("submitted transaction activity", () => {
     expect(getSubmittedTransactions("devnet-regtest")).toHaveLength(0);
   });
 
+  it("keeps Open and Verified activity separate", () => {
+    recordSubmittedTransaction({
+      networkId: "devnet-regtest",
+      vaultId: "verified",
+      kind: "private_send",
+      amountBaseUnits: 42n,
+      tokenSymbol: "zkBTC",
+      signature: "verified-signature",
+    });
+
+    expect(getSubmittedTransactions("devnet-regtest", "open")).toHaveLength(0);
+    expect(getSubmittedTransactions("devnet-regtest", "verified")).toMatchObject([
+      { signature: "verified-signature", vaultId: "verified" },
+    ]);
+  });
+
   it("ignores malformed local storage records", () => {
     localStorage.setItem("utxopia:submitted-transactions:v1", JSON.stringify({
       submitted: [{ signature: "partial" }, { amountBaseUnits: "not-a-number" }],

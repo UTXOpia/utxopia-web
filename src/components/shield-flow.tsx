@@ -20,7 +20,7 @@ import {
   TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { UTXOpiaClient } from "@utxopia/sdk";
-import { derivePoolStatePDA, deriveCommitmentTreePDA, deriveTokenConfigPDA } from "@/lib/solana/pdas";
+import { deriveTokenConfigPDA } from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -47,6 +47,11 @@ import { usePoolFees } from "@/hooks/use-pool-fees";
 import { computeBpsFee, feeShareBps } from "@/lib/pool-fees";
 import { formatAmount } from "@/lib/utils/formatting";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
+import {
+  finalizePolicyApproval,
+  policyStageMessage,
+  preparePolicyApproval,
+} from "@/lib/policy-approval";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -80,6 +85,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const [status, setStatus] = useState<ShieldStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
+  const [policyMessage, setPolicyMessage] = useState<string | null>(null);
   const [copiedAddr, setCopiedAddr] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -142,6 +148,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     try {
       setStatus("processing");
       setError(null);
+      setPolicyMessage(null);
 
       const amountRaw = BigInt(Math.floor(parseFloat(amount) * (10 ** selectedToken.decimals)));
       const quotedDepositFeeBps = poolFees.fees?.depositFeeBps;
@@ -165,8 +172,31 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
       const programId = new PublicKey(chainEnv.config.solana.utxopiaProgramId);
       const [tokenConfigPda] = deriveTokenConfigPDA(mintPubkey, programId);
-      const [poolStatePda] = derivePoolStatePDA(programId);
-      const [commitmentTreePda] = deriveCommitmentTreePDA(programId);
+      const poolStatePda = new PublicKey(chainEnv.config.solana.poolState!);
+      const commitmentTreePda = new PublicKey(
+        chainEnv.config.solana.commitmentTree!,
+      );
+
+      const ixData = new Uint8Array(73);
+      ixData[0] = chainEnv.vaultId === "verified" ? 23 : 12;
+      const dataView = new DataView(ixData.buffer);
+      dataView.setBigUint64(1, amountRaw, true);
+      ixData.set(npkBytes, 9);
+      ixData.set(shieldOutput.ephemeralPub, 41);
+
+      let policyRequestId: string | undefined;
+      let approvalAccount: PublicKey | undefined;
+      if (chainEnv.vaultId === "verified") {
+        const approval = await preparePolicyApproval({
+          networkId: chainEnv.networkId,
+          vaultId: chainEnv.vaultId,
+          actor: publicKey.toBase58(),
+          instructionData: ixData,
+          onStage: (stage) => setPolicyMessage(policyStageMessage(stage)),
+        });
+        policyRequestId = approval.requestId;
+        approvalAccount = new PublicKey(approval.approvalAccount);
+      }
 
       const tx = new Transaction();
       let userTokenAccount: PublicKey;
@@ -217,13 +247,6 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         const vaultPubkey = new PublicKey(vaultBytes);
 
         // 4. Shield instruction (use legacy Token program for wSOL)
-        const ixData = new Uint8Array(73);
-        ixData[0] = 12; // SHIELD discriminator
-        const dataView = new DataView(ixData.buffer);
-        dataView.setBigUint64(1, amountRaw, true);
-        ixData.set(npkBytes, 9);
-        ixData.set(shieldOutput.ephemeralPub, 41);
-
         tx.add(new TransactionInstruction({
           programId,
           data: Buffer.from(ixData),
@@ -235,6 +258,16 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
             { pubkey: vaultPubkey, isSigner: false, isWritable: true },
             { pubkey: commitmentTreePda, isSigner: false, isWritable: true },
             { pubkey: new PublicKey(SPL_TOKEN_PROGRAM_ID), isSigner: false, isWritable: false },
+            ...(approvalAccount
+              ? [
+                  { pubkey: approvalAccount, isSigner: false, isWritable: true },
+                  {
+                    pubkey: new PublicKey(chainEnv.config.solana.policyProgramId!),
+                    isSigner: false,
+                    isWritable: false,
+                  },
+                ]
+              : []),
           ],
         }));
 
@@ -276,13 +309,6 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         const vaultBytes = tokenConfigAccount.data.slice(66, 98);
         const vaultPubkey = new PublicKey(vaultBytes);
 
-        const ixData = new Uint8Array(73);
-        ixData[0] = 12; // SHIELD discriminator
-        const dataView = new DataView(ixData.buffer);
-        dataView.setBigUint64(1, amountRaw, true);
-        ixData.set(npkBytes, 9);
-        ixData.set(shieldOutput.ephemeralPub, 41);
-
         tx.add(new TransactionInstruction({
           programId,
           data: Buffer.from(ixData),
@@ -294,6 +320,16 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
             { pubkey: vaultPubkey, isSigner: false, isWritable: true },
             { pubkey: commitmentTreePda, isSigner: false, isWritable: true },
             { pubkey: tokenProgramId, isSigner: false, isWritable: false },
+            ...(approvalAccount
+              ? [
+                  { pubkey: approvalAccount, isSigner: false, isWritable: true },
+                  {
+                    pubkey: new PublicKey(chainEnv.config.solana.policyProgramId!),
+                    isSigner: false,
+                    isWritable: false,
+                  },
+                ]
+              : []),
           ],
         }));
       }
@@ -310,6 +346,15 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           return;
         }
         throw confirmationError;
+      }
+      if (policyRequestId) {
+        await finalizePolicyApproval({
+          networkId: chainEnv.networkId,
+          vaultId: chainEnv.vaultId,
+          requestId: policyRequestId,
+          signature: sig,
+          onStage: (stage) => setPolicyMessage(policyStageMessage(stage)),
+        });
       }
 
       setStatus("done");
@@ -559,7 +604,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         {poolPermissioned && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-muted border border-gray/15">
             <Info className="w-3.5 h-3.5 shrink-0 text-gray" aria-hidden />
-            <span className="text-[11px] text-gray">Deposits to this pool are submitted via the pool&apos;s auditor.</span>
+            <span className="text-[11px] text-gray">
+              Eligibility is checked privately before this deposit is finalized
+              on Solana.
+            </span>
           </div>
         )}
 
@@ -567,7 +615,6 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         {btcWallet.connected ? (
           <button
             onClick={buildTxPreview}
-            // TODO(permissioned): route value-entry through the auditor co-signing service
             disabled={!canSubmitBtc || buildingPreview || btcAmountSats < BTC_DUST_LIMIT || (btcWallet.balance !== null && btcAmountSats > btcWallet.balance)}
             className={cn(
               "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",
@@ -763,14 +810,26 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       {poolPermissioned && (
         <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-muted border border-gray/15">
           <Info className="w-3.5 h-3.5 shrink-0 text-gray" aria-hidden />
-          <span className="text-[11px] text-gray">Deposits to this pool are submitted via the pool&apos;s auditor.</span>
+          <span className="text-[11px] text-gray">
+            Policy is checked privately before your wallet signs. Asset state
+            and finality remain on Solana.
+          </span>
+        </div>
+      )}
+
+      {policyMessage && status === "processing" && (
+        <div
+          className="flex items-center gap-2 rounded-[10px] border border-privacy/20 bg-privacy/5 px-3 py-2 text-[11px] text-gray-light"
+          role="status"
+        >
+          <Loader2 className="h-3.5 w-3.5 animate-spin text-privacy" />
+          {policyMessage}
         </div>
       )}
 
       {/* Add funds button */}
       <button
         onClick={handleShield}
-        // TODO(permissioned): route value-entry through the auditor co-signing service
         disabled={!canSubmit || status === "processing"}
         className={cn(
           "w-full flex items-center justify-center gap-2 py-3.5 rounded-[12px]",

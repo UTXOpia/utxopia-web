@@ -22,17 +22,17 @@ export interface TokenScanTarget {
 }
 
 let eventClient: EventClient | null = null;
-let eventClientNetwork: string | null = null;
+let eventClientIdentity: string | null = null;
 
-export function getEventClient(): EventClient {
-  const env = getChainEnvironment();
-  if (eventClient && eventClientNetwork !== env.networkId) {
+export function getEventClient(env: ChainEnvironment = getChainEnvironment()): EventClient {
+  const identity = `${env.networkId}:${env.vaultId}`;
+  if (eventClient && eventClientIdentity !== identity) {
     eventClient.close();
     eventClient = null;
   }
   if (!eventClient) {
     const backendUrl = "";
-    const wsBackendUrl = getBackendUrl(env.networkId);
+    const wsBackendUrl = env.config.backend.url || getBackendUrl(env.networkId);
     const wsUrl = wsBackendUrl.replace("http://", "ws://").replace("https://", "wss://");
     eventClient = new EventClient({
       backendUrl,
@@ -41,18 +41,20 @@ export function getEventClient(): EventClient {
       programId: UTXOpiaClient.instance().config.utxopiaProgramId,
       commitmentTreeAddress: UTXOpiaClient.instance().config.commitmentTreePda,
     });
-    eventClientNetwork = env.networkId;
+    eventClientIdentity = identity;
   }
   return eventClient;
 }
 
 export function resetEventClient(): void {
   eventClient = null;
-  eventClientNetwork = null;
+  eventClientIdentity = null;
 }
 
 export async function fetchInboxSource(env: ChainEnvironment): Promise<InboxSource> {
-  return { announcements: await fetchSolanaInboxAnnouncements(env.networkId) };
+  return {
+    announcements: await fetchSolanaInboxAnnouncements(env),
+  };
 }
 
 interface BackendAnnouncementRow {
@@ -66,11 +68,12 @@ interface BackendAnnouncementRow {
   slot?: number | null;
 }
 
-async function fetchSolanaInboxAnnouncements(networkId: string): Promise<OnChainStealthAnnouncement[]> {
+async function fetchSolanaInboxAnnouncements(
+  env: ChainEnvironment,
+): Promise<OnChainStealthAnnouncement[]> {
   try {
-    const resp = await fetch(`/api/announcements?network=${encodeURIComponent(networkId)}`, {
-      cache: "no-store",
-    });
+    const params = new URLSearchParams({ network: env.networkId, vault: env.vaultId });
+    const resp = await fetch(`/api/announcements?${params.toString()}`, { cache: "no-store" });
     if (!resp.ok) throw new Error(`announcements proxy ${resp.status}`);
 
     const data = await resp.json() as { success?: boolean; announcements?: BackendAnnouncementRow[] };
@@ -85,7 +88,7 @@ async function fetchSolanaInboxAnnouncements(networkId: string): Promise<OnChain
     }));
   } catch (err) {
     console.warn("[ChainInbox] backend announcements fetch failed; falling back to EventClient:", err);
-    return getEventClient().fetchAll();
+    return getEventClient(env).fetchAll();
   }
 }
 

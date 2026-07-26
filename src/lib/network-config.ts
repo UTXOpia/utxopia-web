@@ -1,8 +1,8 @@
 /**
  * Network configuration — single source of truth for all addresses.
  *
- * Reads from networks.json (checked into repo). No env vars needed
- * for program IDs, mints, or backend URLs.
+ * Reads network transport configuration from networks.json. Vault pool
+ * identities are applied independently at runtime by vault-config.ts.
  *
  * Only RPC URL and backend URL can be overridden via env vars
  * (for custom RPC providers or local development).
@@ -31,6 +31,10 @@ export interface NetworkConfig {
     permissioned?: boolean;
     /** Base58-encoded auditor viewing pubkey (Solana). Absent ⇒ not permissioned. */
     auditorViewingPubkey?: string;
+    /** Fixed active vault identity, applied from the runtime vault registry. */
+    poolState?: string;
+    commitmentTree?: string;
+    policyProgramId?: string;
   };
   tokens: {
     zkbtcMint: string;

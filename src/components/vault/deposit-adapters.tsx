@@ -6,20 +6,22 @@ import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { ShieldFlow } from "@/components/shield-flow";
 import { hrefWithChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
+import { hrefWithVault, type VaultId } from "@/lib/vault-config";
 
 interface ChainDepositRouteProps {
   networkId: NetworkId;
   config: NetworkConfig;
+  vaultId: VaultId;
 }
 
 export function renderChainDeposit(props: ChainDepositRouteProps): ReactNode {
   return <SolanaDepositPage {...props} />;
 }
 
-function SolanaDepositPage({ networkId }: ChainDepositRouteProps) {
+function SolanaDepositPage({ networkId, vaultId }: ChainDepositRouteProps) {
   return (
     <FlowPageLayout
-      backHref={hrefWithChain("/vault", networkId)}
+      backHref={hrefWithVault(hrefWithChain("/vault", networkId), vaultId)}
       backLabel="Back"
       width={520}
       badges={[

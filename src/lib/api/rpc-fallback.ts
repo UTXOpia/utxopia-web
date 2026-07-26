@@ -7,6 +7,7 @@
 
 import type { NetworkConfig } from "../network-config";
 import { SOLANA_RPC_FALLBACK_URL } from "./constants";
+import { getConfig } from "@utxopia/sdk";
 
 // Rent-exempt minimum for a 1-byte account (NullifierRecord)
 const RENT_EXEMPT_1_BYTE = 897840;
@@ -45,12 +46,21 @@ function getRpcUrl(config?: NetworkConfig): string {
     || SOLANA_RPC_FALLBACK_URL;
 }
 
-async function deriveCommitmentTreePda(programId: string): Promise<string> {
-  const { getProgramDerivedAddress, address } = await import("@solana/kit");
+async function deriveCommitmentTreePda(programId: string, poolMint: string): Promise<string> {
+  const { getProgramDerivedAddress, address, getAddressEncoder } = await import("@solana/kit");
+  const encoder = getAddressEncoder();
+  const [poolState] = await getProgramDerivedAddress({
+    programAddress: address(programId),
+    seeds: [new TextEncoder().encode("pool_state"), encoder.encode(address(poolMint))],
+  });
   const treeIndex = new Uint8Array(4);
   const [pda] = await getProgramDerivedAddress({
     programAddress: address(programId),
-    seeds: [new TextEncoder().encode("commitment_tree"), treeIndex],
+    seeds: [
+      new TextEncoder().encode("commitment_tree"),
+      encoder.encode(poolState),
+      treeIndex,
+    ],
   });
   return pda;
 }
@@ -212,7 +222,8 @@ export async function fetchAnnouncementsFromRpc(
   const rpcUrl = getRpcUrl(config);
   const programId = config?.solana.utxopiaProgramId;
   if (!programId) return [];
-  const commitmentTreePda = await deriveCommitmentTreePda(programId);
+  const poolMint = config?.tokens.zkbtcMint ?? getConfig().zkbtcMint.toString();
+  const commitmentTreePda = await deriveCommitmentTreePda(programId, poolMint);
 
   // 1. Get recent signatures for the commitment tree PDA
   const sigsResp = await fetch(rpcUrl, {

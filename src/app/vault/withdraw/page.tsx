@@ -6,13 +6,14 @@ import { CashOutFlow } from "@/components/send/send-flow";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
+import { hrefWithVault } from "@/lib/vault-config";
 
 export default function WithdrawPage() {
-  const { networkId } = useChainEnvironment();
+  const { networkId, vaultId } = useChainEnvironment();
 
   return (
     <FlowPageLayout
-      backHref={hrefWithChain("/vault", networkId)}
+      backHref={hrefWithVault(hrefWithChain("/vault", networkId), vaultId)}
       backLabel="Back"
       width={460}
       badges={[{ icon: <ArrowUpFromLine className="w-full h-full" />, label: PRODUCT_COPY.actions.takeFundsOut, color: "privacy" }]}

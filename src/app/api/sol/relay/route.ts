@@ -18,6 +18,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import {
+  Connection,
   Keypair,
   PublicKey,
   Transaction,
@@ -33,8 +34,6 @@ import {
 const getUTXOpiaSDK = () => import("@utxopia/sdk");
 
 import {
-  derivePoolStatePDA,
-  deriveCommitmentTreePDA,
   deriveNullifierPDA,
   deriveVkRegistryPDA,
   deriveTokenConfigPDA,
@@ -49,16 +48,13 @@ import {
   getNetworkConfig,
   type NetworkId,
 } from "@/lib/network-config";
+import {
+  getVaultNetworkConfig,
+  parseVaultId,
+} from "@/lib/vault-config";
 import { networkForChain } from "@/lib/chain-registry";
 import { isNativeSolMint } from "@/lib/solana/native-sol";
-import { getMagicBlockClientConfig } from "@/lib/magicblock-config";
-import {
-  assertDelegatedExecutionCluster,
-  buildMagicBlockAtomicCommitInstruction,
-  createMagicBlockExecutionConnections,
-  sendMagicBlockAwareTransaction,
-} from "@/lib/server/magicblock-route";
-import { ConnectionMagicRouter } from "@magicblock-labs/ephemeral-rollups-sdk";
+import { resolvePolicyApproval } from "@/lib/server/policy-coordinator";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -106,6 +102,8 @@ interface RelayRequest {
    * detection. Omit for the common case (note in the active tree) — strictly no-op then.
    */
   sourceTree?: string;
+  /** Opaque backend policy request handle for Verified Privacy. */
+  policyRequestId?: string;
 }
 
 // =============================================================================
@@ -179,7 +177,12 @@ export async function POST(request: NextRequest) {
     const requestedNetwork = request.nextUrl.searchParams.get("network") as NetworkId | null
       ?? detectNetworkFromRequest(request);
     const solanaNetwork = networkForChain(requestedNetwork, "solana");
-    const cfg = getNetworkConfig(solanaNetwork);
+    const vaultId = parseVaultId(request.nextUrl.searchParams.get("vault"));
+    const cfg = getVaultNetworkConfig(
+      solanaNetwork,
+      getNetworkConfig(solanaNetwork),
+      vaultId,
+    );
     if (!cfg.solana.utxopiaProgramId || !cfg.tokens.zkbtcMint || !cfg.solana.chadbufferId) {
       return NextResponse.json(
         { success: false, error: `Solana relay is not configured for network=${solanaNetwork}` },
@@ -227,30 +230,10 @@ export async function POST(request: NextRequest) {
     console.log(`[Relay] Processing Solana ${mode} JoinSplit(${nInputs}x${nOutputs}) on ${solanaNetwork}...`);
 
     const relayer = getRelayerKeypair();
-    const magicBlockConfig = getMagicBlockClientConfig();
-    if (magicBlockConfig.executionMode !== "solana" && mode !== "transfer") {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "ER/PER alpha supports private transfer only; unshield and redeem remain on Solana",
-        },
-        { status: 400 }
-      );
-    }
-    if (magicBlockConfig.executionMode !== "solana" && nInputs > 10) {
-      return NextResponse.json(
-        {
-          success: false,
-          error: "ER/PER transfers support at most 10 inputs per atomic commit",
-        },
-        { status: 400 }
-      );
-    }
-    const executionConnections = createMagicBlockExecutionConnections(
-      cfg.solana.rpcUrl,
-      magicBlockConfig
-    );
-    const connection = executionConnections.base;
+    // Asset state always settles directly on Solana. PER is deliberately kept
+    // out of the commitment-tree/nullifier path and is used only by separate
+    // policy and coordination services.
+    const connection = new Connection(cfg.solana.rpcUrl, "confirmed");
     const programId = new PublicKey(cfg.solana.utxopiaProgramId);
     const chadbufferProgramId = new PublicKey(cfg.solana.chadbufferId);
     const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
@@ -272,17 +255,8 @@ export async function POST(request: NextRequest) {
     // ── Derive common PDAs ─────────────────────────────────────────────
     const nullifierPDAs = nullifierBytes.map((n) => deriveNullifierPDA(n, programId)[0]);
     const [vkRegistryPDA] = deriveVkRegistryPDA(nInputs, nOutputs, programId);
-    const [poolState] = derivePoolStatePDA(programId);
-    const [commitmentTree] = deriveCommitmentTreePDA(programId);
-    if (executionConnections.execution instanceof ConnectionMagicRouter) {
-      await assertDelegatedExecutionCluster(
-        executionConnections.execution,
-        poolState,
-        commitmentTree,
-        magicBlockConfig.executionMode
-      );
-    }
-
+    const poolState = new PublicKey(cfg.solana.poolState!);
+    const commitmentTree = new PublicKey(cfg.solana.commitmentTree!);
     // ── Relayer fee check (transfer mode only) ─────────────────────────
     if (mode === "transfer" && RELAYER_FEE_SATS > 0) {
       const feeIdx = body.relayerFeeOutputIndex;
@@ -469,6 +443,32 @@ export async function POST(request: NextRequest) {
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
     }
 
+    let policyRequestId: string | null = null;
+    if (cfg.solana.permissioned) {
+      if (!body.policyRequestId) {
+        throw new Error("Verified Privacy requires an approved policy request");
+      }
+      const approval = await resolvePolicyApproval({
+        backendUrl: cfg.backend.url,
+        requestId: body.policyRequestId,
+        actor: relayer.publicKey.toBase58(),
+      });
+      policyRequestId = approval.requestId;
+      keys.splice(keys.length - 1, 0, {
+        pubkey: new PublicKey(approval.approvalAccount),
+        isSigner: false,
+        isWritable: true,
+      });
+      if (!cfg.solana.policyProgramId) {
+        throw new Error("Verified Privacy policy program is not configured");
+      }
+      keys.splice(keys.length - 1, 0, {
+        pubkey: new PublicKey(cfg.solana.policyProgramId),
+        isSigner: false,
+        isWritable: false,
+      });
+    }
+
     // ── Submit transaction ─────────────────────────────────────────────
     const mainIx = new TransactionInstruction({
       programId,
@@ -480,24 +480,11 @@ export async function POST(request: NextRequest) {
       ComputeBudgetProgram.setComputeUnitLimit({ units: 1_400_000 }),
       mainIx
     );
-    if (mode === "transfer" && magicBlockConfig.executionMode !== "solana") {
-      tx.add(buildMagicBlockAtomicCommitInstruction({
-        programId,
-        payer: relayer.publicKey,
-        poolState,
-        commitmentTree,
-        nullifierAccounts: nullifierPDAs,
-        nullifierHashes: nullifierBytes,
-      }));
-    }
-
     console.log(`[Relay] Submitting ${mode} transaction...`);
     tx.feePayer = relayer.publicKey;
-    const signature = await sendMagicBlockAwareTransaction(
-      executionConnections,
-      tx,
-      [relayer]
-    );
+    const signature = await sendAndConfirmTransaction(connection, tx, [relayer], {
+      commitment: "confirmed",
+    });
     console.log(`[Relay] Transaction confirmed: ${signature}`);
 
     // Close buffer and reclaim rent
@@ -514,7 +501,8 @@ export async function POST(request: NextRequest) {
       success: true,
       signature,
       bufferAddress: bufferPubkey.toBase58(),
-      executionMode: magicBlockConfig.executionMode,
+      executionMode: "solana",
+      ...(policyRequestId ? { policyRequestId } : {}),
     });
   } catch (error) {
     console.error("[Relay] Error:", error);

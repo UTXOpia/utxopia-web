@@ -14,6 +14,11 @@ import { getChainAdapter } from "@/lib/chain-registry";
 import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { useRelayCandidates } from "@/hooks/use-relay";
 import { submitWithFailover } from "@/lib/relay-submit";
+import {
+  finalizePolicyApproval,
+  policyStageMessage,
+  preparePolicyApproval,
+} from "@/lib/policy-approval";
 
 export type SubmitStatus = "idle" | "preparing" | "processing" | "submitting" | "success" | "error";
 
@@ -26,7 +31,7 @@ export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
   const chainId = getChainAdapter(chainEnv.config).id;
-  const relayCandidates = useRelayCandidates(chainId, chainEnv.networkId);
+  const relayCandidates = useRelayCandidates(chainId, chainEnv.networkId, chainEnv.vaultId);
   const [status, setStatus] = useState<SubmitStatus>("idle");
   const [statusMessage, setStatusMessage] = useState("");
   const [txSignature, setTxSignature] = useState<string | null>(null);
@@ -39,7 +44,14 @@ export function useJoinSplitSubmit() {
     setTxSignature(null);
 
     try {
-      const { bytesToHex, UTXOpiaClient } = await import("@utxopia/sdk");
+      const {
+        buildRedeemInstructionData,
+        buildTransactInstructionData,
+        buildUnshieldInstructionData,
+        bytesToHex,
+        hexToBytes,
+        UTXOpiaClient,
+      } = await import("@utxopia/sdk");
 
       // Initialize prover if needed
       if (!prover.isInitialized) {
@@ -89,7 +101,74 @@ export function useJoinSplitSubmit() {
         ...(params.sourceTree ? { sourceTree: params.sourceTree } : {}),
       };
 
-      let relayResult: { success: boolean; signature?: string; error?: string };
+      const requestNonce = params.relayMode === "redeem"
+        ? BigInt(Date.now())
+        : undefined;
+      let policyRequestId: string | undefined;
+      if (chainEnv.vaultId === "verified") {
+        const actorResponse = await fetch(relayCandidates[0]);
+        if (!actorResponse.ok) {
+          throw new Error("Could not fetch the Verified Privacy relayer");
+        }
+        const { relayerPubkey } = await actorResponse.json() as {
+          relayerPubkey?: string;
+        };
+        if (!relayerPubkey) {
+          throw new Error("Verified Privacy relayer is unavailable");
+        }
+
+        const instructionCommon = {
+          nInputs,
+          nOutputs,
+          merkleRoot: hexToBytes(merkleRootHex),
+          boundParamsHash: hexToBytes(boundParamsHashHex),
+          nullifiers: nullifierHexes.map(hexToBytes),
+          commitmentsOut: commitmentHexes.map(hexToBytes),
+          proofSource: 1 as const,
+        };
+        let instructionData: Uint8Array;
+        if (params.relayMode === "redeem") {
+          instructionData = buildRedeemInstructionData({
+            ...instructionCommon,
+            nPublicOutputs: 1,
+            stealthData: params.stealthDataArrays.slice(0, -1),
+            redeemAmounts: [redeemAmountSats ?? 0n],
+            btcScripts: [params.btcScriptPubKey!],
+            requestNonces: [requestNonce!],
+          });
+        } else if (params.relayMode === "unshield") {
+          const unshieldAmount = BigInt(
+            params.proofInputs.outputs[params.proofInputs.outputs.length - 1].value,
+          );
+          instructionData = buildUnshieldInstructionData({
+            ...instructionCommon,
+            nPublicOutputs: 1,
+            stealthData: params.stealthDataArrays.slice(0, -1),
+            unshieldAmounts: [unshieldAmount],
+          });
+        } else {
+          instructionData = buildTransactInstructionData({
+            ...instructionCommon,
+            stealthData: params.stealthDataArrays,
+          });
+        }
+        const approval = await preparePolicyApproval({
+          networkId: chainEnv.networkId,
+          vaultId: chainEnv.vaultId,
+          actor: relayerPubkey,
+          instructionData,
+          onStage: (stage) => setStatusMessage(policyStageMessage(stage)),
+        });
+        policyRequestId = approval.requestId;
+        setStatusMessage(policyStageMessage("awaiting_signature"));
+      }
+
+      let relayResult: {
+        success: boolean;
+        signature?: string;
+        error?: string;
+        policyRequestId?: string;
+      };
 
       const onFailover = (failedUrl: string, nextUrl: string, err: unknown) => {
         console.warn("[Submit] Relay failed, retrying via another relay...", { failedUrl, nextUrl, err });
@@ -97,7 +176,6 @@ export function useJoinSplitSubmit() {
 
       if (params.relayMode === "redeem") {
         const treeStealthData = params.stealthDataArrays.slice(0, -1);
-        const requestNonce = BigInt(Date.now());
         relayResult = await submitWithFailover(
           (url) => relayClient.submitToRelay({
             ...commonFields,
@@ -105,7 +183,8 @@ export function useJoinSplitSubmit() {
             stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
             redeemAmounts: [(redeemAmountSats ?? 0n).toString()],
             btcScripts: [bytesToHex(params.btcScriptPubKey!)],
-            requestNonces: [requestNonce.toString()],
+            requestNonces: [requestNonce!.toString()],
+            ...(policyRequestId ? { policyRequestId } : {}),
           }, url),
           relayCandidates,
           { onFailover },
@@ -131,6 +210,7 @@ export function useJoinSplitSubmit() {
             stealthData: treeStealthData.map((sd) => bytesToHex(sd)),
             unshieldAmounts: [unshieldAmount.toString()],
             recipientAddresses: [recipientPubkey.toBase58()],
+            ...(policyRequestId ? { policyRequestId } : {}),
           }, `${url}&unshieldMint=${encodeURIComponent(unshieldMint)}`),
           relayCandidates,
           { onFailover },
@@ -142,6 +222,7 @@ export function useJoinSplitSubmit() {
             mode: "transfer",
             stealthData: params.stealthDataArrays.map((sd) => bytesToHex(sd)),
             relayerFeeOutputIndex: params.relayerFeeOutputIndex,
+            ...(policyRequestId ? { policyRequestId } : {}),
           }, url),
           relayCandidates,
           { onFailover },
@@ -153,6 +234,15 @@ export function useJoinSplitSubmit() {
       }
       if (!relayResult.signature) {
         throw new Error("Relay accepted the request but did not return a transaction signature");
+      }
+      if (policyRequestId) {
+        await finalizePolicyApproval({
+          networkId: chainEnv.networkId,
+          vaultId: chainEnv.vaultId,
+          requestId: relayResult.policyRequestId || policyRequestId,
+          signature: relayResult.signature,
+          onStage: (stage) => setStatusMessage(policyStageMessage(stage)),
+        });
       }
 
       setTxSignature(relayResult.signature);
