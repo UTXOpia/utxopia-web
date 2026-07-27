@@ -49,9 +49,11 @@ import { formatAmount } from "@/lib/utils/formatting";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
 import {
   finalizePolicyApproval,
+  isPolicyRejection,
   policyStageMessage,
   preparePolicyApproval,
 } from "@/lib/policy-approval";
+import { ApplyForAccess } from "@/components/apply-for-access";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -600,6 +602,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </div>
         )}
 
+        {status === "error" && isPolicyRejection(error) && publicKey && (
+          <ApplyForAccess actor={publicKey.toBase58()} networkId={networkId} />
+        )}
+
         {/* Permissioned-pool indicator — visible only when config marks pool permissioned */}
         {poolPermissioned && (
           <div className="flex items-center gap-2 px-3 py-2 rounded-[10px] bg-muted border border-gray/15">
@@ -780,6 +786,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           <AlertCircle className="w-4 h-4 text-red-400 shrink-0" />
           <span className="text-caption text-red-400">{error}</span>
         </div>
+      )}
+
+      {status === "error" && isPolicyRejection(error) && publicKey && (
+        <ApplyForAccess actor={publicKey.toBase58()} networkId={networkId} />
       )}
 
       {status === "unknown" && txSig && (

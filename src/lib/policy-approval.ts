@@ -2,6 +2,10 @@ import type { PolicyStage } from "@/lib/server/policy-coordinator";
 
 const TERMINAL_FAILURES = new Set<PolicyStage>(["rejected", "failed"]);
 
+export function isPolicyRejection(message: string | null | undefined): boolean {
+  return !!message && message.includes("isn't approved for Verified Privacy");
+}
+
 export function policyFailureMessage(stage: PolicyStage, detail?: string): string {
   if (stage === "rejected") {
     return detail && /allow|permission|actor/i.test(detail)
