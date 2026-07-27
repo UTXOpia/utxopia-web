@@ -2,6 +2,16 @@ import type { PolicyStage } from "@/lib/server/policy-coordinator";
 
 const TERMINAL_FAILURES = new Set<PolicyStage>(["rejected", "failed"]);
 
+export function policyFailureMessage(stage: PolicyStage, detail?: string): string {
+  if (stage === "rejected") {
+    return detail && /allow|permission|actor/i.test(detail)
+      ? `This wallet isn't approved for Verified Privacy: ${detail}. Switch to Open Privacy, or ask the operator to allowlist your wallet.`
+      : detail ||
+          "This wallet isn't approved for Verified Privacy. Switch to Open Privacy, or ask the operator to allowlist your wallet.";
+  }
+  return detail || `Policy request ${stage}`;
+}
+
 interface PublicPolicyStatus {
   requestId: string;
   stage: PolicyStage;
@@ -75,7 +85,7 @@ export async function preparePolicyApproval(input: {
   const deadline = Date.now() + 90_000;
   while (status.stage !== "awaiting_signature") {
     if (TERMINAL_FAILURES.has(status.stage)) {
-      throw new Error(status.error || `Policy request ${status.stage}`);
+      throw new Error(policyFailureMessage(status.stage, status.error));
     }
     if (Date.now() >= deadline) {
       throw new Error(`Policy request timed out while ${status.stage}`);
@@ -115,7 +125,7 @@ export async function finalizePolicyApproval(input: {
   const deadline = Date.now() + 30_000;
   while (status.stage !== "finalized") {
     if (TERMINAL_FAILURES.has(status.stage)) {
-      throw new Error(status.error || `Policy request ${status.stage}`);
+      throw new Error(policyFailureMessage(status.stage, status.error));
     }
     if (Date.now() >= deadline) {
       throw new Error(`Solana finality timed out while ${status.stage}`);
