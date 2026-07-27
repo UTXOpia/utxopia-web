@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useCallback, type JSX } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { useBitcoinWalletStore } from "./bitcoin-wallet-store";
 import { useUTXOpiaStore } from "./utxopia-store";
 
@@ -31,6 +32,20 @@ export function StoreHydration(): JSX.Element {
   const hasHydratedRef = useRef(false);
   const hasPasskeyHydratedRef = useRef(false);
 
+  // Re-arm hydration when the network/vault identity changes: vault switching
+  // clears the store keys (keepSession), and the vault warmed at unlock should
+  // restore silently instead of prompting again.
+  const { networkId, vaultId } = useChainEnvironment();
+  const envIdentity = `${networkId}:${vaultId}`;
+  const lastEnvIdentityRef = useRef(envIdentity);
+  useEffect(() => {
+    if (lastEnvIdentityRef.current !== envIdentity) {
+      lastEnvIdentityRef.current = envIdentity;
+      hasHydratedRef.current = false;
+      hasPasskeyHydratedRef.current = false;
+    }
+  }, [envIdentity]);
+
   useEffect(() => {
     // Hydrate Bitcoin wallet from localStorage
     hydrateBtcWallet();
@@ -45,7 +60,7 @@ export function StoreHydration(): JSX.Element {
       hasHydratedRef.current = true;
       hydrateKeys(walletPubkey);
     }
-  }, [walletPubkey, isPoseidonReady, keys, hydrateKeys]);
+  }, [walletPubkey, isPoseidonReady, keys, hydrateKeys, envIdentity]);
 
   // Auto-hydrate passkey keys for the active chain. Runs independently of the
   // wallet (a passkey user may also have a Solana wallet auto-connected — the
@@ -56,7 +71,7 @@ export function StoreHydration(): JSX.Element {
       hasPasskeyHydratedRef.current = true;
       hydratePasskeyKeys();
     }
-  }, [isPoseidonReady, keys, hydratePasskeyKeys]);
+  }, [isPoseidonReady, keys, hydratePasskeyKeys, envIdentity]);
 
   // Reset hydration flag when wallet disconnects
   useEffect(() => {

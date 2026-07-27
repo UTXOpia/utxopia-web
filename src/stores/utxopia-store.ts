@@ -60,16 +60,18 @@ async function deriveStorageKey(owner: string, secret: Uint8Array): Promise<Cryp
 // In-memory per-session cache: derived once at auth (unlock), reused for the rest
 // of the session. A fresh page load has an empty cache, so persisted keys can only
 // be decrypted after the user re-authenticates once (the "once per session" model).
-let sessionStorageKey: { owner: string; key: CryptoKey } | null = null;
+// Keyed per storage owner so one unlock ceremony can warm both vault identities
+// and switching vaults hydrates without a second prompt.
+const sessionStorageKeys = new Map<string, CryptoKey>();
 
 async function unlockStorageKey(owner: string, secret: Uint8Array): Promise<CryptoKey> {
   const key = await deriveStorageKey(owner, secret);
-  sessionStorageKey = { owner, key };
+  sessionStorageKeys.set(owner, key);
   return key;
 }
 
 function cachedStorageKey(owner: string): CryptoKey | null {
-  return sessionStorageKey && sessionStorageKey.owner === owner ? sessionStorageKey.key : null;
+  return sessionStorageKeys.get(owner) ?? null;
 }
 
 async function encryptData(key: CryptoKey, plaintext: string): Promise<string> {
@@ -264,7 +266,7 @@ interface UTXOpiaState {
   deriveKeysFromPasskeySeed: (seed: Uint8Array, networkId?: NetworkId) => Promise<void>;
   hydratePasskeyKeys: (networkId?: NetworkId) => Promise<boolean>;
   loadViewOnlyKeys: (encoded: string) => Promise<void>;
-  clearKeys: (walletPubkey?: string) => void;
+  clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
   startRealtimeInbox: () => () => void;
   refreshPublicBalance: (walletPubkey?: PublicKey) => Promise<void>;
@@ -437,14 +439,30 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       // One passkey → a separate private identity per chain+network (see chainScopedPasskeySeed).
       const net = networkId ?? detectNetwork();
       const vaultId = detectVault();
+      const credentialId = typeof window !== "undefined"
+        ? localStorage.getItem("utxo:passkey_credential_id") || "default"
+        : "default";
+
+      // Warm the sibling vault's identity in the same unlock ceremony: derive,
+      // log the client in, persist, then log in with the active vault last so
+      // switching vaults hydrates silently instead of re-prompting the passkey.
+      const siblingVault: VaultId = vaultId === "open" ? "verified" : "open";
+      try {
+        const siblingSeed = await chainScopedPasskeySeed(seed, net, siblingVault);
+        await client.loginWithSeed(siblingSeed);
+        await persistKeys(
+          passkeyStorageOwner(credentialId, net, siblingVault),
+          siblingSeed,
+        );
+      } catch {
+        // Best-effort: the sibling vault prompts on first switch instead.
+      }
+
       const scopedSeed = await chainScopedPasskeySeed(seed, net, vaultId);
       const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
         await client.loginWithSeed(scopedSeed);
 
       // Persist per chain+network, encrypted under the chain-scoped seed.
-      const credentialId = typeof window !== "undefined"
-        ? localStorage.getItem("utxo:passkey_credential_id") || "default"
-        : "default";
       await persistKeys(
         passkeyStorageOwner(credentialId, net, vaultId),
         scopedSeed,
@@ -472,10 +490,12 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   hydratePasskeyKeys: async (networkId?: NetworkId) => {
     try {
       await ensureChainEnvironment();
-      const credentialId = typeof window !== "undefined"
-        ? localStorage.getItem("utxo:passkey_credential_id")
-        : null;
-      if (!credentialId) return false;
+      if (typeof window === "undefined") return false;
+      // Same "default" fallback as deriveKeysFromPasskeySeed — identities
+      // persisted without a stored credential id must hydrate under the same
+      // storage owner they were written to.
+      const credentialId =
+        localStorage.getItem("utxo:passkey_credential_id") || "default";
 
       const storageId = passkeyStorageOwner(
         credentialId,
@@ -533,9 +553,14 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  clearKeys: (walletPubkey?: string) => {
+  clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => {
     if (walletPubkey) {
       removeKeys(walletStorageOwner(walletPubkey, detectVault()));
+    }
+    // Vault switching passes keepSession so the identities warmed at unlock
+    // stay decryptable; explicit logout drops every in-session storage key.
+    if (!opts?.keepSession) {
+      sessionStorageKeys.clear();
     }
     // Clear UTXOpiaClient state
     if (UTXOpiaClient.isInitialized) {

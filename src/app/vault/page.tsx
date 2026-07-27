@@ -109,7 +109,7 @@ export default function VaultPage() {
   const previousVaultId = useRef(vaultId);
   useEffect(() => {
     if (previousVaultId.current !== vaultId) {
-      clearKeys();
+      clearKeys(undefined, { keepSession: true });
       previousVaultId.current = vaultId;
     }
   }, [clearKeys, vaultId]);
