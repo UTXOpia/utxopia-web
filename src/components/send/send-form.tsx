@@ -31,6 +31,7 @@ import { validateBtcAddress } from "@/components/ui/btc-address-input";
 import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
 import { formatAmount } from "@/lib/utils/formatting";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { getVaultPrivacyDomain } from "@/lib/vault-config";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
 import { getSolanaExplorerTxUrl } from "@/lib/solana-network";
@@ -266,8 +267,7 @@ export function SendForm({
   const poolFees = usePoolFees();
   const activeChainId = getChainAdapter(chainEnv.config).id;
   const boundChainId = SOLANA_BOUND_CHAIN_ID;
-  const privacyDomain =
-    chainEnv.vaultId === "verified" ? "institution" : "public";
+  const privacyDomain = getVaultPrivacyDomain(chainEnv.vaultId);
   const activeChainLabel = "Solana";
   const hasVaultKeys = ctx.hasKeys;
   const refreshPrivateBalance = ctx.refreshInbox;

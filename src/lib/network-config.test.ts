@@ -7,6 +7,7 @@ import {
 } from "./network-config";
 import {
   getVaultNetworkConfig,
+  getVaultPrivacyDomain,
   getVaultRuntimeConfig,
 } from "./vault-config";
 
@@ -76,6 +77,8 @@ describe("network-config query routing", () => {
     expect(open.backend.url).toBe("https://api-hybrid.utxopia.com/open");
     expect(verified.backend.url).toBe("https://api-hybrid.utxopia.com/verified");
     expect(getVaultRuntimeConfig("devnet-regtest", "verified").policyMode).toBe("per");
+    expect(getVaultPrivacyDomain("open")).toBe("public");
+    expect(getVaultPrivacyDomain("verified")).toBe("institution");
   });
 
   it("keeps SNS deployment config request-scoped by network", () => {

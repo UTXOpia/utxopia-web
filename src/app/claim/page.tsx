@@ -35,19 +35,17 @@ import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { recordSubmittedTransaction } from "@/lib/transaction-activity";
 import { formatAmount } from "@/lib/utils/formatting";
 import { cn } from "@/lib/utils";
-import { normalizePrivacyDomain } from "@/lib/magicblock-config";
+import { getVaultPrivacyDomain } from "@/lib/vault-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 function ClaimContent() {
-  const { networkId } = useChainEnvironment();
+  const { networkId, vaultId } = useChainEnvironment();
   const ctx = useUTXOpia();
   const wallet = useWallet();
   const { setVisible: setWalletModalVisible } = useWalletModal();
   const submitter = useJoinSplitSubmit();
-  const privacyDomain = normalizePrivacyDomain(
-    process.env.NEXT_PUBLIC_UTXOPIA_PRIVACY_DOMAIN,
-  );
+  const privacyDomain = getVaultPrivacyDomain(vaultId);
   const [phrase, setPhrase] = useState("");
   const [note, setNote] = useState<ScannedSecretNote | null>(null);
   const [scanning, setScanning] = useState(false);
