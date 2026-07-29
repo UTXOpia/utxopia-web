@@ -459,6 +459,22 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     const usesBtcFaucet = chainEnv.config.bitcoin.network !== "mainnet";
 
     if (usesBtcFaucet) {
+      // The faucet's deposit path targets the Open pool only; letting it run
+      // under a Verified destination would strand the note (Verified identity
+      // addressed into the Open tree — neither inbox would find it).
+      if (chainEnv.vaultId === "verified") {
+        return (
+          <div className={className}>
+            {tokenSelector}
+            <div className="mt-4 rounded-[12px] border border-gray/15 bg-muted/30 p-4 text-caption text-gray-light">
+              <p className="font-semibold text-foreground mb-1">
+                BTC deposits are not available for Verified Privacy yet.
+              </p>
+              <p>Switch the destination to Open to add test BTC, or add a supported Solana token instead.</p>
+            </div>
+          </div>
+        );
+      }
       return (
         <BtcFaucetPrompt
           networkId={networkId}
