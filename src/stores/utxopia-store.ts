@@ -215,6 +215,8 @@ export interface InboxNote {
   isSpent?: boolean;
   /** Token symbol this note belongs to (e.g. "zkBTC", "SOL") */
   tokenSymbol: string;
+  /** Vault the note lives in; absent = the active vault. Set on merged cross-vault views. */
+  vaultId?: "open" | "verified";
 }
 
 export type WithdrawalStatus = "pending" | "processing" | "broadcasting" | "confirmed" | "failed";

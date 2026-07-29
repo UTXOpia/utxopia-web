@@ -29,6 +29,8 @@ import {
   Globe,
   RefreshCw,
   Eye,
+  ShieldCheck,
+  Unlock,
   Wallet,
 } from "lucide-react";
 import Image from "next/image";
@@ -57,8 +59,7 @@ import { VaultTokenList } from "@/components/vault/vault-token-list";
 import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
-import { VaultSwitcher } from "@/components/vault/vault-switcher";
-import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
+import { useSiblingVaultAddress, useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
@@ -108,6 +109,11 @@ export default function VaultPage() {
   const tokenPrices = useTokenPrices();
   const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
   const siblingBalances = useSiblingVaultBalances();
+  const siblingAddressEncoded = useSiblingVaultAddress();
+  const siblingHasFunds =
+    siblingBalances.status === "ready" &&
+    Object.values(siblingBalances.balancesByToken).some((amount) => amount > 0n);
+  const siblingLabel = siblingBalances.vaultId === "verified" ? "Verified" : "Open";
   const previousVaultId = useRef(vaultId);
   useEffect(() => {
     if (previousVaultId.current !== vaultId) {
@@ -218,8 +224,6 @@ export default function VaultPage() {
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
       >
-          <VaultSwitcher networkId={networkId} vaultId={vaultId} />
-
           {/* Wallet Header — identity bar */}
           <div className="flex items-center justify-between mb-2">
             <div className="flex items-center gap-2 min-w-0">
@@ -314,6 +318,23 @@ export default function VaultPage() {
                   Checking name...
                 </span>
               )}
+              {siblingAddressEncoded && siblingHasFunds && (
+                <button
+                  onClick={() => { copyStealth(siblingAddressEncoded); notifyCopied(`${siblingLabel} address`); }}
+                  className="flex items-center gap-1 group cursor-pointer"
+                  title={`Copy ${siblingLabel} receive address — ${siblingLabel} funds live in a separate privacy pool`}
+                >
+                  {siblingBalances.vaultId === "verified" ? (
+                    <ShieldCheck className="w-3 h-3 text-privacy/60 shrink-0" />
+                  ) : (
+                    <Unlock className="w-3 h-3 text-gray/35 shrink-0" />
+                  )}
+                  <code className="text-[11px] font-mono text-gray/35 group-hover:text-gray/55 transition-colors">
+                    {`${siblingAddressEncoded.slice(0, 10)}...${siblingAddressEncoded.slice(-8)}`}
+                  </code>
+                  <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                </button>
+              )}
             </div>
           )}
 
@@ -382,6 +403,8 @@ export default function VaultPage() {
                 isLoading={isLoadingInbox}
                 tokenPrices={tokenPrices}
                 onRefresh={refreshInbox}
+                vaultId={vaultId}
+                sibling={siblingBalances}
               />
 
               {!isViewOnly && (

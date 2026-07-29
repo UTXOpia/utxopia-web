@@ -132,3 +132,16 @@ export function getSubmittedTransactions(
     )
     .sort((a, b) => b.createdAt - a.createdAt);
 }
+
+/** All vaults of one network, for the unified activity stream. */
+export function getSubmittedTransactionsForNetwork(
+  networkId: string,
+): SubmittedTransactionActivity[] {
+  const cutoff = Date.now() - MAX_AGE_MS;
+  const ledger = readLedger();
+  const live = ledger.submitted.filter((item) => item.createdAt >= cutoff);
+  if (live.length !== ledger.submitted.length) writeLedger({ submitted: live });
+  return live
+    .filter((item) => item.networkId === networkId)
+    .sort((a, b) => b.createdAt - a.createdAt);
+}

@@ -178,44 +178,29 @@ export function VaultTokenList({
                 </div>
 
                 {isExpanded && (
-                  <div className="bg-muted/20 divide-y divide-gray/6">
+                  <div
+                    className="bg-muted/20 divide-y divide-gray/6"
+                    title="Open and Verified funds live in separate privacy pools and can't be transferred directly."
+                  >
                     {([
-                      { vault: vaultId, raw: activeRaw, current: true },
-                      { vault: siblingVault, raw: siblingRaw, current: false },
-                    ] as const).map(({ vault, raw, current }) => {
+                      { vault: "open", raw: vaultId === "open" ? activeRaw : siblingRaw },
+                      { vault: "verified", raw: vaultId === "verified" ? activeRaw : siblingRaw },
+                    ] as const).map(({ vault, raw }) => {
                       const meta = VAULT_META[vault];
                       const MetaIcon = meta.icon;
-                      const row = (
-                        <>
+                      return (
+                        <div key={vault} className="flex items-center gap-2 pl-[52px] pr-4 h-[40px]">
                           <MetaIcon
                             className={cn(
                               "w-3.5 h-3.5",
                               vault === "verified" ? "text-privacy" : "text-gray/50",
                             )}
                           />
-                          <span className="flex-1 text-[12px] text-gray-light/80">
-                            {meta.label}
-                            {current && <span className="text-gray/40"> · current</span>}
-                          </span>
+                          <span className="flex-1 text-[12px] text-gray-light/80">{meta.label}</span>
                           <span className="text-[12px] font-mono text-foreground/90">
                             {formatAmount(raw, token.decimals)}
                           </span>
-                          {!current && <ChevronRight className="w-3 h-3 text-gray/40" />}
-                        </>
-                      );
-                      const rowClass = "flex items-center gap-2 pl-[52px] pr-4 h-[40px]";
-                      return current ? (
-                        <div key={vault} className={rowClass}>{row}</div>
-                      ) : (
-                        <Link
-                          key={vault}
-                          href={hrefWithVault(hrefWithChain("/vault", networkId), vault)}
-                          onClick={(e) => e.stopPropagation()}
-                          className={cn(rowClass, "hover:bg-muted/40 transition-colors")}
-                          title={`Switch to the ${meta.label} vault. Vault balances are separate pools and cannot be transferred directly.`}
-                        >
-                          {row}
-                        </Link>
+                        </div>
                       );
                     })}
                   </div>

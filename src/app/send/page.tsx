@@ -3,6 +3,7 @@
 import { Send } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { SendFlow } from "@/components/send/send-flow";
+import { VaultSourcePicker } from "@/components/vault/vault-destination-picker";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
@@ -26,6 +27,7 @@ export default function SendPage() {
       title={PRODUCT_COPY.actions.sendPrivately}
       description="Send to a UTXOpia name, private receive address, or claim link."
     >
+      <VaultSourcePicker />
       <SendFlow />
     </FlowPageLayout>
   );

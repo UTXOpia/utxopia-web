@@ -1,16 +1,20 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Loader2, RefreshCw } from "lucide-react";
+import { Loader2, RefreshCw, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
 import type { TokenPrices } from "@/hooks/use-token-prices";
+import type { VaultId } from "@/lib/vault-config";
+import type { SiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 
 interface VaultBalanceProps {
   balancesByToken: Record<string, bigint>;
   isLoading: boolean;
   tokenPrices: TokenPrices;
   onRefresh: () => void;
+  vaultId: VaultId;
+  sibling?: SiblingVaultBalances;
 }
 
 export function VaultBalance({
@@ -18,10 +22,24 @@ export function VaultBalance({
   isLoading,
   tokenPrices,
   onRefresh,
+  vaultId,
+  sibling,
 }: VaultBalanceProps) {
-  const totalUsd = getVaultUsdValue(balancesByToken, tokenPrices);
+  const activeUsd = getVaultUsdValue(balancesByToken, tokenPrices);
+  const siblingReady = sibling?.status === "ready";
+  const siblingUsd = siblingReady
+    ? getVaultUsdValue(sibling.balancesByToken, tokenPrices)
+    : 0;
+  const totalUsd = activeUsd + siblingUsd;
   const btcPrice = tokenPrices.btc || 0;
   const btcEquivalent = btcPrice > 0 ? totalUsd / btcPrice : 0;
+
+  const openUsd = vaultId === "open" ? activeUsd : siblingUsd;
+  const verifiedUsd = vaultId === "verified" ? activeUsd : siblingUsd;
+  const showSplit = siblingReady && verifiedUsd > 0;
+
+  const usd = (v: number) =>
+    v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
   return (
     <div className="text-center py-6 mb-2">
@@ -36,7 +54,7 @@ export function VaultBalance({
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.35, ease: "easeOut" }}
           >
-            ${totalUsd.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            ${usd(totalUsd)}
           </motion.p>
           <p className="text-body2 text-gray/60 font-mono flex items-center justify-center gap-1.5">
             {btcEquivalent.toFixed(8)} BTC
@@ -49,6 +67,14 @@ export function VaultBalance({
               <RefreshCw className={cn("w-3 h-3", isLoading && "animate-spin")} />
             </button>
           </p>
+          {showSplit && (
+            <p className="mt-1.5 text-[11px] text-gray/45 font-mono flex items-center justify-center gap-1">
+              Open ${usd(openUsd)}
+              <span className="text-gray/30">·</span>
+              <ShieldCheck className="w-3 h-3 text-privacy/70" />
+              <span className="text-privacy/70">Verified ${usd(verifiedUsd)}</span>
+            </p>
+          )}
         </>
       )}
     </div>

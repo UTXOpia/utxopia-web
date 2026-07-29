@@ -16,6 +16,7 @@ import {
   Loader2,
   AlertTriangle,
   Search,
+  ShieldCheck,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -42,8 +43,11 @@ import { getAlphaDemoNetworkInboxNotes } from "@/lib/alpha-demo-ledger";
 import {
   getSubmittedActivityDisplaySymbol,
   getSubmittedTransactions,
+  getSubmittedTransactionsForNetwork,
   type SubmittedTransactionActivity,
 } from "@/lib/transaction-activity";
+import { vaultsSupported } from "@/lib/vault-config";
+import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { getChainTransactionUrl } from "@/lib/chain-links";
 import {
   indexOwnedNoteOrigins,
@@ -114,7 +118,7 @@ function ActivityRow({
 }) {
   const [expanded, setExpanded] = useState(false);
   const [copied, setCopied] = useState(false);
-  const { networkId: network, config } = useChainEnvironment();
+  const { networkId: network, vaultId: activeVaultId, config } = useChainEnvironment();
   const token = getToken(note.tokenSymbol);
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(note.amount) / 10 ** token.decimals) * price : 0;
@@ -164,8 +168,11 @@ function ActivityRow({
 
         {/* Label + time */}
         <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground font-medium">
+          <span className="text-sm text-foreground font-medium inline-flex items-center gap-1.5">
             {annotation?.label ?? (isReceived ? receivedLabel : "Note spent")}
+            {(note.vaultId ?? activeVaultId) === "verified" && (
+              <ShieldCheck className="w-3 h-3 text-privacy/70 shrink-0" aria-label="Verified vault" />
+            )}
           </span>
           <p className="text-[11px] text-gray/40">{timeAgo(note.createdAt)}</p>
         </div>
@@ -590,8 +597,11 @@ function SubmittedTransactionRow({
           )}
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm text-foreground font-medium">
+          <span className="text-sm text-foreground font-medium inline-flex items-center gap-1.5">
             {annotation?.label ?? meta.label}
+            {(activity.vaultId ?? "open") === "verified" && (
+              <ShieldCheck className="w-3 h-3 text-privacy/70 shrink-0" aria-label="Verified vault" />
+            )}
           </span>
           <p className={cn(
             "text-[11px]",
@@ -814,12 +824,14 @@ function ActivityFeed() {
     const scoped = getAlphaDemoNetworkInboxNotes(networkId, stealthAddress);
     return scoped.length > 0 ? scoped : getAlphaDemoNetworkInboxNotes(networkId);
   }, [networkId, stealthAddress]);
+  const siblingVault = useSiblingVaultBalances();
   const displayNotes = useMemo(() => {
     const byId = new Map<string, InboxNote>();
     for (const note of notes) byId.set(note.id, note);
+    for (const note of siblingVault.notes) byId.set(note.id, note);
     for (const note of alphaDemoNotes) byId.set(note.id, note);
     return Array.from(byId.values());
-  }, [alphaDemoNotes, notes]);
+  }, [alphaDemoNotes, notes, siblingVault.notes]);
 
   useEffect(() => {
     const sync = () => {
@@ -846,7 +858,11 @@ function ActivityFeed() {
 
   useEffect(() => {
     const sync = () =>
-      setSubmittedActivities(getSubmittedTransactions(networkId, vaultId));
+      setSubmittedActivities(
+        vaultsSupported(networkId)
+          ? getSubmittedTransactionsForNetwork(networkId)
+          : getSubmittedTransactions(networkId, vaultId),
+      );
     sync();
     window.addEventListener("storage", sync);
     window.addEventListener("utxopia:transaction-activity", sync);

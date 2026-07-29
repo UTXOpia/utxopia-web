@@ -9,6 +9,8 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import {
   scanUnifiedNotes,
   computeNullifierHashForNote,
+  createStealthMetaAddress,
+  encodeStealthMetaAddress,
   UTXOpiaClient,
   type ScannedNote,
 } from "@utxopia/sdk";
@@ -23,7 +25,7 @@ import {
 import { fetchInboxSource } from "@/lib/chain-inbox";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
-import { loadWarmVaultKeys, useUTXOpiaStore } from "@/stores/utxopia-store";
+import { loadWarmVaultKeys, useUTXOpiaStore, type InboxNote } from "@/stores/utxopia-store";
 
 export type SiblingVaultStatus =
   | "unsupported" // network has no dual vaults
@@ -36,6 +38,8 @@ export interface SiblingVaultBalances {
   status: SiblingVaultStatus;
   vaultId: VaultId;
   balancesByToken: Record<string, bigint>;
+  /** Decrypted sibling-vault notes (spent + unspent), InboxNote-shaped for reuse in activity views. */
+  notes: InboxNote[];
   refresh: () => void;
 }
 
@@ -77,6 +81,41 @@ function siblingScanTargets(env: ChainEnvironment): Array<{ symbol: string; toke
   return targets;
 }
 
+/** Encoded receive address of the sibling vault's identity, from the warm key
+ *  cache. Null while locked/unsupported/view-only. */
+export function useSiblingVaultAddress(): string | null {
+  const { networkId, vaultId } = useChainEnvironment();
+  const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
+  const isViewOnly = useUTXOpiaStore((s) => s.isViewOnly);
+  const sibling = siblingVaultId(vaultId);
+  const [address, setAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!vaultsSupported(networkId) || isViewOnly || !hasKeys) {
+      setAddress(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      try {
+        const keys = await loadWarmVaultKeys(networkId, sibling);
+        if (cancelled || !keys) {
+          if (!cancelled) setAddress(null);
+          return;
+        }
+        setAddress(encodeStealthMetaAddress(createStealthMetaAddress(keys)));
+      } catch {
+        if (!cancelled) setAddress(null);
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [networkId, sibling, hasKeys, isViewOnly]);
+
+  return address;
+}
+
 export function useSiblingVaultBalances(): SiblingVaultBalances {
   const { networkId, vaultId } = useChainEnvironment();
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
@@ -88,6 +127,7 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
     supported ? "loading" : "unsupported",
   );
   const [balancesByToken, setBalancesByToken] = useState<Record<string, bigint>>({});
+  const [notes, setNotes] = useState<InboxNote[]>([]);
   const [refreshTick, setRefreshTick] = useState(0);
   const generation = useRef(0);
 
@@ -97,6 +137,7 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
     if (!supported || isViewOnly || !hasKeys) {
       setStatus(supported ? "locked" : "unsupported");
       setBalancesByToken({});
+      setNotes([]);
       return;
     }
 
@@ -111,6 +152,7 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
         if (!keys) {
           setStatus("locked");
           setBalancesByToken({});
+          setNotes([]);
           return;
         }
 
@@ -147,10 +189,23 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
 
         const withSpent = scanned.map((note) => {
           const hashHex = Buffer.from(computeNullifierHashForNote(keys, note)).toString("hex");
-          return { ...note, isSpent: spentPdas.has(nullifierHashToPDA(hashHex)) };
+          return { ...note, nullifierHash: hashHex, isSpent: spentPdas.has(nullifierHashToPDA(hashHex)) };
         });
 
         setBalancesByToken(sumUnspentByToken(withSpent));
+        setNotes(withSpent.map((note, index) => {
+          const commitmentHex = Buffer.from(note.commitment)
+            .toString("hex")
+            .toLowerCase()
+            .padStart(64, "0");
+          return {
+            ...note,
+            id: `${commitmentHex.slice(0, 16)}-${index}`,
+            commitmentHex,
+            createdAt: note.blockTime ? note.blockTime * 1000 : Date.now(),
+            vaultId: sibling,
+          };
+        }));
         setStatus("ready");
       } catch {
         if (!live()) return;
@@ -166,5 +221,5 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
     };
   }, [supported, isViewOnly, hasKeys, networkId, sibling, refreshTick]);
 
-  return { status, vaultId: sibling, balancesByToken, refresh };
+  return { status, vaultId: sibling, balancesByToken, notes, refresh };
 }

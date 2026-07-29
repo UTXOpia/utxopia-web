@@ -630,7 +630,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
                 : "bg-gray/20 text-gray/50 cursor-not-allowed"
             )}
           >
-            {buildingPreview ? (<><Loader2 className="w-4 h-4 animate-spin" />Generating...</>) : (<><Shield className="w-4 h-4" />Add BTC privately</>)}
+            {buildingPreview ? (<><Loader2 className="w-4 h-4 animate-spin" />Generating...</>) : (<><Shield className="w-4 h-4" />Add BTC privately{chainEnv.vaultId === "verified" ? " · Verified" : ""}</>)}
           </button>
         ) : (
           <button
@@ -857,7 +857,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         ) : (
           <>
             <Shield className="w-4 h-4" />
-            Add {selectedToken.symbol} privately
+            Add {selectedToken.symbol} privately{chainEnv.vaultId === "verified" ? " · Verified" : ""}
           </>
         )}
       </button>

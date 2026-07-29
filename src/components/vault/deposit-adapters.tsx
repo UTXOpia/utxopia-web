@@ -4,6 +4,7 @@ import { type ReactNode } from "react";
 import { PlusCircle } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { ShieldFlow } from "@/components/shield-flow";
+import { VaultDestinationPicker } from "@/components/vault/vault-destination-picker";
 import { hrefWithChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
 import { hrefWithVault, type VaultId } from "@/lib/vault-config";
@@ -35,6 +36,7 @@ function SolanaDepositPage({ networkId, vaultId }: ChainDepositRouteProps) {
       title={PRODUCT_COPY.actions.addFunds}
       description="Deposit native BTC or shield supported Solana assets into your private vault."
     >
+      <VaultDestinationPicker />
       <ShieldFlow />
     </FlowPageLayout>
   );
