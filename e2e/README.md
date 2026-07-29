@@ -19,7 +19,6 @@ npm i -g agent-browser && agent-browser install
 | `UTXOPIA_DEV_KEYS_JSON` | Yes* | JSON blob of dev keys (see below) |
 | `E2E_TRANSFER_RECIPIENT` | Yes | Stealth meta address (`utxo:…`) for the transfer step |
 | `E2E_SOL_UNSHIELD_ADDR` | Yes | Public Solana devnet address for the unshield step |
-| `E2E_SUI_UNSHIELD_ADDR` | Yes | Public Sui testnet `0x…` address for the unshield step |
 
 *Alternatively, create `e2e/.dev-keys.json` (see below). The file is gitignored.
 
@@ -38,7 +37,7 @@ The dev-signer reads throwaway test keypairs. Two sources are supported (in prio
 ### Option A — environment variable (CI-friendly)
 
 ```bash
-export UTXOPIA_DEV_KEYS_JSON='{"solanaSecretKeyB58":"...","suiSecretKey":"...","btcWif":"...","utxopiaSeedHex":"..."}'
+export UTXOPIA_DEV_KEYS_JSON='{"solanaSecretKeyB58":"...","btcWif":"...","utxopiaSeedHex":"..."}'
 ```
 
 ### Option B — local file (developer machine)
@@ -48,7 +47,7 @@ Create `e2e/.dev-keys.json` (this path is gitignored):
 ```json
 {
   "solanaSecretKeyB58": "...",
-  "suiSecretKey": "...",
+
   "btcWif": "...",
   "utxopiaSeedHex": "..."
 }
@@ -62,13 +61,12 @@ Run the dev-signer account generator to derive the three chain addresses:
 bun ops/scripts/dev-signer-accounts.ts
 ```
 
-The script prints a JSON blob containing the four key fields above and the
-three public addresses to fund. Fund them on the relevant testnet/devnet faucets
+The script prints a JSON blob containing the three key fields above and the
+public addresses to fund. Fund them on the relevant testnet/devnet faucets
 before running the E2E. Paste the output JSON into your chosen key source above.
 
 Minimum suggested funding:
 - Solana devnet: 0.05 SOL and ~0.01 zkBTC (or whatever token is registered)
-- Sui testnet: 0.05 SUI + enough of the registered test Coin
 
 ## Running the token-loop E2E
 
@@ -76,7 +74,6 @@ Minimum suggested funding:
 # From the web directory
 E2E_TRANSFER_RECIPIENT="utxo:..." \
 E2E_SOL_UNSHIELD_ADDR="<solana-pubkey>" \
-E2E_SUI_UNSHIELD_ADDR="0x..." \
 bun e2e/token-loop.e2e.ts
 ```
 
@@ -91,11 +88,11 @@ Screenshots on failure are written to `e2e/screenshots/`.
 
 ## What the test drives
 
-For each chain (Sui testnet, then Solana devnet):
+On Solana devnet:
 
 1. **SHIELD** — navigates to `/vault/deposit`, fills amount, submits, waits for "Funds added privately".
 2. **TRANSFER** — navigates to `/send`, enters a stealth address + amount, submits, waits for "Sent privately".
-3. **UNSHIELD** — navigates to `/vault/withdraw`, enters a public address + amount, submits, waits for "Cashed out" (Sui) or the equivalent success indicator (Solana).
+3. **UNSHIELD** — navigates to `/vault/withdraw`, enters a public address + amount, submits, waits for the success indicator.
 
 ### Key injection — localStorage model
 
@@ -103,7 +100,7 @@ Before each step the script performs a three-phase injection:
 
 1. **Open `APP_URL`** — navigates to the app root to establish the correct origin (required for `localStorage` access).
 2. **`eval` → `localStorage.setItem("__UTXOPIA_DEV_KEYS", ...)`** — persists the JSON-encoded dev keys under `DEV_KEYS_STORAGE_KEY`. This survives the subsequent navigation.
-3. **Open the target URL** (e.g. `/vault/deposit?network=sui-testnet`) — on this load the `DevSigner` component mounts and `loadDevKeys()` reads the persisted value from `localStorage`, then installs the Sui / Solana / BTC wallet shims automatically.
+3. **Open the target URL** (e.g. `/vault/deposit?network=devnet-regtest`) — on this load the `DevSigner` component mounts and `loadDevKeys()` reads the persisted value from `localStorage`, then installs the Solana / BTC wallet shims automatically.
 
 This is more robust than injecting into `window.__UTXOPIA_DEV_KEYS` directly: `window` globals are reset on every navigation, so a window injection before a `?network=` reload can race the `DevSigner` useEffect. `localStorage` persists across same-origin navigations and is the second priority source in `loadDevKeys()` (after `globalThis` injection, before env vars).
 
@@ -111,7 +108,7 @@ This is more robust than injecting into `window.__UTXOPIA_DEV_KEYS` directly: `w
 
 BTC deposit and BTC redeem (cash-out to Bitcoin) steps are included in
 `token-loop.e2e.ts` but are **disabled by default**. Set `RUN_BTC=1` to
-enable them. They run after the token loop for each chain.
+enable them. They run after the token loop.
 
 ### Required infrastructure
 
@@ -152,7 +149,6 @@ Skip them by not setting `RUN_BTC=1`.
 RUN_BTC=1 \
 E2E_TRANSFER_RECIPIENT="utxo:..." \
 E2E_SOL_UNSHIELD_ADDR="<solana-pubkey>" \
-E2E_SUI_UNSHIELD_ADDR="0x..." \
 E2E_BTC_REDEEM_ADDR="bcrt1q..." \
 bun e2e/token-loop.e2e.ts
 ```
@@ -162,13 +158,11 @@ bun e2e/token-loop.e2e.ts
 **BTC deposit (`stepBtcDeposit`)**
 
 1. Navigates to `/vault/deposit?network=<chain>`.
-2. On Solana: selects the BTC token, connects the `window.unisat` dev shim,
+2. Selects the BTC token, connects the `window.unisat` dev shim,
    fills the amount, clicks "Add BTC privately", waits for the PSBT preview,
    then clicks "Confirm & Sign". The dev shim auto-signs and broadcasts the
    PSBT via Esplora. Waits for "BTC deposit submitted".
-3. On Sui hybrid: follows the "Deposit regtest BTC" link to the faucet page
-   and submits the faucet form.
-4. Polls `/vault/activity` until a "Received" note (zkBTC) appears, meaning
+3. Polls `/vault/activity` until a "Received" note (zkBTC) appears, meaning
    the deposit-tracker has fully confirmed + minted the note on-chain.
    Timeout: `BTC_DEPOSIT_TIMEOUT_MS` (default 10 min).
 
@@ -195,7 +189,7 @@ recovery steps in `memory/hybrid-regtest-devnet-coupling.md` before rerunning.
 Several selectors in `token-loop.e2e.ts` are annotated `// VERIFY`. These rely on visible text labels extracted from the component source but have not been validated against a live running app. Before a production CI run, open the app and take an accessibility snapshot to confirm:
 
 ```bash
-agent-browser open http://localhost:3000/vault/deposit?network=sui-testnet
+agent-browser open http://localhost:3000/vault/deposit?network=devnet-regtest
 agent-browser snapshot -i
 ```
 

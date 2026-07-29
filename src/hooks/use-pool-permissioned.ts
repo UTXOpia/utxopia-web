@@ -9,8 +9,6 @@ export interface PoolPermissionedInfo {
   permissioned: boolean;
   /** Decoded auditor viewing pubkey bytes, if configured. */
   auditorViewingPubkey?: Uint8Array;
-  /** Sui AuditorCap object ID, if configured (Sui pools only). */
-  auditorCapId?: string;
 }
 
 function hexToBytes(hex: string): Uint8Array {

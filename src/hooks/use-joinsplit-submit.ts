@@ -197,7 +197,7 @@ export function useJoinSplitSubmit() {
         // Compute unshield amount from proof outputs (last output is unshield)
         const unshieldAmount = Number(params.proofInputs.outputs[params.proofInputs.outputs.length - 1].value);
 
-        // Pass the token mint via the URL (mirrors Sui's coinType): the relay
+        // Pass the token mint via the URL: the relay
         // derives the token program, pool vault, token config and recipient ATA
         // from it, so any SPL token can be cashed out. Defaults to zkBTC, which
         // derives the same accounts as before — byte-identical for zkBTC.

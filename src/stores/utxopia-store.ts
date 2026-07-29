@@ -257,12 +257,6 @@ interface UTXOpiaState {
     signMessage: (message: Uint8Array) => Promise<Uint8Array>;
   }) => Promise<void>;
   hydrateKeys: (walletPubkey: PublicKey) => Promise<boolean>;
-  deriveKeysFromAuthSignature: (input: {
-    signature: Uint8Array;
-    account: string;
-    chain?: string;
-    network?: string;
-  }) => Promise<void>;
   deriveKeysFromPasskeySeed: (seed: Uint8Array, networkId?: NetworkId) => Promise<void>;
   hydratePasskeyKeys: (networkId?: NetworkId) => Promise<boolean>;
   loadViewOnlyKeys: (encoded: string) => Promise<void>;
@@ -404,31 +398,6 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       hasKeys: true,
     });
     return true;
-  },
-
-  deriveKeysFromAuthSignature: async ({ signature, account, chain = "sui", network = "testnet" }) => {
-    set({ isLoading: true, error: null });
-    try {
-      await ensureChainEnvironment();
-      const client = UTXOpiaClient.instance();
-      const { keys: derivedKeys, stealthAddress: meta, stealthAddressEncoded: encoded } =
-        await client.loginWithAuthSignature(signature, { account, chain, network });
-
-      await persistKeys(`${chain}:${account}`, signature);
-
-      set({
-        keys: derivedKeys,
-        stealthAddress: meta,
-        stealthAddressEncoded: encoded,
-        hasKeys: true,
-        isLoading: false,
-      });
-    } catch (err) {
-      set({
-        error: err instanceof Error ? err.message : "Failed to derive keys from auth signature",
-        isLoading: false,
-      });
-    }
   },
 
   deriveKeysFromPasskeySeed: async (seed: Uint8Array, networkId?: NetworkId) => {

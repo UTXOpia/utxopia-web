@@ -24,7 +24,7 @@ export interface ReviewModalProps {
   privacyNote?: string;
   /** Optional warning row (e.g. BTC privacy notice). */
   warning?: string;
-  /** Relay registry chain id ("sol" / "sui") for the per-tx relay line. */
+  /** Relay registry chain id ("sol") for the per-tx relay line. */
   chainId: string;
   /** Full network id for relay health probing. */
   networkId: string;

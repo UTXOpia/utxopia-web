@@ -4,7 +4,7 @@ import type { RelayConfig } from "./relays";
 import type { RelayHealth } from "./relay-health";
 
 function makeRelay(id: string): RelayConfig {
-  return { id, name: id, url: (n) => `/api/sui/relay?network=${n}` };
+  return { id, name: id, url: (n) => `/api/sol/relay?network=${n}` };
 }
 
 function makeHealth(

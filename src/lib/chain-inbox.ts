@@ -190,25 +190,6 @@ export function parseAuditorCiphertextSegments(
   };
 }
 
-/**
- * Extract an auditor-ciphertext record from a parsed JSON event's fields.
- * The blob rides existing events as an `auditor_ciphertext` field (number[])
- * and a `commitment` (or `note`) field (number[]). Returns null when
- * `auditor_ciphertext` is absent or empty.
- */
-export function auditorCiphertextFromSuiFields(
-  payload: Record<string, unknown>,
-  blockTime?: number,
-): AuditorCiphertextRecord | null {
-  const ciphertextField = payload.auditor_ciphertext;
-  if (!Array.isArray(ciphertextField) || ciphertextField.length === 0) return null;
-  const blob = bytesField(ciphertextField);
-  if (!blob || blob.length !== 112) return null;
-  const commitment = bytesField(payload.commitment) ?? bytesField(payload.note);
-  if (!commitment || commitment.length !== 32) return null;
-  return { commitment, blob, blockTime };
-}
-
 // ---------------------------------------------------------------------------
 // Solana auditor ciphertext fetcher
 // ---------------------------------------------------------------------------

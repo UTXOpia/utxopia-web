@@ -23,7 +23,7 @@ export interface RelayConfig {
 export interface SerializableRelay {
   id: string;
   name: string;
-  /** URL template with `{network}` placeholder, e.g. `/api/sui/relay?network={network}` */
+  /** URL template with `{network}` placeholder, e.g. `/api/sol/relay?network={network}` */
   urlTemplate: string;
   region?: string;
   custom?: boolean;
@@ -47,14 +47,6 @@ export function serializableToConfig(r: SerializableRelay): RelayConfig {
 // ---------------------------------------------------------------------------
 
 const BUILTIN_RELAYS: Record<string, SerializableRelay[]> = {
-  sui: [
-    {
-      id: "default",
-      name: "Utxopia relay",
-      // Reproduces: `/api/sui/relay?network=${encodeURIComponent(networkId)}`
-      urlTemplate: "/api/sui/relay?network={network}",
-    },
-  ],
   sol: [
     {
       id: "default",
@@ -66,14 +58,13 @@ const BUILTIN_RELAYS: Record<string, SerializableRelay[]> = {
 };
 
 /**
- * Normalize the app's chain id ("solana"/"sui", from `config.chain`) to the
- * registry/API key ("sol"/"sui"). Accepts either form so callers using either
+ * Normalize the app's chain id ("solana", from `config.chain`) to the
+ * registry/API key ("sol"). Accepts either form so callers using either
  * convention resolve correctly.
  */
 function relayChainKey(chainId: string): string {
   const c = chainId.toLowerCase();
   if (c === "solana" || c === "sol") return "sol";
-  if (c === "sui") return "sui";
   return c;
 }
 

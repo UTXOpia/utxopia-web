@@ -155,7 +155,7 @@ function NotAvailableNotice({ network }: { network?: string }) {
 {`# 1. Start regtest BTC + esplora
 docker compose -f docker-compose.regtest.yml up -d
 
-# 2. Switch backend to hybrid (Solana or Sui + regtest BTC)
+# 2. Switch backend to hybrid (Solana + regtest BTC)
 docker compose -f docker-compose.hybrid.yml up --build -d
 
 # 3. Sync the matching env

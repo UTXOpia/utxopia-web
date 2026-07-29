@@ -30,7 +30,7 @@ export interface TransferUserInputs {
   /** Redeem (btc) only: withdrawal service fee model read from relay meta. */
   serviceFeeBase?: number;
   serviceFeeBps?: number;
-  /** Chain id folded into bound params (Solana 103, Sui 784). */
+  /** Chain id folded into bound params (Solana 103). */
   boundChainId: bigint;
   /** Privacy domain bound into the proof's public boundParamsHash. */
   privacyDomain: "public" | "institution";

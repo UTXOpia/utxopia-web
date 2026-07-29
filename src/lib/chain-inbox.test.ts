@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import { getNetworkConfig } from "./network-config";
 import {
-  auditorCiphertextFromSuiFields,
   fetchInboxSource,
   parseAuditorCiphertextSegments,
 } from "./chain-inbox";
@@ -92,44 +91,5 @@ describe("fetchInboxSource", () => {
     expect(source.announcements[0].leafIndex).toBe(7);
     expect(source.announcements[0].blockTime).toBe(1_700_000_000);
     expect(source.announcements[0].slot).toBe(123);
-  });
-});
-
-// ---------------------------------------------------------------------------
-// auditorCiphertextFromSuiFields — Sui field extractor
-// ---------------------------------------------------------------------------
-
-describe("auditorCiphertextFromSuiFields", () => {
-  const commitment = Array.from({ length: 32 }, (_, i) => i);
-  const blob = Array.from({ length: 112 }, (_, i) => i % 256);
-
-  it("extracts commitment and blob from a valid Sui event payload", () => {
-    const payload = { commitment, auditor_ciphertext: blob };
-    const result = auditorCiphertextFromSuiFields(payload, 1_700_000_000);
-    expect(result).not.toBeNull();
-    expect(result!.commitment).toEqual(Uint8Array.from(commitment));
-    expect(result!.blob).toEqual(Uint8Array.from(blob));
-    expect(result!.blockTime).toBe(1_700_000_000);
-  });
-
-  it("returns null when auditor_ciphertext field is absent", () => {
-    const payload = { commitment };
-    expect(auditorCiphertextFromSuiFields(payload)).toBeNull();
-  });
-
-  it("returns null when auditor_ciphertext is an empty array (public-pool case)", () => {
-    const payload = { commitment, auditor_ciphertext: [] };
-    expect(auditorCiphertextFromSuiFields(payload)).toBeNull();
-  });
-
-  it("returns null when blob length is not 112 bytes", () => {
-    const shortBlob = Array.from({ length: 64 }, () => 0);
-    const payload = { commitment, auditor_ciphertext: shortBlob };
-    expect(auditorCiphertextFromSuiFields(payload)).toBeNull();
-  });
-
-  it("returns null when commitment is missing", () => {
-    const payload = { auditor_ciphertext: blob };
-    expect(auditorCiphertextFromSuiFields(payload)).toBeNull();
   });
 });

@@ -2,7 +2,7 @@
 import { test, expect, afterEach } from "bun:test";
 import { loadDevKeys, DEV_KEYS_STORAGE_KEY } from "./keys";
 
-const FULL = { solanaSecretKeyB58: "S", suiSecretKey: "U", btcWif: "B", utxopiaSeedHex: "00" };
+const FULL = { solanaSecretKeyB58: "S", btcWif: "B", utxopiaSeedHex: "00" };
 
 function stubLocalStorage(raw: string | null) {
   (globalThis as Record<string, unknown>).localStorage = {
@@ -13,12 +13,12 @@ function stubLocalStorage(raw: string | null) {
 afterEach(() => {
   delete (globalThis as Record<string, unknown>).__UTXOPIA_DEV_KEYS;
   delete (globalThis as Record<string, unknown>).localStorage;
-  for (const k of ["NEXT_PUBLIC_DEV_SOLANA_SK","NEXT_PUBLIC_DEV_SUI_SK","NEXT_PUBLIC_DEV_BTC_WIF","NEXT_PUBLIC_DEV_UTXOPIA_SEED"]) delete process.env[k];
+  for (const k of ["NEXT_PUBLIC_DEV_SOLANA_SK","NEXT_PUBLIC_DEV_BTC_WIF","NEXT_PUBLIC_DEV_UTXOPIA_SEED"]) delete process.env[k];
 });
 
 test("runtime injection takes precedence", () => {
   (globalThis as Record<string, unknown>).__UTXOPIA_DEV_KEYS = {
-    solanaSecretKeyB58: "S", suiSecretKey: "U", btcWif: "B", utxopiaSeedHex: "00",
+    solanaSecretKeyB58: "S", btcWif: "B", utxopiaSeedHex: "00",
   };
   process.env.NEXT_PUBLIC_DEV_SOLANA_SK = "ENV";
   expect(loadDevKeys()?.solanaSecretKeyB58).toBe("S");
@@ -26,7 +26,6 @@ test("runtime injection takes precedence", () => {
 
 test("falls back to env vars", () => {
   process.env.NEXT_PUBLIC_DEV_SOLANA_SK = "S";
-  process.env.NEXT_PUBLIC_DEV_SUI_SK = "U";
   process.env.NEXT_PUBLIC_DEV_BTC_WIF = "B";
   process.env.NEXT_PUBLIC_DEV_UTXOPIA_SEED = "00";
   expect(loadDevKeys()?.btcWif).toBe("B");
@@ -34,7 +33,7 @@ test("falls back to env vars", () => {
 
 test("reads complete keys from localStorage", () => {
   stubLocalStorage(JSON.stringify(FULL));
-  expect(loadDevKeys()?.suiSecretKey).toBe("U");
+  expect(loadDevKeys()?.solanaSecretKeyB58).toBe("S");
 });
 
 test("globalThis injection beats localStorage", () => {

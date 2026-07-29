@@ -34,7 +34,6 @@ interface VaultFirstStepsProps {
   hasBackup: boolean;
   hasFunds: boolean;
   depositHref?: string;
-  accent?: "privacy" | "sui";
   onBackupComplete?: () => void;
 }
 
@@ -43,7 +42,6 @@ export function VaultFirstSteps({
   hasBackup,
   hasFunds,
   depositHref = "/vault/deposit",
-  accent = "privacy",
   onBackupComplete,
 }: VaultFirstStepsProps) {
   const identity = useMemo(() => getBackupIdentityForKeys(keys), [keys]);
@@ -71,25 +69,15 @@ export function VaultFirstSteps({
 
   const doneCount = (fundsDone ? 1 : 0) + (hasBackup ? 1 : 0);
   const totalSteps = 2;
-  const tone = accent === "sui"
-    ? {
-        border: "border-sui/15",
-        bg: "bg-sui/5",
-        hoverBg: "hover:bg-sui/5",
-        dot: "bg-sui",
-        doneBg: "bg-sui/5",
-        icon: "text-sui",
-        button: "bg-sui text-background hover:bg-sui/90",
-      }
-    : {
-        border: "border-privacy/15",
-        bg: "bg-privacy/5",
-        hoverBg: "hover:bg-privacy/5",
-        dot: "bg-privacy",
-        doneBg: "bg-privacy/5",
-        icon: "text-privacy",
-        button: "bg-foreground text-background hover:bg-white",
-      };
+  const tone = {
+    border: "border-privacy/15",
+    bg: "bg-privacy/5",
+    hoverBg: "hover:bg-privacy/5",
+    dot: "bg-privacy",
+    doneBg: "bg-privacy/5",
+    icon: "text-privacy",
+    button: "bg-foreground text-background hover:bg-white",
+  };
 
   const handleDownloadBackup = () => {
     if (!identity) return;

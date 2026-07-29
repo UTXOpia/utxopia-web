@@ -34,7 +34,7 @@ import {
 } from "@/components/relay/relay-rows";
 
 interface RelayControlProps {
-  /** Relay registry chain id: "sui" or "sol". */
+  /** Relay registry chain id: "sol". */
   chainId: string;
   /** Full network id — passed to relay.url() when pinging. */
   networkId: string;

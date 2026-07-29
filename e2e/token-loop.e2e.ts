@@ -2,7 +2,7 @@
 /**
  * token-loop.e2e.ts — Browser E2E for the dev-signer "token loop"
  *
- * Drives: SHIELD → TRANSFER → UNSHIELD on both Sui testnet and Solana devnet.
+ * Drives: SHIELD → TRANSFER → UNSHIELD on Solana devnet.
  *
  * Requirements:
  *   - App running:  cd web && NEXT_PUBLIC_DEV_SIGNER=1 bun run dev
@@ -22,7 +22,6 @@ import * as path from "path";
 
 interface DevKeys {
   solanaSecretKeyB58: string;
-  suiSecretKey: string;
   btcWif: string;
   utxopiaSeedHex: string;
 }
@@ -60,7 +59,6 @@ const BTC_DEPOSIT_TIMEOUT_MS = parseInt(process.env.BTC_DEPOSIT_TIMEOUT_MS ?? "6
 const BTC_REDEEM_TIMEOUT_MS = parseInt(process.env.BTC_REDEEM_TIMEOUT_MS ?? "600000", 10);
 
 const CHAINS: ChainConfig[] = [
-  { name: "Sui testnet", networkParam: "sui-testnet", network: "sui-testnet" },
   { name: "Solana devnet", networkParam: "devnet", network: "devnet" },
 ];
 
@@ -76,8 +74,6 @@ const TRANSFER_RECIPIENT = process.env.E2E_TRANSFER_RECIPIENT ?? "REPLACE_WITH_S
 
 /** Solana devnet: unshield destination (public wallet address). */
 const SOL_UNSHIELD_ADDR = process.env.E2E_SOL_UNSHIELD_ADDR ?? "REPLACE_WITH_SOL_ADDRESS"; // VERIFY: a valid Solana devnet public key
-/** Sui testnet: unshield destination (public 0x… address). */
-const SUI_UNSHIELD_ADDR = process.env.E2E_SUI_UNSHIELD_ADDR ?? "REPLACE_WITH_SUI_ADDRESS"; // VERIFY: a valid 0x… Sui testnet address
 
 // ---------------------------------------------------------------------------
 // Key loading
@@ -172,19 +168,16 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   // DevSigner activates on mount — wait for the form to appear
   ab("wait", "--text", "Add"); // "Add funds" page title or button // VERIFY: page loads with "Add" text
 
-  // For Sui: the SuiShieldFlow renders "Add <TOKEN> privately" button
-  // For Solana: the ShieldFlow renders "Add <TOKEN> privately" button
-  // Both flows auto-select Self as the recipient (defaultToSelf=true in StealthRecipientInput)
+  // The ShieldFlow renders "Add <TOKEN> privately" button and auto-selects
+  // Self as the recipient (defaultToSelf=true in StealthRecipientInput)
 
   // Fill amount
-  // The amount input has placeholder "0.00" (Solana) or similar (Sui)
-  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY: placeholder exact text; Sui may use different placeholder
+  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY: placeholder exact text
   ab("wait", "500"); // brief settle for balance/canSubmit reactivity
 
   // Submit — the primary button contains "Add" + "privately"
   ab("find", "role", "button", "click", "--name", `Add`); // VERIFY: button text starts with "Add"; use snapshot to confirm exact name if needed
 
-  // Wait for success — both Solana ("Funds added privately") and Sui ("Funds added privately")
   ab("wait", "--text", "Funds added privately", "--timeout", "90000");
   console.log("  ✓ Shield success");
 }
@@ -197,35 +190,18 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
   ab("wait", "--load", "networkidle");
   ab("wait", "--text", "Send"); // page title // VERIFY: page has "Send" heading
 
-  if (chain.name.startsWith("Sui")) {
-    // SuiSendFlow: amount field first, then recipient
-    // The SuiTokenAmountField amount input has placeholder "0.00" or similar
-    ab("find", "placeholder", "0.00", "fill", amount); // VERIFY placeholder
-    ab("wait", "300");
-    // Recipient: placeholder "utxo:… · alice.utxopia.sui · 0x…"
-    ab("find", "placeholder", "utxo:…", "fill", recipient); // VERIFY: exact placeholder from sui-send-flow.tsx line 302
-    ab("wait", "1000"); // allow stealth address detection to trigger
-  } else {
-    // Solana SendForm: RecipientInput then AmountField
-    // RecipientInput placeholder is variable; locate by role first then fill
-    ab("find", "role", "textbox", "fill", recipient); // VERIFY: may need snapshot to pick correct input
-    ab("wait", "500");
-    ab("find", "placeholder", "0.00", "fill", amount); // VERIFY placeholder
-    ab("wait", "300");
-  }
+  // Solana SendForm: RecipientInput then AmountField
+  // RecipientInput placeholder is variable; locate by role first then fill
+  ab("find", "role", "textbox", "fill", recipient); // VERIFY: may need snapshot to pick correct input
+  ab("wait", "500");
+  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY placeholder
+  ab("wait", "300");
 
-  // Submit — button text is "Send <TOKEN>" on Sui; "Review" or "Send" on Solana
-  // Sui: SuiSubmitButton idleLabel = `Send ${selected.symbol}`
-  // Solana: opens ReviewModal first
-  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: on Solana this opens Review modal; on Sui it submits
+  // Submit — opens the ReviewModal
+  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: opens Review modal
+  ab("wait", "--text", "Confirm"); // VERIFY: ReviewModal has a Confirm button
+  ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY: exact button text
 
-  if (!chain.name.startsWith("Sui")) {
-    // Solana shows a ReviewModal; confirm inside it
-    ab("wait", "--text", "Confirm"); // VERIFY: ReviewModal has a Confirm button
-    ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY: exact button text
-  }
-
-  // Success: Sui = "Sent privately", Solana = flow-specific success text
   ab("wait", "--text", "privately", "--timeout", "120000"); // covers "Sent privately" and "added privately"
   console.log("  ✓ Transfer success");
 }
@@ -252,10 +228,6 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
  * UI flow (Solana devnet — ShieldFlow with isBtcNative branch):
  *   /vault/deposit → select BTC token → fill amount → "Add BTC privately" →
  *   BtcDepositPreview → "Confirm & Sign" → ShieldSuccess "BTC deposit submitted"
- *
- * For Sui testnet the BTC deposit routes via the faucet/regtest path and is
- * only available on hybrid (regtest) networks.  On non-hybrid Sui we skip
- * gracefully (the BTC option is disabled in the UI).
  */
 async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> {
   const depositUrl = `${APP_URL}/vault/deposit?network=${chain.network}`;
@@ -263,20 +235,7 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
   injectDevKeysViaStorage(keys, depositUrl);
   ab("wait", "--load", "networkidle");
 
-  if (chain.name.startsWith("Sui")) {
-    // Sui hybrid: BTC deposit goes via /faucet?address=... page.
-    // The deposit card at /vault/deposit shows a "Deposit regtest BTC" link.
-    // Click through and submit the faucet form.
-    ab("wait", "--text", "Deposit regtest BTC", "--timeout", "15000"); // VERIFY: link text from deposit-adapters.tsx
-    ab("find", "role", "link", "click", "--name", "Deposit regtest BTC"); // VERIFY: exact link label
-    ab("wait", "--load", "networkidle");
-    // Faucet page: fill amount and submit
-    ab("find", "placeholder", "0.00000000", "fill", BTC_DEPOSIT_AMOUNT); // VERIFY: faucet amount input placeholder
-    ab("wait", "500");
-    ab("find", "role", "button", "click", "--name", "Deposit"); // VERIFY: faucet submit button text
-    // Faucet redirects to /vault/activity?result=deposit_btc after broadcast
-    ab("wait", "--text", "deposit", "--timeout", "30000"); // VERIFY: success signal on faucet
-  } else {
+  {
     // Solana devnet: ShieldFlow with BTC token.
     // The token selector defaults to the first token; we need to switch to BTC.
     ab("wait", "--text", "Add Funds"); // page title from SolanaDepositPage // VERIFY
@@ -380,29 +339,18 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   ab("wait", "--load", "networkidle");
   ab("wait", "--text", "Cash out"); // page title from withdraw/page.tsx // VERIFY
 
-  if (chain.name.startsWith("Sui")) {
-    // Sui cash-out to BTC: SuiSendFlow — recipient-aware.
-    // Enter a BTC address; the flow detects it and switches to redeem mode.
-    ab("find", "placeholder", "utxo:…", "fill", BTC_REDEEM_ADDR); // VERIFY: placeholder from sui-send-flow.tsx
-    ab("wait", "1000");
-    ab("find", "placeholder", "0.00", "fill", BTC_REDEEM_AMOUNT); // VERIFY: amount field placeholder
-    ab("wait", "500");
-    ab("find", "role", "button", "click", "--name", "Cash out"); // VERIFY: SuiSubmitButton idleLabel
-  } else {
-    // Solana cash-out to BTC: SendForm.
-    // RecipientInput placeholder: "Paste address, alice.utxopia.sui, or .utxopia.sol name"
-    ab("find", "placeholder", "Paste address", "fill", BTC_REDEEM_ADDR); // VERIFY: placeholder from recipient-input.tsx line 95
-    ab("wait", "1000");
-    // After a valid BTC address is detected, the amount field appears.
-    ab("find", "placeholder", "0.00", "fill", BTC_REDEEM_AMOUNT); // VERIFY: AmountField placeholder
-    ab("wait", "500");
-    // The "Send" button opens the ReviewModal.
-    ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: send-form.tsx line 613
-    // ReviewModal shows "Hold to confirm" (HoldButton from review-modal.tsx line 79).
-    ab("wait", "--text", "Hold to confirm", "--timeout", "10000"); // VERIFY
-    // Hold the button — agent-browser simulates a hold via a long click or hold action.
-    ab("find", "role", "button", "click", "--name", "Hold to confirm"); // VERIFY: HoldButton accessible name — may need "hold" action instead of "click"
-  }
+  // Solana cash-out to BTC: SendForm.
+  ab("find", "placeholder", "Paste address", "fill", BTC_REDEEM_ADDR); // VERIFY: placeholder from recipient-input.tsx line 95
+  ab("wait", "1000");
+  // After a valid BTC address is detected, the amount field appears.
+  ab("find", "placeholder", "0.00", "fill", BTC_REDEEM_AMOUNT); // VERIFY: AmountField placeholder
+  ab("wait", "500");
+  // The "Send" button opens the ReviewModal.
+  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: send-form.tsx line 613
+  // ReviewModal shows "Hold to confirm" (HoldButton from review-modal.tsx line 79).
+  ab("wait", "--text", "Hold to confirm", "--timeout", "10000"); // VERIFY
+  // Hold the button — agent-browser simulates a hold via a long click or hold action.
+  ab("find", "role", "button", "click", "--name", "Hold to confirm"); // VERIFY: HoldButton accessible name — may need "hold" action instead of "click"
 
   // Wait for the app to navigate to the activity page with result=cashout_btc.
   // send-form.tsx line 458: router.push(`/vault/activity?result=cashout_btc`)
@@ -457,29 +405,16 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
   ab("wait", "--load", "networkidle");
   ab("wait", "--text", "Cash out"); // page title // VERIFY
 
-  if (chain.name.startsWith("Sui")) {
-    // SuiSendFlow (same component as send, but framed as cash out)
-    ab("find", "placeholder", "0.00", "fill", amount); // VERIFY placeholder
-    ab("wait", "300");
-    // Public Sui address triggers unshield mode
-    ab("find", "placeholder", "utxo:…", "fill", addr); // VERIFY placeholder
-    ab("wait", "1000");
-    ab("find", "role", "button", "click", "--name", "Cash out"); // VERIFY: SuiSubmitButton idleLabel = "Cash out <TOKEN>"
-  } else {
-    // Solana SendForm with showClaimLink=false
-    ab("find", "role", "textbox", "fill", addr); // VERIFY
-    ab("wait", "500");
-    ab("find", "placeholder", "0.00", "fill", amount); // VERIFY
-    ab("wait", "300");
-    ab("find", "role", "button", "click", "--name", "Send"); // VERIFY
-    ab("wait", "--text", "Confirm"); // VERIFY
-    ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY
-  }
+  // Solana SendForm with showClaimLink=false
+  ab("find", "role", "textbox", "fill", addr); // VERIFY
+  ab("wait", "500");
+  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY
+  ab("wait", "300");
+  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY
+  ab("wait", "--text", "Confirm"); // VERIFY
+  ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY
 
-  // Sui success: "Cashed out" (SuiFlowSuccess title on unshield mode)
-  // Solana: transaction success text varies; wait for "success" or explorer link
-  const successText = chain.name.startsWith("Sui") ? "Cashed out" : "successfully"; // VERIFY Solana success text
-  ab("wait", "--text", successText, "--timeout", "120000");
+  ab("wait", "--text", "successfully", "--timeout", "120000"); // VERIFY Solana success text
   console.log("  ✓ Unshield success");
 }
 
@@ -492,7 +427,7 @@ async function runChain(chain: ChainConfig, keys: DevKeys): Promise<void> {
   console.log(`Chain: ${chain.name}`);
   console.log("=".repeat(60));
 
-  const unshieldAddr = chain.name.startsWith("Sui") ? SUI_UNSHIELD_ADDR : SOL_UNSHIELD_ADDR;
+  const unshieldAddr = SOL_UNSHIELD_ADDR;
 
   try {
     console.log("\n[1/3] SHIELD");
@@ -551,12 +486,11 @@ async function main(): Promise<void> {
   // Validate placeholder addresses haven't been left as-is
   if (
     TRANSFER_RECIPIENT.startsWith("REPLACE_") ||
-    SOL_UNSHIELD_ADDR.startsWith("REPLACE_") ||
-    SUI_UNSHIELD_ADDR.startsWith("REPLACE_")
+    SOL_UNSHIELD_ADDR.startsWith("REPLACE_")
   ) {
     console.error(
       "ERROR: One or more placeholder addresses need replacing.\n" +
-        "Set E2E_TRANSFER_RECIPIENT, E2E_SOL_UNSHIELD_ADDR, E2E_SUI_UNSHIELD_ADDR\n" +
+        "Set E2E_TRANSFER_RECIPIENT, E2E_SOL_UNSHIELD_ADDR\n" +
         "or edit the defaults in token-loop.e2e.ts.",
     );
     process.exit(1);

@@ -2,7 +2,7 @@
  * Relay health checking and auto-selection.
  *
  * pingRelay uses /api/relayer/meta (a GET endpoint that exists in this app) as a
- * reachability probe. The relay submission routes (/api/sol/relay, /api/sui/relay)
+ * reachability probe. The relay submission route (/api/sol/relay)
  * only export POST, so a HEAD/GET to those returns 405 — not a useful health signal.
  * /api/relayer/meta is always present, returns JSON quickly, and shares the same
  * origin as the relay routes, making it a reliable liveness indicator.
@@ -32,8 +32,8 @@ export async function pingRelay(
   const timeoutMs = opts?.timeoutMs ?? DEFAULT_TIMEOUT_MS;
 
   // Derive the health probe URL from the relay URL.
-  // Relay URLs look like `/api/sui/relay?network=...` (relative) or
-  // `https://host/api/sui/relay?network=...` (absolute external).
+  // Relay URLs look like `/api/sol/relay?network=...` (relative) or
+  // `https://host/api/sol/relay?network=...` (absolute external).
   let probeUrl: string;
   try {
     if (relayUrl.startsWith("/") || relayUrl.startsWith("http")) {
