@@ -45,6 +45,7 @@ import { getBackendUrl } from "@/lib/api/constants";
 import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 import { getClientIp } from "@/lib/server/rate-limit";
 import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
+import { getVaultNetworkConfig, parseVaultId, vaultsSupported } from "@/lib/vault-config";
 import {
   createNonInteractiveDeposit,
   createDirectVaultDeposit,
@@ -426,7 +427,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   const activeNetwork = getRequestNetwork(req);
-  const activeConfig = getRequestNetworkConfig(activeNetwork);
+  let activeConfig = getRequestNetworkConfig(activeNetwork);
+  // Vault-scope the deposit: the OP_RETURN pool tag must match the destination
+  // pool (Open vs Verified are distinct pools with distinct mints/tags).
+  const vaultId = parseVaultId(req.nextUrl.searchParams.get("vault"));
+  if (vaultId !== "open" && vaultsSupported(activeNetwork) && "solana" in activeConfig) {
+    activeConfig = getVaultNetworkConfig(activeNetwork, activeConfig as NetworkConfig, vaultId);
+  }
   const btcNetwork = activeConfig?.bitcoin?.network || process.env.NEXT_PUBLIC_BTC_NETWORK || "";
 
   if (btcNetwork !== "regtest") {

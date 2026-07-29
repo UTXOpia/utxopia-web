@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Droplets } from "lucide-react";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,7 @@ interface FaucetResponse {
 }
 
 export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
+  const { vaultId } = useChainEnvironment();
   const [amountSats, setAmountSats] = useState(100_000);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DripResult | null>(null);
@@ -97,7 +99,7 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
     setResult(null);
 
     try {
-      const params = new URLSearchParams({ network });
+      const params = new URLSearchParams({ network, vault: vaultId });
       const response = await fetch(`/api/faucet/regtest?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
