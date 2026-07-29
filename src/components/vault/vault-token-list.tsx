@@ -1,41 +1,84 @@
 "use client";
 
+import { useState } from "react";
 import Image from "next/image";
 import Link from "next/link";
-import { ArrowRight, ChevronRight, Loader2, PlusCircle } from "lucide-react";
+import {
+  ArrowRight,
+  ChevronDown,
+  ChevronRight,
+  Loader2,
+  PlusCircle,
+  ShieldCheck,
+  Unlock,
+} from "lucide-react";
 import { cn } from "@/lib/utils";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { hrefWithVault, siblingVaultId, type VaultId } from "@/lib/vault-config";
 import type { TokenPrices } from "@/hooks/use-token-prices";
+import type { SiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 
 interface VaultTokenListProps {
   balancesByToken: Record<string, bigint>;
   depositCount: number;
   isLoading: boolean;
   networkId: NetworkId;
+  vaultId: VaultId;
   tokenPrices: TokenPrices;
+  sibling?: SiblingVaultBalances;
 }
+
+const VAULT_META: Record<VaultId, { label: string; icon: typeof Unlock }> = {
+  open: { label: "Open", icon: Unlock },
+  verified: { label: "Verified", icon: ShieldCheck },
+};
 
 export function VaultTokenList({
   balancesByToken,
   depositCount,
   isLoading,
   networkId,
+  vaultId,
   tokenPrices,
+  sibling,
 }: VaultTokenListProps) {
-  const hasAnyBalance = VAULT_TOKENS.some(
-    (token) => Number(balancesByToken?.[token.shieldedSymbol] ?? 0n) > 0,
-  );
+  const [expanded, setExpanded] = useState<Set<string>>(new Set());
+  const siblingReady = sibling?.status === "ready";
+  const siblingVault = siblingVaultId(vaultId);
+
+  const totalFor = (symbol: string): bigint =>
+    (balancesByToken?.[symbol] ?? 0n) +
+    (siblingReady ? sibling.balancesByToken[symbol] ?? 0n : 0n);
+
+  const hasAnyBalance = VAULT_TOKENS.some((token) => totalFor(token.shieldedSymbol) > 0n);
 
   const sortedTokens = [...VAULT_TOKENS].sort((a, b) => {
-    const aRaw = Number(balancesByToken?.[a.shieldedSymbol] ?? 0n);
-    const bRaw = Number(balancesByToken?.[b.shieldedSymbol] ?? 0n);
+    const aRaw = Number(totalFor(a.shieldedSymbol));
+    const bRaw = Number(totalFor(b.shieldedSymbol));
     if (aRaw > 0 && bRaw === 0) return -1;
     if (aRaw === 0 && bRaw > 0) return 1;
     const aUsd = (aRaw / 10 ** a.decimals) * (tokenPrices[a.priceKey] || 0);
     const bUsd = (bRaw / 10 ** b.decimals) * (tokenPrices[b.priceKey] || 0);
     return bUsd - aUsd;
   });
+
+  const toggleExpanded = (symbol: string) => {
+    setExpanded((prev) => {
+      const next = new Set(prev);
+      if (next.has(symbol)) next.delete(symbol);
+      else next.add(symbol);
+      return next;
+    });
+  };
+
+  const formatAmount = (raw: bigint, decimals: number): string => {
+    const maxDec = Math.min(decimals, 6);
+    return (Number(raw) / 10 ** decimals).toLocaleString("en-US", {
+      minimumFractionDigits: 2,
+      maximumFractionDigits: maxDec,
+    });
+  };
 
   return (
     <div className="mb-5">
@@ -57,40 +100,143 @@ export function VaultTokenList({
           <VaultTokenEmptyState networkId={networkId} />
         ) : (
           sortedTokens.map((token) => {
-            const rawBalance = Number(balancesByToken?.[token.shieldedSymbol] ?? 0n);
-            const balanceNum = rawBalance / 10 ** token.decimals;
-            const hasBalance = rawBalance > 0;
-            const maxDec = Math.min(token.decimals, 6);
-            const balance = balanceNum.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: maxDec });
+            const symbol = token.shieldedSymbol;
+            const activeRaw = balancesByToken?.[symbol] ?? 0n;
+            const siblingRaw = siblingReady ? sibling.balancesByToken[symbol] ?? 0n : 0n;
+            const totalRaw = activeRaw + siblingRaw;
+            const hasBalance = totalRaw > 0n;
             const price = tokenPrices[token.priceKey];
-            const usdValue = price ? (rawBalance / 10 ** token.decimals) * price : 0;
+            const usdValue = price ? (Number(totalRaw) / 10 ** token.decimals) * price : 0;
+            // Vaults are separate pools: sub-rows exist so users see WHERE the
+            // money sits — only offer the breakdown when both sides are known.
+            const expandable = siblingReady && hasBalance;
+            const isExpanded = expandable && expanded.has(symbol);
+            const verifiedRaw = vaultId === "verified" ? activeRaw : siblingRaw;
 
             return (
-              <div key={token.symbol} className={cn("flex items-center gap-3 px-4 h-[60px] transition-colors", hasBalance ? "hover:bg-muted/40" : "opacity-40")}>
-                <Image src={token.shieldedLogo} alt={token.shieldedSymbol} width={36} height={36} className="rounded-full" />
-                <div className="flex-1 min-w-0">
-                  <p className="text-body2-semibold text-foreground">{token.shieldedSymbol}</p>
-                  <p className="text-[11px] text-gray/50">{token.name}</p>
-                </div>
-                <div className="text-right">
-                  {isLoading ? (
-                    <Loader2 className="w-4 h-4 animate-spin text-privacy ml-auto" />
-                  ) : hasBalance ? (
-                    <>
-                      <p className="text-body2-semibold text-foreground font-mono">{balance}</p>
-                      <p className="text-[11px] text-gray/45 font-mono">
-                        ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                      </p>
-                    </>
-                  ) : (
-                    <p className="text-body2 text-gray/30 font-mono">0.00</p>
+              <div key={token.symbol}>
+                <div
+                  role={expandable ? "button" : undefined}
+                  tabIndex={expandable ? 0 : undefined}
+                  onClick={expandable ? () => toggleExpanded(symbol) : undefined}
+                  onKeyDown={
+                    expandable
+                      ? (e) => {
+                          if (e.key === "Enter" || e.key === " ") {
+                            e.preventDefault();
+                            toggleExpanded(symbol);
+                          }
+                        }
+                      : undefined
+                  }
+                  className={cn(
+                    "flex items-center gap-3 px-4 h-[60px] transition-colors",
+                    hasBalance ? "hover:bg-muted/40" : "opacity-40",
+                    expandable && "cursor-pointer",
+                  )}
+                >
+                  <Image src={token.shieldedLogo} alt={symbol} width={36} height={36} className="rounded-full" />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-body2-semibold text-foreground">{symbol}</p>
+                      {verifiedRaw > 0n && (
+                        <span
+                          title="Part of this balance is in the Verified vault"
+                          className="inline-flex items-center gap-0.5 rounded-full bg-privacy/10 px-1.5 py-0.5 text-[10px] text-privacy"
+                        >
+                          <ShieldCheck className="w-3 h-3" />
+                          Verified
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-gray/50">{token.name}</p>
+                  </div>
+                  <div className="text-right">
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-privacy ml-auto" />
+                    ) : hasBalance ? (
+                      <>
+                        <p className="text-body2-semibold text-foreground font-mono">
+                          {formatAmount(totalRaw, token.decimals)}
+                        </p>
+                        <p className="text-[11px] text-gray/45 font-mono">
+                          ${usdValue.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                        </p>
+                      </>
+                    ) : (
+                      <p className="text-body2 text-gray/30 font-mono">0.00</p>
+                    )}
+                  </div>
+                  {expandable && (
+                    <ChevronDown
+                      className={cn(
+                        "w-3.5 h-3.5 text-gray/40 transition-transform",
+                        isExpanded && "rotate-180",
+                      )}
+                    />
                   )}
                 </div>
+
+                {isExpanded && (
+                  <div className="bg-muted/20 divide-y divide-gray/6">
+                    {([
+                      { vault: vaultId, raw: activeRaw, current: true },
+                      { vault: siblingVault, raw: siblingRaw, current: false },
+                    ] as const).map(({ vault, raw, current }) => {
+                      const meta = VAULT_META[vault];
+                      const MetaIcon = meta.icon;
+                      const row = (
+                        <>
+                          <MetaIcon
+                            className={cn(
+                              "w-3.5 h-3.5",
+                              vault === "verified" ? "text-privacy" : "text-gray/50",
+                            )}
+                          />
+                          <span className="flex-1 text-[12px] text-gray-light/80">
+                            {meta.label}
+                            {current && <span className="text-gray/40"> · current</span>}
+                          </span>
+                          <span className="text-[12px] font-mono text-foreground/90">
+                            {formatAmount(raw, token.decimals)}
+                          </span>
+                          {!current && <ChevronRight className="w-3 h-3 text-gray/40" />}
+                        </>
+                      );
+                      const rowClass = "flex items-center gap-2 pl-[52px] pr-4 h-[40px]";
+                      return current ? (
+                        <div key={vault} className={rowClass}>{row}</div>
+                      ) : (
+                        <Link
+                          key={vault}
+                          href={hrefWithVault(hrefWithChain("/vault", networkId), vault)}
+                          onClick={(e) => e.stopPropagation()}
+                          className={cn(rowClass, "hover:bg-muted/40 transition-colors")}
+                          title={`Switch to the ${meta.label} vault. Vault balances are separate pools and cannot be transferred directly.`}
+                        >
+                          {row}
+                        </Link>
+                      );
+                    })}
+                  </div>
+                )}
               </div>
             );
           })
         )}
       </div>
+
+      {sibling?.status === "locked" && (
+        <p className="px-1 mt-1.5 text-[11px] text-gray/40">
+          {VAULT_META[siblingVault].label} vault balance is locked —{" "}
+          <Link
+            href={hrefWithVault(hrefWithChain("/vault", networkId), siblingVault)}
+            className="text-privacy/60 hover:text-privacy transition-colors"
+          >
+            switch to unlock
+          </Link>
+        </p>
+      )}
     </div>
   );
 }

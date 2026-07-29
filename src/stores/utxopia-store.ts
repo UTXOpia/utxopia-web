@@ -168,6 +168,19 @@ function walletStorageOwner(walletPubkey: string, vaultId: VaultId): string {
   return vaultId === "open" ? walletPubkey : `${walletPubkey}:vault:${vaultId}`;
 }
 
+/** Decrypt a vault identity's keys from the in-session warm cache (no passkey
+ *  prompt). Returns null when that vault was never unlocked this session —
+ *  callers must treat that as "locked", not as an error. Passkey flow only:
+ *  wallet identities warm no sibling. */
+export async function loadWarmVaultKeys(
+  networkId: NetworkId,
+  vaultId: VaultId,
+): Promise<UTXOpiaKeys | null> {
+  if (typeof window === "undefined") return null;
+  const credentialId = localStorage.getItem("utxo:passkey_credential_id") || "default";
+  return loadKeys(passkeyStorageOwner(credentialId, networkId, vaultId), new Uint8Array(32));
+}
+
 function removeKeys(walletPubkey: string): void {
   try {
     localStorage.removeItem(KEYS_STORAGE_PREFIX + walletPubkey);

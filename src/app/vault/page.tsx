@@ -58,6 +58,7 @@ import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
 import { VaultSwitcher } from "@/components/vault/vault-switcher";
+import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
@@ -106,6 +107,7 @@ export default function VaultPage() {
 
   const tokenPrices = useTokenPrices();
   const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
+  const siblingBalances = useSiblingVaultBalances();
   const previousVaultId = useRef(vaultId);
   useEffect(() => {
     if (previousVaultId.current !== vaultId) {
@@ -422,7 +424,9 @@ export default function VaultPage() {
                 depositCount={depositCount}
                 isLoading={isLoadingInbox}
                 networkId={networkId}
+                vaultId={vaultId}
                 tokenPrices={tokenPrices}
+                sibling={siblingBalances}
               />
             </>
           )}

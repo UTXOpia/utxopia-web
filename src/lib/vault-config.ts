@@ -48,6 +48,14 @@ export function parseVaultId(value: string | null | undefined): VaultId {
   return value?.trim().toLowerCase() === "verified" ? "verified" : "open";
 }
 
+export function vaultsSupported(networkId: NetworkId): boolean {
+  return networkId === "devnet" || networkId === "devnet-regtest";
+}
+
+export function siblingVaultId(vaultId: VaultId): VaultId {
+  return vaultId === "open" ? "verified" : "open";
+}
+
 export function getVaultPrivacyDomain(
   vaultId: VaultId,
 ): "public" | "institution" {
