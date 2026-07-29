@@ -36,7 +36,12 @@ export function VaultBalance({
 
   const openUsd = vaultId === "open" ? activeUsd : siblingUsd;
   const verifiedUsd = vaultId === "verified" ? activeUsd : siblingUsd;
-  const showSplit = siblingReady && verifiedUsd > 0;
+  // Gate on native funds, not USD — a dead price feed must not hide the split.
+  const verifiedNative = Object.values(
+    (vaultId === "verified" ? balancesByToken : siblingReady ? sibling.balancesByToken : {}) ?? {},
+  ).some((amount) => amount > 0n);
+  const showSplit = siblingReady && verifiedNative;
+  const pricesLive = totalUsd > 0;
 
   const usd = (v: number) =>
     v.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -69,10 +74,12 @@ export function VaultBalance({
           </p>
           {showSplit && (
             <p className="mt-1.5 text-[11px] text-gray/45 font-mono flex items-center justify-center gap-1">
-              Open ${usd(openUsd)}
+              {pricesLive ? `Open $${usd(openUsd)}` : "Open"}
               <span className="text-gray/30">·</span>
               <ShieldCheck className="w-3 h-3 text-privacy/70" />
-              <span className="text-privacy/70">Verified ${usd(verifiedUsd)}</span>
+              <span className="text-privacy/70">
+                {pricesLive ? `Verified $${usd(verifiedUsd)}` : "Verified"}
+              </span>
             </p>
           )}
         </>
