@@ -429,9 +429,11 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   const activeNetwork = getRequestNetwork(req);
   let activeConfig = getRequestNetworkConfig(activeNetwork);
   // Vault-scope the deposit: the OP_RETURN pool tag must match the destination
-  // pool (Open vs Verified are distinct pools with distinct mints/tags).
+  // pool (Open vs Verified are distinct pools with distinct mints/tags). Open
+  // needs the overlay too — the base network config can point at an older
+  // deployment, and a tag no tracker recognises strands the deposit silently.
   const vaultId = parseVaultId(new URL(req.url).searchParams.get("vault"));
-  if (vaultId !== "open" && vaultsSupported(activeNetwork) && "solana" in activeConfig) {
+  if (vaultsSupported(activeNetwork) && "solana" in activeConfig) {
     activeConfig = getVaultNetworkConfig(activeNetwork, activeConfig as NetworkConfig, vaultId);
   }
   const btcNetwork = activeConfig?.bitcoin?.network || process.env.NEXT_PUBLIC_BTC_NETWORK || "";
