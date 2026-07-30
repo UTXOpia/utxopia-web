@@ -27,6 +27,8 @@ interface VaultTokenListProps {
   vaultId: VaultId;
   tokenPrices: TokenPrices;
   sibling?: SiblingVaultBalances;
+  /** BTC deposits broadcast but not yet spendable. */
+  pendingCount?: number;
 }
 
 const VAULT_META: Record<VaultId, { label: string; icon: typeof Unlock }> = {
@@ -42,6 +44,7 @@ export function VaultTokenList({
   vaultId,
   tokenPrices,
   sibling,
+  pendingCount = 0,
 }: VaultTokenListProps) {
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const siblingReady = sibling?.status === "ready";
@@ -85,7 +88,18 @@ export function VaultTokenList({
     <div className="mb-5">
       <div className="flex items-center justify-between px-1 mb-2">
         <span className="text-[11px] text-gray/50 uppercase tracking-wider font-medium">Tokens</span>
-        {depositCount > 0 && (
+        {/* One slot, two states: in-flight deposits take priority over the
+            plain link, since both lead to the same place. */}
+        {pendingCount > 0 ? (
+          <Link
+            href={hrefWithChain("/vault/activity", networkId)}
+            className="flex items-center gap-1 text-[11px] text-privacy/80 hover:text-privacy transition-colors cursor-pointer"
+          >
+            <Loader2 className="w-3 h-3 animate-spin" />
+            {pendingCount} arriving
+            <ChevronRight className="w-3 h-3" />
+          </Link>
+        ) : depositCount > 0 ? (
           <Link
             href={hrefWithChain("/vault/activity?tab=notes", networkId)}
             className="flex items-center gap-0.5 text-[11px] text-privacy/60 hover:text-privacy transition-colors cursor-pointer"
@@ -93,7 +107,7 @@ export function VaultTokenList({
             View activity
             <ChevronRight className="w-3 h-3" />
           </Link>
-        )}
+        ) : null}
       </div>
 
       <div className="rounded-[14px] border border-gray/10 overflow-hidden divide-y divide-gray/8">

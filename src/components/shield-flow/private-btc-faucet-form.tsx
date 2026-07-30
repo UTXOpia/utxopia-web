@@ -32,6 +32,17 @@ interface FaucetResponse {
   error?: string;
 }
 
+/** Whole-unit countdown: a raw second count reads as a broken button once the
+ *  daily limit pushes the wait into the hours. */
+function formatCooldown(seconds: number): string {
+  if (seconds >= 3600) {
+    const hours = Math.ceil(seconds / 3600);
+    return `${hours}h`;
+  }
+  if (seconds >= 60) return `${Math.ceil(seconds / 60)}m`;
+  return `${Math.max(seconds, 1)}s`;
+}
+
 export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
   const { vaultId } = useChainEnvironment();
   const [amountSats, setAmountSats] = useState(100_000);
@@ -120,7 +131,7 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         setResult({
           kind: "cooldown",
           retryAfterSec: body.retryAfterSec,
-          message: body.error ?? `Cooldown active. Try again in ${body.retryAfterSec}s.`,
+          message: body.error ?? `Daily limit reached. Try again in ${formatCooldown(body.retryAfterSec)}.`,
         });
       } else if (!response.ok || !body.ok) {
         setResult({ kind: "err", message: body.error ?? `HTTP ${response.status}` });
@@ -231,7 +242,7 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         {submitting
           ? "Creating Bitcoin transaction..."
           : cooldownActive
-            ? `Wait ${cooldownLeft}s`
+            ? `Try again in ${formatCooldown(cooldownLeft)}`
             : "Get private test BTC"}
       </button>
 

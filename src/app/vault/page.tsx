@@ -56,11 +56,11 @@ import { VaultBalance } from "@/components/vault/vault-balance";
 import { VaultGuide } from "@/components/vault/vault-guide";
 import { VaultNetworkStatus } from "@/components/vault/vault-network-status";
 import { VaultTokenList } from "@/components/vault/vault-token-list";
-import { VaultPendingDeposits } from "@/components/vault/vault-pending-deposits";
 import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
 import { useSiblingVaultAddress, useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
+import { usePendingBtcDeposits } from "@/hooks/use-pending-btc-deposits";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
@@ -110,6 +110,7 @@ export default function VaultPage() {
   const tokenPrices = useTokenPrices();
   const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
   const siblingBalances = useSiblingVaultBalances();
+  const pendingBtcCount = usePendingBtcDeposits(networkId, networkConfig);
   const siblingAddressEncoded = useSiblingVaultAddress();
   const siblingHasFunds =
     siblingBalances.status === "ready" &&
@@ -443,8 +444,6 @@ export default function VaultPage() {
                 vaultId={vaultId}
               />
 
-              <VaultPendingDeposits networkId={networkId} config={networkConfig} />
-
               <VaultTokenList
                 balancesByToken={balancesByToken}
                 depositCount={depositCount}
@@ -453,6 +452,7 @@ export default function VaultPage() {
                 vaultId={vaultId}
                 tokenPrices={tokenPrices}
                 sibling={siblingBalances}
+                pendingCount={pendingBtcCount}
               />
             </>
           )}
