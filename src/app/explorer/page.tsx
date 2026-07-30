@@ -156,7 +156,9 @@ function ExplorerContent({ network }: { network: NetworkId }) {
   }, [vaultScoped, activeFilter, selectedTokens]);
 
   // TVL from on-chain pool state (same as main page)
-  const { stats } = usePoolStats(network);
+  // TVL follows the pool filter: "All pools" sums both, a scoped view shows
+  // only that pool's value.
+  const { stats } = usePoolStats(network, showVaultFilter ? activeVault : undefined);
   const prices = useTokenPrices();
 
   const totalShieldedDisplay = useMemo(() => {

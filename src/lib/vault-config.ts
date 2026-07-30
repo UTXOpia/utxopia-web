@@ -48,6 +48,12 @@ export function parseVaultId(value: string | null | undefined): VaultId {
   return value?.trim().toLowerCase() === "verified" ? "verified" : "open";
 }
 
+/** Every pool's zkBTC mint. Each vault mints its own, so anything resolving
+ *  token ids across pools (explorer TVL, merged feeds) needs all of them. */
+export function allVaultZkbtcMints(): string[] {
+  return Object.values(DEVNET_VAULTS).map((vault) => vault.mint);
+}
+
 export function vaultsSupported(networkId: NetworkId): boolean {
   return networkId === "devnet" || networkId === "devnet-regtest";
 }

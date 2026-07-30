@@ -12,6 +12,7 @@ import type { NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getTokenBySymbol } from "@/lib/supported-tokens";
 import { buildTokenIdMap } from "@/lib/token-map";
+import { vaultsSupported, type VaultId } from "@/lib/vault-config";
 
 /** Per-token TVL info */
 export interface TokenTVL {
@@ -29,8 +30,10 @@ export interface PoolStats {
   tokenTVL: TokenTVL[];
 }
 
-async function fetchPoolStats(network: NetworkId): Promise<PoolStats> {
-  const resp = await fetch(`/api/pool/stats?network=${encodeURIComponent(network)}`, {
+async function fetchPoolStats(network: NetworkId, vault?: VaultId): Promise<PoolStats> {
+  const query = new URLSearchParams({ network });
+  if (vault) query.set("vault", vault);
+  const resp = await fetch(`/api/pool/stats?${query.toString()}`, {
     signal: AbortSignal.timeout(5000),
   });
 
@@ -90,12 +93,45 @@ async function fetchPoolStats(network: NetworkId): Promise<PoolStats> {
   };
 }
 
-export function usePoolStats(networkId?: NetworkId) {
+/** Sum per-token TVL across pools, keyed by shielded symbol. */
+function mergePoolStats(parts: PoolStats[]): PoolStats {
+  const bySymbol = new Map<string, TokenTVL>();
+  for (const part of parts) {
+    for (const entry of part.tokenTVL) {
+      const existing = bySymbol.get(entry.shieldedSymbol);
+      if (existing) existing.totalShielded += entry.totalShielded;
+      else bySymbol.set(entry.shieldedSymbol, { ...entry });
+    }
+  }
+  return {
+    totalShielded: parts.reduce((sum, p) => sum + p.totalShielded, 0n),
+    depositCount: parts.reduce((sum, p) => sum + p.depositCount, 0),
+    totalCommitments: parts.reduce((sum, p) => sum + p.totalCommitments, 0),
+    volume: parts.reduce((sum, p) => sum + p.volume, 0n),
+    tokenTVL: [...bySymbol.values()],
+  };
+}
+
+/**
+ * @param vault Pool scope. Omit for the network's default pool (unchanged
+ *   behaviour); "all" sums every pool on dual-vault networks.
+ */
+export function usePoolStats(networkId?: NetworkId, vault?: VaultId | "all") {
   const env = useChainEnvironment();
   const network = networkId ?? env.networkId;
+  const scope: VaultId | "all" | "default" = vault ?? "default";
   const { data: stats, error, isLoading, mutate } = useSWR<PoolStats>(
-    ["pool-stats", network],
-    () => fetchPoolStats(network),
+    ["pool-stats", network, scope],
+    () => {
+      if (scope === "default" || !vaultsSupported(network)) return fetchPoolStats(network);
+      if (scope === "all") {
+        return Promise.all([
+          fetchPoolStats(network, "open"),
+          fetchPoolStats(network, "verified"),
+        ]).then(mergePoolStats);
+      }
+      return fetchPoolStats(network, scope);
+    },
     {
       refreshInterval: 30000,
       dedupingInterval: 10000,

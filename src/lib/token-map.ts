@@ -66,6 +66,17 @@ export async function buildTokenIdMap(): Promise<Map<string, string>> {
         if (!map.has(hex)) map.set(hex, token.symbol);
       } catch (err) { console.error("[TokenMap] tokenId computation failed for:", token.symbol, err); }
     }
+
+    // Each vault mints its own zkBTC, and getConfig() only carries the active
+    // one. Register every pool's mint so cross-pool views (explorer TVL) can
+    // resolve BTC rows from the pool they are not scoped to.
+    const { allVaultZkbtcMints } = await import("@/lib/vault-config");
+    for (const mint of allVaultZkbtcMints()) {
+      try {
+        const hex = toHex64(computeTokenId(new PublicKey(mint).toBytes()));
+        if (!map.has(hex)) map.set(hex, "BTC");
+      } catch { /* not a valid mint on this deployment */ }
+    }
   } catch (err) {
     console.error("[TokenMap] Poseidon init failed, using precomputed fallback:", err);
   }
