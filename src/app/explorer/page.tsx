@@ -20,7 +20,8 @@ import { cn } from "@/lib/utils";
 import { detectNetwork, NETWORK_META, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
-import { TypeFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState } from "./components/shared";
+import { TypeFilterBar, VaultFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState, type VaultFilter } from "./components/shared";
+import { vaultsSupported } from "@/lib/vault-config";
 import type { FilterType, TokenFilter } from "./components/shared";
 import { TransferRow, getTransferKind } from "./components/transfers-tab";
 import { getTokenByFilter, formatTokenAmount, tvlToUsd, type TokenFilterId } from "@/lib/supported-tokens";
@@ -49,6 +50,7 @@ function useSyncStatus(network: NetworkId) {
 
 function ExplorerContent({ network }: { network: NetworkId }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
+  const [activeVault, setActiveVault] = useState<VaultFilter>("all");
   const [selectedTokens, setSelectedTokens] = useState<Set<TokenFilter>>(() => new Set(["btc", "sol", "usdc", "usdt"] as TokenFilter[]));
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
@@ -84,17 +86,38 @@ function ExplorerContent({ network }: { network: NetworkId }) {
 
   // All transactions come from useExplorer(), already sorted by timestamp desc.
 
-  // Counts by type (withdraw counts as unshield)
+  const showVaultFilter = vaultsSupported(network);
+
+  // Transactions in the selected pool scope — the base for type counts and rows.
+  const vaultScoped = useMemo(
+    () =>
+      activeVault === "all"
+        ? allTransactions
+        : allTransactions.filter((t) => (t.vault ?? "open") === activeVault),
+    [allTransactions, activeVault],
+  );
+
+  // Pool counts stay whole-feed so the numbers don't change as you filter.
+  const vaultCounts = useMemo(() => {
+    const c: Record<VaultFilter, number> = { all: allTransactions.length, open: 0, verified: 0 };
+    for (const tx of allTransactions) {
+      if ((tx.vault ?? "open") === "verified") c.verified++;
+      else c.open++;
+    }
+    return c;
+  }, [allTransactions]);
+
+  // Counts by type (withdraw counts as unshield), within the selected pool
   const counts = useMemo(() => {
     const c: Record<FilterType, number> = { all: 0, shield: 0, transfer: 0, unshield: 0 };
-    for (const tx of allTransactions) {
+    for (const tx of vaultScoped) {
       if (tx.type === "shield") c.shield++;
       else if (tx.type === "transfer") c.transfer++;
       else c.unshield++; // unshield + withdraw
     }
-    c.all = allTransactions.length;
+    c.all = vaultScoped.length;
     return c;
-  }, [allTransactions]);
+  }, [vaultScoped]);
 
   // Map token symbol to filter ID
   function getTokenFilter(tx: ExplorerTransaction): TokenFilterId {
@@ -107,7 +130,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
 
   // Filter by type AND token
   const filtered = useMemo(() => {
-    let items = allTransactions;
+    let items = vaultScoped;
 
     // Type filter
     if (activeFilter !== "all") {
@@ -127,7 +150,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
     }
 
     return items;
-  }, [allTransactions, activeFilter, selectedTokens]);
+  }, [vaultScoped, activeFilter, selectedTokens]);
 
   // TVL from on-chain pool state (same as main page)
   const { stats } = usePoolStats(network);
@@ -151,7 +174,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
       </div>
 
       {/* Filter Bar */}
-      <div className="flex items-center justify-between mb-4">
+      <div className="flex items-center justify-between mb-4 gap-3 flex-wrap">
         <TypeFilterBar
           activeFilter={activeFilter}
           onFilterChange={setActiveFilter}
@@ -169,7 +192,16 @@ function ExplorerContent({ network }: { network: NetworkId }) {
           }}
           counts={counts}
         />
-        <RefreshButton onClick={refreshAll} />
+        <div className="flex items-center gap-2">
+          {showVaultFilter && (
+            <VaultFilterBar
+              activeVault={activeVault}
+              onVaultChange={setActiveVault}
+              counts={vaultCounts}
+            />
+          )}
+          <RefreshButton onClick={refreshAll} />
+        </div>
       </div>
 
       {/* Unified Table */}

@@ -12,6 +12,7 @@
 
 import { NextResponse } from "next/server";
 import { getBackendUrl } from "@/lib/api/constants";
+import { parseVaultScope, vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
@@ -148,7 +149,8 @@ function transformTransfer(t: BackendTransfer, tokenMap: Map<string, string>): E
 export async function GET(request: Request) {
   try {
     const network = detectNetworkFromRequest(request);
-    const backendUrl = getBackendUrl(network);
+    const scope = parseVaultScope(new URL(request.url).searchParams.get("vault"));
+    const { backendUrl } = vaultTargets(network, scope === "all" ? "open" : scope)[0];
     const resp = await fetch(`${backendUrl}/api/transfers`, { cache: "no-store" });
     if (!resp.ok) {
       return NextResponse.json({ success: true, transactions: [], count: 0 });

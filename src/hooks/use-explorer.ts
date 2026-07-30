@@ -4,6 +4,7 @@ import useSWR from "swr";
 import type { IndexerLeaf } from "@utxopia/sdk";
 import type { NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import type { VaultId } from "@/lib/vault-config";
 
 // =============================================================================
 // Types
@@ -94,6 +95,8 @@ export interface ExplorerTransaction {
   outputs: TxOutput[];
   /** BTC deposit lifecycle (shield only) */
   btcMeta?: BtcDepositMeta;
+  /** Source pool. Absent on networks without dual vaults. */
+  vault?: VaultId;
 }
 
 export interface RedemptionRecord {
@@ -223,7 +226,11 @@ export function useExplorer(networkId?: NetworkId) {
   const { data, error, isLoading, mutate } = useSWR<ExplorerTransaction[]>(
     ["explorer-unified", network],
     async () => {
-      const resp = await fetch(`/api/explorer/transactions?network=${encodeURIComponent(network)}`);
+      // Always request both pools; the vault filter runs client-side so
+      // switching it never refetches.
+      const resp = await fetch(
+        `/api/explorer/transactions?network=${encodeURIComponent(network)}&vault=all`,
+      );
       if (!resp.ok) {
         throw new Error(`Explorer request failed (${resp.status})`);
       }

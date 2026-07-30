@@ -7,8 +7,9 @@
  */
 
 import { NextResponse } from "next/server";
-import { getBackendUrl } from "@/lib/api/constants";
 import { detectNetworkFromRequest } from "@/lib/network-config";
+import { parseVaultScope, tagVault, vaultTargets } from "@/lib/api/vault-fanout";
+import type { VaultId } from "@/lib/vault-config";
 import { ExplorerTx, normalizeExplorerTransaction } from "./helpers";
 export const dynamic = "force-dynamic";
 
@@ -28,13 +29,16 @@ async function fetchFromBackendUnified(backendUrl: string): Promise<ExplorerTx[]
 async function fetchCombined(
   origin: string,
   cookieHeader: string | null,
+  vaultId: VaultId | null,
 ): Promise<ExplorerTx[]> {
-  // Forward the network cookie so sub-routes resolve the same backend.
+  // Forward the network cookie so sub-routes resolve the same backend, and the
+  // vault so they read the same pool this target is for.
   const headers: Record<string, string> = {};
   if (cookieHeader) headers["cookie"] = cookieHeader;
+  const query = vaultId ? `?vault=${vaultId}` : "";
   const [depositsResp, transfersResp] = await Promise.all([
-    fetch(`${origin}/api/explorer/deposits`, { cache: "no-store", headers }).catch(() => null),
-    fetch(`${origin}/api/transfers`, { cache: "no-store", headers }).catch(() => null),
+    fetch(`${origin}/api/explorer/deposits${query}`, { cache: "no-store", headers }).catch(() => null),
+    fetch(`${origin}/api/transfers${query}`, { cache: "no-store", headers }).catch(() => null),
   ]);
 
   const deposits: ExplorerTx[] = depositsResp?.ok
@@ -54,16 +58,21 @@ export async function GET(request: Request) {
     // Resolve backend URL per-request from the network cookie so the user's
     // selection in /settings reaches the right stack.
     const network = detectNetworkFromRequest(request);
-    const backendUrl = getBackendUrl(network);
+    const scope = parseVaultScope(new URL(request.url).searchParams.get("vault"));
+    const origin = new URL(request.url).origin;
+    const cookie = request.headers.get("cookie");
 
-    // Try unified backend endpoint first
-    let transactions = await fetchFromBackendUnified(backendUrl);
+    // One backend per requested vault; rows carry the pool they came from.
+    const perVault = await Promise.all(
+      vaultTargets(network, scope).map(async ({ vaultId, backendUrl }) => {
+        const unified = await fetchFromBackendUnified(backendUrl);
+        const rows = unified ?? (await fetchCombined(origin, cookie, vaultId));
+        return tagVault(rows, vaultId);
+      }),
+    );
 
-    // Fallback: combine deposits (includes tracker-only) + transfers
-    if (!transactions) {
-      const origin = new URL(request.url).origin;
-      transactions = await fetchCombined(origin, request.headers.get("cookie"));
-    }
+    let transactions = perVault.flat();
+    transactions.sort((a, b) => (b.timestamp ?? 0) - (a.timestamp ?? 0));
 
     // Resolve token symbols server-side
     try {

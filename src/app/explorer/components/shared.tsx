@@ -18,11 +18,14 @@ import {
   Search,
   RefreshCw,
   Shield,
+  ShieldCheck,
+  Unlock,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainLinkClass, getChainTransactionUrl } from "@/lib/chain-links";
 import { EXPLORER_FILTER_TOKENS, type TokenFilterId } from "@/lib/supported-tokens";
+import type { VaultId } from "@/lib/vault-config";
 import {
   getProductTransactionLabel,
   PRODUCT_COPY,
@@ -43,6 +46,80 @@ const TOKEN_LIST = EXPLORER_FILTER_TOKENS.map((t) => ({
   secondLogo: t.explorerSecondLogo,
   live: t.enabled,
 }));
+
+
+// --- Vault Filter (dual-vault networks only) ---
+
+export type VaultFilter = "all" | VaultId;
+
+const VAULT_PILLS: { id: VaultFilter; label: string; icon: React.ReactNode }[] = [
+  { id: "all", label: "All pools", icon: null },
+  { id: "open", label: "Open", icon: <Unlock className="w-3.5 h-3.5" /> },
+  { id: "verified", label: "Verified", icon: <ShieldCheck className="w-3.5 h-3.5" /> },
+];
+
+/** Pool scope selector. Open and Verified are separate pools; "All pools" merges both feeds. */
+export function VaultFilterBar({
+  activeVault,
+  onVaultChange,
+  counts,
+}: {
+  activeVault: VaultFilter;
+  onVaultChange: (v: VaultFilter) => void;
+  counts: Record<VaultFilter, number>;
+}) {
+  return (
+    <div className="flex items-center gap-1 rounded-full border border-gray/15 bg-muted/30 p-0.5">
+      {VAULT_PILLS.map((pill) => {
+        const isActive = activeVault === pill.id;
+        return (
+          <button
+            key={pill.id}
+            onClick={() => onVaultChange(pill.id)}
+            aria-pressed={isActive}
+            className={cn(
+              "flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-medium transition-colors cursor-pointer",
+              isActive
+                ? "bg-card text-foreground border border-gray/20"
+                : "text-gray/60 hover:text-foreground border border-transparent",
+            )}
+          >
+            {pill.icon}
+            {pill.label}
+            <span className={cn("font-mono text-[11px]", isActive ? "text-gray/60" : "text-gray/40")}>
+              {counts[pill.id]}
+            </span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+/** Small per-row tag showing which pool a transaction belongs to. */
+export function VaultTag({ vault }: { vault?: VaultId }) {
+  if (!vault) return null;
+  if (vault === "verified") {
+    return (
+      <span
+        title="Verified Privacy pool"
+        className="inline-flex items-center gap-0.5 rounded-full bg-privacy/10 px-1.5 py-0.5 text-[10px] text-privacy"
+      >
+        <ShieldCheck className="w-3 h-3" />
+        Verified
+      </span>
+    );
+  }
+  return (
+    <span
+      title="Open Privacy pool"
+      className="inline-flex items-center gap-0.5 rounded-full bg-gray/10 px-1.5 py-0.5 text-[10px] text-gray/60"
+    >
+      <Unlock className="w-3 h-3" />
+      Open
+    </span>
+  );
+}
 
 // --- Type Filter Bar ---
 

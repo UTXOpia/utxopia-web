@@ -15,7 +15,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { useExplorer, type ExplorerTransaction, type RedemptionRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, VaultTag, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { SUPPORTED_TOKENS, getTokenBySymbol } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -134,7 +134,10 @@ export function TransferRow({
           )}
         </Td>
         <Td>
-          <TypeBadge kind={kind} isBtcDeposit={isBtcDeposit} />
+          <div className="flex items-center gap-1.5">
+            <TypeBadge kind={kind} isBtcDeposit={isBtcDeposit} />
+            <VaultTag vault={tx.vault} />
+          </div>
         </Td>
         <Td>
           {kind === "shield" ? (

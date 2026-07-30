@@ -15,6 +15,7 @@ const getSolanaKit = () => import("@solana/kit");
 import { getHeliusRpcUrl } from "@/lib/helius-server";
 
 import { getBackendUrl } from "@/lib/api/constants";
+import { parseVaultScope, vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest, getNetworkConfig } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
@@ -111,7 +112,24 @@ export async function GET(request: Request) {
     const network = detectNetworkFromRequest(request);
     const cfg = getNetworkConfig(network, { applyEnvOverrides: false });
     const rpcUrl = cfg.solana.rpcUrl || getHeliusRpcUrl(network === "mainnet" ? "mainnet" : "devnet");
-    const backendUrl = getBackendUrl(network);
+    // Redemptions are keyed by request signature and joined onto transaction
+    // rows that already carry their vault, so this merges both pools' backend
+    // data rather than tagging rows itself. The PDA scan is program-wide and
+    // already covers both pools.
+    const scope = parseVaultScope(new URL(request.url).searchParams.get("vault"));
+    const targets = vaultTargets(network, scope);
+    const backendUrl = targets[0].backendUrl;
+    const mergeBackendJson = async (path: string, key: string) => {
+      const parts = await Promise.all(
+        targets.map(({ backendUrl: url }) =>
+          fetch(`${url}${path}`)
+            .then((r) => (r.ok ? r.json() : null))
+            .catch(() => null),
+        ),
+      );
+      const rows = parts.flatMap((part) => (Array.isArray(part?.[key]) ? part[key] : []));
+      return { ok: true, json: async () => ({ [key]: rows }) };
+    };
 
     // Fetch all sources in parallel: PDA scan + consolidated backend + pool state + transfers
     const [redemptions, allResp, poolStateResp, transfersResp] = await Promise.all([
@@ -122,9 +140,9 @@ export async function GET(request: Request) {
         console.warn("[Redemptions] PDA scan failed:", e.message);
         return [];
       }),
-      fetch(`${backendUrl}/api/redemption/all`).catch(() => null),
+      mergeBackendJson("/api/redemption/all", "tracking"),
       fetch(`${backendUrl}/api/relayer/meta`).catch(() => null),
-      fetch(`${backendUrl}/api/transfers`).catch(() => null),
+      mergeBackendJson("/api/transfers", "transfers"),
     ]);
 
     // Parse fee config from backend relayer meta

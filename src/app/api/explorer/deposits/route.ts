@@ -15,6 +15,7 @@
 import { NextResponse } from "next/server";
 import { fetchAnnouncementsFromRpc } from "@/lib/api/rpc-fallback";
 import { getBackendUrl } from "@/lib/api/constants";
+import { parseVaultScope, vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest, getNetworkConfig } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
@@ -118,7 +119,10 @@ function decodeLeU64(hex: string): number {
 export async function GET(request: Request) {
   const network = detectNetworkFromRequest(request);
   try {
-    const backendUrl = getBackendUrl(network);
+    const scope = parseVaultScope(new URL(request.url).searchParams.get("vault"));
+    // Single pool per call: the explorer transactions route fans out and calls
+    // this once per vault.
+    const { backendUrl } = vaultTargets(network, scope === "all" ? "open" : scope)[0];
 
     // Build token ID map (async — uses Poseidon for localnet mint resolution)
     const { buildTokenIdMap } = await import("@/lib/token-map");
