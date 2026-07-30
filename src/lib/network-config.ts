@@ -10,6 +10,7 @@
 
 import networksJson from "./networks.json";
 import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
+import { getVaultRuntimeConfig, vaultsSupported } from "@/lib/vault-config";
 
 export type NetworkId =
   | "devnet"
@@ -299,8 +300,27 @@ export function getNetworkConfig(
 ): NetworkConfig {
   const { applyEnvOverrides = true } = options;
   const net = network ?? detectNetwork();
-  const cfg = { ...networks[net] };
+  let cfg = { ...networks[net] };
   if (!cfg) throw new Error(`Unknown network: ${net}`);
+
+  // On dual-vault networks the pool fields come from the vault table, not the
+  // JSON copy. Pool-unaware code paths read this config, and a stale copy
+  // points them at a pool that no longer exists without failing loudly.
+  if (vaultsSupported(net)) {
+    // Pool identity only. Backend routing stays with the explicit ?vault=
+    // param, so an unscoped request keeps hitting the unscoped backend.
+    const openVault = getVaultRuntimeConfig(net, "open");
+    cfg = {
+      ...cfg,
+      solana: {
+        ...cfg.solana,
+        utxopiaProgramId: openVault.programId,
+        poolState: openVault.poolState,
+        commitmentTree: openVault.commitmentTree,
+      },
+      tokens: { ...cfg.tokens, zkbtcMint: openVault.mint },
+    };
+  }
 
   if (!applyEnvOverrides) return cfg;
 

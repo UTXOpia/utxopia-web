@@ -27,9 +27,11 @@ describe("siblingVaultId", () => {
 });
 
 describe("vaultsSupported", () => {
-  it("is true only on devnet networks", () => {
-    expect(vaultsSupported("devnet")).toBe(true);
+  it("covers only the deployment that has both pools", () => {
     expect(vaultsSupported("devnet-regtest")).toBe(true);
+    // Plain devnet is a different program and mint; handing it this
+    // deployment's pool addresses would target someone else's pool.
+    expect(vaultsSupported("devnet")).toBe(false);
     expect(vaultsSupported("mainnet" as never)).toBe(false);
   });
 });

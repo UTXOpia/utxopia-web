@@ -43,14 +43,12 @@
     "chain": "solana",
     "solana": {
       "rpcUrl": "https://api.devnet.solana.com",
-      "utxopiaProgramId": "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",
+      "utxopiaProgramId": "__from-vault-config__",
       "btcLightClientId": "8hCSNKf8ByqZdet2D4SDiZHDrB1u9ohkhqKKzr9i7vfQ",
-      "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF",
-      "poolState": "9xeWc39r3Z176MUpMpaqCGJGneHMj4pfMRv9u6dp2Qgd",
-      "commitmentTree": "4FvM9dCzDvr39Xu5xRUQc6EEm3UjSikyWUY5Hzpc5C4A"
+      "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF"
     },
     "tokens": {
-      "zkbtcMint": "GuruxfN5irYcCyDiKFMeDRTNbP2WeHF1oWjQ8q8Esc16",
+      "zkbtcMint": "__from-vault-config__",
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
       "wsolMint": "So11111111111111111111111111111111111111112"
