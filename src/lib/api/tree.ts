@@ -34,9 +34,11 @@ export interface TreeStatusResponse {
 export async function getTreeProofFromBackend(
   commitmentHex: string,
   network?: NetworkId,
+  backendUrl?: string,
 ): Promise<TreeProofResponse | null> {
   try {
-    const url = `${getBackendUrl(network)}/api/tree/proof?commitment=${encodeURIComponent(commitmentHex)}`;
+    const base = backendUrl ?? getBackendUrl(network);
+    const url = `${base}/api/tree/proof?commitment=${encodeURIComponent(commitmentHex)}`;
     const res = await fetch(url, {
       signal: AbortSignal.timeout(3000),
     });

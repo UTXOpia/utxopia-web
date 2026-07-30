@@ -10,6 +10,7 @@ import {
   type CommitmentTreeIndex,
 } from "@utxopia/sdk";
 import { getTreeProofFromBackend } from "@/lib/api/tree";
+import { vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest, getNetworkConfig, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 export const dynamic = "force-dynamic";
 
@@ -221,7 +222,17 @@ export async function GET(request: NextRequest) {
     // =========================================================================
     // Fast path: try backend's cached tree first
     // =========================================================================
-    const backendResult = await getTreeProofFromBackend(commitmentHex, network);
+    // A commitment lives in exactly one pool's tree and callers do not say
+    // which, so ask each pool until one answers.
+    // ponytail: fast path only; the on-chain fallback below still rebuilds the
+    // default pool's tree, so a backend outage breaks non-default pools.
+    const backendResult = await (async () => {
+      for (const { backendUrl } of vaultTargets(network, "all")) {
+        const found = await getTreeProofFromBackend(commitmentHex, network, backendUrl);
+        if (found?.success) return found;
+      }
+      return null;
+    })();
 
     if (backendResult?.success) {
       console.log(`[Merkle Proof API] Fast path: proof from backend for leaf ${backendResult.leaf_index}`);
