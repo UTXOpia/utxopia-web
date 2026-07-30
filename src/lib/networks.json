@@ -43,12 +43,14 @@
     "chain": "solana",
     "solana": {
       "rpcUrl": "https://api.devnet.solana.com",
-      "utxopiaProgramId": "E1CGHUi2EPq9weU2Nf1KMF6gSeTvTf7MhaYW1ojx4HWZ",
+      "utxopiaProgramId": "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",
       "btcLightClientId": "8hCSNKf8ByqZdet2D4SDiZHDrB1u9ohkhqKKzr9i7vfQ",
-      "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF"
+      "chadbufferId": "C5RpjtTMFXKVZCtXSzKXD4CDNTaWBg3dVeMfYvjZYHDF",
+      "poolState": "9xeWc39r3Z176MUpMpaqCGJGneHMj4pfMRv9u6dp2Qgd",
+      "commitmentTree": "4FvM9dCzDvr39Xu5xRUQc6EEm3UjSikyWUY5Hzpc5C4A"
     },
     "tokens": {
-      "zkbtcMint": "3pa5rC4uKJa6G2WhzvRZ2JB2BNbcJs9hTmdPZfTUTvyj",
+      "zkbtcMint": "GuruxfN5irYcCyDiKFMeDRTNbP2WeHF1oWjQ8q8Esc16",
       "usdcMint": "Acxjj3uzWGLYZX4XiBU8HFjvjgLptvhwTN4PzHY2Qzey",
       "usdtMint": "CxyroE8Eio1H1YRDgiLsCPxWJjrWXSNKDkUqN5utm5uS",
       "wsolMint": "So11111111111111111111111111111111111111112"
