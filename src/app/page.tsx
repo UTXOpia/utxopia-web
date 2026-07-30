@@ -262,7 +262,8 @@ function FeatureCarousel() {
 /* ── Main Page ── */
 
 export default function Home() {
-  const { stats, isLoading: isLoadingStats, error: statsError } = usePoolStats();
+  // The landing page has no pool scope, so its TVL is every pool's value.
+  const { stats, isLoading: isLoadingStats, error: statsError } = usePoolStats(undefined, "all");
   const prices = useTokenPrices();
   const {
     transactions,
