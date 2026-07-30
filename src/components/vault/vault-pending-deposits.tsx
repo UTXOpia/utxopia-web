@@ -64,16 +64,17 @@ export function VaultPendingDeposits({
   return (
     <Link
       href={hrefWithChain("/vault/activity", networkId)}
-      className="mb-3 flex items-center gap-2.5 rounded-[12px] border border-gray/15 bg-muted/30 px-4 py-2.5 transition-colors hover:bg-muted/50"
+      className="mb-3 flex items-center gap-2.5 rounded-[12px] border border-gray/15 bg-muted/30 px-4 py-2 transition-colors hover:bg-muted/50"
     >
       <Loader2 className="h-3.5 w-3.5 shrink-0 animate-spin text-privacy" />
-      <div className="min-w-0 flex-1">
-        <p className="text-[12px] text-foreground">
-          {pending.length === 1 ? "BTC deposit arriving" : `${pending.length} BTC deposits arriving`}
-        </p>
-        <p className="text-[11px] text-gray/50">Not spendable until it lands</p>
-      </div>
-      <span className="font-mono text-[12px] text-gray-light/80">+{btc} BTC</span>
+      {/* "Arriving" carries the not-yet-spendable meaning on its own; the
+          amount stays out of the balance above, which is the real safeguard. */}
+      <p className="min-w-0 flex-1 text-[12px] text-foreground">
+        <span className="font-mono">{btc} BTC</span> arriving
+        {pending.length > 1 && (
+          <span className="text-gray/50"> · {pending.length} deposits</span>
+        )}
+      </p>
       <ChevronRight className="h-3 w-3 shrink-0 text-gray/40" />
     </Link>
   );
