@@ -56,6 +56,7 @@ import { VaultBalance } from "@/components/vault/vault-balance";
 import { VaultGuide } from "@/components/vault/vault-guide";
 import { VaultNetworkStatus } from "@/components/vault/vault-network-status";
 import { VaultTokenList } from "@/components/vault/vault-token-list";
+import { VaultPendingDeposits } from "@/components/vault/vault-pending-deposits";
 import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
@@ -441,6 +442,8 @@ export default function VaultPage() {
                 depositCount={depositCount}
                 vaultId={vaultId}
               />
+
+              <VaultPendingDeposits networkId={networkId} config={networkConfig} />
 
               <VaultTokenList
                 balancesByToken={balancesByToken}

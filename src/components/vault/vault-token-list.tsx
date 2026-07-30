@@ -15,7 +15,7 @@ import {
 import { cn } from "@/lib/utils";
 import { VAULT_TOKENS } from "@/lib/supported-tokens";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
-import { hrefWithVault, siblingVaultId, type VaultId } from "@/lib/vault-config";
+import { hrefWithVault, siblingVaultId, vaultsSupported, type VaultId } from "@/lib/vault-config";
 import type { TokenPrices } from "@/hooks/use-token-prices";
 import type { SiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 
@@ -46,6 +46,7 @@ export function VaultTokenList({
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const siblingReady = sibling?.status === "ready";
   const siblingVault = siblingVaultId(vaultId);
+  const dualVault = vaultsSupported(networkId);
 
   const totalFor = (symbol: string): bigint =>
     (balancesByToken?.[symbol] ?? 0n) +
@@ -107,11 +108,23 @@ export function VaultTokenList({
             const hasBalance = totalRaw > 0n;
             const price = tokenPrices[token.priceKey];
             const usdValue = price ? (Number(totalRaw) / 10 ** token.decimals) * price : 0;
-            // Vaults are separate pools: sub-rows exist so users see WHERE the
-            // money sits — only offer the breakdown when both sides are known.
-            const expandable = siblingReady && hasBalance;
-            const isExpanded = expandable && expanded.has(symbol);
+            const openRaw = vaultId === "open" ? activeRaw : siblingRaw;
             const verifiedRaw = vaultId === "verified" ? activeRaw : siblingRaw;
+            // Vaults are separate pools, so a balance always needs an owner.
+            // Expandable whenever there is something to attribute — with the
+            // sibling locked the panel says so rather than hiding the split.
+            const expandable = dualVault && hasBalance;
+            const isExpanded = expandable && expanded.has(symbol);
+            // Tag the row when every unit sits in one pool. Split balances get
+            // no tag: the chevron is the honest answer there.
+            const soleVault: VaultId | null =
+              siblingReady && hasBalance
+                ? verifiedRaw === 0n
+                  ? "open"
+                  : openRaw === 0n
+                    ? "verified"
+                    : null
+                : null;
 
             return (
               <div key={token.symbol}>
@@ -139,15 +152,7 @@ export function VaultTokenList({
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-1.5">
                       <p className="text-body2-semibold text-foreground">{symbol}</p>
-                      {verifiedRaw > 0n && (
-                        <span
-                          title="Part of this balance is in the Verified vault"
-                          className="inline-flex items-center gap-0.5 rounded-full bg-privacy/10 px-1.5 py-0.5 text-[10px] text-privacy"
-                        >
-                          <ShieldCheck className="w-3 h-3" />
-                          Verified
-                        </span>
-                      )}
+                      {soleVault && <VaultRowTag vault={soleVault} />}
                     </div>
                     <p className="text-[11px] text-gray/50">{token.name}</p>
                   </div>
@@ -183,11 +188,12 @@ export function VaultTokenList({
                     title="Open and Verified funds live in separate privacy pools and can't be transferred directly."
                   >
                     {([
-                      { vault: "open", raw: vaultId === "open" ? activeRaw : siblingRaw },
-                      { vault: "verified", raw: vaultId === "verified" ? activeRaw : siblingRaw },
+                      { vault: "open", raw: openRaw },
+                      { vault: "verified", raw: verifiedRaw },
                     ] as const).map(({ vault, raw }) => {
                       const meta = VAULT_META[vault];
                       const MetaIcon = meta.icon;
+                      const known = siblingReady || vault === vaultId;
                       return (
                         <div key={vault} className="flex items-center gap-2 pl-[52px] pr-4 h-[40px]">
                           <MetaIcon
@@ -197,8 +203,13 @@ export function VaultTokenList({
                             )}
                           />
                           <span className="flex-1 text-[12px] text-gray-light/80">{meta.label}</span>
-                          <span className="text-[12px] font-mono text-foreground/90">
-                            {formatAmount(raw, token.decimals)}
+                          <span
+                            className={cn(
+                              "text-[12px] font-mono",
+                              known ? "text-foreground/90" : "text-gray/40",
+                            )}
+                          >
+                            {known ? formatAmount(raw, token.decimals) : "Locked"}
                           </span>
                         </div>
                       );
@@ -223,6 +234,25 @@ export function VaultTokenList({
         </p>
       )}
     </div>
+  );
+}
+
+/** Pool attribution for a balance that sits entirely in one pool. */
+function VaultRowTag({ vault }: { vault: VaultId }) {
+  const meta = VAULT_META[vault];
+  const Icon = meta.icon;
+  const verified = vault === "verified";
+  return (
+    <span
+      title={`All of this balance is in the ${meta.label} pool`}
+      className={cn(
+        "inline-flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px]",
+        verified ? "bg-privacy/10 text-privacy" : "bg-gray/10 text-gray/60",
+      )}
+    >
+      <Icon className="w-3 h-3" />
+      {meta.label}
+    </span>
   );
 }
 
