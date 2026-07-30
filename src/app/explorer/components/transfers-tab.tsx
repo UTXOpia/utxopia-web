@@ -71,12 +71,15 @@ export function TransferRow({
   expanded,
   onToggle,
   redemption,
+  showVault = false,
 }: {
   tx: TransferTx;
   network?: NetworkId;
   expanded: boolean;
   onToggle: () => void;
   redemption?: RedemptionRecord;
+  /** Render the Pool cell. Off when the table is already scoped to one pool. */
+  showVault?: boolean;
 }) {
   const kind = getTransferKind(tx);
   const isUnshieldOrWithdraw = kind === "unshield" || kind === "withdraw";
@@ -134,11 +137,13 @@ export function TransferRow({
           )}
         </Td>
         <Td>
-          <div className="flex items-center gap-1.5">
-            <TypeBadge kind={kind} isBtcDeposit={isBtcDeposit} />
-            <VaultTag vault={tx.vault} />
-          </div>
+          <TypeBadge kind={kind} isBtcDeposit={isBtcDeposit} />
         </Td>
+        {showVault && (
+          <Td>
+            <VaultTag vault={tx.vault} />
+          </Td>
+        )}
         <Td>
           {kind === "shield" ? (
             <FlowCell

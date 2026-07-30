@@ -87,6 +87,9 @@ function ExplorerContent({ network }: { network: NetworkId }) {
   // All transactions come from useExplorer(), already sorted by timestamp desc.
 
   const showVaultFilter = vaultsSupported(network);
+  // The Pool column only earns its width in the merged view; when the table is
+  // scoped to one pool every cell would repeat the same tag.
+  const showPoolColumn = showVaultFilter && activeVault === "all";
 
   // Transactions in the selected pool scope — the base for type counts and rows.
   const vaultScoped = useMemo(
@@ -210,12 +213,13 @@ function ExplorerContent({ network }: { network: NetworkId }) {
           <EmptyState label="transactions" />
         ) : (
           <div className="overflow-x-auto rounded-[12px] border border-gray/15 backdrop-blur-sm bg-muted/30">
-            <table className="w-full min-w-[750px]">
+            <table className={cn("w-full", showPoolColumn ? "min-w-[840px]" : "min-w-[750px]")}>
               <thead>
                 <tr className="border-b border-gray/15 bg-muted/50">
                   <Th>Status</Th>
                   <Th>Tx ID</Th>
                   <Th>Type</Th>
+                  {showPoolColumn && <Th>Pool</Th>}
                   <Th>Flow</Th>
                   <Th>Amount</Th>
                   <Th>Time</Th>
@@ -233,6 +237,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
                       expanded={expanded.has(rowKey)}
                       onToggle={() => toggle(rowKey)}
                       redemption={redemptionByRequestTx.get(tx.txSignature)}
+                      showVault={showPoolColumn}
                     />
                   );
                 })}
