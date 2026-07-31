@@ -188,12 +188,28 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
       let policyRequestId: string | undefined;
       let approvalAccount: PublicKey | undefined;
+      let exitDestinationPda: PublicKey | undefined;
       if (chainEnv.vaultId === "verified") {
+        // Keyed on the depositor, because that is the owner an unshield credits.
+        [exitDestinationPda] = PublicKey.findProgramAddressSync(
+          [
+            Buffer.from("exit_destination"),
+            poolStatePda.toBytes(),
+            Buffer.from([0]),
+            publicKey.toBytes(),
+          ],
+          programId,
+        );
         const approval = await preparePolicyApproval({
           networkId: chainEnv.networkId,
           vaultId: chainEnv.vaultId,
           actor: publicKey.toBase58(),
-          instructionData: ixData,
+          action: 23,
+          // Entry passes its whole payload as one intent part: nothing in a
+          // deposit ages, so these exact bytes stay valid until the answer
+          // arrives. The discriminator is dropped because the program hashes
+          // the data the dispatcher hands it, with the action supplied apart.
+          intentParts: [ixData.slice(1)],
           onStage: (stage) => setPolicyMessage(policyStageMessage(stage)),
         });
         policyRequestId = approval.requestId;
@@ -268,6 +284,9 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
                     isSigner: false,
                     isWritable: false,
                   },
+                  // Value cannot enter without a way back out: the program
+                  // refuses a depositor with no registered exit.
+                  { pubkey: exitDestinationPda!, isSigner: false, isWritable: false },
                 ]
               : []),
           ],
@@ -330,6 +349,9 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
                     isSigner: false,
                     isWritable: false,
                   },
+                  // Value cannot enter without a way back out: the program
+                  // refuses a depositor with no registered exit.
+                  { pubkey: exitDestinationPda!, isSigner: false, isWritable: false },
                 ]
               : []),
           ],

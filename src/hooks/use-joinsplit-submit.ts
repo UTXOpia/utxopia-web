@@ -6,6 +6,7 @@
  */
 
 import { toHex64 } from "@/lib/utils/hex";
+import { PublicKey } from "@solana/web3.js";
 import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
@@ -46,6 +47,7 @@ export function useJoinSplitSubmit() {
     try {
       const {
         buildRedeemInstructionData,
+        buildPolicyIntentParts,
         buildTransactInstructionData,
         buildUnshieldInstructionData,
         bytesToHex,
@@ -152,11 +154,41 @@ export function useJoinSplitSubmit() {
             stealthData: params.stealthDataArrays,
           });
         }
+        // The approval commits to the spend's intent, not to these bytes: a
+        // moving merkle root forces a re-proof, and a byte-bound approval would
+        // die the moment anyone else deposited while the authority was deciding.
+        const intentParts =
+          params.relayMode === "redeem"
+            ? buildPolicyIntentParts({
+                action: 15,
+                nullifiers: nullifierHexes.map(hexToBytes),
+                redeemAmounts: [redeemAmountSats ?? 0n],
+                btcScripts: [params.btcScriptPubKey!],
+                requestNonces: [requestNonce!],
+              })
+            : params.relayMode === "unshield"
+              ? buildPolicyIntentParts({
+                  action: 14,
+                  nullifiers: nullifierHexes.map(hexToBytes),
+                  unshieldAmounts: [
+                    BigInt(params.proofInputs.outputs[params.proofInputs.outputs.length - 1].value),
+                  ],
+                  recipientOwners: [
+                    new PublicKey(params.unshieldRecipientAddress!).toBytes(),
+                  ],
+                })
+              : buildPolicyIntentParts({
+                  action: 13,
+                  nullifiers: nullifierHexes.map(hexToBytes),
+                });
+
         const approval = await preparePolicyApproval({
           networkId: chainEnv.networkId,
           vaultId: chainEnv.vaultId,
           actor: relayerPubkey,
-          instructionData,
+          action:
+            params.relayMode === "redeem" ? 15 : params.relayMode === "unshield" ? 14 : 13,
+          intentParts,
           onStage: (stage) => setStatusMessage(policyStageMessage(stage)),
         });
         policyRequestId = approval.requestId;

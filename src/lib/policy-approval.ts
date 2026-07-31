@@ -73,7 +73,10 @@ export async function preparePolicyApproval(input: {
   networkId: string;
   vaultId: string;
   actor: string;
-  instructionData: Uint8Array;
+  /** Asset instruction discriminator this approval covers. */
+  action: number;
+  /** Intent parts, in the order the asset program hashes them. */
+  intentParts: Uint8Array[];
   onStage: (stage: PolicyStage) => void;
 }): Promise<{ requestId: string; approvalAccount: string }> {
   const created = await parse(await fetch(policyUrl(input.networkId, input.vaultId), {
@@ -81,7 +84,10 @@ export async function preparePolicyApproval(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       actor: input.actor,
-      instructionDataBase64: Buffer.from(input.instructionData).toString("base64"),
+      action: input.action,
+      intentPartsBase64: input.intentParts.map((part) =>
+        Buffer.from(part).toString("base64"),
+      ),
     }),
   }));
   let status = created;
