@@ -15,6 +15,12 @@ export interface VaultRuntimeConfig {
   commitmentTree: string;
   policyProgramId?: string;
   backendPath: `/${string}`;
+  /** Per-vault BTC custody. Each vault has its own Ika dWallet, so its own
+   *  taproot address — sharing one would mean sharing an indistinguishable
+   *  UTXO set. */
+  btcAddress: string;
+  btcGroupPubkey: string;
+  ikaDwallet: string;
 }
 
 /** Stored vault facts. The pool and tree addresses are PDAs of these, so they
@@ -29,8 +35,11 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
     permissioned: false,
     policyMode: "disabled",
     programId: "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",
-    mint: "GuruxfN5irYcCyDiKFMeDRTNbP2WeHF1oWjQ8q8Esc16",
+    mint: "BJ5SXA33qK8r8BxJD4nQPf72ae9bactiA2Zqo33EcvPu",
     backendPath: "/open",
+    btcAddress: "bcrt1pysaxc36sf7pdz6r4fk5nj25ahjatnw0ec526vzfz07kyvs4j5fhsn4t4nf",
+    btcGroupPubkey: "243a6c47504f82d168754da9392a9dbcbab9b9f9c515a609227fac4642b2a26f",
+    ikaDwallet: "CEBgewq8EbxTMLqYxbwYyd23Cx2pxdYyyzXXRoAZTeBW",
   },
   verified: {
     id: "verified",
@@ -40,8 +49,11 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
     policyMode: "per",
     programId: "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",
     policyProgramId: "9asWYKVriWGpExW5xM44ChHjZtispkLCiWKkM8SQi8Rs",
-    mint: "8WzWMJi1a6fJutP9U5C9FYcjsD7ZBPnCvJh3ZKiM3Rmr",
+    mint: "FxvPBTfQZdzNoAwyLg5mVxsVHfqhAqceDHHvcPamWhPg",
     backendPath: "/verified",
+    btcAddress: "bcrt1p4e0v8p9vwp6afc3732fc92l28ukpyj0tf9c9ud3rajakawh047dqamndtn",
+    btcGroupPubkey: "ae5ec384ac7075d4e23e8a9382abea3f2c1249eb49705e3623ecbb6ebaefaf9a",
+    ikaDwallet: "E7GWP4qTCB4Y6LVw2JMioVKfZxSjBjKsQ75fdAAHLzX",
   },
 };
 
@@ -136,6 +148,18 @@ export function getVaultNetworkConfig(
     backend: {
       ...base.backend,
       url: `${base.backend.url.replace(/\/+$/, "")}${vault.backendPath}`,
+    },
+    // Without these the sibling vault inherited the primary's deposit address,
+    // so its deposits would be watched at — and credited to — the wrong pool.
+    bitcoin: {
+      ...base.bitcoin,
+      poolAddress: vault.btcAddress,
+      groupPubkey: vault.btcGroupPubkey,
+    },
+    ika: base.ika && {
+      ...base.ika,
+      dwallet: vault.ikaDwallet,
+      dwalletXOnlyPubkey: vault.btcGroupPubkey,
     },
   };
 }
