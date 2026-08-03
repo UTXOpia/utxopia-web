@@ -67,13 +67,17 @@ describe("network-config query routing", () => {
 
     expect(open.solana.permissioned).toBe(false);
     expect(open.solana.poolState).toBe(
-      "9xeWc39r3Z176MUpMpaqCGJGneHMj4pfMRv9u6dp2Qgd",
+      "CeEEmE9MvFPZtqcgv1rsXmzNmfvchbs8VEZJGFKZ2Cyj",
     );
     expect(verified.solana.permissioned).toBe(true);
     expect(verified.solana.poolState).toBe(
-      "7mS4wHAV24YSHZ5wzrUZkMBSSa2jywEMCJa6bLyDRKbh",
+      "7u3eYJ2Gksb8JoLC7bpyJvjh8UVgVqVEwzWbrDCLSkh9",
     );
     expect(open.tokens.zkbtcMint).not.toBe(verified.tokens.zkbtcMint);
+    // Each vault has its own Ika dWallet, so its own taproot address. Sharing one
+    // would mean one indistinguishable UTXO set across both vaults.
+    expect(open.bitcoin.poolAddress).not.toBe(verified.bitcoin.poolAddress);
+    expect(open.ika?.dwallet).not.toBe(verified.ika?.dwallet);
     expect(open.backend.url).toBe("https://api-hybrid.utxopia.com/open");
     expect(verified.backend.url).toBe("https://api-hybrid.utxopia.com/verified");
     expect(getVaultRuntimeConfig("devnet-regtest", "verified").policyMode).toBe("per");

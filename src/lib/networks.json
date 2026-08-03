@@ -55,16 +55,16 @@
     },
     "bitcoin": {
       "network": "regtest",
-      "poolAddress": "bcrt1psuxp526rsmja6h95uaw82l3a8wqchacj9sl6cjkrgq0vc2a2xndqen72zx",
-      "groupPubkey": "870c1a2b4386e5dd5cb4e75c757e3d3b818bf7122c3fac4ac3401ecc2baa34da",
+      "poolAddress": "bcrt1pysaxc36sf7pdz6r4fk5nj25ahjatnw0ec526vzfz07kyvs4j5fhsn4t4nf",
+      "groupPubkey": "243a6c47504f82d168754da9392a9dbcbab9b9f9c515a609227fac4642b2a26f",
       "depositMode": "direct",
       "explorerUrl": "https://btc.utxopia.com/regtest"
     },
     "ika": {
       "programId": "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY",
       "grpcEndpoint": "pre-alpha-dev-1.ika.ika-network.net:443",
-      "dwallet": "QcqbhDZGyQ3AWciMHNwiAa6cw3yeJpiBiK6qGMytbn9",
-      "dwalletXOnlyPubkey": "870c1a2b4386e5dd5cb4e75c757e3d3b818bf7122c3fac4ac3401ecc2baa34da"
+      "dwallet": "CEBgewq8EbxTMLqYxbwYyd23Cx2pxdYyyzXXRoAZTeBW",
+      "dwalletXOnlyPubkey": "243a6c47504f82d168754da9392a9dbcbab9b9f9c515a609227fac4642b2a26f"
     },
     "backend": {
       "url": "https://api-hybrid.utxopia.com"
