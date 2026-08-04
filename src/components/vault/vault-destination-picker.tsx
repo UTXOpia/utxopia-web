@@ -181,7 +181,7 @@ export function VaultDestinationPicker({ className }: { className?: string }) {
                   className="flex w-full items-center gap-1.5 text-[11px] text-gray/45 hover:text-privacy transition-colors cursor-pointer"
                 >
                   <ShieldCheck className="h-3 w-3" />
-                  Verified Privacy · Request access
+                  Verified Privacy · Have an invite code?
                 </button>
               )}
             </div>
