@@ -20,10 +20,12 @@ type Status = "idle" | "signing" | "redeeming" | "done" | "error";
  *   server-issued nonce with the connected wallet, so it can only ever be the
  *   wallet in front of us. Letting someone type an address they cannot sign for
  *   is exactly the hole that signature closes.
- * - The bitcoin address is required, and permanent. It registers the
- *   destination a withdrawal can reach *without* the operator's approval —
- *   which is what keeps the vault non-custodial for you — and the on-chain
- *   registry has no remove instruction, so a wrong address stays wrong.
+ * - The bitcoin address is optional here, and permanent if given. A Solana
+ *   exit alone already recovers every SPL asset in the vault without anyone's
+ *   approval; only converting zkBTC back to bitcoin needs a registered script.
+ *   Demanding a permanent, unverifiable address at the most rushed moment a
+ *   member has is a worse trade than letting them check and register one later
+ *   — the registry has no remove instruction, so a wrong address stays wrong.
  */
 export function RedeemInvite({
   networkId,
@@ -39,7 +41,7 @@ export function RedeemInvite({
   const [error, setError] = useState<string | null>(null);
 
   const busy = status === "signing" || status === "redeeming";
-  const ready = code.trim().length > 0 && btcAddress.trim().length > 0 && !busy;
+  const ready = code.trim().length > 0 && !busy;
 
   const post = async (action: string, body: unknown) => {
     const response = await fetch(
@@ -78,7 +80,7 @@ export function RedeemInvite({
         wallet,
         nonce: challenge.nonce,
         signature,
-        btc_address: btcAddress.trim(),
+        ...(btcAddress.trim() ? { btc_address: btcAddress.trim() } : {}),
       });
       setStatus("done");
     } catch (caught) {
@@ -99,7 +101,9 @@ export function RedeemInvite({
         <Check className="mt-0.5 h-4 w-4 shrink-0 text-privacy" aria-hidden />
         <span>
           <strong className="text-foreground">You&apos;re in.</strong>{" "}
-          Your wallet and bitcoin address are registered on chain. Try the deposit again.
+          {btcAddress.trim()
+            ? "Your wallet and bitcoin address are registered on chain. Try the deposit again."
+            : "Your wallet is registered on chain. Add a bitcoin address before you rely on withdrawing bitcoin without us."}
         </span>
       </div>
     );
@@ -125,7 +129,9 @@ export function RedeemInvite({
       </label>
 
       <label className="flex flex-col gap-1">
-        <span className="text-caption text-gray-light">Bitcoin withdrawal address</span>
+        <span className="text-caption text-gray-light">
+          Bitcoin withdrawal address <span className="text-gray">(optional)</span>
+        </span>
         <input
           value={btcAddress}
           onChange={(event) => setBtcAddress(event.target.value)}
@@ -140,8 +146,9 @@ export function RedeemInvite({
           )}
         />
         <span className="text-caption text-gray">
-          This is where you can withdraw bitcoin to <strong>without needing approval</strong>.
-          It is written on chain permanently and cannot be changed or removed — check it twice.
+          Where you can withdraw bitcoin to <strong>without needing our approval</strong>. Written
+          on chain permanently — it cannot be changed or removed, so check it twice. You can skip
+          this and add one later; until you do, only bitcoin withdrawals need us.
         </span>
       </label>
 
