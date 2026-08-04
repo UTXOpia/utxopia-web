@@ -10,7 +10,10 @@ import { PublicKey } from "@solana/web3.js";
 import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
+import { useConnection } from "@solana/wallet-adapter-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { hasSolanaExit } from "@/lib/exit-registry";
+import { getVaultRuntimeConfig } from "@/lib/vault-config";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { useRelayCandidates } from "@/hooks/use-relay";
@@ -31,6 +34,7 @@ export interface JoinSplitSubmitResult {
 export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
+  const { connection } = useConnection();
   const chainId = getChainAdapter(chainEnv.config).id;
   const relayCandidates = useRelayCandidates(chainId, chainEnv.networkId, chainEnv.vaultId);
   const [status, setStatus] = useState<SubmitStatus>("idle");
@@ -106,8 +110,32 @@ export function useJoinSplitSubmit() {
       const requestNonce = params.relayMode === "redeem"
         ? BigInt(Date.now())
         : undefined;
+      // Cashing out to an address you already registered needs no approval:
+      // the registry entry is the authorisation (`unshield.rs:275`). Skipping
+      // the coordinator here is what makes that the *ordinary* path rather than
+      // an emergency one — and an escape hatch nobody walks is one that rots.
+      // Checked against Solana, not the backend, since the point is what holds
+      // when the backend does not answer.
+      let registeredExit = false;
+      if (chainEnv.vaultId === "verified" && params.relayMode === "unshield"
+          && params.unshieldRecipientAddress) {
+        try {
+          const vault = getVaultRuntimeConfig(chainEnv.networkId, chainEnv.vaultId);
+          registeredExit = await hasSolanaExit(
+            connection,
+            new PublicKey(vault.programId),
+            new PublicKey(vault.poolState),
+            new PublicKey(params.unshieldRecipientAddress),
+          );
+        } catch {
+          // Unreadable is not "unregistered" — fall back to the approval path,
+          // which always works.
+          registeredExit = false;
+        }
+      }
+
       let policyRequestId: string | undefined;
-      if (chainEnv.vaultId === "verified") {
+      if (chainEnv.vaultId === "verified" && !registeredExit) {
         const actorResponse = await fetch(relayCandidates[0]);
         if (!actorResponse.ok) {
           throw new Error("Could not fetch the Verified Privacy relayer");

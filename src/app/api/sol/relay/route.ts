@@ -55,6 +55,7 @@ import {
 import { networkForChain } from "@/lib/chain-registry";
 import { isNativeSolMint } from "@/lib/solana/native-sol";
 import { resolvePolicyApproval } from "@/lib/server/policy-coordinator";
+import { resolveRegisteredExits } from "@/lib/server/exit-registry";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -278,6 +279,8 @@ export async function POST(request: NextRequest) {
     // ── Build instruction data + accounts (per mode) ───────────────────
     let ixData: Uint8Array;
     const keys: { pubkey: PublicKey; isSigner: boolean; isWritable: boolean }[] = [];
+    /** Set only when every unshield recipient already has an exit registered. */
+    let registeredExits: PublicKey[] | null = null;
 
     if (mode === "unshield") {
       // ── UNSHIELD (disc=14, multi-output) ─────────────────────────────
@@ -337,6 +340,17 @@ export async function POST(request: NextRequest) {
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
       if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
+
+      // Cashing out to an address you registered needs no approval at all — the
+      // registry entry is the authorisation (`unshield.rs:275`). That is not an
+      // emergency route, it is the faster one: no coordinator round trip and no
+      // dependency on the operator being awake. Take it whenever every recipient
+      // qualifies, and fall back to the approval path when any does not.
+      if (cfg.solana.permissioned) {
+        registeredExits = await resolveRegisteredExits(
+          connection, programId, poolState, recipientPubkeys,
+        );
+      }
 
       // Native SOL recipients receive lamports directly. Ordinary SPL outputs
       // still require an ATA.
@@ -444,7 +458,15 @@ export async function POST(request: NextRequest) {
     }
 
     let policyRequestId: string | null = null;
-    if (cfg.solana.permissioned) {
+    if (cfg.solana.permissioned && registeredExits) {
+      // Ragequit. The program recognises it by what sits at the tail: registry
+      // entries here, an approval/policy pair otherwise (`resolve_spend_path`).
+      // One entry per public output, immediately before the proof buffer.
+      const bufferAt = keys.length - 1;
+      keys.splice(bufferAt, 0, ...registeredExits.map((pubkey) => ({
+        pubkey, isSigner: false, isWritable: false,
+      })));
+    } else if (cfg.solana.permissioned) {
       if (!body.policyRequestId) {
         throw new Error("Verified Privacy requires an approved policy request");
       }
