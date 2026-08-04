@@ -10,7 +10,24 @@ import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 
 export const dynamic = "force-dynamic";
 
-export async function POST(request: NextRequest) {
+/**
+ * Proxy for the Verified vault's invite endpoints.
+ *
+ * Only `challenge` and `redeem` are reachable. Minting codes is deliberately
+ * absent: it is gated by a separate operator key on the backend and has no
+ * business behind a public origin.
+ */
+const ALLOWED = new Set(["challenge", "redeem"]);
+
+export async function POST(
+  request: NextRequest,
+  { params }: { params: Promise<{ action: string }> },
+) {
+  const { action } = await params;
+  if (!ALLOWED.has(action)) {
+    return NextResponse.json({ error: "unknown invite action" }, { status: 404 });
+  }
+
   const requestedNetwork = request.nextUrl.searchParams.get("network") as NetworkId | null
     ?? detectNetworkFromRequest(request);
   const networkId = networkForChain(requestedNetwork, "solana");
@@ -21,7 +38,7 @@ export async function POST(request: NextRequest) {
   );
 
   const response = await fetch(
-    `${config.backend.url.replace(/\/+$/, "")}/api/access-requests`,
+    `${config.backend.url.replace(/\/+$/, "")}/api/invite/${action}`,
     {
       method: "POST",
       headers: applyBackendAuthHeaders({ "Content-Type": "application/json" }),

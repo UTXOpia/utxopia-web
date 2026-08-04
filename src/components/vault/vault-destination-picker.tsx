@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithVault, vaultsSupported, type VaultId } from "@/lib/vault-config";
 import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
-import { ApplyForAccess } from "@/components/apply-for-access";
+import { RedeemInvite } from "@/components/redeem-invite";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 const hasFunds = (balances: Record<string, bigint>): boolean =>
@@ -173,7 +173,7 @@ export function VaultDestinationPicker({ className }: { className?: string }) {
           {actor && (
             <div className="px-2 pb-1.5 pt-2">
               {showApply ? (
-                <ApplyForAccess actor={actor} networkId={networkId} />
+                <RedeemInvite networkId={networkId} />
               ) : (
                 <button
                   type="button"

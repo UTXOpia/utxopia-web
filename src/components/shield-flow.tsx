@@ -53,7 +53,7 @@ import {
   policyStageMessage,
   preparePolicyApproval,
 } from "@/lib/policy-approval";
-import { ApplyForAccess } from "@/components/apply-for-access";
+import { RedeemInvite } from "@/components/redeem-invite";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -625,7 +625,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         )}
 
         {status === "error" && isPolicyRejection(error) && publicKey && (
-          <ApplyForAccess actor={publicKey.toBase58()} networkId={networkId} />
+          <RedeemInvite networkId={networkId} />
         )}
 
         {/* Permissioned-pool indicator — visible only when config marks pool permissioned */}
@@ -811,7 +811,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       )}
 
       {status === "error" && isPolicyRejection(error) && publicKey && (
-        <ApplyForAccess actor={publicKey.toBase58()} networkId={networkId} />
+        <RedeemInvite networkId={networkId} />
       )}
 
       {status === "unknown" && txSig && (
