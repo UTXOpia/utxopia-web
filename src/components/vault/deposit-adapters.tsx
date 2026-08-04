@@ -8,7 +8,13 @@ import { VaultDestinationPicker } from "@/components/vault/vault-destination-pic
 import { ExitGuarantee } from "@/components/vault/exit-guarantee";
 import { getNetworkConfig, hrefWithChain, type NetworkConfig, type NetworkId } from "@/lib/network-config";
 import { PRODUCT_COPY } from "@/lib/product-language";
-import { getVaultNetworkConfig, getVaultRuntimeConfig, hrefWithVault, type VaultId } from "@/lib/vault-config";
+import {
+  getVaultNetworkConfig,
+  getVaultRuntimeConfig,
+  hrefWithVault,
+  vaultsSupported,
+  type VaultId,
+} from "@/lib/vault-config";
 import type { BtcNetwork } from "@/lib/exit-registry";
 
 interface ChainDepositRouteProps {
@@ -25,9 +31,15 @@ function SolanaDepositPage({ networkId, vaultId }: ChainDepositRouteProps) {
   // Shown here and not in settings: this is where a member first takes on
   // zkBTC, and zkBTC is the one asset they cannot convert back on their own
   // without a registered bitcoin address. Anywhere later is after the fact.
-  const vault = vaultId === "verified" ? getVaultRuntimeConfig(networkId, vaultId) : null;
-  const btcNetwork = getVaultNetworkConfig(networkId, getNetworkConfig(networkId), vaultId)
-    .bitcoin.network as BtcNetwork;
+  // `?vault=verified` parses on any network, but the vault configs only exist on
+  // the one deployment that has two pools — reading them elsewhere throws and
+  // would take the whole deposit page with it.
+  const verified = vaultId === "verified" && vaultsSupported(networkId);
+  const vault = verified ? getVaultRuntimeConfig(networkId, vaultId) : null;
+  const btcNetwork = verified
+    ? (getVaultNetworkConfig(networkId, getNetworkConfig(networkId), vaultId)
+        .bitcoin.network as BtcNetwork)
+    : null;
 
   return (
     <FlowPageLayout
@@ -46,7 +58,7 @@ function SolanaDepositPage({ networkId, vaultId }: ChainDepositRouteProps) {
       description="Deposit native BTC or shield supported Solana assets into your private vault."
     >
       <VaultDestinationPicker />
-      {vault && (
+      {vault && btcNetwork && (
         <ExitGuarantee
           programId={vault.programId}
           poolState={vault.poolState}
