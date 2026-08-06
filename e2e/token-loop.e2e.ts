@@ -43,12 +43,24 @@ const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
  *  Requires the full backend stack (see README § BTC legs). */
 const RUN_BTC = process.env.RUN_BTC === "1";
 
+/** Run only the BTC legs (requires RUN_BTC=1). See runChain for why. */
+const SKIP_TOKEN_LOOP = process.env.SKIP_TOKEN_LOOP === "1";
+
+/** Skip the deposit leg when the vault already holds zkBTC — the redeem leg
+ *  only needs a balance, and re-depositing costs a 10-minute poll. */
+const SKIP_BTC_DEPOSIT = process.env.SKIP_BTC_DEPOSIT === "1";
+
 /** BTC deposit amount in sats — the deposit field is denominated in sats
  *  ("Amount (sats)"), not BTC. 10_000 sats = 0.0001 BTC. */
 const BTC_DEPOSIT_AMOUNT_SATS = process.env.E2E_BTC_DEPOSIT_AMOUNT_SATS ?? "10000";
 
 /** BTC redeem amount in sats (what to cash out). */
-const BTC_REDEEM_AMOUNT = process.env.E2E_BTC_REDEEM_AMOUNT ?? "5000";
+const BTC_REDEEM_AMOUNT_SATS = process.env.E2E_BTC_REDEEM_AMOUNT ?? "4000";
+
+/** The withdraw form's "Amount" is denominated in whole BTC — only the *deposit*
+ *  form is labelled "Amount (sats)". Filling the sats figure straight in asked
+ *  for 5000 BTC and the submit died with "outputs require 500000000500 sats". */
+const BTC_REDEEM_AMOUNT_BTC = (Number(BTC_REDEEM_AMOUNT_SATS) / 1e8).toFixed(8);
 
 /** BTC address to receive the redeem payout (testnet / regtest address). */
 const BTC_REDEEM_ADDR = process.env.E2E_BTC_REDEEM_ADDR ?? "REPLACE_WITH_BTC_ADDRESS"; // VERIFY: must be a valid testnet/regtest bech32 address
@@ -112,19 +124,75 @@ function loadDevKeys(): DevKeys {
 // ---------------------------------------------------------------------------
 
 /** Run an agent-browser command and return stdout. Throws on non-zero exit. */
+/** The daemon's IPC read returns EAGAIN while the renderer is pegged — which it
+ *  is for a minute at a time during in-browser WASM proof generation. The CLI
+ *  gives up after its own 5 retries and exits 1, so a busy daemon is
+ *  indistinguishable from a real failure unless you read the message. Retry
+ *  that case only: a timed-out wait or a missing element is a real result and
+ *  must still fail. Both the daemon and Chrome survive this, so retrying works.
+ */
+const DAEMON_BUSY = /Resource temporarily unavailable|daemon may be busy|os error 35/i;
+const AB_ATTEMPTS = 4;
+
 function ab(...args: string[]): string {
-  const result = spawnSync("agent-browser", args, {
-    encoding: "utf-8",
-    stdio: ["pipe", "pipe", "pipe"],
-  });
-  if (result.status !== 0) {
-    const stderr = result.stderr?.trim() ?? "";
-    const stdout = result.stdout?.trim() ?? "";
-    throw new Error(
-      `agent-browser ${args.join(" ")} failed (exit ${result.status})\n${stderr || stdout}`,
-    );
+  for (let attempt = 1; ; attempt++) {
+    const result = spawnSync("agent-browser", args, {
+      encoding: "utf-8",
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    if (result.status === 0) return result.stdout?.trim() ?? "";
+
+    const message = (result.stderr?.trim() || result.stdout?.trim()) ?? "";
+    if (attempt >= AB_ATTEMPTS || !DAEMON_BUSY.test(message)) {
+      throw new Error(
+        `agent-browser ${args.join(" ")} failed (exit ${result.status})\n${message}`,
+      );
+    }
+    console.log(`  … browser daemon busy, retrying (${attempt}/${AB_ATTEMPTS - 1})`);
+    execSync(`sleep ${attempt * 5}`);
   }
-  return result.stdout?.trim() ?? "";
+}
+
+/** Wait for text, polling in short slices instead of one long block.
+ *
+ *  A single `wait --text X --timeout 120000` asks the daemon to block far longer
+ *  than the CLI is willing to wait on its IPC read, so it reports the daemon as
+ *  unresponsive and exits 1 — a failure indistinguishable from "the text never
+ *  appeared". Every failure this harness has hit was on a long wait (60s/120s/
+ *  180s); the deposit leg's loop of 8s waits never once tripped it. So keep each
+ *  request short and do the waiting here.
+ */
+function waitForText(text: string, totalMs: number): void {
+  const deadline = Date.now() + totalMs;
+  let lastError: unknown;
+  while (Date.now() < deadline) {
+    try {
+      ab("wait", "--text", text, "--timeout", "8000");
+      return;
+    } catch (err) {
+      lastError = err;
+    }
+  }
+  throw new Error(
+    `timed out after ${totalMs}ms waiting for text ${JSON.stringify(text)}\n` +
+      `${lastError instanceof Error ? lastError.message : String(lastError)}`,
+  );
+}
+
+/** Best-effort "page settled" hint.
+ *
+ *  `wait --load networkidle` blocks for the 30s default, which is already longer
+ *  than the CLI will wait on its IPC read — so on a busy page it reports the
+ *  daemon as unresponsive instead of settling. Ask for a short slice and move on
+ *  either way: this is a readiness hint, never an assertion. The explicit text
+ *  and element waits that follow are what actually gate each step.
+ */
+function waitIdle(): void {
+  try {
+    ab("wait", "--load", "networkidle", "--timeout", "8000");
+  } catch {
+    // Not settled within the slice — the next explicit wait decides the outcome.
+  }
 }
 
 /** Take a screenshot to the e2e/screenshots directory and log its path. */
@@ -233,8 +301,8 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   const depositUrl = `${APP_URL}/vault/deposit?network=${chain.network}`;
   console.log(`  → Navigating to deposit: ${depositUrl}`);
   injectDevKeysViaStorage(keys, depositUrl);
-  ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Add funds"); // page heading
+  waitIdle();
+  waitForText("Add funds", 30000); // page heading
 
   // The dropdown defaults to BTC; the token loop runs on SOL.
   selectToken(SHIELD_TOKEN);
@@ -260,8 +328,8 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
   const sendUrl = `${APP_URL}/send?network=${chain.network}`;
   console.log(`  → Navigating to send: ${sendUrl}`);
   injectDevKeysViaStorage(keys, sendUrl);
-  ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Send privately"); // page heading
+  waitIdle();
+  waitForText("Send privately", 30000); // page heading
 
   // Both fields are matched by <label>; `find role textbox` does not resolve
   // here, and the amount field only mounts once the recipient parses.
@@ -279,14 +347,14 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
   // The review modal confirms via HoldButton, labelled "Hold to confirm". With
   // NEXT_PUBLIC_DEV_SIGNER=1 it wires onClick straight to onComplete, so a
   // plain click is enough; without it this would need a real press-and-hold.
-  ab("wait", "--text", "Hold to confirm");
+  waitForText("Hold to confirm", 30000);
   clickButton("Hold to confirm");
 
   // "View on explorer" renders only in the modal's success view, and only once
   // a signature came back. Anything looser is a false pass: the previous wait
   // matched "privately" — which is already in the "Send privately" heading, so
   // it returned before the transfer was even submitted.
-  ab("wait", "--text", "View on explorer", "--timeout", "120000");
+  waitForText("View on explorer", 120000);
   console.log("  ✓ Transfer success");
 }
 
@@ -317,9 +385,9 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
   const depositUrl = `${APP_URL}/vault/deposit?network=${chain.network}`;
   console.log(`  → BTC deposit: navigating to ${depositUrl}`);
   injectDevKeysViaStorage(keys, depositUrl);
-  ab("wait", "--load", "networkidle");
+  waitIdle();
 
-  ab("wait", "--text", "Add funds"); // page heading
+  waitForText("Add funds", 30000); // page heading
   selectToken("BTC");
 
   // The BTC amount field carries no placeholder — match it by its <label>.
@@ -338,7 +406,7 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
     ab("wait", "--text", "Confirm & Sign", "--timeout", "20000");
     clickButton("Confirm & Sign");
   }
-  ab("wait", "--text", "submitted", "--timeout", "60000");
+  waitForText("submitted", 60000);
   screenshot("btc-deposit-submitted");
   console.log("  ✓ BTC deposit broadcast");
 
@@ -352,7 +420,7 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
 
   while (Date.now() < deadline) {
     injectDevKeysViaStorage(keys, activityUrl);
-    ab("wait", "--load", "networkidle");
+    waitIdle();
     try {
       // The activity page renders "Received" in each incoming note row.
       // Also accept "zkBTC Minted" which DepositStatusTracker shows at status=ready.
@@ -395,8 +463,8 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   const withdrawUrl = `${APP_URL}/vault/withdraw?network=${chain.network}`;
   console.log(`  → BTC redeem: navigating to ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
-  ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Take funds out"); // page heading
+  waitIdle();
+  waitForText("Take funds out", 30000); // page heading
 
   // Bitcoin is the default destination, but assert it rather than assume.
   selectCashOutDestination("bitcoin");
@@ -405,16 +473,21 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   // connected test wallet"), so E2E_BTC_REDEEM_ADDR is ignored there.
   ab("find", "label", "Bitcoin address", "fill", BTC_REDEEM_ADDR);
   ab("wait", "1000");
-  ab("find", "label", "Amount", "fill", BTC_REDEEM_AMOUNT);
+  ab("find", "label", "Amount", "fill", BTC_REDEEM_AMOUNT_BTC);
   ab("wait", "500");
   clickButton("Review BTC withdrawal");
   // UNVERIFIED below: the review modal needs a non-zero private balance.
   ab("wait", "--text", "Hold to confirm", "--timeout", "10000");
   clickButton("Hold to confirm");
 
-  // Wait for the app to navigate to the activity page with result=cashout_btc.
-  // send-form.tsx line 458: router.push(`/vault/activity?result=cashout_btc`)
-  ab("wait", "--url", "**/vault/activity**", "--timeout", "60000"); // UNVERIFIED: needs a submitted redeem to redirect.
+  // No redirect happens here: send-form only pushes /vault/activity from
+  // onViewActivity, i.e. when the user clicks "View activity". Submitting leaves
+  // the modal open on its success view, so assert on that — the same signal the
+  // token legs use, and the only one that implies a real signature.
+  // Same budget as the unshield leg. A redeem proof is a JoinSplit plus the BTC
+  // script binding and takes well over a minute in-browser; the 60s this used to
+  // allow expired mid-proof, which reads as a product failure but is not one.
+  waitForText("View on explorer", 180000);
   screenshot("btc-redeem-submitted");
   console.log("  ✓ BTC redeem submitted; polling for BTC txid…");
 
@@ -427,7 +500,7 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
 
   while (Date.now() < deadline) {
     injectDevKeysViaStorage(keys, vaultUrl);
-    ab("wait", "--load", "networkidle");
+    waitIdle();
     try {
       // WithdrawalStatusList renders "Confirmed" badge label from withdrawal-status.tsx line 37.
       ab("wait", "--text", "Confirmed", "--timeout", "8000"); // UNVERIFIED: needs the redemption service + Ika to confirm.
@@ -462,8 +535,8 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
   const withdrawUrl = `${APP_URL}/vault/withdraw?network=${chain.network}`;
   console.log(`  → Navigating to withdraw: ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
-  ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Take funds out"); // page heading
+  waitIdle();
+  waitForText("Take funds out", 30000); // page heading
 
   // The destination picker defaults to Bitcoin — switch to Solana first.
   selectCashOutDestination("solana");
@@ -473,14 +546,14 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
   ab("find", "label", "Amount", "fill", amount);
   ab("wait", "500");
   clickButton("Review cash out");
-  ab("wait", "--text", "Hold to confirm");
+  waitForText("Hold to confirm", 30000);
   clickButton("Hold to confirm");
 
   // The submission does NOT redirect: send-form keeps the user on the page and
   // the modal shows the confirmed result inline, with "View activity" as an
   // explicit action. So assert on the success view — waiting for a
   // /vault/activity URL just burns the timeout and wedges the browser daemon.
-  ab("wait", "--text", "View on explorer", "--timeout", "180000");
+  waitForText("View on explorer", 180000);
   console.log("  ✓ Unshield success");
 }
 
@@ -496,18 +569,30 @@ async function runChain(chain: ChainConfig, keys: DevKeys): Promise<void> {
   const unshieldAddr = SOL_UNSHIELD_ADDR;
 
   try {
-    console.log("\n[1/3] SHIELD");
-    await stepShield(chain, keys, SHIELD_AMOUNT);
+    if (SKIP_TOKEN_LOOP) {
+      // The BTC legs stand on their own — the deposit mints the zkBTC the redeem
+      // spends — and each is a long poll that re-navigates every iteration. Being
+      // able to run them without the token loop first halves the browser work and
+      // stops an unrelated SOL failure from gating them.
+      console.log("\nToken loop SKIPPED (SKIP_TOKEN_LOOP=1).");
+    } else {
+      console.log("\n[1/3] SHIELD");
+      await stepShield(chain, keys, SHIELD_AMOUNT);
 
-    console.log("\n[2/3] TRANSFER");
-    await stepTransfer(chain, keys, TRANSFER_AMOUNT, TRANSFER_RECIPIENT);
+      console.log("\n[2/3] TRANSFER");
+      await stepTransfer(chain, keys, TRANSFER_AMOUNT, TRANSFER_RECIPIENT);
 
-    console.log("\n[3/3] UNSHIELD");
-    await stepUnshield(chain, keys, UNSHIELD_AMOUNT, unshieldAddr);
+      console.log("\n[3/3] UNSHIELD");
+      await stepUnshield(chain, keys, UNSHIELD_AMOUNT, unshieldAddr);
+    }
 
     if (RUN_BTC) {
-      console.log("\n[4/4] BTC DEPOSIT");
-      await stepBtcDeposit(chain, keys);
+      if (SKIP_BTC_DEPOSIT) {
+        console.log("\n[4/4] BTC DEPOSIT SKIPPED (SKIP_BTC_DEPOSIT=1)");
+      } else {
+        console.log("\n[4/4] BTC DEPOSIT");
+        await stepBtcDeposit(chain, keys);
+      }
 
       console.log("\n[5/4] BTC REDEEM");
       await stepBtcRedeem(chain, keys);

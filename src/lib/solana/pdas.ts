@@ -143,15 +143,22 @@ export function deriveVkRegistryPDA(
   );
 }
 
+/** Pool-scoped, matching `redeem.rs`:
+ *  `["redemption", pool_state, user, nonce_le]`. The pool seed was added on
+ *  chain and in the SDK but not here, so this helper derived an address the
+ *  program rejects with InvalidSeeds ("Provided seeds do not result in a valid
+ *  address") — after the proof had already verified, which made it read like a
+ *  proof problem. Same omission the nullifier PDA had. */
 export function deriveRedemptionRequestPDA(
   userPubkey: PublicKey,
   nonce: bigint,
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
   const nonceBytes = new Uint8Array(8);
   new DataView(nonceBytes.buffer).setBigUint64(0, nonce, true);
   return PublicKey.findProgramAddressSync(
-    [Buffer.from("redemption"), userPubkey.toBytes(), nonceBytes],
+    [Buffer.from("redemption"), poolState.toBuffer(), userPubkey.toBytes(), nonceBytes],
     programId
   );
 }

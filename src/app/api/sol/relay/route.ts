@@ -139,8 +139,9 @@ function deriveRedemptionRequestPDA(
   user: PublicKey,
   nonce: bigint,
   programId: PublicKey,
+  poolState: PublicKey,
 ): [PublicKey, number] {
-  return deriveSyncRedemptionRequestPDA(user, nonce, programId);
+  return deriveSyncRedemptionRequestPDA(user, nonce, programId, poolState);
 }
 
 // =============================================================================
@@ -401,7 +402,7 @@ export async function POST(request: NextRequest) {
       const requestNonceBigints = requestNonces.map(n => BigInt(n));
 
       const redemptionRequestPDAs = requestNonceBigints.map(n =>
-        deriveRedemptionRequestPDA(relayer.publicKey, n, programId)[0]
+        deriveRedemptionRequestPDA(relayer.publicKey, n, programId, poolState)[0]
       );
       const [tokenConfigPDA] = deriveTokenConfigPDA(zkbtcMint, programId, poolState);
 

@@ -86,6 +86,21 @@ source .env.e2e && bun e2e/token-loop.e2e.ts
 The script exits 0 on success, non-zero on any step failure.
 Screenshots on failure are written to `e2e/screenshots/`.
 
+### A stale indexer breaks proofs, not just reads
+
+`Assert Failed. Error in template JoinSplit_322 line: 124` is
+`inputMerkle[i].root === merkleRoot` in `joinsplit.circom` — the Merkle proof the
+client was handed does not hash to the root it was given, so no proof is ever
+produced and nothing reaches the relay. The usual cause is an indexer whose leaf
+set is behind the chain, and it reports `"synced": true` while that is true.
+Compare the two directly before blaming the circuit or the relay:
+
+```bash
+curl -s "http://localhost:3000/api/tree/status?network=devnet-regtest&vault=open"
+# next_index/size here must match the on-chain commitment_tree, and the roots
+# must be byte-identical. Repair with ops/scripts/repair-indexer-leaves.ts.
+```
+
 ### When the browser daemon wedges
 
 `Failed to read: Resource temporarily unavailable (os error 35)` is the
@@ -157,6 +172,8 @@ Skip them by not setting `RUN_BTC=1`.
 | Variable | Default | Description |
 |---|---|---|
 | `RUN_BTC` | unset | Set to `1` to enable BTC legs |
+| `SKIP_TOKEN_LOOP` | unset | `1` runs only the BTC legs. They stand alone — the deposit mints the zkBTC the redeem spends — so the token loop is pure overhead when retrying a BTC leg |
+| `SKIP_BTC_DEPOSIT` | unset | `1` skips the deposit when the vault already holds zkBTC. Retrying the redeem otherwise costs a 10-minute deposit poll |
 | `E2E_BTC_REDEEM_ADDR` | (required when RUN_BTC=1) | Testnet/regtest bech32 BTC address to receive redeem payout |
 | `E2E_BTC_DEPOSIT_AMOUNT_SATS` | `10000` | Amount to deposit, in **sats** (the field is `Amount (sats)`) |
 | `E2E_BTC_REDEEM_AMOUNT` | `5000` | Amount to redeem in sats |
