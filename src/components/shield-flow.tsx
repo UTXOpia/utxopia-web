@@ -19,7 +19,11 @@ import {
   NATIVE_MINT,
   TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
-import { UTXOpiaClient } from "@utxopia/sdk";
+import {
+  UTXOpiaClient,
+  buildShieldInstructionData,
+  buildShieldPermissionedInstructionData,
+} from "@utxopia/sdk";
 import {
   deriveTokenConfigPDA,
   deriveExitDestinationPDA,
@@ -185,12 +189,24 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         chainEnv.config.solana.commitmentTree!,
       );
 
-      const ixData = new Uint8Array(73);
-      ixData[0] = chainEnv.vaultId === "verified" ? 23 : 12;
-      const dataView = new DataView(ixData.buffer);
-      dataView.setBigUint64(1, amountRaw, true);
-      ixData.set(npkBytes, 9);
-      ixData.set(shieldOutput.ephemeralPub, 41);
+      // Built by the SDK so the discriminators and the layout stay with the
+      // program. Byte-identical to what this used to assemble by hand, which
+      // matters twice over: the verified path hashes these bytes into the
+      // policy intent below.
+      const ixData = chainEnv.vaultId === "verified"
+        ? buildShieldPermissionedInstructionData({
+            amount: amountRaw,
+            npk: npkBytes,
+            ephemeralPub: shieldOutput.ephemeralPub,
+            // This pool does not attach one today; sending an empty blob keeps
+            // the instruction exactly 73 bytes, as before.
+            auditorCiphertext: new Uint8Array(0),
+          })
+        : buildShieldInstructionData({
+            amount: amountRaw,
+            npk: npkBytes,
+            ephemeralPub: shieldOutput.ephemeralPub,
+          });
 
       let policyRequestId: string | undefined;
       let approvalAccount: PublicKey | undefined;
