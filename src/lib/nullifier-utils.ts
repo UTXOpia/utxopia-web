@@ -10,8 +10,14 @@ export function nullifierHashToPDA(hashHex: string): string {
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   }
+  // Pool-scoped, matching the program. Tree 0 only: this maps historical
+  // nullifier hashes to addresses for display, and no rotation has happened.
   const [pda] = PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.NULLIFIER), bytes],
+    [
+      Buffer.from(PDA_SEEDS.NULLIFIER),
+      new PublicKey(getConfig().poolStatePda).toBuffer(),
+      bytes,
+    ],
     new PublicKey(getConfig().utxopiaProgramId)
   );
   return pda.toBase58();

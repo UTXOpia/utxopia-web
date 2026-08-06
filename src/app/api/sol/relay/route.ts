@@ -254,9 +254,11 @@ export async function POST(request: NextRequest) {
     });
 
     // ── Derive common PDAs ─────────────────────────────────────────────
-    const nullifierPDAs = nullifierBytes.map((n) => deriveNullifierPDA(n, programId)[0]);
-    const [vkRegistryPDA] = deriveVkRegistryPDA(nInputs, nOutputs, programId);
     const poolState = new PublicKey(cfg.solana.poolState!);
+    const nullifierPDAs = nullifierBytes.map(
+      (n) => deriveNullifierPDA(n, poolState, 0, programId)[0]
+    );
+    const [vkRegistryPDA] = deriveVkRegistryPDA(nInputs, nOutputs, programId);
     const commitmentTree = new PublicKey(cfg.solana.commitmentTree!);
     // ── Relayer fee check (transfer mode only) ─────────────────────────
     if (mode === "transfer" && RELAYER_FEE_SATS > 0) {

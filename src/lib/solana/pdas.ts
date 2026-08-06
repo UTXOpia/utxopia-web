@@ -79,14 +79,30 @@ export function deriveCommitmentTreePDA(
   );
 }
 
+/**
+ * Seeds are ["nullifier", pool_state, nullifier] on tree 0, and
+ * ["nullifier", pool_state, tree_index_le, nullifier] after a rotation.
+ *
+ * A nullifier is Poseidon(nullifyingKey, leafIndex), so it names a note only
+ * within one pool and one tree — leaf indices restart at 0 in each new tree.
+ * Drop either scope and two distinct notes collapse onto one PDA, where
+ * spending either strands the other. Tree 0 keeps the shorter seeds so records
+ * already on chain stay reachable.
+ */
 export function deriveNullifierPDA(
   nullifierHash: Uint8Array,
+  poolState: PublicKey,
+  treeIndex = 0,
   programId: PublicKey = getUTXOpiaProgramId()
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.NULLIFIER), nullifierHash],
-    programId
-  );
+  const seeds: Buffer[] = [Buffer.from(PDA_SEEDS.NULLIFIER), poolState.toBuffer()];
+  if (treeIndex !== 0) {
+    const idx = Buffer.alloc(4);
+    idx.writeUInt32LE(treeIndex);
+    seeds.push(idx);
+  }
+  seeds.push(Buffer.from(nullifierHash));
+  return PublicKey.findProgramAddressSync(seeds, programId);
 }
 
 export function deriveLightClientPDA(
