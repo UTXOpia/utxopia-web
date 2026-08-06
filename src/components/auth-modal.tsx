@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Fingerprint, Wallet, X, Eye } from "lucide-react";
+import { Fingerprint, Wallet, X, Eye, Upload } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 export interface AuthState {
@@ -17,6 +17,9 @@ export interface AuthState {
   onWalletConnect: () => void;
   onWalletDeriveKeys: () => void;
   onViewOnlyLogin?: (viewingKey: string) => void;
+  /** Restore spending keys from a recovery file. Rejects with a user-facing
+   *  message, which the modal shows next to the picker. */
+  onImportBackup?: (fileContents: string) => Promise<void>;
 }
 
 interface AuthModalProps {
@@ -30,11 +33,26 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
     passkeySupported, hasPasskeyCredential, passkeyLoading,
     walletLoading, walletConnected, error,
     onPasskeyRegister, onPasskeyAuthenticate,
-    onWalletConnect, onWalletDeriveKeys, onViewOnlyLogin,
+    onWalletConnect, onWalletDeriveKeys, onViewOnlyLogin, onImportBackup,
   } = auth;
-  const isLoading = passkeyLoading || walletLoading;
+  const [importing, setImporting] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
+  const isLoading = passkeyLoading || walletLoading || importing;
   const [showViewOnly, setShowViewOnly] = useState(false);
   const [viewingKeyInput, setViewingKeyInput] = useState("");
+
+  const handleImport = async (file: File | undefined) => {
+    if (!file || !onImportBackup) return;
+    setImporting(true);
+    setImportError(null);
+    try {
+      await onImportBackup(await file.text());
+    } catch (cause) {
+      setImportError(cause instanceof Error ? cause.message : "Could not read this recovery file.");
+    } finally {
+      setImporting(false);
+    }
+  };
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -242,6 +260,43 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   </button>
                 </div>
               </div>
+            )}
+
+            {/* Restore from recovery file — one click to the picker, with the
+                session-only caveat stated before the click, not after. */}
+            {onImportBackup && (
+              <>
+                <label
+                  className={cn(
+                    "w-full flex items-center gap-4 p-4 rounded-[14px]",
+                    "bg-gray/8 hover:bg-gray/15 border border-gray/15",
+                    "hover:border-gray/30 transition-all duration-200 group",
+                    isLoading ? "opacity-40 cursor-not-allowed" : "cursor-pointer",
+                  )}
+                >
+                  <div className="p-2.5 rounded-[10px] bg-gray/12 group-hover:bg-gray/20 transition-colors shrink-0">
+                    <Upload className="w-5 h-5 text-gray-light" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-body2-semibold text-gray-light">
+                      {importing ? "Restoring..." : "Restore from Backup File"}
+                    </p>
+                    <p className="text-caption text-gray mt-0.5">
+                      Unlocks this session only. Keep the file to sign in again.
+                    </p>
+                  </div>
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="sr-only"
+                    disabled={isLoading}
+                    onChange={(e) => { void handleImport(e.target.files?.[0]); e.target.value = ""; }}
+                  />
+                </label>
+                {importError && (
+                  <p className="px-1 text-caption text-red-400">{importError}</p>
+                )}
+              </>
             )}
           </div>
         </Dialog.Content>

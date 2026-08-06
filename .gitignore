@@ -75,3 +75,7 @@ images/
 *.key
 e2e/.dev-keys.json
 e2e/screenshots/
+
+# One lockfile. vercel.json installs with bun; a stale package-lock pinned the
+# SDK over git+ssh (unauthenticated on CI) at a commit years behind bun.lock.
+package-lock.json

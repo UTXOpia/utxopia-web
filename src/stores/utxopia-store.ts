@@ -29,6 +29,7 @@ import {
 import type { VaultId } from "@/lib/vault-config";
 import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
 import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
+import { parseVaultBackupFile } from "@/lib/vault-backup";
 import { getAlphaDemoInboxNotes } from "@/lib/alpha-demo-ledger";
 
 // ============================================================================
@@ -249,6 +250,9 @@ interface UTXOpiaState {
   isLoading: boolean;
   error: string | null;
   hasKeys: boolean;
+  /** Keys came from an imported recovery file, so they exist only in memory —
+   *  nothing was written to localStorage and a reload logs the user out. */
+  isImportedSession: boolean;
 
   // Inbox
   inboxNotes: InboxNote[];
@@ -275,6 +279,7 @@ interface UTXOpiaState {
   deriveKeysFromPasskeySeed: (seed: Uint8Array, networkId?: NetworkId) => Promise<void>;
   hydratePasskeyKeys: (networkId?: NetworkId) => Promise<boolean>;
   loadViewOnlyKeys: (encoded: string) => Promise<void>;
+  importBackupKeys: (raw: string) => Promise<void>;
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
   startRealtimeInbox: () => () => void;
@@ -299,6 +304,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   isLoading: false,
   error: null,
   hasKeys: false,
+  isImportedSession: false,
   inboxNotes: [],
   inboxTotalSats: 0n,
   inboxBalancesByToken: {},
@@ -537,6 +543,33 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
+  // Deliberately does not persist: the storage key is derived from a live
+  // credential secret (see deriveStorageKey) and an imported file carries no
+  // secret to derive it from. Spending keys stay in memory for this session.
+  // Throws so the importing UI can show the failure next to the file picker.
+  importBackupKeys: async (raw: string) => {
+    await ensureChainEnvironment();
+    const { payload, solanaPublicKey } = parseVaultBackupFile(raw);
+    const client = UTXOpiaClient.instance();
+    try {
+      client.restoreKeys(payload.keys, solanaPublicKey);
+    } catch {
+      throw new Error("This recovery file could not be opened — its keys are unreadable.");
+    }
+    if (!client.keys) throw new Error("This recovery file contains no vault keys.");
+    set({
+      keys: client.keys,
+      viewOnlyKeys: null,
+      isViewOnly: false,
+      stealthAddress: client.stealthAddress ?? null,
+      stealthAddressEncoded: client.stealthAddressEncoded ?? null,
+      hasKeys: true,
+      isImportedSession: true,
+      isLoading: false,
+      error: null,
+    });
+  },
+
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => {
     if (walletPubkey) {
       removeKeys(walletStorageOwner(walletPubkey, detectVault()));
@@ -559,6 +592,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       passkeyNameOwnerSecret: null,
       error: null,
       hasKeys: false,
+      isImportedSession: false,
       inboxNotes: [],
       inboxTotalSats: 0n,
       inboxBalancesByToken: {},
