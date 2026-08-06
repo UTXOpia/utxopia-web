@@ -753,6 +753,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         </div>
         <div className="flex items-center gap-2 p-3 bg-muted border border-gray/15 rounded-[12px] focus-within:border-privacy/30 transition-colors">
           <input
+            data-testid="shield-amount"
             type="number"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
@@ -861,6 +862,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
       {/* Add funds button */}
       <button
+        data-testid="shield-submit"
         onClick={handleShield}
         disabled={!canSubmit || status === "processing"}
         className={cn(

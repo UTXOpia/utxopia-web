@@ -30,7 +30,7 @@ export function ShieldSuccess({
   const { config, networkId } = useChainEnvironment();
 
   return (
-    <div className={cn("space-y-4 text-center py-6", className)}>
+    <div data-testid="shield-success" className={cn("space-y-4 text-center py-6", className)}>
       <div className={cn("inline-flex p-3 rounded-full border", isBtc ? "bg-btc/10 border-btc/20" : "bg-privacy/10 border-privacy/20")}>
         <CheckCircle2 className={cn("w-8 h-8", isBtc ? "text-btc" : "text-privacy")} />
       </div>

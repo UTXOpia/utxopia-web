@@ -99,8 +99,10 @@ On Solana devnet:
 Before each step the script performs a three-phase injection:
 
 1. **Open `APP_URL`** — navigates to the app root to establish the correct origin (required for `localStorage` access).
-2. **`eval` → `localStorage.setItem("__UTXOPIA_DEV_KEYS", ...)`** — persists the JSON-encoded dev keys under `DEV_KEYS_STORAGE_KEY`. This survives the subsequent navigation.
-3. **Open the target URL** (e.g. `/vault/deposit?network=devnet-regtest`) — on this load the `DevSigner` component mounts and `loadDevKeys()` reads the persisted value from `localStorage`, then installs the Solana / BTC wallet shims automatically.
+2. **`eval` → `localStorage.setItem(...)`** — persists two keys that survive the subsequent navigation:
+   - `__UTXOPIA_DEV_KEYS` (`DEV_KEYS_STORAGE_KEY`) — the JSON-encoded dev keys.
+   - `walletName` — set to `"UTXOpia Dev Signer"`. **Required.** `<WalletProvider autoConnect>` only restores a *previously selected* wallet, so without this the Solana legs stall on "Connect wallet": the amount field and submit button never mount and every token step fails.
+3. **Open the target URL** (e.g. `/vault/deposit?network=devnet-regtest`) — on this load the `DevSigner` component mounts, `loadDevKeys()` reads the persisted value from `localStorage`, and the BTC (`window.unisat`) shim is installed. The Solana side is not a `window` shim: it is registered as a wallet-adapter entry via `devSolanaAdapters()` in `app/providers.tsx`, which is why the `walletName` seed is what actually connects it.
 
 This is more robust than injecting into `window.__UTXOPIA_DEV_KEYS` directly: `window` globals are reset on every navigation, so a window injection before a `?network=` reload can race the `DevSigner` useEffect. `localStorage` persists across same-origin navigations and is the second priority source in `loadDevKeys()` (after `globalThis` injection, before env vars).
 
@@ -138,7 +140,7 @@ Skip them by not setting `RUN_BTC=1`.
 |---|---|---|
 | `RUN_BTC` | unset | Set to `1` to enable BTC legs |
 | `E2E_BTC_REDEEM_ADDR` | (required when RUN_BTC=1) | Testnet/regtest bech32 BTC address to receive redeem payout |
-| `E2E_BTC_DEPOSIT_AMOUNT` | `0.0001` | BTC amount to deposit (in BTC, e.g. `0.0001`) |
+| `E2E_BTC_DEPOSIT_AMOUNT_SATS` | `10000` | Amount to deposit, in **sats** (the field is `Amount (sats)`) |
 | `E2E_BTC_REDEEM_AMOUNT` | `5000` | Amount to redeem in sats |
 | `BTC_DEPOSIT_TIMEOUT_MS` | `600000` (10 min) | Polling timeout for zkBTC note to appear after deposit |
 | `BTC_REDEEM_TIMEOUT_MS` | `600000` (10 min) | Polling timeout for BTC txid/Confirmed to appear after redeem |
@@ -158,10 +160,13 @@ bun e2e/token-loop.e2e.ts
 **BTC deposit (`stepBtcDeposit`)**
 
 1. Navigates to `/vault/deposit?network=<chain>`.
-2. Selects the BTC token, connects the `window.unisat` dev shim,
-   fills the amount, clicks "Add BTC privately", waits for the PSBT preview,
-   then clicks "Confirm & Sign". The dev shim auto-signs and broadcasts the
-   PSBT via Esplora. Waits for "BTC deposit submitted".
+2. Selects the BTC token and fills `Amount (sats)`. What happens next depends
+   on the network: on **devnet-regtest** the branch renders the regtest faucet
+   ("Get private test BTC"), which credits the private vault directly — there
+   is no PSBT preview. On the **testnet4 wallet flow** it clicks
+   "Add BTC privately", waits for the PSBT preview, then "Confirm & Sign",
+   and the `window.unisat` dev shim auto-signs and broadcasts via Esplora.
+   The script tries the faucet button first and falls back to the PSBT path.
 3. Polls `/vault/activity` until a "Received" note (zkBTC) appears, meaning
    the deposit-tracker has fully confirmed + minted the note on-chain.
    Timeout: `BTC_DEPOSIT_TIMEOUT_MS` (default 10 min).
@@ -169,10 +174,13 @@ bun e2e/token-loop.e2e.ts
 **BTC redeem (`stepBtcRedeem`)**
 
 1. Navigates to `/vault/withdraw?network=<chain>`.
-2. Pastes the BTC address (`E2E_BTC_REDEEM_ADDR`) into the recipient field.
-   The app detects a BTC address and switches to "Cash out to Bitcoin" mode.
-3. Fills the amount, clicks "Send", holds the "Hold to confirm" button in
-   the ReviewModal.
+2. Selects the **Bitcoin** destination tab, then fills the `Bitcoin address`
+   field with `E2E_BTC_REDEEM_ADDR`. Note: on regtest the app pins the payout
+   to the connected test wallet and pre-fills this field ("Regtest safety: BTC
+   withdrawals can only go to your connected test wallet"), so
+   `E2E_BTC_REDEEM_ADDR` is ignored there.
+3. Fills the amount, clicks "Review BTC withdrawal", holds the "Hold to
+   confirm" button in the ReviewModal.
 4. Waits for the app to redirect to `/vault/activity?result=cashout_btc`.
 5. Polls the vault page for the `WithdrawalStatusList` to show "Confirmed"
    or a "BTC TX" row (indicating the BTC txid from Ika MPC is present).
@@ -186,11 +194,31 @@ recovery steps in `memory/hybrid-regtest-devnet-coupling.md` before rerunning.
 
 ## Selector notes
 
-Several selectors in `token-loop.e2e.ts` are annotated `// VERIFY`. These rely on visible text labels extracted from the component source but have not been validated against a live running app. Before a production CI run, open the app and take an accessibility snapshot to confirm:
+Selectors were validated against a live dev server (agent-browser 0.27.0). What
+that run established, and which is worth knowing before editing them:
+
+- **`find role textbox` does not resolve** in this app — match inputs by their
+  `<label>` instead (`find label "Recipient"`, `find label "Amount"`).
+- **Multi-line button labels are not matchable by accessible name.** The token
+  selector and the cash-out destination tabs render their label and description
+  as separate lines, so their accessible names contain newlines
+  (`"Solana\nCash out"`) and `--name "Solana Cash out"` fails. Both carry
+  `data-testid`s for this reason: `token-selector-trigger`,
+  `token-option-<SYMBOL>`, `cash-out-destination-{bitcoin,solana}`.
+- **Submit buttons are not called "Send".** They are `Add <SYMBOL> privately`,
+  `Review private transfer`, `Review cash out` and `Review BTC withdrawal`.
+  Matching `--name "Send"` is actively dangerous on `/send`: it also matches
+  **"Send via claim link"**, a different flow.
+- **Amount placeholders differ per page** — `0.00` on deposit, but the send and
+  withdraw fields use `0`, which is why they are matched by label.
+
+Steps still annotated `// UNVERIFIED` need a funded private balance or the full
+backend stack: the review modal only opens with a non-zero balance, so the
+confirm/hold controls and the success strings could not be exercised.
+
+To re-check after a UI change:
 
 ```bash
 agent-browser open http://localhost:3000/vault/deposit?network=devnet-regtest
 agent-browser snapshot -i
 ```
-
-Then cross-check the `find placeholder` and `find role button` calls against the actual snapshot output and update as needed.

@@ -28,6 +28,8 @@ export function TokenSelector({
   return (
     <div className="relative" ref={dropdownRef}>
       <button
+        type="button"
+        data-testid="token-selector-trigger"
         onClick={() => onOpenChange(!dropdownOpen)}
         className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-[8px] bg-background/60 border border-gray/15 hover:border-gray/30 transition-colors cursor-pointer"
       >
@@ -40,6 +42,8 @@ export function TokenSelector({
           {availableTokens.map((token) => (
             <button
               key={token.symbol}
+              type="button"
+              data-testid={`token-option-${token.symbol}`}
               onClick={() => {
                 onSelect(token);
                 onOpenChange(false);

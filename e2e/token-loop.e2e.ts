@@ -43,8 +43,9 @@ const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
  *  Requires the full backend stack (see README § BTC legs). */
 const RUN_BTC = process.env.RUN_BTC === "1";
 
-/** BTC deposit amount in BTC (≥ dust limit, well below funded amount). */
-const BTC_DEPOSIT_AMOUNT = process.env.E2E_BTC_DEPOSIT_AMOUNT ?? "0.0001";
+/** BTC deposit amount in sats — the deposit field is denominated in sats
+ *  ("Amount (sats)"), not BTC. 10_000 sats = 0.0001 BTC. */
+const BTC_DEPOSIT_AMOUNT_SATS = process.env.E2E_BTC_DEPOSIT_AMOUNT_SATS ?? "10000";
 
 /** BTC redeem amount in sats (what to cash out). */
 const BTC_REDEEM_AMOUNT = process.env.E2E_BTC_REDEEM_AMOUNT ?? "5000";
@@ -61,6 +62,9 @@ const BTC_REDEEM_TIMEOUT_MS = parseInt(process.env.BTC_REDEEM_TIMEOUT_MS ?? "600
 const CHAINS: ChainConfig[] = [
   { name: "Solana devnet", networkParam: "devnet", network: "devnet" },
 ];
+
+/** Token symbol driven by the loop; must match a token-option-<symbol> testid. */
+const SHIELD_TOKEN = process.env.E2E_SHIELD_TOKEN ?? "SOL";
 
 /** Amount to shield / transfer / unshield per step.
  *  Must be well below the funded balance. Adjust per funded amount. */
@@ -134,25 +138,49 @@ function screenshot(label: string): void {
   }
 }
 
+/** Accessible name of the dev wallet adapter (see lib/dev-signer/solana-adapter.ts). */
+const DEV_WALLET_NAME = "UTXOpia Dev Signer";
+
 /** Persist dev keys into localStorage under DEV_KEYS_STORAGE_KEY so they
  *  survive the page reload that follows. Steps:
  *  1. Open APP_URL (establishes the origin, required before localStorage access).
- *  2. eval: localStorage.setItem("__UTXOPIA_DEV_KEYS", JSON.stringify(keys)).
+ *  2. eval: seed both `__UTXOPIA_DEV_KEYS` and `walletName`.
  *  3. Open the actual target URL — DevSigner mounts, loadDevKeys() finds the
  *     stored value, and installs the wallet shims before the form renders.
  *
  *  localStorage survives navigation within the same origin, so this is robust
- *  against the reload that happens between step 2 and step 3. */
+ *  against the reload that happens between step 2 and step 3.
+ *
+ *  `walletName` is what makes <WalletProvider autoConnect> reconnect: autoConnect
+ *  only restores a *previously selected* wallet, so without this the Solana legs
+ *  sit on "Connect wallet" forever and every token step fails. */
 function injectDevKeysViaStorage(keys: DevKeys, targetUrl: string): void {
   // Step 1 — establish origin so localStorage is accessible.
   ab("open", APP_URL);
-  // Step 2 — persist keys.
-  const payload = JSON.stringify(keys);
-  const script = `localStorage.setItem("__UTXOPIA_DEV_KEYS", ${JSON.stringify(payload)});`;
-  const b64 = Buffer.from(script).toString("base64");
-  ab("eval", "-b", b64);
+  // Step 2 — persist keys + pre-select the dev wallet.
+  const script =
+    `localStorage.setItem("__UTXOPIA_DEV_KEYS", ${JSON.stringify(JSON.stringify(keys))});` +
+    `localStorage.setItem("walletName", ${JSON.stringify(JSON.stringify(DEV_WALLET_NAME))});`;
+  ab("eval", "-b", Buffer.from(script).toString("base64"));
   // Step 3 — navigate to target; DevSigner reads localStorage on mount.
   ab("open", targetUrl);
+}
+
+/** Pick a token in the ShieldFlow dropdown. The trigger and each option carry
+ *  data-testids because their visible labels are multi-line and not matchable
+ *  by accessible name. */
+function selectToken(symbol: string): void {
+  ab("find", "testid", "token-selector-trigger", "click");
+  ab("wait", "800");
+  ab("find", "testid", `token-option-${symbol}`, "click");
+  ab("wait", "1500");
+}
+
+/** Choose the withdraw destination network (Bitcoin vs Solana).
+ *  Defaults to Bitcoin, so the Solana cash-out leg must switch explicitly. */
+function selectCashOutDestination(destination: "bitcoin" | "solana"): void {
+  ab("find", "testid", `cash-out-destination-${destination}`, "click");
+  ab("wait", "1200");
 }
 
 // ---------------------------------------------------------------------------
@@ -165,20 +193,20 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   console.log(`  → Navigating to deposit: ${depositUrl}`);
   injectDevKeysViaStorage(keys, depositUrl);
   ab("wait", "--load", "networkidle");
-  // DevSigner activates on mount — wait for the form to appear
-  ab("wait", "--text", "Add"); // "Add funds" page title or button // VERIFY: page loads with "Add" text
+  ab("wait", "--text", "Add funds"); // page heading
 
-  // The ShieldFlow renders "Add <TOKEN> privately" button and auto-selects
-  // Self as the recipient (defaultToSelf=true in StealthRecipientInput)
+  // The dropdown defaults to BTC; the token loop runs on SOL.
+  selectToken(SHIELD_TOKEN);
 
-  // Fill amount
-  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY: placeholder exact text
+  // Amount + submit only render once the dev wallet is connected, which the
+  // seeded `walletName` handles during injectDevKeysViaStorage.
+  ab("wait", '[data-testid="shield-amount"]', "--timeout", "15000");
+  ab("find", "testid", "shield-amount", "fill", amount);
   ab("wait", "500"); // brief settle for balance/canSubmit reactivity
 
-  // Submit — the primary button contains "Add" + "privately"
-  ab("find", "role", "button", "click", "--name", `Add`); // VERIFY: button text starts with "Add"; use snapshot to confirm exact name if needed
+  ab("find", "testid", "shield-submit", "click");
 
-  ab("wait", "--text", "Funds added privately", "--timeout", "90000");
+  ab("wait", '[data-testid="shield-success"]', "--timeout", "90000");
   console.log("  ✓ Shield success");
 }
 
@@ -188,19 +216,22 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
   console.log(`  → Navigating to send: ${sendUrl}`);
   injectDevKeysViaStorage(keys, sendUrl);
   ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Send"); // page title // VERIFY: page has "Send" heading
+  ab("wait", "--text", "Send privately"); // page heading
 
-  // Solana SendForm: RecipientInput then AmountField
-  // RecipientInput placeholder is variable; locate by role first then fill
-  ab("find", "role", "textbox", "fill", recipient); // VERIFY: may need snapshot to pick correct input
+  // Both fields are matched by <label>; `find role textbox` does not resolve
+  // here, and the amount field only mounts once the recipient parses.
+  ab("find", "label", "Recipient", "fill", recipient);
+  ab("wait", "1000");
+  ab("find", "label", "Amount", "fill", amount);
   ab("wait", "500");
-  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY placeholder
-  ab("wait", "300");
 
-  // Submit — opens the ReviewModal
-  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: opens Review modal
-  ab("wait", "--text", "Confirm"); // VERIFY: ReviewModal has a Confirm button
-  ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY: exact button text
+  // Submit — opens the ReviewModal. Must not be matched as "Send": that also
+  // matches "Send via claim link", which is a different flow.
+  ab("find", "role", "button", "click", "--name", "Review private transfer");
+  // UNVERIFIED: the ReviewModal only opens with a non-zero balance, so the
+  // confirm control below could not be checked against a live app.
+  ab("wait", "--text", "Confirm");
+  ab("find", "role", "button", "click", "--name", "Confirm");
 
   ab("wait", "--text", "privately", "--timeout", "120000"); // covers "Sent privately" and "added privately"
   console.log("  ✓ Transfer success");
@@ -235,53 +266,28 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
   injectDevKeysViaStorage(keys, depositUrl);
   ab("wait", "--load", "networkidle");
 
-  {
-    // Solana devnet: ShieldFlow with BTC token.
-    // The token selector defaults to the first token; we need to switch to BTC.
-    ab("wait", "--text", "Add Funds"); // page title from SolanaDepositPage // VERIFY
+  ab("wait", "--text", "Add funds"); // page heading
+  selectToken("BTC");
 
-    // Open the token selector dropdown and pick BTC.
-    // TokenSelector renders the currently selected token symbol inside a button.
-    ab("find", "role", "button", "click", "--name", "BTC"); // VERIFY: token selector shows "BTC" when BTC is selected — click it to open dropdown first if needed
-    ab("wait", "500");
-    // If BTC is not the default token, the dropdown opens — pick it.
-    // The dropdown renders each token as a button with its symbol.
-    // If BTC was already selected, the above click re-opens then closes — harmless.
-    // Fallback: directly look for the BTC option in the open dropdown.
-    try {
-      ab("find", "role", "option", "click", "--name", "BTC"); // VERIFY: dropdown option text; may be listitem not option
-    } catch {
-      // BTC was likely already selected — continue.
-    }
-    ab("wait", "500");
+  // The BTC amount field carries no placeholder — match it by its <label>.
+  ab("find", "label", "Amount (sats)", "fill", BTC_DEPOSIT_AMOUNT_SATS);
+  ab("wait", "500");
 
-    // The BTC flow shows "Connect BTC Wallet" button when unisat is not yet connected.
-    // DevSigner installs window.unisat shim on mount; click "Connect BTC Wallet" then
-    // pick "UniSat" from the wallet picker.
-    try {
-      ab("wait", "--text", "Connect BTC Wallet", "--timeout", "5000"); // VERIFY
-      ab("find", "role", "button", "click", "--name", "Connect BTC Wallet"); // VERIFY
-      ab("wait", "500");
-      ab("find", "role", "button", "click", "--name", "UniSat"); // VERIFY: wallet picker option label
-      ab("wait", "1000");
-    } catch {
-      // Already connected (e.g. from a previous step) — continue.
-    }
-
-    // Fill the BTC amount (placeholder "0.00000000" from shield-flow.tsx line 428).
-    ab("find", "placeholder", "0.00000000", "fill", BTC_DEPOSIT_AMOUNT); // VERIFY: exact placeholder
-    ab("wait", "500");
-
-    // Click "Add BTC privately" to build the PSBT preview.
-    ab("find", "role", "button", "click", "--name", "Add BTC privately"); // VERIFY: button text from shield-flow.tsx line 487
-    ab("wait", "--text", "Confirm & Sign", "--timeout", "20000"); // VERIFY: BtcDepositPreview renders this button
-
-    // Confirm and sign — DevSigner shim auto-approves.
-    ab("find", "role", "button", "click", "--name", "Confirm & Sign"); // VERIFY: button text from btc-deposit-preview.tsx line 164
-    ab("wait", "--text", "BTC deposit submitted", "--timeout", "60000"); // VERIFY: ShieldSuccess h3 text from shield-success.tsx line 38
-    screenshot("btc-deposit-submitted");
-    console.log("  ✓ BTC deposit broadcast");
+  // NOTE: on devnet-regtest the BTC branch renders the regtest faucet
+  // ("Get private test BTC"), which credits the private vault directly — there
+  // is no Connect BTC Wallet → PSBT preview → "Confirm & Sign" sequence. The
+  // PSBT path below applies to the testnet4 wallet flow and is UNVERIFIED: the
+  // BTC legs need the full backend stack (see README § BTC legs) to exercise.
+  try {
+    ab("find", "role", "button", "click", "--name", "Get private test BTC");
+  } catch {
+    ab("find", "role", "button", "click", "--name", "Add BTC privately");
+    ab("wait", "--text", "Confirm & Sign", "--timeout", "20000");
+    ab("find", "role", "button", "click", "--name", "Confirm & Sign");
   }
+  ab("wait", "--text", "submitted", "--timeout", "60000");
+  screenshot("btc-deposit-submitted");
+  console.log("  ✓ BTC deposit broadcast");
 
   // Poll /vault/activity until a "Received" note appears (zkBTC minted).
   // This requires the deposit-tracker, BTC confirmations, sweep, and Ika
@@ -297,7 +303,7 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
     try {
       // The activity page renders "Received" in each incoming note row.
       // Also accept "zkBTC Minted" which DepositStatusTracker shows at status=ready.
-      ab("wait", "--text", "Received", "--timeout", "8000"); // VERIFY: ActivityRow "Received" label from activity/page.tsx line 111
+      ab("wait", "--text", "Received", "--timeout", "8000"); // UNVERIFIED: needs the deposit-tracker to mint a note.
       minted = true;
       break;
     } catch {
@@ -337,24 +343,25 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   console.log(`  → BTC redeem: navigating to ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
   ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Cash out"); // page title from withdraw/page.tsx // VERIFY
+  ab("wait", "--text", "Take funds out"); // page heading
 
-  // Solana cash-out to BTC: SendForm.
-  ab("find", "placeholder", "Paste address", "fill", BTC_REDEEM_ADDR); // VERIFY: placeholder from recipient-input.tsx line 95
+  // Bitcoin is the default destination, but assert it rather than assume.
+  selectCashOutDestination("bitcoin");
+  // NOTE: on regtest the app pins the payout to the connected test wallet and
+  // pre-fills this field ("Regtest safety: BTC withdrawals can only go to your
+  // connected test wallet"), so E2E_BTC_REDEEM_ADDR is ignored there.
+  ab("find", "label", "Bitcoin address", "fill", BTC_REDEEM_ADDR);
   ab("wait", "1000");
-  // After a valid BTC address is detected, the amount field appears.
-  ab("find", "placeholder", "0.00", "fill", BTC_REDEEM_AMOUNT); // VERIFY: AmountField placeholder
+  ab("find", "label", "Amount", "fill", BTC_REDEEM_AMOUNT);
   ab("wait", "500");
-  // The "Send" button opens the ReviewModal.
-  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY: send-form.tsx line 613
-  // ReviewModal shows "Hold to confirm" (HoldButton from review-modal.tsx line 79).
-  ab("wait", "--text", "Hold to confirm", "--timeout", "10000"); // VERIFY
-  // Hold the button — agent-browser simulates a hold via a long click or hold action.
-  ab("find", "role", "button", "click", "--name", "Hold to confirm"); // VERIFY: HoldButton accessible name — may need "hold" action instead of "click"
+  ab("find", "role", "button", "click", "--name", "Review BTC withdrawal");
+  // UNVERIFIED below: the review modal needs a non-zero private balance.
+  ab("wait", "--text", "Hold to confirm", "--timeout", "10000");
+  ab("find", "role", "button", "click", "--name", "Hold to confirm");
 
   // Wait for the app to navigate to the activity page with result=cashout_btc.
   // send-form.tsx line 458: router.push(`/vault/activity?result=cashout_btc`)
-  ab("wait", "--url", "**/vault/activity**", "--timeout", "60000"); // VERIFY: agent-browser URL glob syntax
+  ab("wait", "--url", "**/vault/activity**", "--timeout", "60000"); // UNVERIFIED: needs a submitted redeem to redirect.
   screenshot("btc-redeem-submitted");
   console.log("  ✓ BTC redeem submitted; polling for BTC txid…");
 
@@ -370,13 +377,13 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
     ab("wait", "--load", "networkidle");
     try {
       // WithdrawalStatusList renders "Confirmed" badge label from withdrawal-status.tsx line 37.
-      ab("wait", "--text", "Confirmed", "--timeout", "8000"); // VERIFY: status label from withdrawal-status.tsx
+      ab("wait", "--text", "Confirmed", "--timeout", "8000"); // UNVERIFIED: needs the redemption service + Ika to confirm.
       confirmed = true;
       break;
     } catch {
       // Also accept a raw BTC txid substring (64 hex chars — any 8-char hex slug is a signal).
       try {
-        ab("wait", "--text", "BTC TX", "--timeout", "3000"); // VERIFY: "BTC TX" label in WithdrawalCard row
+        ab("wait", "--text", "BTC TX", "--timeout", "3000"); // UNVERIFIED: needs a BTC txid from Ika MPC.
         confirmed = true;
         break;
       } catch {
@@ -403,18 +410,20 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
   console.log(`  → Navigating to withdraw: ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
   ab("wait", "--load", "networkidle");
-  ab("wait", "--text", "Cash out"); // page title // VERIFY
+  ab("wait", "--text", "Take funds out"); // page heading
 
-  // Solana SendForm with showClaimLink=false
-  ab("find", "role", "textbox", "fill", addr); // VERIFY
+  // The destination picker defaults to Bitcoin — switch to Solana first.
+  selectCashOutDestination("solana");
+  ab("find", "label", "Solana wallet address", "fill", addr);
+  ab("wait", "1000");
+  ab("find", "label", "Amount", "fill", amount);
   ab("wait", "500");
-  ab("find", "placeholder", "0.00", "fill", amount); // VERIFY
-  ab("wait", "300");
-  ab("find", "role", "button", "click", "--name", "Send"); // VERIFY
-  ab("wait", "--text", "Confirm"); // VERIFY
-  ab("find", "role", "button", "click", "--name", "Confirm"); // VERIFY
+  // UNVERIFIED below: the review step needs a non-zero private balance.
+  ab("find", "role", "button", "click", "--name", "Review cash out");
+  ab("wait", "--text", "Confirm");
+  ab("find", "role", "button", "click", "--name", "Confirm");
 
-  ab("wait", "--text", "successfully", "--timeout", "120000"); // VERIFY Solana success text
+  ab("wait", "--text", "successfully", "--timeout", "120000"); // UNVERIFIED: needs a funded private balance.
   console.log("  ✓ Unshield success");
 }
 

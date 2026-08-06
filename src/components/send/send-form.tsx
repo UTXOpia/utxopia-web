@@ -143,6 +143,7 @@ function CashOutDestinationPicker({
             <button
               key={option.value}
               type="button"
+              data-testid={`cash-out-destination-${option.value}`}
               aria-pressed={selected}
               onClick={() => onChange(option.value)}
               className={cn(
