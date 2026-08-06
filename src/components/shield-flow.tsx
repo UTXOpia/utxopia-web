@@ -173,8 +173,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       const { npkBytes } = shieldOutput;
 
       const programId = new PublicKey(chainEnv.config.solana.utxopiaProgramId);
-      const [tokenConfigPda] = deriveTokenConfigPDA(mintPubkey, programId);
       const poolStatePda = new PublicKey(chainEnv.config.solana.poolState!);
+      // Always seed from this vault's pool — the default is the pool of whatever
+      // mint the SDK config carries, which is the wrong pool on a dual-vault network.
+      const [tokenConfigPda] = deriveTokenConfigPDA(mintPubkey, programId, poolStatePda);
       const commitmentTreePda = new PublicKey(
         chainEnv.config.solana.commitmentTree!,
       );

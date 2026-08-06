@@ -40,6 +40,7 @@ export function TokenSourcePicker({
       <label className="block text-xs text-muted-foreground mb-1.5">From</label>
       <button
         type="button"
+        data-testid="token-source-trigger"
         disabled={disabled}
         onClick={() => setOpen((o) => !o)}
         className={cn(
@@ -71,6 +72,7 @@ export function TokenSourcePicker({
             <button
               key={t.shieldedSymbol}
               type="button"
+              data-testid={`token-source-${t.shieldedSymbol}`}
               onClick={() => {
                 onSelect(t.shieldedSymbol);
                 setOpen(false);

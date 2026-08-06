@@ -327,7 +327,11 @@ export async function POST(request: NextRequest) {
       });
 
       // Accounts: pool_state, tree, vk, user, system, token_config, vault, token_program, recipients..., nullifiers...
-      const [tokenConfigPDA] = deriveTokenConfigPDA(unshieldMint, programId);
+      // Seed the token config with *this* vault's pool. The default is the pool of
+      // whatever mint the SDK config happens to carry, which on a dual-vault network
+      // is a different pool — and its token_config PDA does not exist, so the program
+      // sees a system-owned account and rejects the spend.
+      const [tokenConfigPDA] = deriveTokenConfigPDA(unshieldMint, programId, poolState);
       keys.push(
         { pubkey: poolState, isSigner: false, isWritable: true },
         { pubkey: commitmentTree, isSigner: false, isWritable: true },
@@ -399,7 +403,7 @@ export async function POST(request: NextRequest) {
       const redemptionRequestPDAs = requestNonceBigints.map(n =>
         deriveRedemptionRequestPDA(relayer.publicKey, n, programId)[0]
       );
-      const [tokenConfigPDA] = deriveTokenConfigPDA(zkbtcMint, programId);
+      const [tokenConfigPDA] = deriveTokenConfigPDA(zkbtcMint, programId, poolState);
 
       ixData = buildRedeemInstructionData({
         nInputs, nOutputs,

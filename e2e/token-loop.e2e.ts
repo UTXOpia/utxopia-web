@@ -68,6 +68,9 @@ const SHIELD_TOKEN = process.env.E2E_SHIELD_TOKEN ?? "SOL";
 
 /** Amount to shield / transfer / unshield per step.
  *  Must be well below the funded balance. Adjust per funded amount. */
+/** The private-balance symbol the shield produces, e.g. SOL -> zkSOL. */
+const SHIELDED_TOKEN = `zk${SHIELD_TOKEN}`;
+
 const SHIELD_AMOUNT = "0.01";
 const TRANSFER_AMOUNT = "0.005";
 const UNSHIELD_AMOUNT = "0.004";
@@ -169,7 +172,26 @@ function injectDevKeysViaStorage(keys: DevKeys, targetUrl: string): void {
 /** Pick a token in the ShieldFlow dropdown. The trigger and each option carry
  *  data-testids because their visible labels are multi-line and not matchable
  *  by accessible name. */
+/** Click a button by label, scrolling to it first.
+ *
+ *  agent-browser's click does not scroll, and every primary action here sits
+ *  below the fold on a laptop viewport — the click then lands on nothing and
+ *  the run waits out the next selector instead of failing where it broke.
+ */
+function clickButton(name: string): void {
+  ab(
+    "eval",
+    `Array.from(document.querySelectorAll('button'))` +
+      `.find(b => b.innerText.trim().startsWith(${JSON.stringify(name)}))` +
+      `?.scrollIntoView({ block: 'center' })`,
+  );
+  ab("wait", "300");
+  ab("find", "role", "button", "click", "--name", name);
+}
+
 function selectToken(symbol: string): void {
+  ab("scrollintoview", '[data-testid="token-selector-trigger"]');
+  ab("wait", "300");
   ab("find", "testid", "token-selector-trigger", "click");
   ab("wait", "800");
   ab("find", "testid", `token-option-${symbol}`, "click");
@@ -178,6 +200,25 @@ function selectToken(symbol: string): void {
 
 /** Choose the withdraw destination network (Bitcoin vs Solana).
  *  Defaults to Bitcoin, so the Solana cash-out leg must switch explicitly. */
+/** Switch the "From" private-balance asset on the send / withdraw pages.
+ *
+ *  Both default to zkBTC. Left alone, the loop shields one asset and then
+ *  spends a different one — the transfer drains whatever zkBTC happened to be
+ *  lying around and the unshield fails with "No available private notes can
+ *  cover this amount", which reads like a bug but is just the legs disagreeing.
+ */
+function selectSourceToken(shieldedSymbol: string): void {
+  // The picker sits at the bottom of both flows and agent-browser does not
+  // scroll before clicking, so without this the trigger click lands on nothing
+  // and the failure surfaces as a missing *option*, one step later.
+  ab("scrollintoview", '[data-testid="token-source-trigger"]');
+  ab("wait", "300");
+  ab("find", "testid", "token-source-trigger", "click");
+  ab("wait", "500");
+  ab("find", "testid", `token-source-${shieldedSymbol}`, "click");
+  ab("wait", "1000");
+}
+
 function selectCashOutDestination(destination: "bitcoin" | "solana"): void {
   ab("find", "testid", `cash-out-destination-${destination}`, "click");
   ab("wait", "1200");
@@ -204,6 +245,10 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   ab("find", "testid", "shield-amount", "fill", amount);
   ab("wait", "500"); // brief settle for balance/canSubmit reactivity
 
+  // The submit sits below the fold on a laptop viewport and agent-browser's
+  // click does not scroll to it — the click lands on nothing and the run then
+  // waits out the success selector for no reason.
+  ab("scrollintoview", '[data-testid="shield-submit"]');
   ab("find", "testid", "shield-submit", "click");
 
   ab("wait", '[data-testid="shield-success"]', "--timeout", "90000");
@@ -222,18 +267,26 @@ async function stepTransfer(chain: ChainConfig, keys: DevKeys, amount: string, r
   // here, and the amount field only mounts once the recipient parses.
   ab("find", "label", "Recipient", "fill", recipient);
   ab("wait", "1000");
+  // Only now does the asset picker exist — before a recipient parses, the
+  // "From" row is the vault selector, not the private-balance one.
+  selectSourceToken(SHIELDED_TOKEN);
   ab("find", "label", "Amount", "fill", amount);
   ab("wait", "500");
 
   // Submit — opens the ReviewModal. Must not be matched as "Send": that also
   // matches "Send via claim link", which is a different flow.
-  ab("find", "role", "button", "click", "--name", "Review private transfer");
-  // UNVERIFIED: the ReviewModal only opens with a non-zero balance, so the
-  // confirm control below could not be checked against a live app.
-  ab("wait", "--text", "Confirm");
-  ab("find", "role", "button", "click", "--name", "Confirm");
+  clickButton("Review private transfer");
+  // The review modal confirms via HoldButton, labelled "Hold to confirm". With
+  // NEXT_PUBLIC_DEV_SIGNER=1 it wires onClick straight to onComplete, so a
+  // plain click is enough; without it this would need a real press-and-hold.
+  ab("wait", "--text", "Hold to confirm");
+  clickButton("Hold to confirm");
 
-  ab("wait", "--text", "privately", "--timeout", "120000"); // covers "Sent privately" and "added privately"
+  // "View on explorer" renders only in the modal's success view, and only once
+  // a signature came back. Anything looser is a false pass: the previous wait
+  // matched "privately" — which is already in the "Send privately" heading, so
+  // it returned before the transfer was even submitted.
+  ab("wait", "--text", "View on explorer", "--timeout", "120000");
   console.log("  ✓ Transfer success");
 }
 
@@ -279,11 +332,11 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
   // PSBT path below applies to the testnet4 wallet flow and is UNVERIFIED: the
   // BTC legs need the full backend stack (see README § BTC legs) to exercise.
   try {
-    ab("find", "role", "button", "click", "--name", "Get private test BTC");
+    clickButton("Get private test BTC");
   } catch {
-    ab("find", "role", "button", "click", "--name", "Add BTC privately");
+    clickButton("Add BTC privately");
     ab("wait", "--text", "Confirm & Sign", "--timeout", "20000");
-    ab("find", "role", "button", "click", "--name", "Confirm & Sign");
+    clickButton("Confirm & Sign");
   }
   ab("wait", "--text", "submitted", "--timeout", "60000");
   screenshot("btc-deposit-submitted");
@@ -354,10 +407,10 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   ab("wait", "1000");
   ab("find", "label", "Amount", "fill", BTC_REDEEM_AMOUNT);
   ab("wait", "500");
-  ab("find", "role", "button", "click", "--name", "Review BTC withdrawal");
+  clickButton("Review BTC withdrawal");
   // UNVERIFIED below: the review modal needs a non-zero private balance.
   ab("wait", "--text", "Hold to confirm", "--timeout", "10000");
-  ab("find", "role", "button", "click", "--name", "Hold to confirm");
+  clickButton("Hold to confirm");
 
   // Wait for the app to navigate to the activity page with result=cashout_btc.
   // send-form.tsx line 458: router.push(`/vault/activity?result=cashout_btc`)
@@ -416,14 +469,18 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
   selectCashOutDestination("solana");
   ab("find", "label", "Solana wallet address", "fill", addr);
   ab("wait", "1000");
+  selectSourceToken(SHIELDED_TOKEN);
   ab("find", "label", "Amount", "fill", amount);
   ab("wait", "500");
-  // UNVERIFIED below: the review step needs a non-zero private balance.
-  ab("find", "role", "button", "click", "--name", "Review cash out");
-  ab("wait", "--text", "Confirm");
-  ab("find", "role", "button", "click", "--name", "Confirm");
+  clickButton("Review cash out");
+  ab("wait", "--text", "Hold to confirm");
+  clickButton("Hold to confirm");
 
-  ab("wait", "--text", "successfully", "--timeout", "120000"); // UNVERIFIED: needs a funded private balance.
+  // The submission does NOT redirect: send-form keeps the user on the page and
+  // the modal shows the confirmed result inline, with "View activity" as an
+  // explicit action. So assert on the success view — waiting for a
+  // /vault/activity URL just burns the timeout and wedges the browser daemon.
+  ab("wait", "--text", "View on explorer", "--timeout", "180000");
   console.log("  ✓ Unshield success");
 }
 
