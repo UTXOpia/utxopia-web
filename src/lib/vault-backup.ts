@@ -51,36 +51,20 @@ export function markVaultBackupComplete(identity: string): void {
   localStorage.setItem(BACKUP_STATUS_PREFIX + identity, "1");
 }
 
-/** Parse a recovery file for import. Unlike the vault-side checks, this cannot
- *  compare against a live vault — the whole point of importing is that the
- *  original credential is gone — so it validates shape only. The Solana pubkey
- *  comes from the identity string: key reconstruction needs the same bytes the
- *  keys were serialized under, and passkey vaults derive under all-zeros. */
-export function parseVaultBackupFile(raw: string): {
-  payload: VaultBackupPayload;
-  solanaPublicKey: Uint8Array;
-} {
+export function verifyVaultBackupPayload(raw: string, identity: string): void {
   let payload: Partial<VaultBackupPayload>;
   try {
     payload = JSON.parse(raw) as Partial<VaultBackupPayload>;
   } catch {
     throw new Error("This is not a valid UTXOpia recovery file.");
   }
-  if (payload.version !== 1 || payload.app !== "UTXOpia" || !payload.identity || !payload.keys) {
-    throw new Error("This recovery file is incomplete or from an unsupported version.");
+  if (payload.version !== 1 || payload.app !== "UTXOpia" || payload.identity !== identity || !payload.keys) {
+    throw new Error("This recovery file belongs to a different wallet or is incomplete.");
   }
-  const walletHex = payload.identity.startsWith("wallet:")
-    ? payload.identity.slice("wallet:".length)
-    : null;
-  if (walletHex && !/^[0-9a-f]{64}$/i.test(walletHex)) {
-    throw new Error("This recovery file has a malformed wallet identity.");
+  const currentKeys = UTXOpiaClient.instance().serializeKeys();
+  if (!currentKeys || stableJson(payload.keys) !== stableJson(currentKeys)) {
+    throw new Error("This recovery file does not match the current private wallet.");
   }
-  return {
-    payload: payload as VaultBackupPayload,
-    solanaPublicKey: walletHex
-      ? Uint8Array.from(Buffer.from(walletHex, "hex"))
-      : new Uint8Array(32),
-  };
 }
 
 export function createVaultBackupPayload(identity: string): VaultBackupPayload {
@@ -118,4 +102,13 @@ function isPasskeyVault(keys: {
 }): boolean {
   const pubkey = keys.solanaPublicKey;
   return !!pubkey && Array.from(pubkey).every((byte) => byte === 0);
+}
+
+function stableJson(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(stableJson).join(",")}]`;
+  if (value && typeof value === "object") {
+    const object = value as Record<string, unknown>;
+    return `{${Object.keys(object).sort().map((key) => `${JSON.stringify(key)}:${stableJson(object[key])}`).join(",")}}`;
+  }
+  return JSON.stringify(value);
 }

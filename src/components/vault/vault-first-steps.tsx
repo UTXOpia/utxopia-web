@@ -11,6 +11,7 @@ import {
   Download,
   PlusCircle,
   ShieldCheck,
+  Upload,
 } from "lucide-react";
 import type { UTXOpiaKeys } from "@utxopia/sdk";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -19,6 +20,7 @@ import {
   downloadVaultBackup,
   getBackupIdentityForKeys,
   markVaultBackupComplete,
+  verifyVaultBackupPayload,
 } from "@/lib/vault-backup";
 import { notifyCopied } from "@/lib/notifications";
 import { cn } from "@/lib/utils";
@@ -47,6 +49,7 @@ export function VaultFirstSteps({
   // pending-backup dot, and sending stays gated until backup is done.
   const [isExpanded, setIsExpanded] = useState(false);
   const [downloaded, setDownloaded] = useState(false);
+  const [verificationError, setVerificationError] = useState<string | null>(null);
   const [everFunded, setEverFunded] = useState(false);
   const { copied, copy } = useCopyToClipboard();
 
@@ -76,14 +79,10 @@ export function VaultFirstSteps({
     button: "bg-foreground text-background hover:bg-white",
   };
 
-  // Taking a copy of the keys — downloaded or copied — is what completes the
-  // step; there is no upload-back check to gate sending on.
   const handleDownloadBackup = () => {
     if (!identity) return;
     downloadVaultBackup(identity);
     setDownloaded(true);
-    markVaultBackupComplete(identity);
-    onBackupComplete?.();
   };
 
   const handleCopyBackup = () => {
@@ -91,8 +90,18 @@ export function VaultFirstSteps({
     const payload = createVaultBackupPayload(identity);
     copy(JSON.stringify(payload, null, 2));
     notifyCopied("Private vault recovery backup");
-    markVaultBackupComplete(identity);
-    onBackupComplete?.();
+  };
+
+  const handleVerifyBackup = async (file: File | undefined) => {
+    if (!identity || !file) return;
+    try {
+      verifyVaultBackupPayload(await file.text(), identity);
+      markVaultBackupComplete(identity);
+      setVerificationError(null);
+      onBackupComplete?.();
+    } catch (cause) {
+      setVerificationError(cause instanceof Error ? cause.message : "Recovery verification failed.");
+    }
   };
 
   // Funds without a backup are unrecoverable if keys are lost — escalate
@@ -199,7 +208,20 @@ export function VaultFirstSteps({
                   {copied ? <Check className="h-3.5 w-3.5" /> : <Copy className="h-3.5 w-3.5" />}
                   {copied ? "Copied" : "Copy"}
                 </button>
+                <label className="inline-flex min-h-11 cursor-pointer items-center gap-1.5 rounded-[8px] bg-muted px-3 text-caption font-semibold text-gray-light transition-colors hover:bg-muted/80">
+                  <Upload className="h-3.5 w-3.5" />
+                  Verify recovery file
+                  <input
+                    type="file"
+                    accept="application/json,.json"
+                    className="sr-only"
+                    onChange={(event) => void handleVerifyBackup(event.target.files?.[0])}
+                  />
+                </label>
               </div>
+            )}
+            {!hasBackup && verificationError && (
+              <p className="mt-2 pl-[30px] text-[11px] text-error">{verificationError}</p>
             )}
           </div>
         </div>

@@ -51,7 +51,6 @@ export function useUTXOpia() {
     // Keys
     keys: store.keys,
     isViewOnly: store.isViewOnly,
-    isImportedSession: store.isImportedSession,
     stealthAddress: store.stealthAddress,
     stealthAddressEncoded: store.stealthAddressEncoded,
     isLoading: store.isLoading,
@@ -82,7 +81,6 @@ export function useUTXOpiaKeys() {
   return {
     keys: ctx.keys,
     isViewOnly: ctx.isViewOnly,
-    isImportedSession: ctx.isImportedSession,
     stealthAddress: ctx.stealthAddress,
     stealthAddressEncoded: ctx.stealthAddressEncoded,
     isLoading: ctx.isLoading,

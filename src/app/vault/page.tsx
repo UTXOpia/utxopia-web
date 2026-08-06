@@ -71,7 +71,6 @@ export default function VaultPage() {
   const {
     keys,
     isViewOnly,
-    isImportedSession,
     stealthAddressEncoded,
     isLoading,
     error,
@@ -132,7 +131,6 @@ export default function VaultPage() {
 
   const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
-  const importBackupKeys = useUTXOpiaStore((s) => s.importBackupKeys);
 
   const handlePasskeyRegister = async () => {
     const seed = await registerPasskey();
@@ -159,8 +157,8 @@ export default function VaultPage() {
   const [snsNameInput, setSnsNameInput] = useState("");
 
   useEffect(() => {
-    setHasRecoveryBackup(isImportedSession || hasBackupForKeys(keys));
-  }, [keys, isImportedSession]);
+    setHasRecoveryBackup(hasBackupForKeys(keys));
+  }, [keys]);
 
   const snsSuggestion = useMemo(() => {
     const tail = (stealthAddressEncoded ?? "")
@@ -491,7 +489,6 @@ export default function VaultPage() {
           onWalletConnect: () => { setAuthModalOpen(false); setVisible(true); },
           onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
           onViewOnlyLogin: (viewingKey) => { loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
-          onImportBackup: async (contents) => { await importBackupKeys(contents); setAuthModalOpen(false); },
         }}
       />
 
