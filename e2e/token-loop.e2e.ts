@@ -39,6 +39,9 @@ interface ChainConfig {
 
 const APP_URL = process.env.APP_URL ?? "http://localhost:3000";
 
+/** Esplora base used to confirm the BTC payout actually landed. */
+const ESPLORA_URL = process.env.E2E_ESPLORA_URL ?? "https://btc.utxopia.com/regtest";
+
 /** BTC-leg feature flag — set RUN_BTC=1 to enable BTC deposit + redeem steps.
  *  Requires the full backend stack (see README § BTC legs). */
 const RUN_BTC = process.env.RUN_BTC === "1";
@@ -163,18 +166,41 @@ function ab(...args: string[]): string {
  *  request short and do the waiting here.
  */
 function waitForText(text: string, totalMs: number): void {
+  waitForAnyText([text], totalMs);
+}
+
+/** Same, but satisfied by whichever of several strings shows up first. Used
+ *  where one step has two legitimate outcomes — e.g. the BTC deposit renders the
+ *  regtest faucet's "Private BTC balance updated" but the testnet4 wallet flow's
+ *  "submitted", and which one you get depends on the network. */
+function waitForAnyText(texts: string[], totalMs: number): void {
   const deadline = Date.now() + totalMs;
   let lastError: unknown;
   while (Date.now() < deadline) {
-    try {
-      ab("wait", "--text", text, "--timeout", "8000");
-      return;
-    } catch (err) {
-      lastError = err;
+    for (const text of texts) {
+      try {
+        ab("wait", "--text", text, "--timeout", "8000");
+        return;
+      } catch (err) {
+        lastError = err;
+      }
     }
   }
+  // Say what the page actually showed. Without this a timeout is unfalsifiable:
+  // you cannot tell a wrong expected string from a step that never ran, and the
+  // screenshot is taken later, by which point transient banners have gone.
+  let onScreen = "<unavailable>";
+  try {
+    onScreen = ab(
+      "eval",
+      "location.pathname + ' :: ' + document.body.innerText.replace(/\\s+/g,' ').slice(0,600)",
+    );
+  } catch {
+    // Page unreadable — the message below still names what was expected.
+  }
   throw new Error(
-    `timed out after ${totalMs}ms waiting for text ${JSON.stringify(text)}\n` +
+    `timed out after ${totalMs}ms waiting for any of ${JSON.stringify(texts)}\n` +
+      `page showed: ${onScreen}\n` +
       `${lastError instanceof Error ? lastError.message : String(lastError)}`,
   );
 }
@@ -192,6 +218,65 @@ function waitIdle(): void {
     ab("wait", "--load", "networkidle", "--timeout", "8000");
   } catch {
     // Not settled within the slice — the next explicit wait decides the outcome.
+  }
+}
+
+/** Dismiss the onboarding modals that gate /vault.
+ *
+ *  Two stack up on a fresh profile — "Claim your receive name", then "Use a
+ *  private vault" — and they cover the page entirely. The redeem leg polls
+ *  /vault for withdrawal status, so without this it waits out its whole budget
+ *  looking at a modal while the withdrawal has long since confirmed on chain.
+ */
+function dismissOnboarding(): void {
+  for (const name of ["Maybe later", "Skip"]) {
+    try {
+      ab("find", "role", "button", "click", "--name", name);
+      ab("wait", "500");
+    } catch {
+      // Not showing — nothing to dismiss.
+    }
+  }
+}
+
+/** Mine regtest blocks. Nothing mines on its own, so a BTC payout sits in the
+ *  mempool forever, and the redemption then waits on *finality* — the light
+ *  client finalises a few blocks back, so confirming the payout is not enough
+ *  ("block 494 > finalized 490"). Both stages need blocks to keep coming. */
+function mineRegtest(blocks: number): void {
+  try {
+    execSync(
+      `curl -s -X POST "${APP_URL}/api/regtest/mine?network=devnet-regtest" ` +
+        `-H 'Content-Type: application/json' -d '{"blocks":${blocks}}' --max-time 60`,
+      { stdio: "pipe" },
+    );
+  } catch {
+    // Not a regtest deployment, or the miner is unavailable — the poll below
+    // still decides the outcome.
+  }
+}
+
+/** Sats received at the BTC payout address, confirmed + mempool.
+ *
+ *  This is the ground truth for "the cash-out arrived", and it is external to
+ *  the app. The alternatives do not work: /vault renders no withdrawal status,
+ *  the activity page hides it inside an expanded row, and
+ *  /api/explorer/redemptions scans redemption PDAs — which complete_redemption
+ *  closes, so a *successful* redemption vanishes from that feed.
+ */
+function payoutSats(address: string): number {
+  try {
+    const raw = execSync(
+      `curl -s "${ESPLORA_URL}/api/address/${address}" --max-time 30`,
+      { encoding: "utf-8", stdio: "pipe" },
+    );
+    const d = JSON.parse(raw) as {
+      chain_stats?: { funded_txo_sum?: number };
+      mempool_stats?: { funded_txo_sum?: number };
+    };
+    return (d.chain_stats?.funded_txo_sum ?? 0) + (d.mempool_stats?.funded_txo_sum ?? 0);
+  } catch {
+    return -1;
   }
 }
 
@@ -406,7 +491,9 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
     ab("wait", "--text", "Confirm & Sign", "--timeout", "20000");
     clickButton("Confirm & Sign");
   }
-  waitForText("submitted", 60000);
+  // regtest credits the vault directly via the faucet; testnet4 goes through the
+  // wallet PSBT flow. Accept whichever this network actually renders.
+  waitForAnyText(["Private BTC balance updated", "submitted"], 60000);
   screenshot("btc-deposit-submitted");
   console.log("  ✓ BTC deposit broadcast");
 
@@ -460,6 +547,9 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
  * we wait for it to show up in the withdrawal-status tracker.
  */
 async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
+  // Baseline first: a redemption that settled on an earlier run must not count
+  // as this one succeeding.
+  const payoutBefore = payoutSats(BTC_REDEEM_ADDR);
   const withdrawUrl = `${APP_URL}/vault/withdraw?network=${chain.network}`;
   console.log(`  → BTC redeem: navigating to ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
@@ -491,32 +581,28 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   screenshot("btc-redeem-submitted");
   console.log("  ✓ BTC redeem submitted; polling for BTC txid…");
 
-  // Poll /vault/withdraw (or the vault btc-widget panel) for the withdrawal
-  // status tracker showing "Confirmed" or a BTC txid.  The WithdrawalStatusList
-  // component renders inside the vault page; navigate there to poll.
-  const vaultUrl = `${APP_URL}/vault?network=${chain.network}`;
+  // Poll the redemption feed for settlement. Not the UI: /vault renders no
+  // withdrawal status at all, and on the activity page the status lives inside
+  // an expanded row behind two onboarding modals.
   const deadline = Date.now() + BTC_REDEEM_TIMEOUT_MS;
   let confirmed = false;
 
   while (Date.now() < deadline) {
-    injectDevKeysViaStorage(keys, vaultUrl);
-    waitIdle();
-    try {
-      // WithdrawalStatusList renders "Confirmed" badge label from withdrawal-status.tsx line 37.
-      ab("wait", "--text", "Confirmed", "--timeout", "8000"); // UNVERIFIED: needs the redemption service + Ika to confirm.
+    // Keep blocks coming: the payout needs confirmations, then the redemption
+    // needs the light client to finalise that block. Both stall without this.
+    // Keep blocks coming: the payout needs confirmations, and then the
+    // redemption needs the light client to finalise that block. Both stall
+    // without this — nothing mines on regtest.
+    mineRegtest(2);
+    const payoutNow = payoutSats(BTC_REDEEM_ADDR);
+    if (payoutNow > payoutBefore) {
+      console.log(`  → payout received: ${payoutNow - payoutBefore} sats`);
       confirmed = true;
       break;
-    } catch {
-      // Also accept a raw BTC txid substring (64 hex chars — any 8-char hex slug is a signal).
-      try {
-        ab("wait", "--text", "BTC TX", "--timeout", "3000"); // UNVERIFIED: needs a BTC txid from Ika MPC.
-        confirmed = true;
-        break;
-      } catch {
-        const remaining = Math.round((deadline - Date.now()) / 1000);
-        console.log(`  … BTC txid not yet visible; ${remaining}s remaining`);
-      }
     }
+    const remaining = Math.round((deadline - Date.now()) / 1000);
+    console.log(`  … BTC payout not received yet (${payoutNow} sats at destination); ${remaining}s remaining`);
+    execSync("sleep 10");
   }
 
   if (!confirmed) {
