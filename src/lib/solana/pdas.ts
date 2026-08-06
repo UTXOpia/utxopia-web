@@ -54,6 +54,14 @@ export function getChadbufferProgramId(): PublicKey {
 
 // =============================================================================
 // PDA Derivation (sync, using PDA_SEEDS from SDK)
+//
+// Every default below resolves through the SDK config, and `initConfig` is only
+// ever called from the browser (chain-environment.ts). Server code that takes
+// the defaults therefore derives against the SDK's built-in mint — a pool that
+// was never deployed — and the program rejects the resulting accounts as
+// system-owned. In an API route, always pass `poolId`/`poolState` explicitly
+// from the resolved network config. On a dual-vault network the same applies to
+// client code: the default is whichever vault the SDK saw last.
 // =============================================================================
 
 export function derivePoolStatePDA(
@@ -198,8 +206,8 @@ export function derivePoolVaultATA(
   programId: PublicKey = getUTXOpiaProgramId(),
   mint: PublicKey = getZkbtcMint(),
   tokenProgramId: PublicKey = getToken2022ProgramId(),
+  poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): PublicKey {
-  const [poolState] = derivePoolStatePDA(programId);
   return getAssociatedTokenAddressSync(
     mint,
     poolState,

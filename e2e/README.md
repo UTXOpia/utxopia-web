@@ -86,6 +86,24 @@ source .env.e2e && bun e2e/token-loop.e2e.ts
 The script exits 0 on success, non-zero on any step failure.
 Screenshots on failure are written to `e2e/screenshots/`.
 
+### When the browser daemon wedges
+
+`Failed to read: Resource temporarily unavailable (os error 35)` is the
+agent-browser daemon dying, not a product failure — it happens under the CPU
+load of proof generation. The tell is that the failure screenshot *also* fails
+to capture. Recover with a close, a pause, and one warm-up open; running the
+suite immediately after `close` races the restart and fails on the first step:
+
+```bash
+agent-browser close; sleep 5; agent-browser open http://localhost:3000
+```
+
+Check the chain before believing such a failure: a wedge during UNSHIELD leaves
+the note spent by TRANSFER and no cash-out, so the *next* run can pick that
+stale note and fail with `custom program error: 0x1774`
+(6004 `NullifierAlreadyUsed`). That is leftover fixture state, not a bug — it
+clears once a full run completes.
+
 ## What the test drives
 
 On Solana devnet:

@@ -18,7 +18,13 @@ export function usePoolFees() {
     setLoading(true);
     try {
       const programId = new PublicKey(chainEnv.config.solana.utxopiaProgramId);
-      const [poolState] = derivePoolStatePDA(programId);
+      // Seed from the environment's mint, not the SDK default: on a dual-vault
+      // network the default is whichever vault the SDK was configured for last,
+      // so the fees shown could belong to the other pool.
+      const [poolState] = derivePoolStatePDA(
+        programId,
+        new PublicKey(chainEnv.config.tokens.zkbtcMint),
+      );
       const account = await connection.getAccountInfo(poolState, "confirmed");
       const parsed = account ? parsePoolFees(account.data) : null;
       if (!parsed) throw new Error("Pool fee configuration is unavailable.");
@@ -32,7 +38,7 @@ export function usePoolFees() {
     } finally {
       setLoading(false);
     }
-  }, [chainEnv.config.solana.utxopiaProgramId, connection]);
+  }, [chainEnv.config.solana.utxopiaProgramId, chainEnv.config.tokens.zkbtcMint, connection]);
 
   useEffect(() => {
     void refresh().catch(() => undefined);

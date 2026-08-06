@@ -352,11 +352,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<VerifyRes
     };
 
     try {
-    // 5. Derive all PDAs
-    const [poolStatePDA] = derivePoolStatePDA(utxopiaProgramId);
-    const [commitmentTreePDA] = deriveCommitmentTreePDA(utxopiaProgramId);
+    // 5. Derive all PDAs. Seed the pool from this network's mint rather than
+    // letting it default: the default reads the SDK config, and `initConfig`
+    // only ever runs in the browser (chain-environment.ts), so on the server it
+    // resolves to a mint that was never deployed — a pool whose PDAs do not
+    // exist, which the program rejects as a bad account owner.
+    const [poolStatePDA] = derivePoolStatePDA(utxopiaProgramId, zkbtcMint);
+    const [commitmentTreePDA] = deriveCommitmentTreePDA(utxopiaProgramId, 0, poolStatePDA);
     const [lightClientPDA] = deriveLightClientPDA(btcLightClientProgramId);
-    const poolVaultATA = derivePoolVaultATA(utxopiaProgramId, zkbtcMint, token2022ProgramId);
+    const poolVaultATA = derivePoolVaultATA(utxopiaProgramId, zkbtcMint, token2022ProgramId, poolStatePDA);
     // Active complete_deposit (disc 11) flow keys the receipt by txid only (web-local helper).
     const [depositReceiptPDA] = deriveDepositReceiptPDA(depositTxidInternal, utxopiaProgramId);
 
