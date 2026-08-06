@@ -50,10 +50,7 @@ export function useJoinSplitSubmit() {
 
     try {
       const {
-        buildRedeemInstructionData,
         buildPolicyIntentParts,
-        buildTransactInstructionData,
-        buildUnshieldInstructionData,
         bytesToHex,
         hexToBytes,
         UTXOpiaClient,
@@ -147,44 +144,10 @@ export function useJoinSplitSubmit() {
           throw new Error("Verified Privacy relayer is unavailable");
         }
 
-        const instructionCommon = {
-          nInputs,
-          nOutputs,
-          merkleRoot: hexToBytes(merkleRootHex),
-          boundParamsHash: hexToBytes(boundParamsHashHex),
-          nullifiers: nullifierHexes.map(hexToBytes),
-          commitmentsOut: commitmentHexes.map(hexToBytes),
-          proofSource: 1 as const,
-        };
-        let instructionData: Uint8Array;
-        if (params.relayMode === "redeem") {
-          instructionData = buildRedeemInstructionData({
-            ...instructionCommon,
-            nPublicOutputs: 1,
-            stealthData: params.stealthDataArrays.slice(0, -1),
-            redeemAmounts: [redeemAmountSats ?? 0n],
-            btcScripts: [params.btcScriptPubKey!],
-            requestNonces: [requestNonce!],
-          });
-        } else if (params.relayMode === "unshield") {
-          const unshieldAmount = BigInt(
-            params.proofInputs.outputs[params.proofInputs.outputs.length - 1].value,
-          );
-          instructionData = buildUnshieldInstructionData({
-            ...instructionCommon,
-            nPublicOutputs: 1,
-            stealthData: params.stealthDataArrays.slice(0, -1),
-            unshieldAmounts: [unshieldAmount],
-          });
-        } else {
-          instructionData = buildTransactInstructionData({
-            ...instructionCommon,
-            stealthData: params.stealthDataArrays,
-          });
-        }
-        // The approval commits to the spend's intent, not to these bytes: a
-        // moving merkle root forces a re-proof, and a byte-bound approval would
-        // die the moment anyone else deposited while the authority was deciding.
+        // The approval commits to the spend's intent, not to the instruction
+        // bytes: a moving merkle root forces a re-proof, and a byte-bound
+        // approval would die the moment anyone else deposited while the
+        // authority was deciding.
         const intentParts =
           params.relayMode === "redeem"
             ? buildPolicyIntentParts({
