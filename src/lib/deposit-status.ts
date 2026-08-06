@@ -87,3 +87,16 @@ export const WITHDRAWAL_STATUS_CONFIG: Record<string, StatusDisplayConfig> = {
   Cancelled: { label: "Cancelled", color: "text-gray", bg: "bg-gray/10 border-gray/20" },
   Failed: { label: "Failed", color: "text-red-400", bg: "bg-red-500/10 border-red-500/20" },
 };
+
+/**
+ * Resolve a deposit lifecycle state to its display config.
+ *
+ * Falls back to the old fixed "Processing" wording for states this map does not
+ * know — a pending row is the only feedback the user gets until the deposit is
+ * credited, so an unrecognised state must still render as in-progress rather
+ * than blank.
+ */
+export function describeDepositStatus(status?: string): StatusDisplayConfig {
+  if (status && DEPOSIT_STATUS_CONFIG[status]) return DEPOSIT_STATUS_CONFIG[status];
+  return { label: "Processing", color: "text-warning/75", bg: "bg-warning/10 border-warning/20", spinning: true };
+}

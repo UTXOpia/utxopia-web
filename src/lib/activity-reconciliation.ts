@@ -12,6 +12,8 @@ export interface IndexedPrivateTransaction {
   inputs: Array<{ nullifierHash?: string; btcDepositTxid?: string }>;
   outputs: Array<{ commitment?: string }>;
   btcDepositTxid?: string;
+  /** Backend-classified lifecycle state, e.g. "confirmed" | "stalled". */
+  status?: string;
 }
 
 export type OwnedNoteOriginKind = "btc_deposit" | "shield" | "transfer";

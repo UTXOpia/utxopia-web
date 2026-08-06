@@ -64,6 +64,7 @@ import {
 } from "@/lib/activity-annotations";
 import { PersonalAnnotationEditor } from "@/components/activity/personal-annotation-editor";
 import { PRODUCT_COPY } from "@/lib/product-language";
+import { describeDepositStatus } from "@/lib/deposit-status";
 
 function getToken(sym: string): SupportedToken {
   return getTokenBySymbol(sym) || SUPPORTED_TOKENS[0];
@@ -309,17 +310,23 @@ function PendingFaucetRow({
   tokenPrices,
   annotation,
   onSaveAnnotation,
+  backendStatus,
 }: {
   activity: PendingFaucetActivity;
   tokenPrices: TokenPrices;
   annotation?: ActivityAnnotation;
   onSaveAnnotation: (input: { label?: string; note?: string }) => void;
+  /** Lifecycle state the indexer reports for this deposit, if it has seen it. */
+  backendStatus?: string;
 }) {
   const [expanded, setExpanded] = useState(false);
   const { config } = useChainEnvironment();
   const token = getToken("zkBTC");
   const price = tokenPrices[token.priceKey];
   const usdValue = price ? (Number(activity.amountSats) / 10 ** token.decimals) * price : 0;
+  // Fall back to the local optimistic state only while the indexer has nothing
+  // to say about this txid yet.
+  const pendingState = describeDepositStatus(backendStatus ?? activity.status);
   const btcTxUrl = activity.txid
     ? `${config.bitcoin.explorerUrl.replace(/\/$/, "")}/tx/${activity.txid}`
     : null;
@@ -341,7 +348,9 @@ function PendingFaucetRow({
           <span className="text-sm text-foreground font-medium">
             {annotation?.label ?? "Faucet deposit"}
           </span>
-          <p className="text-[11px] text-warning/75">Processing · {timeAgo(activity.createdAt)}</p>
+          <p className={cn("text-[11px]", pendingState.color)}>
+            {pendingState.label} · {timeAgo(activity.createdAt)}
+          </p>
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
@@ -810,6 +819,7 @@ function ActivityFeed() {
   const { networkId, vaultId, config } = useChainEnvironment();
   const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const [pendingActivities, setPendingActivities] = useState<PendingFaucetActivity[]>([]);
+  const [btcTxStatuses, setBtcTxStatuses] = useState<Map<string, string>>(new Map());
   const [submittedActivities, setSubmittedActivities] = useState<SubmittedTransactionActivity[]>([]);
   const [indexedTransactions, setIndexedTransactions] = useState<IndexedPrivateTransaction[]>([]);
   const [hashQuery, setHashQuery] = useState("");
@@ -840,6 +850,17 @@ function ActivityFeed() {
           transaction.btcDepositTxid ? [transaction.btcDepositTxid] : []
         ),
       );
+      // A pending row only disappears once its deposit is credited, so until
+      // then it is the only thing the user can look at. The backend already
+      // classifies these — showing a fixed "Processing" hid states like
+      // "stalled" behind a spinner that implied everything was on track.
+      setBtcTxStatuses(new Map(
+        indexedTransactions.flatMap((transaction) =>
+          transaction.btcDepositTxid && transaction.status
+            ? [[transaction.btcDepositTxid, transaction.status] as const]
+            : []
+        ),
+      ));
       setPendingActivities(getPendingFaucetActivities({
         networkId,
         stealthAddress,
@@ -902,6 +923,7 @@ function ActivityFeed() {
       inputs?: Array<{ nullifierHash?: string; btcDepositTxid?: string }>;
       outputs?: Array<{ commitment?: string }>;
       btcMeta?: { depositTxid?: string | null };
+      status?: string;
     }> };
     return (data.transactions ?? []).flatMap((transaction) =>
       transaction.txSignature && Number.isFinite(transaction.timestamp)
@@ -912,6 +934,7 @@ function ActivityFeed() {
             inputs: transaction.inputs ?? [],
             outputs: transaction.outputs ?? [],
             btcDepositTxid: transaction.btcMeta?.depositTxid ?? undefined,
+            status: transaction.status,
           }]
         : []
     );
@@ -1213,6 +1236,7 @@ function ActivityFeed() {
                       tokenPrices={tokenPrices}
                       annotation={annotations[annotationIdForActivity(item)]}
                       onSaveAnnotation={(input) => updateAnnotation(annotationIdForActivity(item), input)}
+                      backendStatus={btcTxStatuses.get(item.activity.txid)}
                     />
                   : <SubmittedTransactionRow
                       key={item.id}
