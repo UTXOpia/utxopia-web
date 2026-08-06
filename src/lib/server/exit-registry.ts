@@ -1,4 +1,5 @@
 import { Connection, PublicKey } from "@solana/web3.js";
+import { deriveExitDestinationPDA, EXIT_KIND_SOLANA_OWNER } from "@/lib/solana/pdas";
 
 /**
  * The pool's exit registry, as the relay needs it.
@@ -11,21 +12,15 @@ import { Connection, PublicKey } from "@solana/web3.js";
  * The browser-side counterpart lives in `@/lib/exit-registry`; this one runs on
  * the relay because that is where the account list is assembled.
  */
-const EXIT_DESTINATION_SEED = "exit_destination";
-const EXIT_KIND_SOLANA_OWNER = 0;
-
 export function solanaExitPda(
   programId: PublicKey,
   poolState: PublicKey,
   owner: PublicKey,
 ): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(EXIT_DESTINATION_SEED),
-      poolState.toBuffer(),
-      Buffer.from([EXIT_KIND_SOLANA_OWNER]),
-      owner.toBuffer(),
-    ],
+  return deriveExitDestinationPDA(
+    poolState,
+    EXIT_KIND_SOLANA_OWNER,
+    owner.toBytes(),
     programId,
   )[0];
 }

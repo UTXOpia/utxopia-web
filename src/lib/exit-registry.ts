@@ -1,6 +1,7 @@
 import { Connection, PublicKey } from "@solana/web3.js";
 import { Address, OutScript } from "@scure/btc-signer";
 import { sha256 } from "@noble/hashes/sha256";
+import { deriveExitDestinationPDA } from "@/lib/solana/pdas";
 
 /**
  * The Verified vault's exit registry, read straight from Solana.
@@ -15,7 +16,6 @@ import { sha256 } from "@noble/hashes/sha256";
  * is no on-chain question of the form "does this member have one". For SPL the
  * key is the owner's own pubkey, so that one is directly answerable.
  */
-const EXIT_DESTINATION_SEED = "exit_destination";
 export const EXIT_KIND_SOLANA_OWNER = 0;
 export const EXIT_KIND_BTC_SCRIPT = 1;
 
@@ -33,10 +33,7 @@ export function exitDestinationPda(
   kind: number,
   key: Uint8Array,
 ): PublicKey {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(EXIT_DESTINATION_SEED), poolState.toBuffer(), Buffer.from([kind]), Buffer.from(key)],
-    programId,
-  )[0];
+  return deriveExitDestinationPDA(poolState, kind, key, programId)[0];
 }
 
 /** `sha256(scriptPubKey)` — scripts are variable length, the key never is. */

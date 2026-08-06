@@ -20,7 +20,11 @@ import {
   TOKEN_PROGRAM_ID as SPL_TOKEN_PROGRAM_ID,
 } from "@solana/spl-token";
 import { UTXOpiaClient } from "@utxopia/sdk";
-import { deriveTokenConfigPDA } from "@/lib/solana/pdas";
+import {
+  deriveTokenConfigPDA,
+  deriveExitDestinationPDA,
+  EXIT_KIND_SOLANA_OWNER,
+} from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -193,13 +197,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       let exitDestinationPda: PublicKey | undefined;
       if (chainEnv.vaultId === "verified") {
         // Keyed on the depositor, because that is the owner an unshield credits.
-        [exitDestinationPda] = PublicKey.findProgramAddressSync(
-          [
-            Buffer.from("exit_destination"),
-            poolStatePda.toBytes(),
-            Buffer.from([0]),
-            publicKey.toBytes(),
-          ],
+        [exitDestinationPda] = deriveExitDestinationPDA(
+          poolStatePda,
+          EXIT_KIND_SOLANA_OWNER,
+          publicKey.toBytes(),
           programId,
         );
         const approval = await preparePolicyApproval({

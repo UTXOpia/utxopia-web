@@ -13,6 +13,11 @@ import {
   type MerkleProof,
 } from "./mempool";
 import { hexToBytes } from "@utxopia/sdk";
+import {
+  deriveLightClientPDA as sdkLightClientPDA,
+  deriveBlockHeaderPDA as sdkBlockHeaderPDA,
+  deriveHeightIndexPDA as sdkHeightIndexPDA,
+} from "@/lib/solana/pdas";
 
 // BTC Light Client Program ID — uses env var, falls back to devnet for dev
 const BTC_LIGHT_CLIENT_ID = new PublicKey(
@@ -42,10 +47,7 @@ export interface SPVVerifyResult {
 export function deriveLightClientPDA(
   programId: PublicKey = BTC_LIGHT_CLIENT_ID
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("btc_light_client")],
-    programId
-  );
+  return sdkLightClientPDA(programId);
 }
 
 /**
@@ -55,10 +57,7 @@ export function deriveBlockHeaderPDA(
   blockHash: Uint8Array,
   programId: PublicKey = BTC_LIGHT_CLIENT_ID
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("block"), Buffer.from(blockHash)],
-    programId
-  );
+  return sdkBlockHeaderPDA(blockHash, programId);
 }
 
 /**
@@ -68,12 +67,7 @@ export function deriveHeightIndexPDA(
   blockHeight: number,
   programId: PublicKey = BTC_LIGHT_CLIENT_ID
 ): [PublicKey, number] {
-  const heightBuffer = Buffer.alloc(8);
-  heightBuffer.writeBigUInt64LE(BigInt(blockHeight));
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("height_index"), heightBuffer],
-    programId
-  );
+  return sdkHeightIndexPDA(blockHeight, programId);
 }
 
 /**

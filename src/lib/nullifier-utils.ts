@@ -1,6 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
-import { PDA_SEEDS, getConfig } from "@utxopia/sdk";
+import { getConfig } from "@utxopia/sdk";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
+import { deriveNullifierPDA, getUTXOpiaProgramId } from "@/lib/solana/pdas";
 import type { NetworkId } from "@/lib/network-config";
 
 /** Derive nullifier PDA address (base58) from nullifier hash hex */
@@ -10,15 +11,14 @@ export function nullifierHashToPDA(hashHex: string): string {
   for (let i = 0; i < bytes.length; i++) {
     bytes[i] = parseInt(clean.slice(i * 2, i * 2 + 2), 16);
   }
-  // Pool-scoped, matching the program. Tree 0 only: this maps historical
-  // nullifier hashes to addresses for display, and no rotation has happened.
-  const [pda] = PublicKey.findProgramAddressSync(
-    [
-      Buffer.from(PDA_SEEDS.NULLIFIER),
-      new PublicKey(getConfig().poolStatePda).toBuffer(),
-      bytes,
-    ],
-    new PublicKey(getConfig().utxopiaProgramId)
+  // Tree 0 only: this maps historical nullifier hashes to addresses for
+  // display, and no rotation has happened. Seeds come from the SDK so this
+  // cannot drift from the program on its own.
+  const [pda] = deriveNullifierPDA(
+    bytes,
+    new PublicKey(getConfig().poolStatePda),
+    0,
+    getUTXOpiaProgramId(),
   );
   return pda.toBase58();
 }

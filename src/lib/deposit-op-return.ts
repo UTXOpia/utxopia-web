@@ -10,6 +10,7 @@ import {
   type DepositOpReturnContext,
 } from "@utxopia/sdk";
 import type { NetworkConfig } from "@/lib/network-config";
+import { derivePoolStatePDA } from "@/lib/solana/pdas";
 
 const TEXT_ENCODER = new TextEncoder();
 
@@ -43,10 +44,7 @@ export function parseDepositOpReturnHex(opReturnHex: string): {
 function solanaDepositOpReturnContext(cfg: NetworkConfig): DepositOpReturnContext {
   const programId = new PublicKey(cfg.solana.utxopiaProgramId);
   const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
-  const [poolStatePda] = PublicKey.findProgramAddressSync(
-    [Buffer.from("pool_state"), zkbtcMint.toBuffer()],
-    programId
-  );
+  const [poolStatePda] = derivePoolStatePDA(programId, zkbtcMint);
 
   return {
     destinationChain: DEPOSIT_DESTINATION_CHAIN.SOLANA,

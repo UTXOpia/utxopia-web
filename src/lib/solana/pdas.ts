@@ -1,18 +1,42 @@
 /**
  * Solana PDA Derivation & Config Helpers (web3.js)
  *
- * Thin wrapper that provides @solana/web3.js PublicKey constants and
- * synchronous PDA derivation using seed constants from @utxopia/sdk.
+ * An adapter, not a second implementation. Every seed array comes from
+ * `@utxopia/sdk`, which mirrors the on-chain program; this file only turns those
+ * seeds into `@solana/web3.js` `PublicKey`s synchronously, because the SDK's own
+ * derivations are async (`getProgramDerivedAddress`) and the wallet adapter path
+ * needs sync `PublicKey`s.
  *
- * All instruction data building lives in @utxopia/sdk — this file only
- * bridges SDK config → web3.js types for wallet-adapter compatibility.
+ * Do not write a seed literal here. This file used to restate the seeds itself
+ * and drifted from the program twice — the nullifier record and the redemption
+ * request each lost their pool scope, and each failed only on chain, after a
+ * proof had already been generated and paid for.
  *
  * @module solana/pdas
  */
 
 import { PublicKey } from "@solana/web3.js";
 import { getAssociatedTokenAddressSync } from "@solana/spl-token";
-import { getConfig, PDA_SEEDS } from "@utxopia/sdk";
+import {
+  getConfig,
+  blockHeaderSeeds,
+  commitmentTreeSeeds,
+  depositReceiptSeeds,
+  exitDestinationSeeds,
+  heightIndexSeeds,
+  lightClientSeeds,
+  nullifierRecordSeeds,
+  poolConfigSeeds,
+  poolStateSeeds,
+  redemptionRequestSeeds,
+  tokenConfigSeeds,
+  verifiedTransactionSeeds,
+  vkRegistrySeeds,
+  EXIT_KIND_SOLANA_OWNER,
+  EXIT_KIND_BTC_SCRIPT,
+} from "@utxopia/sdk";
+
+export { EXIT_KIND_SOLANA_OWNER, EXIT_KIND_BTC_SCRIPT };
 
 // =============================================================================
 // Program IDs as web3.js PublicKeys (lazy, from SDK config)
@@ -53,7 +77,7 @@ export function getChadbufferProgramId(): PublicKey {
 }
 
 // =============================================================================
-// PDA Derivation (sync, using PDA_SEEDS from SDK)
+// PDA Derivation (sync, over the SDK's seed builders)
 //
 // Every default below resolves through the SDK config, and `initConfig` is only
 // ever called from the browser (chain-environment.ts). Server code that takes
@@ -64,14 +88,19 @@ export function getChadbufferProgramId(): PublicKey {
 // client code: the default is whichever vault the SDK saw last.
 // =============================================================================
 
+/** Turn SDK seed bytes into a web3.js PDA. The one place address math happens. */
+function pda(seeds: Uint8Array[], programId: PublicKey): [PublicKey, number] {
+  return PublicKey.findProgramAddressSync(
+    seeds.map((seed) => Buffer.from(seed)),
+    programId,
+  );
+}
+
 export function derivePoolStatePDA(
   programId: PublicKey = getUTXOpiaProgramId(),
   poolId: PublicKey = getZkbtcMint(),
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.POOL_STATE), poolId.toBuffer()],
-    programId
-  );
+  return pda(poolStateSeeds(poolId.toBytes()), programId);
 }
 
 export function deriveCommitmentTreePDA(
@@ -79,57 +108,36 @@ export function deriveCommitmentTreePDA(
   treeIndex = 0,
   poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
-  const idx = Buffer.alloc(4);
-  idx.writeUInt32LE(treeIndex, 0);
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.COMMITMENT_TREE), poolState.toBuffer(), idx],
-    programId
-  );
+  return pda(commitmentTreeSeeds(poolState.toBytes(), treeIndex), programId);
 }
 
-/**
- * Seeds are ["nullifier", pool_state, nullifier] on tree 0, and
- * ["nullifier", pool_state, tree_index_le, nullifier] after a rotation.
- *
- * A nullifier is Poseidon(nullifyingKey, leafIndex), so it names a note only
- * within one pool and one tree — leaf indices restart at 0 in each new tree.
- * Drop either scope and two distinct notes collapse onto one PDA, where
- * spending either strands the other. Tree 0 keeps the shorter seeds so records
- * already on chain stay reachable.
- */
 export function deriveNullifierPDA(
   nullifierHash: Uint8Array,
   poolState: PublicKey,
   treeIndex = 0,
   programId: PublicKey = getUTXOpiaProgramId()
 ): [PublicKey, number] {
-  const seeds: Buffer[] = [Buffer.from(PDA_SEEDS.NULLIFIER), poolState.toBuffer()];
-  if (treeIndex !== 0) {
-    const idx = Buffer.alloc(4);
-    idx.writeUInt32LE(treeIndex);
-    seeds.push(idx);
-  }
-  seeds.push(Buffer.from(nullifierHash));
-  return PublicKey.findProgramAddressSync(seeds, programId);
+  return pda(nullifierRecordSeeds(nullifierHash, poolState.toBytes(), treeIndex), programId);
 }
 
 export function deriveLightClientPDA(
   programId: PublicKey = getBtcLightClientProgramId()
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.LIGHT_CLIENT)],
-    programId
-  );
+  return pda(lightClientSeeds(), programId);
 }
 
 export function deriveBlockHeaderPDA(
   blockHash: Uint8Array,
   programId: PublicKey = getBtcLightClientProgramId()
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.BLOCK_HEADER), blockHash],
-    programId
-  );
+  return pda(blockHeaderSeeds(blockHash), programId);
+}
+
+export function deriveHeightIndexPDA(
+  height: number | bigint,
+  programId: PublicKey = getBtcLightClientProgramId()
+): [PublicKey, number] {
+  return pda(heightIndexSeeds(height), programId);
 }
 
 export function deriveVkRegistryPDA(
@@ -137,30 +145,16 @@ export function deriveVkRegistryPDA(
   nOutputs: number,
   programId: PublicKey = getUTXOpiaProgramId()
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.VK_REGISTRY), new Uint8Array([nInputs]), new Uint8Array([nOutputs])],
-    programId
-  );
+  return pda(vkRegistrySeeds(nInputs, nOutputs), programId);
 }
 
-/** Pool-scoped, matching `redeem.rs`:
- *  `["redemption", pool_state, user, nonce_le]`. The pool seed was added on
- *  chain and in the SDK but not here, so this helper derived an address the
- *  program rejects with InvalidSeeds ("Provided seeds do not result in a valid
- *  address") — after the proof had already verified, which made it read like a
- *  proof problem. Same omission the nullifier PDA had. */
 export function deriveRedemptionRequestPDA(
   userPubkey: PublicKey,
   nonce: bigint,
   programId: PublicKey = getUTXOpiaProgramId(),
   poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
-  const nonceBytes = new Uint8Array(8);
-  new DataView(nonceBytes.buffer).setBigUint64(0, nonce, true);
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("redemption"), poolState.toBuffer(), userPubkey.toBytes(), nonceBytes],
-    programId
-  );
+  return pda(redemptionRequestSeeds(poolState.toBytes(), userPubkey.toBytes(), nonce), programId);
 }
 
 export function deriveVerifiedTransactionPDA(
@@ -168,20 +162,17 @@ export function deriveVerifiedTransactionPDA(
   txid: Uint8Array,
   programId: PublicKey = getBtcLightClientProgramId()
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("verified_tx"), Buffer.from(blockHash), Buffer.from(txid)],
-    programId
-  );
+  return pda(verifiedTransactionSeeds(blockHash, txid), programId);
 }
 
+/** Omit `depositVout` for the active `complete_deposit` flow; pass it for the
+ *  OP_RETURN-free `verify_deposit` flow, which keys one receipt per output. */
 export function deriveDepositReceiptPDA(
   depositTxid: Uint8Array,
-  programId: PublicKey = getUTXOpiaProgramId()
+  programId: PublicKey = getUTXOpiaProgramId(),
+  depositVout?: number,
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("deposit_receipt"), Buffer.from(depositTxid)],
-    programId
-  );
+  return pda(depositReceiptSeeds(depositTxid, depositVout), programId);
 }
 
 export function deriveTokenConfigPDA(
@@ -189,24 +180,33 @@ export function deriveTokenConfigPDA(
   programId: PublicKey = getUTXOpiaProgramId(),
   poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from(PDA_SEEDS.TOKEN_CONFIG), poolState.toBuffer(), mint.toBuffer()],
-    programId
-  );
+  return pda(tokenConfigSeeds(poolState.toBytes(), mint.toBytes()), programId);
 }
 
 export function derivePoolConfigPDA(
   programId: PublicKey = getUTXOpiaProgramId(),
   poolState: PublicKey = derivePoolStatePDA(programId)[0],
 ): [PublicKey, number] {
-  return PublicKey.findProgramAddressSync(
-    [Buffer.from("pool_config"), poolState.toBuffer()],
-    programId
-  );
+  return pda(poolConfigSeeds(poolState.toBytes()), programId);
+}
+
+/** `key` is the recipient token account's OWNER for EXIT_KIND_SOLANA_OWNER, or
+ *  `sha256(btcScript)` for EXIT_KIND_BTC_SCRIPT. The kind is a seed, so an owner
+ *  and a script hash sharing 32 bytes stay distinct. */
+export function deriveExitDestinationPDA(
+  poolState: PublicKey,
+  kind: number,
+  key: Uint8Array,
+  programId: PublicKey = getUTXOpiaProgramId(),
+): [PublicKey, number] {
+  return pda(exitDestinationSeeds(poolState.toBytes(), kind, key), programId);
 }
 
 // =============================================================================
-// Utility
+// Associated token accounts
+//
+// Plain SPL derivations, not UTXOpia PDAs — no program seeds involved, so they
+// stay here rather than in the SDK.
 // =============================================================================
 
 export function derivePoolVaultATA(

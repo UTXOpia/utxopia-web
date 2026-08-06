@@ -1,5 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import type { NetworkConfig, NetworkId } from "@/lib/network-config";
+import { derivePoolStatePDA, deriveCommitmentTreePDA } from "@/lib/solana/pdas";
 
 export type VaultId = "open" | "verified";
 
@@ -57,8 +58,6 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
   },
 };
 
-const POOL_STATE_SEED = "pool_state";
-const COMMITMENT_TREE_SEED = "commitment_tree";
 const derived = new Map<VaultId, VaultRuntimeConfig>();
 
 /** Resolve a vault's PDAs once. Deriving beats storing: a stored address can
@@ -69,15 +68,9 @@ function resolveVault(seed: VaultSeed): VaultRuntimeConfig {
   if (cached) return cached;
 
   const programId = new PublicKey(seed.programId);
-  const [poolState] = PublicKey.findProgramAddressSync(
-    [Buffer.from(POOL_STATE_SEED), new PublicKey(seed.mint).toBuffer()],
-    programId,
-  );
-  const treeIndex = Buffer.alloc(4); // tree 0; rotation picks later indices on chain
-  const [commitmentTree] = PublicKey.findProgramAddressSync(
-    [Buffer.from(COMMITMENT_TREE_SEED), poolState.toBuffer(), treeIndex],
-    programId,
-  );
+  const [poolState] = derivePoolStatePDA(programId, new PublicKey(seed.mint));
+  // tree 0; rotation picks later indices on chain
+  const [commitmentTree] = deriveCommitmentTreePDA(programId, 0, poolState);
 
   const resolved: VaultRuntimeConfig = {
     ...seed,
