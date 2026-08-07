@@ -3,6 +3,7 @@ import { getConfig } from "@utxopia/sdk";
 import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { deriveNullifierPDA, getUTXOpiaProgramId } from "@/lib/solana/pdas";
 import type { NetworkId } from "@/lib/network-config";
+import type { VaultId } from "@/lib/vault-config";
 
 /** Derive nullifier PDA address (base58) from nullifier hash hex */
 export function nullifierHashToPDA(hashHex: string): string {
@@ -23,12 +24,17 @@ export function nullifierHashToPDA(hashHex: string): string {
   return pda.toBase58();
 }
 
-// Module-level cache for incremental sync, scoped by backend URL so switching
-// app networks cannot mix nullifier state from different deployments.
+// Module-level cache for incremental sync, scoped by backend URL, network and
+// vault so switching any of them cannot mix nullifier state from different
+// deployments — or, as happened, from different pools on the same one.
 const caches = new Map<string, { pdas: Set<string>; latestSlot: number; total: number }>();
 
-function cacheForBackend(backendUrl: string, network?: NetworkId): { pdas: Set<string>; latestSlot: number; total: number } {
-  const key = `${backendUrl.replace(/\/$/, "")}|${network ?? ""}`;
+function cacheForBackend(
+  backendUrl: string,
+  network?: NetworkId,
+  vault?: VaultId,
+): { pdas: Set<string>; latestSlot: number; total: number } {
+  const key = `${backendUrl.replace(/\/$/, "")}|${network ?? ""}|${vault ?? ""}`;
   let cache = caches.get(key);
   if (!cache) {
     cache = { pdas: new Set<string>(), latestSlot: 0, total: 0 };
@@ -37,15 +43,29 @@ function cacheForBackend(backendUrl: string, network?: NetworkId): { pdas: Set<s
   return cache;
 }
 
-/** Fetch spent nullifier PDAs: backend primary, on-chain fallback */
-export async function fetchSpentNullifierPDAs(backendUrl: string, network?: NetworkId): Promise<Set<string>> {
+/**
+ * Fetch spent nullifier PDAs: backend primary, on-chain fallback.
+ *
+ * `vault` is not optional in practice even though the signature allows it. The
+ * backend indexes each pool separately, so omitting it answers for the Open
+ * pool: in the Verified vault every spent note came back unspent, balances
+ * counted notes that were already gone, and the note selector eventually picked
+ * one — surfacing as `custom program error: 0x1774` (NullifierAlreadyUsed) at
+ * simulation, which reads like a protocol fault rather than a stale spent set.
+ */
+export async function fetchSpentNullifierPDAs(
+  backendUrl: string,
+  network?: NetworkId,
+  vault?: VaultId,
+): Promise<Set<string>> {
   const normalizedBackendUrl = backendUrl.replace(/\/$/, "");
-  const cache = cacheForBackend(normalizedBackendUrl, network);
+  const cache = cacheForBackend(normalizedBackendUrl, network, vault);
   // Primary: backend incremental sync
   try {
     const params = new URLSearchParams();
     if (cache.latestSlot > 0) params.set("since", String(cache.latestSlot));
     if (network) params.set("network", network);
+    if (vault) params.set("vault", vault);
     const query = params.toString();
     const resp = await fetch(`${normalizedBackendUrl}/api/nullifiers${query ? `?${query}` : ""}`);
     const data = await resp.json();

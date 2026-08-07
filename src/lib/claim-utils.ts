@@ -84,7 +84,7 @@ export async function scanSecretPhrase(
   const backendUrl = getBackendUrl(network);
   const spentPdas = inboxSource.spentNullifiers
     ? null
-    : await fetchSpentNullifierPDAs(backendUrl, network);
+    : await fetchSpentNullifierPDAs(backendUrl, network, env.vaultId);
 
   const results: ScannedSecretNote[] = [];
   for (const note of scannedNotes) {
@@ -132,7 +132,11 @@ export async function refreshNullifierStatus(
   network?: NetworkId,
 ): Promise<ScannedSecretNote[]> {
   const backendUrl = getBackendUrl(network);
-  const spentPdas = await fetchSpentNullifierPDAs(backendUrl, network);
+  // Per-pool index: without the vault this answers for Open and every Verified
+  // note reads as unspent.
+  const spentPdas = await fetchSpentNullifierPDAs(
+    backendUrl, network, getChainEnvironment().vaultId,
+  );
 
   return notes.map((n) => ({
     ...n,

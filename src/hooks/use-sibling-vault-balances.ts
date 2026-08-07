@@ -180,10 +180,11 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
         }
         if (!live()) return;
 
-        // Both vaults share one program, so nullifier PDAs are program-global:
-        // the same spent set covers sibling notes.
+        // Both vaults share one program, so nullifier PDAs are program-global —
+        // but the backend indexes them per pool, so this must ask for the
+        // sibling's own vault or every sibling note comes back unspent.
         const spentPdas = scanned.length
-          ? await fetchSpentNullifierPDAs("", networkId)
+          ? await fetchSpentNullifierPDAs("", networkId, sibling)
           : new Set<string>();
         if (!live()) return;
 
