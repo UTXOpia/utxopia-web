@@ -10,7 +10,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useState, useCallback } from "react";
 import { useProver } from "@/hooks/use-prover";
 import type { TransferParams } from "@/hooks/use-build-transfer-params";
-import { useConnection } from "@solana/wallet-adapter-react";
+import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hasSolanaExit } from "@/lib/exit-registry";
 import { getVaultRuntimeConfig } from "@/lib/vault-config";
@@ -35,6 +35,8 @@ export function useJoinSplitSubmit() {
   const prover = useProver();
   const chainEnv = useChainEnvironment();
   const { connection } = useConnection();
+  // Verified membership is bound to a wallet, so this is who the spend is for.
+  const { publicKey: memberWallet } = useWallet();
   const chainId = getChainAdapter(chainEnv.config).id;
   const relayCandidates = useRelayCandidates(chainId, chainEnv.networkId, chainEnv.vaultId);
   const [status, setStatus] = useState<SubmitStatus>("idle");
@@ -177,6 +179,10 @@ export function useJoinSplitSubmit() {
           networkId: chainEnv.networkId,
           vaultId: chainEnv.vaultId,
           actor: relayerPubkey,
+          // The relayer signs, but the spend is the member's. Without this the
+          // approval is filed under the relayer and the member's own activity
+          // is invisible to them and to us.
+          member: memberWallet?.toBase58(),
           action:
             params.relayMode === "redeem" ? 15 : params.relayMode === "unshield" ? 14 : 13,
           intentParts,
@@ -292,7 +298,8 @@ export function useJoinSplitSubmit() {
     setStatusMessage("");
     setTxSignature(null);
     setError(null);
-  }, []);
+  }, [
+    memberWallet,]);
 
   return {
     status,

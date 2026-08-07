@@ -73,6 +73,13 @@ export async function preparePolicyApproval(input: {
   networkId: string;
   vaultId: string;
   actor: string;
+  /** The member this spend is for, when the actor is not them.
+   *
+   *  A deposit is signed by the member so `actor` already names them. Anything
+   *  relayed is signed by the relayer, and without this the approval records the
+   *  relayer — every member's transfers then land on one pubkey that is not a
+   *  member at all. */
+  member?: string;
   /** Asset instruction discriminator this approval covers. */
   action: number;
   /** Intent parts, in the order the asset program hashes them. */
@@ -84,6 +91,7 @@ export async function preparePolicyApproval(input: {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       actor: input.actor,
+      member: input.member ?? input.actor,
       action: input.action,
       intentPartsBase64: input.intentParts.map((part) =>
         Buffer.from(part).toString("base64"),
