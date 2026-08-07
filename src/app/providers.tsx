@@ -11,6 +11,7 @@ import { getSolanaRpcUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
 import { UtxopiaPrivyProvider } from "@/lib/privy-solana";
 import { DevSigner, devSolanaAdapters } from "@/lib/dev-signer";
+import { FeedbackWidget } from "@/components/feedback/feedback-widget";
 
 // Import wallet adapter CSS
 import "@solana/wallet-adapter-react-ui/styles.css";
@@ -41,6 +42,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
               {/* Reflect active chain onto <html data-chain> for accent tokens */}
               <ChainThemeSync />
               {children}
+              <FeedbackWidget />
               <Toaster
                 position="top-right"
                 toastOptions={{
