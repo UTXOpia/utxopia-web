@@ -32,19 +32,28 @@ export function StoreHydration(): JSX.Element {
   const hasHydratedRef = useRef(false);
   const hasPasskeyHydratedRef = useRef(false);
 
-  // Re-arm hydration when the network/vault identity changes: vault switching
-  // clears the store keys (keepSession), and the vault warmed at unlock should
-  // restore silently instead of prompting again.
+  // Switching vault switches private identity. Drop the old keys and re-arm
+  // hydration so the vault warmed at unlock restores silently.
+  //
+  // This lives here, in the globally-mounted hydrator, because it used to live
+  // on /vault — and the switch does not happen there. `VaultDestinationPicker`
+  // switches from /vault/deposit, where nothing reset the keys, so the store
+  // kept serving the *previous* vault's stealth address while the URL, the
+  // pool and the deposit all said the new one. The deposit then landed in the
+  // right pool encrypted to the wrong identity: unspendable from either vault
+  // view, and invisible in both, because each view scans only its own pool.
   const { networkId, vaultId } = useChainEnvironment();
   const envIdentity = `${networkId}:${vaultId}`;
   const lastEnvIdentityRef = useRef(envIdentity);
+  const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
   useEffect(() => {
     if (lastEnvIdentityRef.current !== envIdentity) {
       lastEnvIdentityRef.current = envIdentity;
       hasHydratedRef.current = false;
       hasPasskeyHydratedRef.current = false;
+      clearKeys(undefined, { keepSession: true });
     }
-  }, [envIdentity]);
+  }, [envIdentity, clearKeys]);
 
   useEffect(() => {
     // Hydrate Bitcoin wallet from localStorage

@@ -507,10 +507,14 @@ export function SendForm({
   const devSignerEnabled =
     process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
     !chainEnv.networkId.includes("mainnet");
+  // An imported session already proves the user holds the recovery file — and
+  // its backup flag is keyed to a credential that no longer exists on this
+  // device, so gating on it would block the sweep the import was for.
   const requiresBackup =
     !!ctx.keys &&
     ctx.inboxDepositCount > 0 &&
     !devSignerEnabled &&
+    !ctx.isImportedSession &&
     !hasBackupForKeys(ctx.keys);
   const isSubmittingInFlight =
     submitting ||

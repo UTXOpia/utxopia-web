@@ -18,7 +18,7 @@
  * - View-only mode (viewing key import)
  */
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { motion } from "framer-motion";
 import {
   Key,
@@ -71,6 +71,7 @@ export default function VaultPage() {
   const {
     keys,
     isViewOnly,
+    isImportedSession,
     stealthAddressEncoded,
     isLoading,
     error,
@@ -116,13 +117,8 @@ export default function VaultPage() {
     siblingBalances.status === "ready" &&
     Object.values(siblingBalances.balancesByToken).some((amount) => amount > 0n);
   const siblingLabel = siblingBalances.vaultId === "verified" ? "Verified" : "Open";
-  const previousVaultId = useRef(vaultId);
-  useEffect(() => {
-    if (previousVaultId.current !== vaultId) {
-      clearKeys(undefined, { keepSession: true });
-      previousVaultId.current = vaultId;
-    }
-  }, [clearKeys, vaultId]);
+  // Vault-switch key reset moved to StoreHydration — it has to cover every page
+  // that can switch vaults, and /vault/deposit is the one that actually does.
   const bitcoinNetworkLabel =
     networkConfig.bitcoin.network.charAt(0).toUpperCase() +
     networkConfig.bitcoin.network.slice(1);
@@ -131,6 +127,7 @@ export default function VaultPage() {
 
   const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
+  const importBackupKeys = useUTXOpiaStore((s) => s.importBackupKeys);
 
   const handlePasskeyRegister = async () => {
     const seed = await registerPasskey();
@@ -157,8 +154,8 @@ export default function VaultPage() {
   const [snsNameInput, setSnsNameInput] = useState("");
 
   useEffect(() => {
-    setHasRecoveryBackup(hasBackupForKeys(keys));
-  }, [keys]);
+    setHasRecoveryBackup(isImportedSession || hasBackupForKeys(keys));
+  }, [keys, isImportedSession]);
 
   const snsSuggestion = useMemo(() => {
     const tail = (stealthAddressEncoded ?? "")
@@ -489,6 +486,7 @@ export default function VaultPage() {
           onWalletConnect: () => { setAuthModalOpen(false); setVisible(true); },
           onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
           onViewOnlyLogin: (viewingKey) => { loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
+          onImportBackup: async (contents) => { await importBackupKeys(contents); setAuthModalOpen(false); },
         }}
       />
 
