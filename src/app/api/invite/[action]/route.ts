@@ -31,11 +31,20 @@ export async function POST(
   const requestedNetwork = request.nextUrl.searchParams.get("network") as NetworkId | null
     ?? detectNetworkFromRequest(request);
   const networkId = networkForChain(requestedNetwork, "solana");
-  const config = getVaultNetworkConfig(
-    networkId,
-    getNetworkConfig(networkId),
-    "verified",
-  );
+
+  // The Verified vault exists on one deployment, so any other network throws
+  // here. Letting it escape produced a bare 500 with an empty body — a member
+  // on the wrong network saw "redeem failed (500)" and had nothing to act on,
+  // which is the same symptom as a leaked or expired code.
+  let config;
+  try {
+    config = getVaultNetworkConfig(networkId, getNetworkConfig(networkId), "verified");
+  } catch (error) {
+    return NextResponse.json(
+      { error: error instanceof Error ? error.message : "unsupported network" },
+      { status: 400 },
+    );
+  }
 
   const response = await fetch(
     `${config.backend.url.replace(/\/+$/, "")}/api/invite/${action}`,

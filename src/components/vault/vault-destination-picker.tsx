@@ -2,8 +2,11 @@
 
 // Vault-scope controls for value flows. Vaults are separate on-chain pools;
 // both pickers rewrite ?vault= so the whole flow re-scopes.
-// - Destination (deposit): Verified is offered only to entitled users
-//   (existing verified funds); everyone else gets a quiet request-access row.
+// - Destination (deposit): Verified is offered to entitled users — members of
+//   the vault, or anyone already holding funds in it; everyone else gets a quiet
+//   invite row. Membership is the load-bearing half: funds alone cannot be the
+//   test, because a member's *first* deposit necessarily happens before they
+//   have any, which left the invited unable to reach the vault they joined.
 // - Source (send/cash out): balance-driven — segmented when both vaults hold
 //   funds, a static chip when one does, silent auto-switch when the current
 //   vault is empty but the other is funded.
@@ -17,6 +20,7 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithVault, vaultsSupported, type VaultId } from "@/lib/vault-config";
 import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { RedeemInvite } from "@/components/redeem-invite";
+import { useVerifiedMembership } from "@/hooks/use-verified-membership";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 const hasFunds = (balances: Record<string, bigint>): boolean =>
@@ -114,13 +118,15 @@ export function VaultDestinationPicker({ className }: { className?: string }) {
   const stealthAddressEncoded = useUTXOpiaStore((s) => s.stealthAddressEncoded);
   const router = useRouter();
   const [showApply, setShowApply] = useState(false);
+  const membership = useVerifiedMembership();
 
   if (!vaultsSupported(networkId)) return null;
 
   const verifiedBalances =
     vaultId === "verified" ? null : sibling.status === "ready" ? sibling.balancesByToken : null;
-  const hasVerifiedFunds =
+  const entitled =
     vaultId === "verified" ||
+    membership === "member" ||
     (verifiedBalances !== null &&
       Object.values(verifiedBalances).some((amount) => amount > 0n));
 
@@ -136,7 +142,7 @@ export function VaultDestinationPicker({ className }: { className?: string }) {
       <p className="mb-1.5 px-1 text-[11px] font-medium uppercase tracking-wider text-gray/50">
         Destination
       </p>
-      {hasVerifiedFunds ? (
+      {entitled ? (
         <div className="grid grid-cols-2 gap-1 rounded-[12px] border border-gray/15 bg-muted/30 p-1">
           {(
             [
