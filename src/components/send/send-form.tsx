@@ -28,6 +28,7 @@ import { BackupRequiredCallout } from "@/components/vault/backup-required-callou
 import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { hasBackupForKeys } from "@/lib/vault-backup";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
+import { humanizeSpendError } from "@/lib/indexer-lag-error";
 import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
 import { formatAmount } from "@/lib/utils/formatting";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -696,7 +697,9 @@ export function SendForm({
         recipient: state.recipient.trim(),
       });
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Send failed");
+      // Proof building happens inside here, so an indexer lag lands as a
+      // circuit assert rather than anything about indexing.
+      setError(humanizeSpendError(e));
     } finally {
       setSubmitting(false);
     }

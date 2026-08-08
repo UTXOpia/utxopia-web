@@ -18,6 +18,7 @@ import { getChainAdapter } from "@/lib/chain-registry";
 import { withTimeout, PROOF_TIMEOUT_MS } from "@/lib/utils/with-timeout";
 import { useRelayCandidates } from "@/hooks/use-relay";
 import { submitWithFailover } from "@/lib/relay-submit";
+import { humanizeSpendError } from "@/lib/indexer-lag-error";
 import {
   finalizePolicyApproval,
   policyStageMessage,
@@ -286,7 +287,9 @@ export function useJoinSplitSubmit() {
       return { success: true, signature: relayResult.signature } satisfies JoinSplitSubmitResult;
     } catch (err) {
       console.error("[Submit] Error:", err);
-      setError(err instanceof Error ? err.message : "Transaction failed");
+      // Raw first — the console keeps the circuit assert for us; the member
+      // gets the version that says whether their money moved.
+      setError(humanizeSpendError(err));
       setStatus("error");
       setStatusMessage("");
       return { success: false, signature: null } satisfies JoinSplitSubmitResult;
