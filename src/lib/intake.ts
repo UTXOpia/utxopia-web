@@ -63,6 +63,122 @@ export interface EmailSink {
   from: string;
 }
 
+/** The product's accent (`--privacy-purple` in styles/base.css). Hard-coded
+ *  because mail has no access to CSS variables. */
+const BRAND_PURPLE = "#9945ff";
+
+/** Absolute, because a mail client has no origin to resolve against. Override
+ *  only if the logo moves; a localhost URL here reaches nobody. */
+const BRAND_LOGO_URL =
+  process.env.INTAKE_EMAIL_LOGO_URL || "https://app.utxopia.com/brand/logo-transparent-96.png";
+
+export interface EmailRow {
+  label: string;
+  /** Rendered as plain text — newlines are preserved, markup is not. */
+  value: string;
+  /** Stack the value under its label instead of beside it. For prose. */
+  block?: boolean;
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;");
+}
+
+/**
+ * A plain, professional intake mail.
+ *
+ * Written to the subset of HTML that mail clients agree on: tables for layout,
+ * inline styles only, no <style> block (Gmail strips it in some views), no web
+ * fonts, no images. It renders the same in Gmail, Apple Mail and Outlook, and
+ * degrades to something readable anywhere else.
+ *
+ * Light background on purpose. A dark template inverts unpredictably across
+ * clients — including into unreadable — and intake mail is read once, quickly,
+ * in whatever the reader already had open.
+ */
+export function renderIntakeEmail({
+  title,
+  badges = [],
+  rows,
+  meta = [],
+}: {
+  title: string;
+  badges?: string[];
+  rows: EmailRow[];
+  meta?: string[];
+}): string {
+  const badgeHtml = badges.length
+    ? `<tr><td style="padding:0 0 18px 0;">${badges
+        .map(
+          (badge) =>
+            `<span style="display:inline-block;margin:0 6px 6px 0;padding:4px 10px;border-radius:999px;` +
+            `background:#f3ecff;color:#5b21b6;font-size:12px;font-weight:600;">${escapeHtml(badge)}</span>`,
+        )
+        .join("")}</td></tr>`
+    : "";
+
+  const rowHtml = rows
+    .map(({ label, value, block }) => {
+      const body = escapeHtml(value || "—").replace(/\n/g, "<br>");
+      const labelCell =
+        `<div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;` +
+        `color:#6b7280;">${escapeHtml(label)}</div>`;
+      const valueCell = `<div style="font-size:14px;line-height:1.6;color:#111827;">${body}</div>`;
+      return (
+        `<tr><td style="padding:12px 0;border-top:1px solid #e5e7eb;">` +
+        (block ? `${labelCell}<div style="height:6px;"></div>${valueCell}` : `${labelCell}${valueCell}`) +
+        `</td></tr>`
+      );
+    })
+    .join("");
+
+  const metaHtml = meta.length
+    ? `<tr><td style="padding:18px 0 0 0;border-top:1px solid #e5e7eb;font-size:12px;line-height:1.7;color:#9ca3af;">` +
+      meta.map(escapeHtml).join("<br>") +
+      `</td></tr>`
+    : "";
+
+  const font =
+    "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+  return [
+    `<!doctype html><html><body style="margin:0;padding:24px 12px;background:#f6f7f9;">`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`,
+    `<tr><td align="center">`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600"`,
+    ` style="max-width:600px;width:100%;background:#ffffff;border:1px solid #e5e7eb;`,
+    `border-radius:12px;overflow:hidden;font-family:${font};">`,
+    // Brand bar: logo *and* wordmark, on a coloured band.
+    //
+    // Gmail, Apple Mail and Outlook.com all load remote images by default now;
+    // Outlook on Windows still asks first. The band and the wordmark are what
+    // survive that, so the header reads as ours either way and the layout does
+    // not move — which is why the image carries alt="" rather than "UTXOpia":
+    // with the wordmark beside it, alt text would just print the name twice.
+    `<tr><td style="background:${BRAND_PURPLE};padding:12px 28px;">`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>`,
+    `<td style="padding-right:9px;vertical-align:middle;line-height:0;">`,
+    `<img src="${BRAND_LOGO_URL}" width="22" height="22" alt=""`,
+    ` style="display:block;width:22px;height:22px;border:0;outline:none;"></td>`,
+    `<td style="vertical-align:middle;">`,
+    `<span style="font-size:13px;font-weight:700;letter-spacing:.12em;color:#ffffff;">UTXOPIA</span>`,
+    `</td></tr></table>`,
+    `</td></tr>`,
+    `<tr><td style="padding:26px 28px 28px 28px;">`,
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`,
+    `<tr><td style="padding:0 0 4px 0;font-size:18px;font-weight:700;color:#111827;">${escapeHtml(title)}</td></tr>`,
+    badgeHtml,
+    rowHtml,
+    metaHtml,
+    `</table></td></tr>`,
+    `</table></td></tr></table></body></html>`,
+  ].join("");
+}
+
 /**
  * Configured only when both halves are present — an API key with nowhere to
  * send is not a sink, and treating it as one turns "no sink" into a 502.
@@ -89,6 +205,7 @@ export async function deliver({
   human,
   subject,
   replyTo,
+  html,
   webhook,
   logPath,
   email,
@@ -99,6 +216,10 @@ export async function deliver({
   /** The sender's own address, so replying in the inbox reaches them. For
    *  applications that reply *is* how a code goes out. */
   replyTo?: string | null;
+  /** Optional HTML body. The text part is always sent alongside it: a mail with
+   *  no text alternative scores worse with spam filters, and some clients still
+   *  show it. */
+  html?: string;
   webhook?: string;
   logPath?: string;
   email?: EmailSink;
@@ -122,6 +243,7 @@ export async function deliver({
           // bold there are just noise in a mail client, and a message full of
           // stray markup is one more thing for a spam filter to dislike.
           text: human.replace(/\*\*/g, ""),
+          ...(html ? { html } : {}),
           ...(replyTo ? { reply_to: replyTo } : {}),
         }),
       });
