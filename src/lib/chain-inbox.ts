@@ -288,19 +288,3 @@ async function fetchSolanaAuditorCiphertexts(): Promise<AuditorCiphertextRecord[
   return records;
 }
 
-function bytesField(value: unknown): Uint8Array | null {
-  if (Array.isArray(value)) {
-    const bytes = value.map((entry) => Number(entry));
-    if (bytes.every((entry) => Number.isInteger(entry) && entry >= 0 && entry <= 255)) {
-      return Uint8Array.from(bytes);
-    }
-    return null;
-  }
-  if (typeof value === "string") {
-    const normalized = value.replace(/^0x/, "");
-    if (/^[0-9a-fA-F]*$/.test(normalized) && normalized.length % 2 === 0) {
-      return Uint8Array.from(Buffer.from(normalized, "hex"));
-    }
-  }
-  return null;
-}

@@ -2,9 +2,6 @@
 
 import { useState, useMemo, useCallback, useEffect, Suspense, Fragment } from "react";
 import {
-  ArrowDownToLine,
-  ArrowUpDown,
-  ArrowUpFromLine,
   Loader2,
   Shield,
 } from "lucide-react";
@@ -23,8 +20,8 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { TypeFilterBar, VaultFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState, type VaultFilter } from "./components/shared";
 import { vaultsSupported } from "@/lib/vault-config";
 import type { FilterType, TokenFilter } from "./components/shared";
-import { TransferRow, getTransferKind } from "./components/transfers-tab";
-import { getTokenByFilter, formatTokenAmount, tvlToUsd, type TokenFilterId } from "@/lib/supported-tokens";
+import { TransferRow } from "./components/transfers-tab";
+import { tvlToUsd, type TokenFilterId } from "@/lib/supported-tokens";
 
 // =============================================================================
 // Sync status: shows when backend indexer is catching up

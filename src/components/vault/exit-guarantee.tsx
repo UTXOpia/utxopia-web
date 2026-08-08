@@ -3,7 +3,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { useConnection, useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
-import bs58 from "bs58";
 import { AlertCircle, Check, Loader2, ShieldAlert, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { hasBtcExit, hasSolanaExit, type BtcNetwork } from "@/lib/exit-registry";

@@ -3,7 +3,7 @@
 import { useUTXOpiaKeys } from "@/hooks/use-utxopia";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
-import { Key, Shield } from "lucide-react";
+import { Key } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /**

@@ -16,13 +16,11 @@ import { useState, useCallback } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import {
   Search, Shield, CheckCircle2, AlertCircle, Copy, Check,
-  RefreshCw, ExternalLink, Loader2, Upload
+  ExternalLink, Upload
 } from "lucide-react";
-import { useConnection } from "@solana/wallet-adapter-react";
 import { cn } from "@/lib/utils";
 import { Spinner } from "@/components/ui/spinner";
 import { WalletButton } from "@/components/ui/wallet-button";
-import { BitcoinIcon } from "@/components/bitcoin-wallet-selector";
 import {
   getTransactionInfo,
   getBlockHeader,
@@ -32,7 +30,6 @@ import {
   type MerkleProof,
   type TransactionInfo,
 } from "@/lib/spv/mempool";
-import { formatBlockHeaderForChain, formatMerkleProofForChain } from "@/lib/spv/verify";
 import { zkBTCApi } from "@/lib/api/client";
 import { getEsploraApiUrl, getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -63,8 +60,7 @@ function spvBitcoinNetwork(config: NetworkConfig): SpvBitcoinNetwork {
 }
 
 export function ManualVerify() {
-  const { publicKey, connected, signTransaction } = useWallet();
-  const { connection } = useConnection();
+  const { connected } = useWallet();
   const { networkId, config } = useChainEnvironment();
   const esploraApiUrl = getEsploraApiUrl(networkId);
   const explorerUrl = getMempoolExplorerUrl(networkId);
@@ -83,7 +79,10 @@ export function ManualVerify() {
   // Block header submission state
   const [headerSubmitting, setHeaderSubmitting] = useState(false);
   const [headerSubmitted, setHeaderSubmitted] = useState(false);
-  const [headerTxSig, setHeaderTxSig] = useState<string | null>(null);
+  // Nothing populates this today — the block-header submit path never sets it,
+  // so the explorer link below stays hidden. Kept so wiring it up stays a
+  // one-line change rather than a re-add.
+  const [headerTxSig] = useState<string | null>(null);
 
   // Core function to fetch all verification data
   const fetchVerificationData = useCallback(async (transactionId: string) => {
@@ -218,17 +217,6 @@ export function ManualVerify() {
       setHeaderSubmitting(false);
     }
   }, [networkId, verificationData]);
-
-  // Format data for display
-  const getFormattedHeaderData = () => {
-    if (!verificationData) return null;
-    return formatBlockHeaderForChain(verificationData.blockHeader);
-  };
-
-  const getFormattedProofData = () => {
-    if (!verificationData || !txid) return null;
-    return formatMerkleProofForChain(txid, verificationData.merkleProof);
-  };
 
   return (
     <div className="flex flex-col">

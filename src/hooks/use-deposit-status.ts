@@ -144,7 +144,7 @@ export function useDepositStatus(
   useEffect(() => {
     if (!depositId || !useWebSocket) return;
 
-    const { ws, unsubscribe } = subscribeToDepositStatus(depositId, {
+    const { unsubscribe } = subscribeToDepositStatus(depositId, {
       onStatusUpdate: handleStatusUpdate,
       onOpen: () => setIsConnected(true),
       onClose: () => setIsConnected(false),

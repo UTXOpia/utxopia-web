@@ -14,7 +14,6 @@
 
 import { NextResponse } from "next/server";
 import { fetchAnnouncementsFromRpc } from "@/lib/api/rpc-fallback";
-import { getBackendUrl } from "@/lib/api/constants";
 import { parseVaultScope, vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest, getNetworkConfig } from "@/lib/network-config";
 export const dynamic = "force-dynamic";

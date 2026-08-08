@@ -5,7 +5,6 @@
 import {
   ExternalLink,
   Shield,
-  Wallet,
 } from "lucide-react";
 import { CopyButton } from "@/components/ui/copy-button";
 import { truncate } from "../helpers";
@@ -72,7 +71,7 @@ export function NullifierInputsList({ tx, network }: { tx: TransferTx; network?:
   );
 }
 
-export function NullifierRow({ pda, index, network }: { pda: string; index: number; network?: NetworkId }) {
+export function NullifierRow({ pda, index: _index, network }: { pda: string; index: number; network?: NetworkId }) {
   const { config } = useChainEnvironment();
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">
@@ -93,7 +92,7 @@ export function NullifierRow({ pda, index, network }: { pda: string; index: numb
   );
 }
 
-export function CommitmentRow({ commitment, leafIndex, txSignature, index, network }: { commitment: string; leafIndex: number; txSignature: string; index: number; network?: NetworkId }) {
+export function CommitmentRow({ commitment, leafIndex, txSignature, index: _index, network }: { commitment: string; leafIndex: number; txSignature: string; index: number; network?: NetworkId }) {
   const { config } = useChainEnvironment();
   return (
     <div className="group flex items-center gap-2 px-3 py-2 rounded-[8px] bg-gray/4 border border-gray/8 hover:border-gray/15 transition-colors">

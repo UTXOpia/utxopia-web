@@ -93,7 +93,7 @@ export async function prepareSPVVerification(
   network: "mainnet" | "testnet" = "testnet"
 ): Promise<SPVVerifyResult> {
   try {
-    const { txInfo, blockHeader, merkleProof, confirmations } =
+    const { blockHeader, merkleProof, confirmations } =
       await getSPVProofData(txid, network);
 
     if (confirmations < MIN_CONFIRMATIONS_FOR_SPV) {
@@ -171,7 +171,6 @@ export function formatBlockHeaderForChain(header: BlockHeader): {
   nonce: number;
 } {
   // Parse raw header (80 bytes = 160 hex chars)
-  const rawBytes = hexToBytes(header.rawHeader);
 
   // Bitcoin header layout:
   // version: 4 bytes (little-endian)

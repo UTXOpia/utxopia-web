@@ -207,8 +207,10 @@ function WithdrawalDetails({ redemption }: { redemption: RedemptionRecord }) {
     : Math.floor(amount * bps / 10000) + base;
   const expectedSend = amount - serviceFee;
   const actualReceived = redemption.actualReceived ? Number(redemption.actualReceived) : null;
-  const [btcMinerFee, setBtcMinerFee] = useState<number | null>(null);
-  const poolRevenue = btcMinerFee !== null && serviceFee > 0 ? serviceFee - btcMinerFee : null;
+  // The child reports the miner fee up, but nothing renders it today — the
+  // pool-revenue figure it fed was never displayed. Keep the setter so the
+  // child's onMinerFee contract still holds.
+  const [, setBtcMinerFee] = useState<number | null>(null);
 
   return (
     <div className="mx-4 my-3 rounded-[10px] bg-gradient-to-b from-gray/6 to-transparent border border-gray/10 overflow-hidden">
@@ -400,7 +402,6 @@ export function WithdrawalRow({
 }) {
   const { config } = useChainEnvironment();
   const r = redemption;
-  const btcAddr = r.btcScript ? scriptToAddress(r.btcScript, network) : null;
 
   return (
     <Fragment>
@@ -556,39 +557,3 @@ export function WithdrawalsTab() {
   );
 }
 
-// --- Amount Cell ---
-
-function WithdrawalAmountCell({ r }: { r: RedemptionRecord }) {
-  const received = r.actualReceived && r.status === "Completed"
-    ? fmtBtc(Number(r.actualReceived))
-    : r.serviceFee
-      ? fmtBtc(Number(r.amountSats) - Number(r.serviceFee))
-      : "...";
-
-  return (
-    <div className="flex items-center gap-1.5 font-mono text-body2">
-      <Image src="/tokens/zkbtc.png" alt="zkBTC" width={14} height={14} className="rounded-full shrink-0" />
-      <span className="text-foreground">{fmtBtc(Number(r.amountSats))}</span>
-      <span className="text-gray/40">→</span>
-      <BitcoinIcon className="w-3.5 h-3.5 text-btc shrink-0" />
-      <span className="text-foreground">{received}</span>
-      <span className="text-[10px] text-gray">BTC</span>
-    </div>
-  );
-}
-
-function WithdrawalFeeCell({ r }: { r: RedemptionRecord }) {
-  const fee = r.serviceFee
-    ? Number(r.serviceFee)
-    : r.actualReceived && Number(r.actualReceived) !== Number(r.amountSats)
-      ? Number(r.amountSats) - Number(r.actualReceived)
-      : 0;
-
-  if (fee === 0) return <span className="text-caption text-gray/40">—</span>;
-
-  return (
-    <span className="text-caption font-mono text-gray">
-      {fmtBtc(fee)} BTC
-    </span>
-  );
-}

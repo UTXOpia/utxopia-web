@@ -15,10 +15,10 @@ export function getChainIcon(config: NetworkConfig): string {
   return `/tokens/${chain.query}.png`;
 }
 
-export function getChainLinkClass(config: NetworkConfig): string {
+export function getChainLinkClass(_config: NetworkConfig): string {
   return "text-gray hover:text-gray-light";
 }
 
-export function getChainMutedLinkClass(config: NetworkConfig): string {
+export function getChainMutedLinkClass(_config: NetworkConfig): string {
   return "text-purple-400/40 hover:text-purple-400";
 }
