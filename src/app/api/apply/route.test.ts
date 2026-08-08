@@ -157,33 +157,74 @@ describe("beta applications", () => {
       expect(await response.json()).toEqual({ ok: true });
     });
 
-    it("mails the application with the applicant as reply-to", async () => {
+    /** Capture every Resend call a submission makes. */
+    async function submitWithMail(
+      body: Record<string, unknown>,
+      status = 200,
+    ): Promise<{ response: Response; mails: Record<string, unknown>[] }> {
       process.env.RESEND_API_KEY = "re_test";
       // Comma-separated: intake can reach a shared address and a personal one.
       process.env.INTAKE_EMAIL_TO = "beta@utxopia.com, info@utxopia.com";
       const realFetch = globalThis.fetch;
-      let sent: Record<string, unknown> | null = null;
-      globalThis.fetch = (async (url: string, init: RequestInit) => {
-        sent = JSON.parse(String(init.body));
-        return new Response("{}", { status: 200 });
+      const mails: Record<string, unknown>[] = [];
+      globalThis.fetch = (async (_url: string, init: RequestInit) => {
+        mails.push(JSON.parse(String(init.body)));
+        return new Response("{}", { status });
       }) as unknown as typeof fetch;
 
       try {
-        const response = await POST(request(complete));
-        expect(response.status).toBe(200);
+        return { response: await POST(request(body)), mails };
       } finally {
         globalThis.fetch = realFetch;
         delete process.env.RESEND_API_KEY;
         delete process.env.INTAKE_EMAIL_TO;
       }
+    }
+
+    it("mails the application with the applicant as reply-to", async () => {
+      const { response, mails } = await submitWithMail(complete);
+      expect(response.status).toBe(200);
 
       // Replying to the mail is how a code goes out, so it has to reach the
       // applicant and not us.
-      expect(sent).toMatchObject({
+      expect(mails[0]).toMatchObject({
         to: ["beta@utxopia.com", "info@utxopia.com"],
         reply_to: "someone@example.com",
         subject: "beta application — someone@example.com",
       });
+    });
+
+    it("sends the applicant a receipt that replies back to intake", async () => {
+      const { response, mails } = await submitWithMail(complete);
+      expect(response.status).toBe(200);
+
+      expect(mails).toHaveLength(2);
+      expect(mails[1]).toMatchObject({
+        to: ["someone@example.com"],
+        reply_to: "beta@utxopia.com",
+        subject: "We got your UTXOpia application",
+      });
+    });
+
+    it("never echoes what the applicant typed back to them", async () => {
+      // The endpoint is unauthenticated and mails whatever address it is
+      // handed. Reflecting free text would make it a way to deliver arbitrary
+      // content to an arbitrary inbox, signed by our domain.
+      const smuggled = "CLICK http://evil.example TO CLAIM YOUR CODE";
+      const { mails } = await submitWithMail({ ...complete, reason: smuggled });
+
+      const receipt = JSON.stringify(mails[1]);
+      expect(receipt).not.toContain(smuggled);
+      expect(receipt).not.toContain("evil.example");
+    });
+
+    it("still accepts the application when the receipt cannot be sent", async () => {
+      // The applicant already did their part; a failed courtesy mail must not
+      // be reported to them as a failed application.
+      const { response, mails } = await submitWithMail(complete, 500);
+      expect(response.status).toBe(200);
+      expect(await response.json()).toEqual({ ok: true });
+      expect(mails).toHaveLength(2);
     });
   });
 });

@@ -103,12 +103,16 @@ function escapeHtml(value: string): string {
 export function renderIntakeEmail({
   title,
   badges = [],
-  rows,
+  intro = [],
+  rows = [],
   meta = [],
 }: {
   title: string;
   badges?: string[];
-  rows: EmailRow[];
+  /** Prose paragraphs, before any rows. A message to a person rather than a
+   *  record about one. */
+  intro?: string[];
+  rows?: EmailRow[];
   meta?: string[];
 }): string {
   const badgeHtml = badges.length
@@ -120,6 +124,16 @@ export function renderIntakeEmail({
         )
         .join("")}</td></tr>`
     : "";
+
+  const introHtml = intro
+    .map(
+      (paragraph, index) =>
+        // The title sits tight above; the first paragraph buys back the gap.
+        `<tr><td style="padding:${index === 0 ? "10px" : "0"} 0 12px 0;` +
+        `font-size:14px;line-height:1.65;color:#374151;">` +
+        `${escapeHtml(paragraph)}</td></tr>`,
+    )
+    .join("");
 
   const rowHtml = rows
     .map(({ label, value, block }) => {
@@ -172,6 +186,7 @@ export function renderIntakeEmail({
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%">`,
     `<tr><td style="padding:0 0 4px 0;font-size:18px;font-weight:700;color:#111827;">${escapeHtml(title)}</td></tr>`,
     badgeHtml,
+    introHtml,
     rowHtml,
     metaHtml,
     `</table></td></tr>`,
@@ -198,6 +213,40 @@ export function emailSink(): EmailSink | undefined {
     .filter(Boolean);
   if (!apiKey || to.length === 0) return undefined;
   return { apiKey, to, from: process.env.INTAKE_EMAIL_FROM || "onboarding@resend.dev" };
+}
+
+/** One Resend call. Returns the raw Response so callers decide what a failure
+ *  means — for intake it is fatal, for a courtesy mail it is not. */
+export async function sendEmail({
+  sink,
+  to,
+  subject,
+  text,
+  html,
+  replyTo,
+}: {
+  sink: EmailSink;
+  to: string[];
+  subject: string;
+  text: string;
+  html?: string;
+  replyTo?: string | null;
+}): Promise<Response> {
+  return fetch("https://api.resend.com/emails", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${sink.apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      from: sink.from,
+      to,
+      subject,
+      text,
+      ...(html ? { html } : {}),
+      ...(replyTo ? { reply_to: replyTo } : {}),
+    }),
+  });
 }
 
 export async function deliver({
@@ -229,23 +278,16 @@ export async function deliver({
 
   if (email) {
     try {
-      const res = await fetch("https://api.resend.com/emails", {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${email.apiKey}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          from: email.from,
-          to: email.to,
-          subject,
-          // `human` is formatted for Discord/Slack. Asterisks that render as
-          // bold there are just noise in a mail client, and a message full of
-          // stray markup is one more thing for a spam filter to dislike.
-          text: human.replace(/\*\*/g, ""),
-          ...(html ? { html } : {}),
-          ...(replyTo ? { reply_to: replyTo } : {}),
-        }),
+      const res = await sendEmail({
+        sink: email,
+        to: email.to,
+        subject,
+        // `human` is formatted for Discord/Slack. Asterisks that render as
+        // bold there are just noise in a mail client, and a message full of
+        // stray markup is one more thing for a spam filter to dislike.
+        text: human.replace(/\*\*/g, ""),
+        html,
+        replyTo,
       });
       if (res.ok) delivered = true;
       else errors.push(`email ${res.status}: ${(await res.text()).slice(0, 200)}`);

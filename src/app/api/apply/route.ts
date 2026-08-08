@@ -19,7 +19,11 @@
  *
  * Any one sink is enough. The webhook and file ones fall back to the feedback
  * variables, so a single setting covers both forms:
- *   RESEND_API_KEY + INTAKE_EMAIL_TO    (shared; replies go to the applicant)
+ *   RESEND_API_KEY + INTAKE_EMAIL_TO    (shared)
+ *
+ * With mail configured a submission sends two: the application to intake, with
+ * the applicant as reply-to, and a receipt to the applicant, with intake as
+ * reply-to. The receipt is best-effort and never fails the request.
  *   APPLY_WEBHOOK_URL || FEEDBACK_WEBHOOK_URL
  *   APPLY_LOG_PATH    || FEEDBACK_LOG_PATH
  */
@@ -33,6 +37,7 @@ import {
   emailSink,
   looksLikeEmail,
   renderIntakeEmail,
+  sendEmail,
 } from "@/lib/intake";
 import { cleanApplyRoles } from "@/lib/apply-roles";
 
@@ -91,6 +96,34 @@ function formatAsEmail(a: Application): string {
       "Reply to this mail to reach the applicant — that reply is how a code goes out.",
     ],
   });
+}
+
+/**
+ * The receipt the applicant gets.
+ *
+ * It repeats nothing they typed. That is a security property, not an
+ * oversight: this endpoint is unauthenticated and will send mail to whatever
+ * address it is handed, so echoing their free text back would turn it into a
+ * way to deliver arbitrary content to an arbitrary inbox, over our domain and
+ * our sender reputation. Everything here is fixed copy.
+ *
+ * The one thing it must land is how a code arrives — a human reply to this
+ * thread — because "you have a code, click here" is the phishing mail someone
+ * will eventually send in our name, and a person who knows what to expect is
+ * the only defence that scales.
+ */
+function confirmationEmail(): { subject: string; html: string; text: string } {
+  const lines = [
+    "Thanks — your application is in, and a person will read it.",
+    "That usually takes a couple of days. Most applications get a no, and it is not personal: every admission writes a permanent entry on chain that nobody can remove, so the cohort stays small on purpose.",
+    "If we do send an invite code, it comes as a reply to this thread, from a person. Never from a link in a post, never automatically, and never from anyone asking you to connect a wallet to claim it. If you get one that does, it is not us.",
+    "Nothing about a wallet is attached to your application — no address, no balances.",
+  ];
+  return {
+    subject: "We got your UTXOpia application",
+    text: `${lines.join("\n\n")}\n\nUTXOpia`,
+    html: renderIntakeEmail({ title: "Your application is in", intro: lines }),
+  };
 }
 
 export async function POST(req: Request) {
@@ -166,6 +199,30 @@ export async function POST(req: Request) {
     );
   }
   if (errors.length) console.warn("[apply] partial delivery", errors);
+
+  // Courtesy receipt, sent only once the application is safely recorded and
+  // deliberately not allowed to fail the request: the applicant has already
+  // done their part, and telling them it went wrong when it did not would cost
+  // us a second submission and them the belief that it works. Replies go to
+  // the intake inbox, which is the thread a code would arrive on.
+  if (mail) {
+    try {
+      const receipt = confirmationEmail();
+      const res = await sendEmail({
+        sink: mail,
+        to: [email],
+        subject: receipt.subject,
+        text: receipt.text,
+        html: receipt.html,
+        replyTo: mail.to[0],
+      });
+      if (!res.ok) {
+        console.warn("[apply] confirmation not sent", res.status, await res.text());
+      }
+    } catch (caught) {
+      console.warn("[apply] confirmation not sent", caught);
+    }
+  }
 
   return NextResponse.json({ ok: true });
 }
