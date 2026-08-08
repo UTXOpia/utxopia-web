@@ -15,7 +15,7 @@ export type ClaimPrivateReceiveNameInput = {
   solanaClaim?: (handle: string) => Promise<boolean>;
 };
 
-export function normalizePrivateNameHandle(input: string, chain: ChainId) {
+export function normalizePrivateNameHandle(input: string, _chain: ChainId) {
   const trimmed = input.trim().toLowerCase();
   const withoutAt = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
   const suffix = ".utxopia.sol";

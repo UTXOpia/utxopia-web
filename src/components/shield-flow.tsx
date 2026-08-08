@@ -406,7 +406,8 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       setError(err instanceof Error ? err.message : "Add funds failed");
       setStatus("error");
     }
-  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction, chainEnv.config, poolFees]);
+  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction,
+      chainEnv.config, chainEnv.networkId, chainEnv.vaultId, poolFees]);
 
   const amountRaw = BigInt(Math.max(0, Math.floor(parseFloat(amount || "0") * (10 ** selectedToken.decimals))));
   const depositFee = computeBpsFee(amountRaw, poolFees.fees?.depositFeeBps ?? 0);

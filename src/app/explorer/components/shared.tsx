@@ -15,7 +15,6 @@ import {
   ChevronDown,
   ExternalLink,
   Loader2,
-  Search,
   RefreshCw,
   Shield,
   ShieldCheck,

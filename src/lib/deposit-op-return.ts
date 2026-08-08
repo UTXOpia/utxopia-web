@@ -3,8 +3,6 @@ import {
   computeDepositPoolTag,
   DEPOSIT_BITCOIN_NETWORK,
   DEPOSIT_DESTINATION_CHAIN,
-  DEPOSIT_OP_RETURN_SIZE,
-  DEPOSIT_POOL_TAG_SIZE,
   parseDepositOpReturn,
   type DepositBitcoinNetwork,
   type DepositOpReturnContext,

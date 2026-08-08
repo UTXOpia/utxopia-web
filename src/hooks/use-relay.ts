@@ -51,7 +51,7 @@ export function useEffectiveRelayUrl(chainId: string, networkId: string, vaultId
     // No health data yet — use first builtin as cold-start default.
     // relays[0] is always defined for known chains (builtins are non-empty).
     return relays[0].url(networkId, vaultId);
-  }, [effective, relays, chainId, networkId, vaultId]);
+  }, [effective, relays, networkId, vaultId]);
 }
 
 /**

@@ -80,7 +80,6 @@ function DepositDetails({ deposit, config, isBtc }: { deposit: DepositRecord; co
   const minerFee = isBtc ? btcMinerFee : 0;
   const serviceFee = isBtc ? btcServiceFee : (d.fee ?? (grossAmount - shieldedAmount));
   const displayGross = isBtc ? (originalDeposit ?? shieldedAmount) : grossAmount;
-  const isDirectVaultDeposit = isBtc && !d.btcMeta?.sweepTxid;
   const fmtAmount = (sats: number) => config.showRaw
     ? sats.toLocaleString()
     : (sats / (10 ** config.decimals)).toLocaleString(undefined, { maximumFractionDigits: config.decimals });

@@ -711,6 +711,8 @@ export function SendForm({
     effectiveToken,
     lookupSnsName,
     chainEnv.networkId,
+    chainEnv.vaultId,
+    privacyDomain,
     noteSelector.selectedNotes,
     relayerMeta,
     effectiveRelayerFee,
@@ -879,6 +881,7 @@ export function SendForm({
       selectedPayToken,
       boundChainId,
       chainEnv.networkId,
+      privacyDomain,
     ],
   );
 

@@ -11,7 +11,6 @@
  */
 
 import { NextResponse } from "next/server";
-import { getBackendUrl } from "@/lib/api/constants";
 import { parseVaultScope, vaultTargets } from "@/lib/api/vault-fanout";
 import { detectNetworkFromRequest } from "@/lib/network-config";
 export const dynamic = "force-dynamic";

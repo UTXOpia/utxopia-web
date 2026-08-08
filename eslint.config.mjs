@@ -21,6 +21,27 @@ const eslintConfig = defineConfig([
       // React Compiler's lint currently flags common mount/hydration effects
       // used by Next client components. Keep the actionable hook rules on.
       "react-hooks/set-state-in-effect": "off",
+
+      // Every <img> left in this codebase is a 14-80px token or brand icon
+      // served from /public. next/image exists to optimise LCP-relevant and
+      // remote images; at this size it optimises nothing and costs an explicit
+      // width/height at each call site. Revisit if a real content image lands.
+      "@next/next/no-img-element": "off",
+
+      // A leading underscore marks a deliberately unused binding: a parameter
+      // that only exists to reach a later one, or a field destructured to be
+      // discarded. Without this the convention is unenforceable and the rule
+      // fires on code that is already saying "I know".
+      "@typescript-eslint/no-unused-vars": [
+        "warn",
+        {
+          argsIgnorePattern: "^_",
+          varsIgnorePattern: "^_",
+          caughtErrorsIgnorePattern: "^_",
+          destructuredArrayIgnorePattern: "^_",
+          ignoreRestSiblings: true,
+        },
+      ],
     },
   },
 ]);

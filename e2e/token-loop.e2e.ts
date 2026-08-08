@@ -74,8 +74,14 @@ const BTC_DEPOSIT_TIMEOUT_MS = parseInt(process.env.BTC_DEPOSIT_TIMEOUT_MS ?? "6
 /** How long to poll for the BTC redeem txid to appear (ms). Default 10 min. */
 const BTC_REDEEM_TIMEOUT_MS = parseInt(process.env.BTC_REDEEM_TIMEOUT_MS ?? "600000", 10);
 
+/** Which network the run drives, via `?network=`. Both `devnet` and
+ *  `devnet-regtest` sit on Solana devnet and are served by api-hybrid; they
+ *  differ in program id and in whether BTC is testnet4 or regtest. The BTC legs
+ *  here mine regtest blocks, so they only make sense on `devnet-regtest`. */
+const E2E_NETWORK = process.env.E2E_NETWORK ?? "devnet";
+
 const CHAINS: ChainConfig[] = [
-  { name: "Solana devnet", networkParam: "devnet", network: "devnet" },
+  { name: `Solana ${E2E_NETWORK}`, networkParam: E2E_NETWORK, network: E2E_NETWORK },
 ];
 
 /** Token symbol driven by the loop; must match a token-option-<symbol> testid. */
@@ -90,9 +96,18 @@ const SHIELD_AMOUNT = "0.01";
 const TRANSFER_AMOUNT = "0.005";
 const UNSHIELD_AMOUNT = "0.004";
 
-/** Dummy stealth recipient for the transfer step.
- *  Replace with a real utxo:… address derived from the dev seed before live run. */
-const TRANSFER_RECIPIENT = process.env.E2E_TRANSFER_RECIPIENT ?? "REPLACE_WITH_STEALTH_ADDRESS"; // VERIFY: must be a valid utxo:… stealth meta address
+/** Stealth recipient for the transfer step.
+ *
+ *  A fixed address is deliberate: the transfer leg is testing that a private
+ *  send builds, proves and lands, not that we can spend it afterwards. Pinning
+ *  it keeps runs reproducible and removes a per-run derivation step — the app
+ *  only ever shows a *truncated* meta address, and the one on the deposit page
+ *  is a one-time deposit address, not this. Override to send somewhere you can
+ *  actually spend from. */
+const TRANSFER_RECIPIENT = process.env.E2E_TRANSFER_RECIPIENT
+  ?? "utxo:90935e024056c1aa69bc32cb662c45ce2fde0670ccc7ac3d60b03c55b88dc327"
+   + "e100efc857a86fba2496f7d4adb8820a88cd9666c8d566ad2e5942dbad2722142"
+   + "0d1c6f0b7149af92212486a9a42055e263749255f968dfcccc7b7eb5e9aa102";
 
 /** Solana devnet: unshield destination (public wallet address). */
 const SOL_UNSHIELD_ADDR = process.env.E2E_SOL_UNSHIELD_ADDR ?? "REPLACE_WITH_SOL_ADDRESS"; // VERIFY: a valid Solana devnet public key
@@ -221,24 +236,6 @@ function waitIdle(): void {
   }
 }
 
-/** Dismiss the onboarding modals that gate /vault.
- *
- *  Two stack up on a fresh profile — "Claim your receive name", then "Use a
- *  private vault" — and they cover the page entirely. The redeem leg polls
- *  /vault for withdrawal status, so without this it waits out its whole budget
- *  looking at a modal while the withdrawal has long since confirmed on chain.
- */
-function dismissOnboarding(): void {
-  for (const name of ["Maybe later", "Skip"]) {
-    try {
-      ab("find", "role", "button", "click", "--name", name);
-      ab("wait", "500");
-    } catch {
-      // Not showing — nothing to dismiss.
-    }
-  }
-}
-
 /** Mine regtest blocks. Nothing mines on its own, so a BTC payout sits in the
  *  mempool forever, and the redemption then waits on *finality* — the light
  *  client finalises a few blocks back, so confirming the payout is not enough
@@ -322,6 +319,28 @@ function injectDevKeysViaStorage(keys: DevKeys, targetUrl: string): void {
   ab("open", targetUrl);
 }
 
+/** Unlock this pool's private identity, if the page is gating on it.
+ *
+ *  The identity is per-pool and is *derived at first unlock* from a wallet
+ *  signature — hydration can only restore one that already exists, so a fresh
+ *  browser profile always meets this wall. Until it clears, the amount field
+ *  never mounts and the submit button stays disabled, which reads exactly like
+ *  a hung proof: the run then waits out the success selector for nothing.
+ *
+ *  The component unmounts once keys exist, so a miss here means "already
+ *  unlocked" and is not an error. The dev adapter implements signMessage, so
+ *  the signature is granted without a prompt.
+ */
+function unlockVaultIdentity(): void {
+  try {
+    ab("find", "testid", "vault-identity-unlock", "click");
+  } catch {
+    return; // No gate on screen — this pool's identity is already unlocked.
+  }
+  console.log("  → Unlocking the pool's private identity…");
+  ab("wait", "6000");
+}
+
 /** Pick a token in the ShieldFlow dropdown. The trigger and each option carry
  *  data-testids because their visible labels are multi-line and not matchable
  *  by accessible name. */
@@ -391,6 +410,8 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
 
   // The dropdown defaults to BTC; the token loop runs on SOL.
   selectToken(SHIELD_TOKEN);
+
+  unlockVaultIdentity();
 
   // Amount + submit only render once the dev wallet is connected, which the
   // seeded `walletName` handles during injectDevKeysViaStorage.

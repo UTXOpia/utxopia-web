@@ -18,7 +18,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import {
   Connection,
-  Keypair,
   PublicKey,
   Transaction,
   TransactionInstruction,
@@ -55,9 +54,6 @@ import {
 } from "@/lib/spv/mempool";
 // hexToBytes imported lazily via getUTXOpiaSDK()
 
-import {
-  buildMerkleProofPath,
-} from "@/lib/spv/verify";
 import { resolveVerifyConfig } from "@/lib/server/verify-routing";
 export const dynamic = "force-dynamic";
 

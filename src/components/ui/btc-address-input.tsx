@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useCallback, useEffect } from "react";
+import { useState, useCallback } from "react";
 import { Check, AlertCircle, Bitcoin } from "lucide-react";
 import { cn } from "@/lib/utils";
 
@@ -81,7 +81,6 @@ function decodeBech32(addr: string): { version: number; program: Uint8Array } | 
   const sepIdx = lower.lastIndexOf("1");
   if (sepIdx < 1 || sepIdx + 7 > lower.length) return null;
 
-  const hrp = lower.slice(0, sepIdx);
   const dataPart = lower.slice(sepIdx + 1);
 
   // Decode charset

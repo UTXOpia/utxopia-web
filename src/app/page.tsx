@@ -16,7 +16,6 @@ import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
-import { cn } from "@/lib/utils";
 
 /* ── Feature visualizations ── */
 

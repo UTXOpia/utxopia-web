@@ -294,15 +294,17 @@ export function useJoinSplitSubmit() {
       setStatusMessage("");
       return { success: false, signature: null } satisfies JoinSplitSubmitResult;
     }
-  }, [prover, chainEnv, chainId, relayCandidates]);
+    // memberWallet matters here: it is captured at mount, so a wallet connected
+    // afterwards would otherwise still be read as null and the approval filed
+    // under the relayer rather than the member.
+  }, [prover, chainEnv, relayCandidates, connection, memberWallet]);
 
   const reset = useCallback(() => {
     setStatus("idle");
     setStatusMessage("");
     setTxSignature(null);
     setError(null);
-  }, [
-    memberWallet,]);
+  }, []);
 
   return {
     status,

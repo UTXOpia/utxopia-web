@@ -52,7 +52,7 @@ const MODE_OPTIONS = [
   { mode: "btc" as const, label: "Bitcoin", icon: Bitcoin, color: "text-btc", private: false },
 ] as const;
 
-export function OutputRowCard({ output, index, canRemove, handlers, config }: OutputRowCardProps) {
+export function OutputRowCard({ output, index: _index, canRemove, handlers, config }: OutputRowCardProps) {
   const { onUpdate, onRemove } = handlers;
   const {
     defaultAddress,
@@ -63,9 +63,7 @@ export function OutputRowCard({ output, index, canRemove, handlers, config }: Ou
     serviceFeeSats = 0,
     serviceFeeBps = 0,
     tokenUnit = "sats",
-    tokenSymbol = "zkBTC",
   } = config;
-  const currentMode = MODE_OPTIONS.find((m) => m.mode === output.mode) ?? MODE_OPTIONS[0];
 
   return (
     <div className="rounded-[12px] bg-card border border-gray/15 p-3 space-y-2">
@@ -207,7 +205,7 @@ function TypeDropdown({ currentMode, disablePublic, disableBtc, onChange }: {
 
 // --- Recipient Inputs (inline, no labels, compact) ---
 
-function RecipientInput({ output, onUpdate, defaultAddress, selfMeta }: {
+function RecipientInput({ output, onUpdate, defaultAddress: _defaultAddress, selfMeta }: {
   output: OutputRow;
   onUpdate: (update: Partial<OutputRow>) => void;
   defaultAddress: string;
