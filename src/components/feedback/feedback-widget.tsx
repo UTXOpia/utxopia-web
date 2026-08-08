@@ -1,10 +1,24 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { MessageSquarePlus, X } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { FeedbackForm } from "./feedback-form";
+
+const OPEN_EVENT = "utxopia:open-feedback";
+
+/**
+ * Open the feedback dialog from anywhere.
+ *
+ * The widget is mounted once in `providers.tsx`, so an event is all a caller
+ * needs — no context, no provider, no prop drilled through pages that do not
+ * care. Sending someone to a separate page for this loses their place, which
+ * for "this just broke" is the whole context worth capturing.
+ */
+export function openFeedback(): void {
+  if (typeof window !== "undefined") window.dispatchEvent(new Event(OPEN_EVENT));
+}
 
 /**
  * Always-present feedback button.
@@ -16,6 +30,12 @@ import { FeedbackForm } from "./feedback-form";
  */
 export function FeedbackWidget() {
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener(OPEN_EVENT, show);
+    return () => window.removeEventListener(OPEN_EVENT, show);
+  }, []);
 
   return (
     <Dialog.Root open={open} onOpenChange={setOpen}>

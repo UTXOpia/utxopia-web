@@ -10,6 +10,7 @@ import { SiteFooter } from "@/components/site-footer";
 import { WalletButton } from "@/components/ui";
 import { RedeemInvite } from "@/components/redeem-invite";
 import { useVerifiedMembership } from "@/hooks/use-verified-membership";
+import { openFeedback } from "@/components/feedback/feedback-widget";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 import { hrefWithVault, vaultsSupported } from "@/lib/vault-config";
@@ -205,12 +206,13 @@ function Redeem() {
 
         <p className="mt-2 text-caption text-gray">
           Code expired, or something not working?{" "}
-          <Link
-            href={hrefWithChain("/feedback", networkId)}
+          <button
+            type="button"
+            onClick={openFeedback}
             className="underline underline-offset-4 hover:text-foreground"
           >
             Tell us
-          </Link>{" "}
+          </button>{" "}
           — expiry is a free re-confirmation checkpoint, not a rejection, and we will reissue.
         </p>
       </div>

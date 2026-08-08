@@ -47,12 +47,6 @@ export function SiteFooter() {
           <span className="text-caption text-gray/60">
             Public alpha · Testnet only · Unaudited
           </span>
-          <Link
-            href={hrefWithChain("/feedback", networkId)}
-            className="text-caption text-gray hover:text-foreground transition-colors"
-          >
-            Feedback
-          </Link>
           <a
             href="https://github.com/UTXOpia"
             target="_blank"
