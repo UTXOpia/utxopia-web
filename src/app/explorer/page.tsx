@@ -45,6 +45,14 @@ function useSyncStatus(network: NetworkId) {
 // Explorer Content
 // =============================================================================
 
+/** Identity of a row, and therefore its React key. Defined once so the dedupe
+ *  in `filtered` and the `key` prop cannot drift apart — if they ever disagree,
+ *  duplicates come straight back. */
+function rowKeyOf(tx: ExplorerTransaction): string {
+  const id = tx.txSignature || tx.btcMeta?.depositTxid || `${tx.type}-${tx.timestamp}`;
+  return `${tx.type}-${id}`;
+}
+
 function ExplorerContent({ network }: { network: NetworkId }) {
   const [activeFilter, setActiveFilter] = useState<FilterType>("all");
   const [activeVault, setActiveVault] = useState<VaultFilter>("all");
@@ -130,7 +138,23 @@ function ExplorerContent({ network }: { network: NetworkId }) {
 
   // Filter by type AND token
   const filtered = useMemo(() => {
-    let items = vaultScoped;
+    // The feed merges several sources and can carry the same transaction twice
+    // — most often a shield that arrives from both the deposit and the transfer
+    // side. Two entries with the same key is not a cosmetic problem: React
+    // reconciles a keyed list by key, so a duplicate leaves an orphaned <tr>
+    // from the previous render that never receives new props. That is what put
+    // a stale "Open" pool tag in the table after switching pool filters, in a
+    // column the header had already dropped.
+    //
+    // Deduplicating here, on the exact key the rows are rendered with, is what
+    // makes "keys are unique" true by construction rather than by luck.
+    const seen = new Set<string>();
+    let items = vaultScoped.filter((t) => {
+      const key = rowKeyOf(t);
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
 
     // Type filter
     if (activeFilter !== "all") {
@@ -230,7 +254,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
                   const rowKey = tx.txSignature || tx.btcMeta?.depositTxid || `${tx.type}-${tx.timestamp}`;
                   return (
                     <TransferRow
-                      key={`${tx.type}-${rowKey}`}
+                      key={rowKeyOf(tx)}
                       tx={tx}
                       network={network}
                       expanded={expanded.has(rowKey)}

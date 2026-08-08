@@ -236,7 +236,9 @@ export function TransferRow({
       </tr>
       {expanded && (
         <tr>
-          <td colSpan={8} className="p-0">
+          {/* Follows the Pool column: the table is 8 wide only while that column
+              is shown, and a colSpan wider than the table stretches the row. */}
+          <td colSpan={showVault ? 8 : 7} className="p-0">
             <TransferDetails tx={tx} redemption={redemption} network={network} />
           </td>
         </tr>
