@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { APPLY_ROLES, type ApplyRole } from "@/lib/apply-roles";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "sending" | "done" | "error";
@@ -14,35 +15,37 @@ const inputClass = cn(
 );
 
 /**
- * The five questions from `launch/OUTREACH.md`, plus an email and where they
- * heard about it.
+ * An email, a self-description, one open question, and two opt-ins.
  *
- * Nothing here issues a code. The form's own copy says applications are read
- * by a person and most get a no, because that is true and because a form that
- * implies automatic admission attracts exactly the applicants this cohort is
- * meant to filter out.
+ * This used to ask the five screening questions from `launch/OUTREACH.md`. They
+ * were good questions — but a seven-field form in front of a stranger screens
+ * for patience more than for fit, and the screening it did buy is better done
+ * in the conversation the second opt-in asks for. So the form's job is now to
+ * start that conversation, not to decide it.
+ *
+ * The opt-ins default to off and are asked separately, because "wants a look at
+ * the beta" and "will give us an hour on a call" are different consents, and
+ * bundling them means neither answer is worth anything.
+ *
+ * The role chips are optional and multi-select: most of the people worth
+ * admitting are two or three of them at once, and a required field that only
+ * sorts an inbox is friction charged to the applicant.
+ *
+ * Still true, and still said plainly below: nothing here issues a code.
  */
 export function ApplyForm({ className }: { className?: string }) {
   const { networkId } = useChainEnvironment();
 
   const [email, setEmail] = useState("");
-  const [who, setWho] = useState("");
-  const [useCase, setUseCase] = useState("");
-  const [cliOk, setCliOk] = useState<boolean | null>(null);
-  const [background, setBackground] = useState("");
-  const [distrust, setDistrust] = useState("");
-  const [source, setSource] = useState("");
+  const [roles, setRoles] = useState<ApplyRole[]>([]);
+  const [reason, setReason] = useState("");
+  const [emailOptIn, setEmailOptIn] = useState(false);
+  const [feedbackOptIn, setFeedbackOptIn] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const busy = status === "sending";
-  const ready =
-    !busy &&
-    email.trim().length > 3 &&
-    who.trim().length > 1 &&
-    useCase.trim().length > 1 &&
-    distrust.trim().length > 1 &&
-    cliOk !== null;
+  const ready = !busy && email.trim().length > 3 && reason.trim().length > 1;
 
   const submit = async () => {
     setError(null);
@@ -53,12 +56,10 @@ export function ApplyForm({ className }: { className?: string }) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           email: email.trim(),
-          who: who.trim(),
-          useCase: useCase.trim(),
-          cliOk,
-          background: background.trim(),
-          distrust: distrust.trim(),
-          source: source.trim(),
+          roles,
+          reason: reason.trim(),
+          emailOptIn,
+          feedbackOptIn,
           network: networkId,
         }),
       });
@@ -106,103 +107,69 @@ export function ApplyForm({ className }: { className?: string }) {
         />
       </Field>
 
-      <Field label="Who are you, and where can we see your work?" hint="links are enough">
-        <input
-          value={who}
-          onChange={(event) => setWho(event.target.value)}
-          placeholder="github.com/… , @handle, a paper, a repo"
-          disabled={busy}
-          className={inputClass}
-        />
-      </Field>
-
-      <Field
-        label="What would you actually move through something like this?"
-        hint="or would want to — a real answer beats an enthusiastic one"
-      >
-        <textarea
-          value={useCase}
-          onChange={(event) => setUseCase(event.target.value)}
-          rows={3}
-          maxLength={2000}
-          disabled={busy}
-          className={cn(inputClass, "resize-y leading-relaxed")}
-        />
-      </Field>
-
-      {/* Not a Field: a <label> wrapping buttons has no control to point at. */}
-      <div className="flex flex-col gap-1.5">
-        <span className="text-caption text-gray-light">
-          Can you run a CLI script and paste your full failing state?{" "}
-          <span className="text-gray">
-            — this phase asks for both. &ldquo;No&rdquo; is a fine answer and does not rule you out
-            of later phases.
-          </span>
-        </span>
-        <div className="flex gap-1.5">
-          {[
-            { value: true, label: "Yes" },
-            { value: false, label: "No" },
-          ].map((option) => (
+      {/* Not a Field: a <label> wrapping buttons has no single control to point
+          at, so it would announce the wrong thing to a screen reader. */}
+      <fieldset className="flex flex-col gap-1.5">
+        <legend className="text-caption text-gray-light">
+          What best describes you? <span className="text-gray">— optional, pick any that fit</span>
+        </legend>
+        <div className="flex flex-wrap gap-1.5">
+          {APPLY_ROLES.map((option) => (
             <button
-              key={option.label}
+              key={option}
               type="button"
-              onClick={() => setCliOk(option.value)}
+              aria-pressed={roles.includes(option)}
+              onClick={() =>
+                setRoles((current) =>
+                  current.includes(option)
+                    ? current.filter((entry) => entry !== option)
+                    : [...current, option],
+                )
+              }
               disabled={busy}
               className={cn(
-                "rounded-full border px-4 py-1 text-caption transition-colors",
-                cliOk === option.value
+                "rounded-full border px-3.5 py-1 text-caption transition-colors disabled:opacity-60",
+                roles.includes(option)
                   ? "border-privacy/40 bg-privacy/10 text-foreground"
                   : "border-gray/20 text-gray hover:border-gray/40 hover:text-gray-light",
               )}
             >
-              {option.label}
+              {option}
             </button>
           ))}
         </div>
+      </fieldset>
+
+      <Field label="Why are you interested?" hint="a couple of sentences is plenty">
+        <textarea
+          value={reason}
+          onChange={(event) => setReason(event.target.value)}
+          rows={4}
+          maxLength={2000}
+          disabled={busy}
+          className={cn(inputClass, "resize-y leading-relaxed")}
+        />
+      </Field>
+
+      <div className="flex flex-col gap-2.5">
+        <Consent
+          checked={emailOptIn}
+          onChange={setEmailOptIn}
+          disabled={busy}
+          label="Email me updates"
+          hint="occasional; one reply stops it"
+        />
+        <Consent
+          checked={feedbackOptIn}
+          onChange={setFeedbackOptIn}
+          disabled={busy}
+          label="I'm up for a 1-on-1 feedback call"
+          hint="30 minutes, whenever suits you"
+        />
       </div>
 
-      <Field
-        label="Have you self-custodied bitcoin? Used a shielded protocol?"
-        hint="optional — Zcash, Tornado, Railgun, Penumbra, Sparrow, Nunchuk, anything"
-      >
-        <textarea
-          value={background}
-          onChange={(event) => setBackground(event.target.value)}
-          rows={2}
-          maxLength={2000}
-          disabled={busy}
-          className={cn(inputClass, "resize-y leading-relaxed")}
-        />
-      </Field>
-
-      <Field
-        label="What would have to happen for you to stop trusting us with this?"
-        hint="the one we most want answered. Be unkind."
-      >
-        <textarea
-          value={distrust}
-          onChange={(event) => setDistrust(event.target.value)}
-          rows={3}
-          maxLength={2000}
-          disabled={busy}
-          className={cn(inputClass, "resize-y leading-relaxed")}
-        />
-      </Field>
-
-      <Field label="Where did you hear about this?" hint="optional">
-        <input
-          value={source}
-          onChange={(event) => setSource(event.target.value)}
-          placeholder="a DM from us, a post, a friend…"
-          disabled={busy}
-          className={inputClass}
-        />
-      </Field>
-
       <p className="text-caption leading-relaxed text-gray">
-        Nothing about a wallet is attached to this — no address, no balances. It is an email and
-        your answers, and it reaches the people building the thing.
+        No wallet is attached to this — no address, no balances. Just an email and your answer.
       </p>
 
       {status === "error" && error && (
@@ -244,6 +211,40 @@ function Field({
         {label} {hint && <span className="text-gray">— {hint}</span>}
       </span>
       {children}
+    </label>
+  );
+}
+
+/** An opt-in. Unchecked by default: a consent that ships pre-agreed is not one. */
+function Consent({
+  checked,
+  onChange,
+  disabled,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (next: boolean) => void;
+  disabled: boolean;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <label className="flex cursor-pointer items-start gap-2.5">
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+        disabled={disabled}
+        className={cn(
+          "mt-0.5 h-4 w-4 shrink-0 cursor-pointer appearance-none rounded-[5px]",
+          "border border-gray/30 transition-colors disabled:opacity-60",
+          checked && "border-privacy/50 bg-privacy/70",
+        )}
+      />
+      <span className="text-caption leading-relaxed text-gray-light">
+        {label} <span className="text-gray">— {hint}</span>
+      </span>
     </label>
   );
 }
