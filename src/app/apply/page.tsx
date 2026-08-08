@@ -13,22 +13,24 @@ import { hrefWithChain } from "@/lib/network-config";
  * whoever redeems it first and admission is a permanent on-chain registration,
  * so a code in a public channel is a cohort with no upper bound.
  *
- * The scarcity stated here is real (15 seats, most applications get a no), and
- * saying so plainly is what lets the page do its work without a countdown, a
- * queue position, or a referral tree.
+ * The scarcity stated here is real (a small cohort, most applications get a
+ * no), and saying so plainly is what lets the page do its work without a
+ * countdown, a queue position, or a referral tree. No number is named on
+ * purpose: the figure we work to is an expectation, not a cap, and printing it
+ * turns an estimate into a promise someone will hold us to.
  */
 const HONEST = [
   {
-    title: "It is devnet, and nothing you do here is private.",
-    body: "We collect aggressively in this phase on purpose — full logs, addresses, failing state. That inverts completely before real money is involved, and we would rather you hear it now than read it later.",
+    title: "Devnet only — nothing here is private.",
+    body: "We collect full logs, addresses and failing state on purpose. That inverts before real money is involved.",
   },
   {
     title: "The ask is a condition, not a favour.",
-    body: "Deposit, transfer, and withdraw while our coordinator is switched off — then tell us exactly what broke. If that sounds like work, it is; that is the whole point of the cohort.",
+    body: "Deposit, transfer and withdraw with our coordinator switched off, then tell us exactly what broke.",
   },
   {
-    title: "Fifteen seats, and most applications get a no.",
-    body: "Not a growth tactic. Every admission writes a permanent entry on chain that nobody can remove, so a cohort is a thing you choose once.",
+    title: "Most applications get a no.",
+    body: "Every admission writes a permanent on-chain entry nobody can remove, so a cohort is chosen once.",
   },
 ];
 
@@ -44,16 +46,15 @@ export default function ApplyPage() {
           <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray/15 bg-muted/20 px-3 py-1.5">
             <ShieldCheck className="h-3.5 w-3.5 text-privacy" />
             <span className="text-[10px] font-medium uppercase tracking-wider text-gray">
-              Verified Privacy · closed beta
+              closed beta
             </span>
           </div>
           <h1 className="mb-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-            Apply for the closed beta
+            Apply for Verified Pools
           </h1>
           <p className="text-body2 leading-relaxed text-gray-light">
-            A shielded vault on Solana: deposit, transfer privately, and withdraw to your own
-            registered address without our approval. We are looking for fifteen people to break it
-            before there is anything real inside.
+            A shielded vault on Solana. Deposit, transfer privately, and withdraw to your own
+            registered address — without our approval. We want a small group to break it first.
           </p>
         </div>
 
