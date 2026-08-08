@@ -24,11 +24,10 @@ function request(body: Record<string, unknown>): Request {
 
 const complete = {
   email: "someone@example.com",
-  who: "github.com/someone",
-  useCase: "payroll for two contractors who should not see each other's rate",
-  cliOk: true,
-  background: "ran a Zcash full node for a while",
-  distrust: "if you shipped a change to the exit path without saying so",
+  roles: ["Engineer", "Bitcoiner"],
+  reason: "payroll for two contractors who should not see each other's rate",
+  emailOptIn: true,
+  feedbackOptIn: true,
 };
 
 async function entries() {
@@ -66,7 +65,7 @@ describe("beta applications", () => {
 
     expect(response.status).toBe(200);
     const [entry] = await entries();
-    expect(entry).toMatchObject({ email: "someone@example.com", cli_ok: true });
+    expect(entry).toMatchObject({ email: "someone@example.com", feedback_opt_in: true });
   });
 
   describe("with a sink configured", () => {
@@ -84,16 +83,14 @@ describe("beta applications", () => {
       expect(response.status).toBe(200);
       const written = await entries();
       expect(Object.keys(written[written.length - 1]).sort()).toEqual([
-        "background",
-        "cli_ok",
-        "distrust",
         "email",
+        "email_opt_in",
+        "feedback_opt_in",
         "network",
+        "reason",
         "received_at",
-        "source",
-        "use_case",
+        "roles",
         "user_agent",
-        "who",
       ]);
     });
 
@@ -102,19 +99,56 @@ describe("beta applications", () => {
       expect(response.status).toBe(400);
     });
 
-    it("holds out for the question that pays back", async () => {
-      const response = await POST(request({ ...complete, distrust: "  " }));
+    it("holds out for the one question left", async () => {
+      const response = await POST(request({ ...complete, reason: "  " }));
       expect(response.status).toBe(400);
       expect(await response.json()).toMatchObject({
-        error: "the last question is the one we most want answered",
+        error: "tell us why you're interested — a couple of sentences is plenty",
       });
     });
 
-    it("treats an unanswered CLI question as unanswered, not as no", async () => {
-      const { cliOk, ...withoutAnswer } = complete;
-      void cliOk;
-      const response = await POST(request(withoutAnswer));
-      expect(response.status).toBe(400);
+    it("records an unticked opt-in as a no, never as unset", async () => {
+      const { emailOptIn, feedbackOptIn, ...withoutConsent } = complete;
+      void emailOptIn;
+      void feedbackOptIn;
+      const response = await POST(request(withoutConsent));
+
+      expect(response.status).toBe(200);
+      const written = await entries();
+      expect(written[written.length - 1]).toMatchObject({
+        email_opt_in: false,
+        feedback_opt_in: false,
+      });
+    });
+
+    it("keeps the role buckets to the known set", async () => {
+      const response = await POST(request({
+        ...complete,
+        roles: ["Engineer", "Supreme Overlord", "Engineer"],
+      }));
+
+      expect(response.status).toBe(200);
+      const written = await entries();
+      // Unknown dropped, duplicate collapsed.
+      expect(written[written.length - 1]).toMatchObject({ roles: ["Engineer"] });
+    });
+
+    it("stores roles in a stable order however they were ticked", async () => {
+      const response = await POST(request({ ...complete, roles: ["Bitcoiner", "Engineer"] }));
+
+      expect(response.status).toBe(200);
+      const written = await entries();
+      expect(written[written.length - 1]).toMatchObject({
+        roles: ["Engineer", "Bitcoiner"],
+      });
+    });
+
+    it("does not take a truthy string as consent", async () => {
+      const response = await POST(request({ ...complete, emailOptIn: "yes" }));
+
+      expect(response.status).toBe(200);
+      const written = await entries();
+      expect(written[written.length - 1]).toMatchObject({ email_opt_in: false });
     });
 
     it("issues nothing — an application is a record, not an admission", async () => {

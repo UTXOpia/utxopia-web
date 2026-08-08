@@ -1,17 +1,21 @@
 /**
  * POST /api/apply — closed-beta applications.
  *
- * The five questions are `launch/OUTREACH.md`; each earns its place and none
- * of them is a formality. This route only records answers — it never issues a
+ * An email, why they are interested, and two opt-ins. The five screening
+ * questions this used to carry moved into the conversation the feedback opt-in
+ * asks for: a long form in front of a stranger screens for patience, and the
+ * answers it did collect were worth less than ten minutes on a call.
+ *
+ * This route only records answers — it never issues a
  * code. Auto-issuing on an email would give away the two things scarcity buys:
  * screening (most applications are meant to get a no) and a cohort that lands
  * inside one 48-hour window instead of trickling in, near-self-identifying, on
  * chain. `invite.rs` redeem() checks a code and a wallet signature and nothing
  * else, so anyone holding a code is in, permanently.
  *
- * Unlike feedback this form *is* identity — an email and links to a person's
- * work — so it stays as far from the vault as the code allows: no wallet, no
- * balances, no notes, unknown fields dropped.
+ * Unlike feedback this form *is* identity — an email and how someone describes
+ * themselves — so it stays as far from the vault as the code allows: no wallet,
+ * no balances, no notes, unknown fields dropped.
  *
  * Any one sink is enough. The webhook and file ones fall back to the feedback
  * variables, so a single setting covers both forms:
@@ -28,13 +32,14 @@ import {
   deliver,
   emailSink,
   looksLikeEmail,
+  renderIntakeEmail,
 } from "@/lib/intake";
+import { cleanApplyRoles } from "@/lib/apply-roles";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
 
 const MAX_EMAIL = 254;
-const MAX_SHORT = 500;
 const MAX_LONG = 2000;
 const MAX_CONTEXT = 200;
 
@@ -43,31 +48,49 @@ const rateLimited = createRateLimiter({ windowMs: 10 * 60 * 1000, max: 3 });
 interface Application {
   received_at: string;
   email: string;
-  who: string;
-  use_case: string;
-  cli_ok: boolean;
-  background: string;
-  distrust: string;
-  source: string;
+  roles: string[];
+  reason: string;
+  email_opt_in: boolean;
+  feedback_opt_in: boolean;
   network: string;
   user_agent: string;
 }
 
 function formatForHuman(a: Application): string {
   return [
-    `**beta application** — ${a.email}${a.cli_ok ? "" : "  ·  ⚠️ won't run CLI scripts"}`,
+    `**beta application** — ${a.email}${a.feedback_opt_in ? "  ·  up for a 1-on-1" : ""}`,
     "",
-    `**Who:** ${a.who}`,
+    `**They are:** ${a.roles.join(", ") || "—"}`,
     "",
-    `**Would move:** ${a.use_case}`,
+    `**Why they're interested:** ${a.reason}`,
     "",
-    `**Background:** ${a.background || "— (blank)"}`,
-    "",
-    `**Would stop trusting us if:** ${a.distrust}`,
-    "",
-    `heard via: ${a.source || "—"}   network: ${a.network || "—"}`,
+    `updates: ${a.email_opt_in ? "yes" : "no"}   1-on-1: ${a.feedback_opt_in ? "yes" : "no"}`,
+    `network: ${a.network || "—"}`,
     `at: ${a.received_at}`,
   ].join("\n");
+}
+
+/** The same application as mail. Badges carry what decides whether it gets
+ *  opened now: the self-description, and whether they offered a call. */
+function formatAsEmail(a: Application): string {
+  return renderIntakeEmail({
+    title: "New beta application",
+    badges: [
+      ...a.roles,
+      ...(a.feedback_opt_in ? ["Up for a 1-on-1"] : []),
+      ...(a.email_opt_in ? ["Wants updates"] : []),
+    ],
+    rows: [
+      { label: "Email", value: a.email },
+      { label: "Best describes them", value: a.roles.join(" · ") },
+      { label: "Why they're interested", value: a.reason, block: true },
+    ],
+    meta: [
+      `Network: ${a.network || "—"}`,
+      `Received: ${a.received_at}`,
+      "Reply to this mail to reach the applicant — that reply is how a code goes out.",
+    ],
+  });
 }
 
 export async function POST(req: Request) {
@@ -103,22 +126,12 @@ export async function POST(req: Request) {
     );
   }
 
-  const who = clean(body.who, MAX_SHORT);
-  const useCase = clean(body.useCase, MAX_LONG);
-  const distrust = clean(body.distrust, MAX_LONG);
-
-  // `distrust` is the question that pays back — a blank there is the
-  // application telling you it was filled in to collect something.
-  const missing =
-    who.length < 2 ? "tell us who you are — a link is enough"
-    : useCase.length < 2 ? "tell us what you would move through this"
-    : distrust.length < 2 ? "the last question is the one we most want answered"
-    : null;
-  if (missing) return NextResponse.json({ ok: false, error: missing }, { status: 400 });
-
-  if (typeof body.cliOk !== "boolean") {
+  // The one question left has to be answered, or the form collects addresses
+  // and nothing else.
+  const reason = clean(body.reason, MAX_LONG);
+  if (reason.length < 2) {
     return NextResponse.json(
-      { ok: false, error: "let us know whether you can run a CLI script" },
+      { ok: false, error: "tell us why you're interested — a couple of sentences is plenty" },
       { status: 400 },
     );
   }
@@ -126,12 +139,11 @@ export async function POST(req: Request) {
   const application: Application = {
     received_at: new Date().toISOString(),
     email,
-    who,
-    use_case: useCase,
-    cli_ok: body.cliOk,
-    background: clean(body.background, MAX_LONG),
-    distrust,
-    source: clean(body.source, MAX_SHORT),
+    roles: cleanApplyRoles(body.roles),
+    reason,
+    // Consent is opt-in: anything that is not an explicit `true` is a no.
+    email_opt_in: body.emailOptIn === true,
+    feedback_opt_in: body.feedbackOptIn === true,
     network: clean(body.network, MAX_CONTEXT),
     user_agent: clean(req.headers.get("user-agent"), MAX_CONTEXT),
   };
@@ -139,6 +151,7 @@ export async function POST(req: Request) {
   const { delivered, errors } = await deliver({
     entry: application,
     human: formatForHuman(application),
+    html: formatAsEmail(application),
     subject: `beta application — ${application.email}`,
     replyTo: application.email,
     webhook,
