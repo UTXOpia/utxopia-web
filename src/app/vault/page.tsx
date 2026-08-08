@@ -406,6 +406,25 @@ export default function VaultPage() {
                 sibling={siblingBalances}
               />
 
+              {/* A restored session lives in memory only — nothing is written
+                  to this browser, which is the point. But the member's first
+                  experience of recovery was "it worked, and then it vanished"
+                  on the next reload, with the caveat buried in the dialog they
+                  had already dismissed. Say it where they are, while it is
+                  true. */}
+              {isImportedSession && (
+                <div className="mb-4 rounded-[12px] border border-warning/25 bg-warning/5 px-4 py-3">
+                  <p className="text-caption font-semibold text-foreground">
+                    Restored for this tab only.
+                  </p>
+                  <p className="mt-1 text-caption leading-relaxed text-gray">
+                    Nothing was saved to this browser. Reloading or closing the tab will ask for the
+                    recovery file again — keep it to hand. Your notes are on chain either way;
+                    this only unlocks the keys that read them.
+                  </p>
+                </div>
+              )}
+
               {!isViewOnly && (
                 <VaultFirstSteps
                   keys={keys}
@@ -467,8 +486,13 @@ export default function VaultPage() {
       {/* First-time user onboarding */}
       <OnboardingModal />
 
-      {/* First-login nudge to claim a private receive name (skippable) */}
-      <ReceiveNamePrompt />
+      {/* Claiming a name is optional; losing your notes is not. So this waits
+          until the first-run checklist is done — funds in, recovery file out —
+          rather than being the first thing a new member sees. It used to open
+          as soon as keys existed, which put an interstitial over the vault of
+          somebody who had just redeemed an invite and had nothing to receive
+          at yet, stacked on top of the onboarding tour. */}
+      {hasVaultValue && hasRecoveryBackup && <ReceiveNamePrompt />}
 
       {/* Auth modal */}
       <AuthModal

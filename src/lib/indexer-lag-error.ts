@@ -21,6 +21,8 @@
  * swallow a real one, and "try again later" is bad advice for a genuine bug.
  */
 
+import { describeProgramError } from "./program-error";
+
 const INDEXER_LAG_PATTERNS = [
   // The circuit assert. Match the template + line rather than the whole string:
   // the template name carries a size suffix that changes with circuit params.
@@ -47,6 +49,8 @@ export function isIndexerLagError(error: unknown): boolean {
  */
 export function humanizeSpendError(error: unknown): string {
   const message = error instanceof Error ? error.message : String(error ?? "");
+  // Lag first: an indexer that is behind produces a *proof* failure, which the
+  // program never sees, so the two cases cannot both match.
   if (isIndexerLagError(message)) return INDEXER_LAG_MESSAGE;
-  return message || "Transaction failed";
+  return describeProgramError(message) ?? (message || "Transaction failed");
 }

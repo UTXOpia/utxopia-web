@@ -21,6 +21,7 @@ import {
   markVaultBackupComplete,
 } from "@/lib/vault-backup";
 import { notifyCopied } from "@/lib/notifications";
+import { useChainEnvironment } from "@/lib/chain-environment";
 import { cn } from "@/lib/utils";
 
 // Once a vault has held funds, "Add funds" stays done even if the balance
@@ -43,6 +44,9 @@ export function VaultFirstSteps({
   onBackupComplete,
 }: VaultFirstStepsProps) {
   const identity = useMemo(() => getBackupIdentityForKeys(keys), [keys]);
+  // A recovery file covers one pool. Which one has to be recorded in the file
+  // itself, because `identity` is the same string for both.
+  const { vaultId } = useChainEnvironment();
   // Collapsed by default; the header row still shows progress and the
   // pending-backup dot, and sending stays gated until backup is done.
   const [isExpanded, setIsExpanded] = useState(false);
@@ -80,7 +84,7 @@ export function VaultFirstSteps({
   // step; there is no upload-back check to gate sending on.
   const handleDownloadBackup = () => {
     if (!identity) return;
-    downloadVaultBackup(identity);
+    downloadVaultBackup(identity, vaultId);
     setDownloaded(true);
     markVaultBackupComplete(identity);
     onBackupComplete?.();
@@ -88,7 +92,7 @@ export function VaultFirstSteps({
 
   const handleCopyBackup = () => {
     if (!identity) return;
-    const payload = createVaultBackupPayload(identity);
+    const payload = createVaultBackupPayload(identity, vaultId);
     copy(JSON.stringify(payload, null, 2));
     notifyCopied("Private vault recovery backup");
     markVaultBackupComplete(identity);

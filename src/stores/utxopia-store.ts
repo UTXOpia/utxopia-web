@@ -549,7 +549,9 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   // Throws so the importing UI can show the failure next to the file picker.
   importBackupKeys: async (raw: string) => {
     await ensureChainEnvironment();
-    const { payload, solanaPublicKey } = parseVaultBackupFile(raw);
+    // Pass the pool we are actually in: a file from the other one restores
+    // "successfully" into an empty vault otherwise, with nothing to explain it.
+    const { payload, solanaPublicKey } = parseVaultBackupFile(raw, detectVault());
     const client = UTXOpiaClient.instance();
     try {
       client.restoreKeys(payload.keys, solanaPublicKey);

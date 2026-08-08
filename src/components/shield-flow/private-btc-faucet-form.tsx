@@ -7,6 +7,7 @@ import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 import { cn } from "@/lib/utils";
 
 type DripResult =
@@ -210,24 +211,14 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         </p>
       </div>
 
-      {(!hasVault || cooldownActive) && (
+      {/* Unlock here rather than sending them to /vault and back. The old copy
+          named the cause correctly and then made it someone else's page. */}
+      {!hasVault && <VaultIdentityUnlock />}
+
+      {hasVault && cooldownActive && (
         <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3 text-caption text-warning">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0" />
-          <div>
-            {!hasVault ? (
-              <>
-                Open your vault once to initialize its private deposit identity.
-                <Link
-                  href={hrefWithChain("/vault", network)}
-                  className="ml-1 font-semibold underline underline-offset-2"
-                >
-                  Open vault
-                </Link>
-              </>
-            ) : (
-              <>Cooldown active. Try again in {cooldownLeft}s.</>
-            )}
-          </div>
+          <div>Cooldown active. Try again in {cooldownLeft}s.</div>
         </div>
       )}
 

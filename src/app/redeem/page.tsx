@@ -1,6 +1,8 @@
 "use client";
 
+import { Suspense, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { ArrowRight, ShieldCheck } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
@@ -42,15 +44,45 @@ const PERMANENT = [
   },
 ];
 
+/**
+ * What to do first, in the order that matters if things go wrong. The backup
+ * is second rather than third because the window where a member has funds and
+ * no recovery file is the only one in which our product can lose their money
+ * for them — and it is the same list the invite mail promises, deliberately.
+ */
+const FIRST_STEPS = [
+  {
+    title: "Deposit something small.",
+    body: "A tenth of a SOL is plenty. This is devnet — none of it is real, and none of it is private.",
+  },
+  {
+    title: "Download your recovery file.",
+    body: "Do it before you have anything to lose. Lose it and your notes are gone; there is no support path that recovers them. A passkey is not a backup.",
+  },
+  {
+    title: "Withdraw it to your own wallet address.",
+    body: "That path does not go through us — no approval, no coordinator, no waiting on anyone being awake. It is also the faster route, which is the entire design.",
+  },
+];
+
 export default function RedeemPage() {
+  return (
+    <Suspense fallback={null}>
+      <Redeem />
+    </Suspense>
+  );
+}
+
+function Redeem() {
   const { networkId } = useChainEnvironment();
   const { publicKey } = useWallet();
   const membership = useVerifiedMembership();
+  // The invite mail links straight here with the code in the query string, so
+  // the member never retypes twenty characters into a form on their phone.
+  const prefilled = useSearchParams().get("code") ?? undefined;
+  const [justJoined, setJustJoined] = useState<{ btc: boolean } | null>(null);
 
-  const depositHref = hrefWithChain(
-    hrefWithVault("/vault/deposit", "verified"),
-    networkId,
-  );
+  const vaultHref = hrefWithChain(hrefWithVault("/vault", "verified"), networkId);
 
   return (
     <main className="min-h-screen bg-background">
@@ -78,18 +110,49 @@ export default function RedeemPage() {
             The Verified vault is not deployed on this network. Switch to UTXOpia Devnet and try
             again — your code is unaffected.
           </div>
-        ) : membership === "member" ? (
+        ) : justJoined || membership === "member" ? (
           <div className="rounded-[20px] border border-privacy/25 bg-privacy/5 p-5 sm:p-6">
-            <h2 className="mb-1 text-body1 font-semibold text-foreground">You&apos;re already in.</h2>
-            <p className="mb-4 text-caption leading-relaxed text-gray-light">
-              This wallet is registered on chain as a member. A code is one per wallet, so there is
-              nothing left to redeem here.
+            <h2 className="mb-1 text-body1 font-semibold text-foreground">
+              {justJoined ? "You're in." : "You're already in."}
+            </h2>
+            <p className="mb-5 text-caption leading-relaxed text-gray-light">
+              {justJoined
+                ? justJoined.btc
+                  ? "Your wallet and your bitcoin withdrawal address are registered on chain. Nobody has to approve anything for you to leave."
+                  : "Your wallet is registered on chain as a member. Add a bitcoin address later, before you rely on withdrawing bitcoin without us."
+                : "This wallet is registered on chain as a member. A code is one per wallet, so there is nothing left to redeem here."}
             </p>
+
+            <p className="mb-3 text-caption font-semibold uppercase tracking-wider text-gray/60">
+              What to do first
+            </p>
+            <ol className="mb-5 space-y-3">
+              {FIRST_STEPS.map((step, index) => (
+                <li key={step.title} className="flex gap-3">
+                  <span className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full border border-privacy/30 text-[10px] font-semibold text-privacy">
+                    {index + 1}
+                  </span>
+                  <span className="min-w-0">
+                    <span className="text-caption font-semibold text-foreground">{step.title}</span>
+                    <span className="mt-0.5 block text-caption leading-relaxed text-gray">
+                      {step.body}
+                    </span>
+                  </span>
+                </li>
+              ))}
+            </ol>
+
+            {/* Deliberately the vault, not the deposit form. A pool's private
+                identity is derived on first unlock, and until that has happened
+                the deposit page shows "Private recipient: Not initialized" with
+                the submit button disabled — so sending a member who has just
+                redeemed straight to /vault/deposit lands them on a form they
+                cannot submit, for a reason they have no way to guess. */}
             <Link
-              href={depositHref}
+              href={vaultHref}
               className="inline-flex min-h-10 items-center gap-2 rounded-[10px] bg-foreground px-4 text-caption font-semibold text-background transition-colors hover:bg-white"
             >
-              Add funds to the Verified vault
+              Open your Verified vault
               <ArrowRight className="h-4 w-4" />
             </Link>
           </div>
@@ -112,7 +175,11 @@ export default function RedeemPage() {
 
             <div className="rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
               {publicKey ? (
-                <RedeemInvite networkId={networkId} />
+                <RedeemInvite
+                  networkId={networkId}
+                  initialCode={prefilled}
+                  onRedeemed={(btc) => setJustJoined({ btc })}
+                />
               ) : (
                 <div className="flex flex-col items-start gap-3">
                   <p className="text-caption text-gray-light">
@@ -126,6 +193,17 @@ export default function RedeemPage() {
         )}
 
         <p className="mt-6 text-caption text-gray">
+          Don&apos;t have a code?{" "}
+          <Link
+            href={hrefWithChain("/apply", networkId)}
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Apply for a seat
+          </Link>{" "}
+          — a person reads every application, and codes only ever come back by reply.
+        </p>
+
+        <p className="mt-2 text-caption text-gray">
           Code expired, or something not working?{" "}
           <Link
             href={hrefWithChain("/feedback", networkId)}

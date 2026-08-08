@@ -62,6 +62,7 @@ import {
   preparePolicyApproval,
 } from "@/lib/policy-approval";
 import { RedeemInvite } from "@/components/redeem-invite";
+import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 
 const TOKEN_2022_PROGRAM_ID = new PublicKey(TOKEN_2022_PROGRAM_ID_STR);
 
@@ -623,6 +624,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           )}
         </div>
 
+        {/* Without an identity for this pool the destination below is blank and
+            the submit button is dead, with nothing on the page explaining why. */}
+        {publicKey && !keys && <VaultIdentityUnlock />}
+
         {/* Recipient stealth address */}
         <StealthRecipientInput
           onResolved={(meta, name) => { setResolvedMeta(meta); setResolvedName(name); }}
@@ -809,6 +814,8 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           </div>
         )}
       </div>
+
+      {publicKey && !keys && <VaultIdentityUnlock />}
 
       {/* Recipient stealth address */}
       <StealthRecipientInput

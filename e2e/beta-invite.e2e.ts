@@ -422,6 +422,23 @@ function stepDeposit(devKeys: DevKeys): void {
   openWithKeys(appUrl("/vault/deposit"), devKeys);
   waitForText("Add funds", 30_000);
 
+  // A pool's private identity is derived at first unlock, not restored by
+  // hydration, so the wallet that just redeemed does not have one yet. Every
+  // real member meets this on exactly this screen; the run has to walk it too,
+  // or DEPOSIT fails as a mystery timeout on a greyed-out button.
+  const needsUnlock = () =>
+    evalJson<boolean>(`!!document.querySelector('[data-testid=vault-identity-unlock]')`);
+  if (needsUnlock()) {
+    console.log("  … unlocking the Verified identity (first time in this pool)");
+    clickTestId("vault-identity-unlock");
+    for (let attempt = 0; ; attempt++) {
+      sleep(3000);
+      if (!needsUnlock()) break;
+      if (attempt >= 20) throw new Error("the Verified identity never unlocked — deposit is unreachable");
+    }
+    console.log("  ✓ identity unlocked");
+  }
+
   clickTestId("token-selector-trigger");
   clickTestId("token-option-SOL");
   setInput('[data-testid="shield-amount"]', DEPOSIT_AMOUNT);

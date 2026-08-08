@@ -40,6 +40,8 @@ describe("feedback intake", () => {
   it("fails loudly rather than accepting into nowhere", async () => {
     delete process.env.FEEDBACK_LOG_PATH;
     delete process.env.FEEDBACK_WEBHOOK_URL;
+    delete process.env.RESEND_API_KEY;
+    delete process.env.INTAKE_EMAIL_TO;
 
     const response = await POST(request({ message: "the withdraw button does nothing" }));
 

@@ -33,7 +33,6 @@ describe("indexer lag errors", () => {
     // that retrying cannot fix.
     const others = [
       "No available private notes can cover this amount",
-      "custom program error: 0x1774",
       "Could not fetch the Verified Privacy relayer",
       "Simulation failed. Message: Transaction simulation failed",
     ];
@@ -41,6 +40,12 @@ describe("indexer lag errors", () => {
       expect(isIndexerLagError(raw)).toBe(false);
       expect(humanizeSpendError(new Error(raw))).toBe(raw);
     }
+
+    // A program rejection is not lag either, but it is no longer passed through
+    // raw — see program-error.ts. Retrying does not fix it, and the replacement
+    // text says so rather than suggesting a wait.
+    expect(isIndexerLagError("custom program error: 0x1774")).toBe(false);
+    expect(humanizeSpendError(new Error("custom program error: 0x1774"))).not.toContain("0x1774");
   });
 
   it("never renders an empty error", () => {

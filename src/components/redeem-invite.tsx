@@ -1,9 +1,11 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
+import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { cn } from "@/lib/utils";
 
 type Status = "idle" | "signing" | "redeeming" | "done" | "error";
@@ -29,13 +31,23 @@ type Status = "idle" | "signing" | "redeeming" | "done" | "error";
  */
 export function RedeemInvite({
   networkId,
+  initialCode,
+  onRedeemed,
   className,
 }: {
-  networkId: string;
+  networkId: NetworkId;
+  /** Lets the page own the "you're in" state. Without it the success message
+   *  is a two-line box under a form, still sitting beneath the four things
+   *  nobody can undo — a heading for a decision already made. */
+  onRedeemed?: (registeredBtc: boolean) => void;
+  /** Prefilled from `?code=` so the invite mail is one click. Never
+   *  auto-submitted: redemption is permanent, and the four things nobody can
+   *  undo are on the page above this form to be read first. */
+  initialCode?: string;
   className?: string;
 }) {
   const { publicKey, signMessage } = useWallet();
-  const [code, setCode] = useState("");
+  const [code, setCode] = useState(initialCode ?? "");
   const [btcAddress, setBtcAddress] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
@@ -83,6 +95,7 @@ export function RedeemInvite({
         ...(btcAddress.trim() ? { btc_address: btcAddress.trim() } : {}),
       });
       setStatus("done");
+      onRedeemed?.(!!btcAddress.trim());
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "could not redeem this code");
       setStatus("error");
@@ -181,6 +194,17 @@ export function RedeemInvite({
           : status === "redeeming" ? "Registering on chain…"
           : "Redeem invite code"}
       </button>
+
+      <p className="text-caption text-gray">
+        Don&apos;t have a code?{" "}
+        <Link
+          href={hrefWithChain("/apply", networkId)}
+          className="underline underline-offset-4 hover:text-foreground"
+        >
+          Apply for a seat
+        </Link>
+        .
+      </p>
     </div>
   );
 }
