@@ -319,6 +319,37 @@ function injectDevKeysViaStorage(keys: DevKeys, targetUrl: string): void {
   ab("open", targetUrl);
 }
 
+/** Click a control once it is actually enabled, not merely present.
+ *
+ *  The shield submit stays disabled until the pool's private identity exists,
+ *  and the dev signer derives that in a promise nobody awaits (`void
+ *  loginDevIdentity`, DevSigner.tsx). Whether it has landed by the time we
+ *  reach the button is therefore a race — one a cold start loses, because the
+ *  first WASM/SDK load widens the window.
+ *
+ *  Losing it is silent: agent-browser will happily "click" a disabled button,
+ *  the click does nothing, and the run then waits out the success selector.
+ *  That is indistinguishable from a proof that never finished, which is
+ *  exactly how this cost an afternoon. Wait for enabled instead.
+ */
+function clickWhenEnabled(testid: string, totalMs = 30000): void {
+  const sel = `[data-testid="${testid}"]`;
+  const deadline = Date.now() + totalMs;
+  for (;;) {
+    if (ab("eval", `!document.querySelector(${JSON.stringify(sel)})?.disabled`).includes("true")) {
+      break;
+    }
+    if (Date.now() > deadline) {
+      throw new Error(`${testid} never became enabled within ${totalMs}ms`);
+    }
+    ab("wait", "1000");
+  }
+  // The submit sits below the fold on a laptop viewport and agent-browser's
+  // click does not scroll to it.
+  ab("scrollintoview", sel);
+  ab("find", "testid", testid, "click");
+}
+
 /** Unlock this pool's private identity, if the page is gating on it.
  *
  *  The identity is per-pool and is *derived at first unlock* from a wallet
@@ -419,11 +450,7 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   ab("find", "testid", "shield-amount", "fill", amount);
   ab("wait", "500"); // brief settle for balance/canSubmit reactivity
 
-  // The submit sits below the fold on a laptop viewport and agent-browser's
-  // click does not scroll to it — the click lands on nothing and the run then
-  // waits out the success selector for no reason.
-  ab("scrollintoview", '[data-testid="shield-submit"]');
-  ab("find", "testid", "shield-submit", "click");
+  clickWhenEnabled("shield-submit");
 
   ab("wait", '[data-testid="shield-success"]', "--timeout", "90000");
   console.log("  ✓ Shield success");
