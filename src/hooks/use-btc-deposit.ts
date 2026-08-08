@@ -114,7 +114,7 @@ export function useBtcDeposit({
     } finally {
       setBuildingPreview(false);
     }
-  }, [resolvedMeta, btcAmount, btcWallet, networkConfig, onError]);
+  }, [resolvedMeta, btcAmount, btcWallet, networkConfig, networkId, onError]);
 
   // ── BTC: Confirm & sign PSBT ──
   const confirmAndSign = useCallback(async () => {
