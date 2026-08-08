@@ -156,8 +156,8 @@ export function ApplyForm({ className }: { className?: string }) {
           checked={emailOptIn}
           onChange={setEmailOptIn}
           disabled={busy}
-          label="Email me when there is something worth reading"
-          hint="occasional, and you can stop it with one reply"
+          label="Email me updates"
+          hint="occasional; one reply stops it"
         />
         <Consent
           checked={feedbackOptIn}
