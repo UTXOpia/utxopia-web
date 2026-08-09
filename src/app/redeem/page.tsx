@@ -205,10 +205,23 @@ function Redeem() {
                   )}
                   <p className="text-caption leading-relaxed text-gray-light">
                     {prefilled
-                      ? "Now choose the wallet that will hold your membership. It cannot be changed later, and connecting does not spend the code — you sign a message and confirm on the next step."
+                      ? "Now choose the wallet that will hold your membership. It cannot be changed later."
                       : "Connect the wallet that will hold your membership. It cannot be changed later."}
                   </p>
-                  <WalletButton />
+                  <div className="wallet-cta w-full">
+                    <WalletButton label="Connect wallet to redeem" />
+                  </div>
+                  {/* What the click actually costs, because nothing said so and
+                    * "connect wallet" reads as risk and a gas fee to anyone who
+                    * has met crypto before. All three are true: the adapter asks
+                    * only for the public key, redeem() verifies a signed message
+                    * rather than a transaction, and register_exit_destination is
+                    * paid by the auditor keypair server-side. */}
+                  <p className="text-caption leading-relaxed text-gray">
+                    Connecting shares only your public address — no spending permission. You sign a
+                    message, not a transaction, and pay no fee: we cover the on-chain
+                    registration. Your code is not spent until you confirm.
+                  </p>
                 </div>
               )}
             </div>

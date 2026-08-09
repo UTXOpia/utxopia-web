@@ -29,6 +29,54 @@
     inset 0px 4px 16px rgba(255, 255, 255, 1);
 }
 
+/* Make the wallet adapter's button look like ours.
+ *
+ * Styling it by passing className does not work and never did:
+ * BaseWalletConnectionButton spreads its props and then overwrites className
+ * with "wallet-adapter-button-trigger", so the prop is dropped before it
+ * reaches the DOM. Every `<WalletButton className="btn-primary">` in this app
+ * has been rendering the vendor default.
+ *
+ * So style it as a descendant. Wrap the button in `.wallet-cta` and the button
+ * inside adopts the primary look, whatever the adapter does to its own class. */
+/* The adapter wraps its button in this dropdown div, which is shrink-to-fit —
+ * so the button's own width:100% would resolve against the label, not the card. */
+.wallet-cta .wallet-adapter-dropdown {
+  display: block;
+  width: 100%;
+}
+
+.wallet-cta .wallet-adapter-button {
+  width: 100%;
+  background: linear-gradient(
+    314.6deg,
+    #fff4ab 2.43%,
+    #ffebd4 24.82%,
+    #ffd4fd 59.61%,
+    #ceabff 97.04%
+  );
+  color: black;
+  border-radius: 12px;
+  height: auto;
+  padding: 12px 16px;
+  font-weight: 600;
+  font-size: 14px;
+  line-height: 1.4;
+}
+
+.wallet-cta .wallet-adapter-button:not([disabled]):hover {
+  background: linear-gradient(
+    314.6deg,
+    #fff4ab 2.43%,
+    #ffebd4 24.82%,
+    #ffd4fd 59.61%,
+    #ceabff 97.04%
+  );
+  box-shadow:
+    inset 0px 4px 4px rgba(255, 255, 255, 0.25),
+    inset 0px 4px 16px rgba(255, 255, 255, 1);
+}
+
 .btn-primary:disabled {
   color: #8b8a9e;
   opacity: 0.4;
