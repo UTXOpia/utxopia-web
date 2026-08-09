@@ -30,6 +30,13 @@ export interface ApplicationRecord {
   invited: boolean;
 }
 
+/** Whether there is a database to write to at all. The route needs this before
+ *  it accepts a submission: with no store and no webhook, an application has
+ *  nowhere to go and 503 is the honest answer. */
+export function applicationStoreConfigured(): boolean {
+  return Boolean(verifiedBackendUrl() && getBackendApiKey());
+}
+
 /** Returns true if the row landed. Never throws. */
 export async function recordApplication(entry: ApplicationRecord): Promise<boolean> {
   const backendUrl = verifiedBackendUrl();

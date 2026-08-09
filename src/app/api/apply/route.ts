@@ -23,19 +23,24 @@
  * themselves — so it stays as far from the vault as the code allows: no wallet,
  * no balances, no notes, unknown fields dropped.
  *
- * Every submission is also written to the invite DB, which is what /admin/
- * applications reads. That write is best-effort and happens after delivery —
- * see `lib/server/applications.ts`.
+ * The record of a submission is the row in the invite DB, read back at
+ * /admin/applications. The operator no longer gets a copy by mail: a page is a
+ * better place to read these than an inbox, and the copy doubled the mail sent
+ * per application. On a metered tier that is not free — the second mail is the
+ * one that pushes the *first* over a limit, and the first carries the code.
  *
- * Any one sink is enough. The webhook and file ones fall back to the feedback
- * variables, so a single setting covers both forms:
- *   RESEND_API_KEY + INTAKE_EMAIL_TO    (shared)
+ * So exactly one mail goes out per application, to the applicant: the invite,
+ * or the receipt that stands in when no code could be issued.
  *
- * With mail configured a submission sends two: the application to intake, with
- * the applicant as reply-to, and a receipt to the applicant, with intake as
- * reply-to. The receipt is best-effort and never fails the request.
- *   APPLY_WEBHOOK_URL || FEEDBACK_WEBHOOK_URL
- *   APPLY_LOG_PATH    || FEEDBACK_LOG_PATH
+ *   RESEND_API_KEY + INTAKE_EMAIL_TO    what that mail is sent with; INTAKE_
+ *                                       EMAIL_TO is its reply-to, not a
+ *                                       recipient
+ *   APPLY_WEBHOOK_URL || FEEDBACK_WEBHOOK_URL   optional extras, for a channel
+ *   APPLY_LOG_PATH    || FEEDBACK_LOG_PATH      that wants a push
+ *
+ * The store is what decides whether applications are open at all: with no
+ * database and no webhook, a submission has nowhere to go and the route says so
+ * rather than mailing a code it keeps no record of.
  */
 
 import { NextResponse } from "next/server";
@@ -51,7 +56,7 @@ import {
 } from "@/lib/intake";
 import { cleanApplyRoles } from "@/lib/apply-roles";
 import { autoInviteEnabled, inviteEmail, mintInvite } from "@/lib/server/invite-issue";
-import { recordApplication } from "@/lib/server/applications";
+import { applicationStoreConfigured, recordApplication } from "@/lib/server/applications";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -85,31 +90,6 @@ function formatForHuman(a: Application): string {
     `network: ${a.network || "—"}`,
     `at: ${a.received_at}`,
   ].join("\n");
-}
-
-/** The same application as mail. Badges carry what decides whether it gets
- *  opened now: the self-description, and whether they offered a call. */
-function formatAsEmail(a: Application, autoIssued: boolean): string {
-  return renderIntakeEmail({
-    title: "New beta application",
-    badges: [
-      ...a.roles,
-      ...(a.feedback_opt_in ? ["Up for a 1-on-1"] : []),
-      ...(a.email_opt_in ? ["Wants updates"] : []),
-    ],
-    rows: [
-      { label: "Email", value: a.email },
-      { label: "Best describes them", value: a.roles.join(" · ") },
-      { label: "Why they're interested", value: a.reason, block: true },
-    ],
-    meta: [
-      `Network: ${a.network || "—"}`,
-      `Received: ${a.received_at}`,
-      autoIssued
-        ? "A code was minted and mailed automatically. Reply to this mail to reach the applicant."
-        : "No code went out — reply to this mail to reach the applicant, and that reply is how one goes.",
-    ],
-  });
 }
 
 /**
@@ -146,7 +126,10 @@ export async function POST(req: Request) {
   const webhook = process.env.APPLY_WEBHOOK_URL || process.env.FEEDBACK_WEBHOOK_URL;
   const logPath = process.env.APPLY_LOG_PATH || process.env.FEEDBACK_LOG_PATH;
   const mail = emailSink();
-  if (!mail && !webhook && !logPath) {
+  // The database counts as a sink now, and is the one that normally answers.
+  // Mail alone no longer qualifies: it only carries the applicant's copy, so a
+  // deployment with mail and nothing else would send codes it kept no record of.
+  if (!applicationStoreConfigured() && !webhook && !logPath) {
     return NextResponse.json(
       { ok: false, error: "applications are not open right now" },
       { status: 503 },
@@ -197,47 +180,17 @@ export async function POST(req: Request) {
     user_agent: clean(req.headers.get("user-agent"), MAX_CONTEXT),
   };
 
-  // Minted before the application is recorded, so intake mail can say truthfully
-  // whether a code went out. A code with no record behind it is the cheaper
-  // failure: it is in the invite ledger under this email either way.
   const invite = autoInviteEnabled() ? await mintInvite(application.email) : null;
 
-  const { delivered, errors } = await deliver({
-    entry: application,
-    human: formatForHuman(application),
-    html: formatAsEmail(application, Boolean(invite)),
-    subject: `Beta application — ${application.email}`,
-    replyTo: application.email,
-    webhook,
-    logPath,
-    email: mail,
-  });
-  if (!delivered) {
-    console.error("[apply] every sink failed", errors, application);
-    return NextResponse.json(
-      { ok: false, error: "could not record your application — please email us instead" },
-      { status: 502 },
-    );
-  }
-  if (errors.length) console.warn("[apply] partial delivery", errors);
-
-  // Stored after delivery, for the same reason the receipt is: intake already
-  // has it, so a backend that is down costs a row and not the submission.
-  await recordApplication({
-    email: application.email,
-    roles: application.roles,
-    reason: application.reason,
-    emailOptIn: application.email_opt_in,
-    feedbackOptIn: application.feedback_opt_in,
-    network: application.network,
-    invited: Boolean(invite),
-  });
-
-  // The invite, or the receipt that stands in for it. Sent only once the
-  // application is safely recorded and deliberately not allowed to fail the
-  // request: the applicant has already done their part, and telling them it
-  // went wrong when it did not would cost us a second submission and them the
-  // belief that it works. Replies go to the intake inbox either way.
+  // The one mail this route sends, and it goes to the applicant. The operator's
+  // copy used to go out beside it and does not any more: /admin/applications is
+  // a better place to read these than an inbox, and the copy was costing half
+  // the sending quota — on the tier this runs on, the invite is what runs out.
+  //
+  // Sent before the row is written so `invited` can mean what it says. A code
+  // that was minted but never reached anyone is not an admission, and recording
+  // it as one hides the only failure here worth acting on.
+  let sent = false;
   if (mail) {
     try {
       const outgoing = invite ? inviteEmail(invite) : confirmationEmail();
@@ -249,6 +202,7 @@ export async function POST(req: Request) {
         html: outgoing.html,
         replyTo: mail.to[0],
       });
+      sent = res.ok;
       if (!res.ok) {
         // The code is already minted and cannot be un-minted. Log the plaintext
         // so it can be sent by hand rather than expiring unused in the ledger —
@@ -262,5 +216,40 @@ export async function POST(req: Request) {
     }
   }
 
-  return NextResponse.json({ ok: true, invited: Boolean(invite) });
+  const invited = Boolean(invite) && sent;
+  const stored = await recordApplication({
+    email: application.email,
+    roles: application.roles,
+    reason: application.reason,
+    emailOptIn: application.email_opt_in,
+    feedbackOptIn: application.feedback_opt_in,
+    network: application.network,
+    invited,
+  });
+
+  // Webhook and log file are extras now, not the primary record — pass no email
+  // sink, or the operator copy this change removed comes straight back.
+  const { delivered, errors } = await deliver({
+    entry: application,
+    human: formatForHuman(application),
+    subject: `Beta application — ${application.email}`,
+    replyTo: application.email,
+    webhook,
+    logPath,
+  });
+  if (errors.length) console.warn("[apply] partial delivery", errors);
+
+  // Only a submission that reached nobody and nothing is a failure. If the mail
+  // went out, the applicant has their code and telling them it broke would earn
+  // us a resubmission and them a second code they cannot use.
+  if (!stored && !delivered && !sent) {
+    console.error("[apply] every sink failed", errors, application);
+    return NextResponse.json(
+      { ok: false, error: "could not record your application — please email us instead" },
+      { status: 502 },
+    );
+  }
+  if (!stored) console.warn("[apply] not stored, but delivered elsewhere", application.email);
+
+  return NextResponse.json({ ok: true, invited });
 }
