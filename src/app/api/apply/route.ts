@@ -23,6 +23,10 @@
  * themselves — so it stays as far from the vault as the code allows: no wallet,
  * no balances, no notes, unknown fields dropped.
  *
+ * Every submission is also written to the invite DB, which is what /admin/
+ * applications reads. That write is best-effort and happens after delivery —
+ * see `lib/server/applications.ts`.
+ *
  * Any one sink is enough. The webhook and file ones fall back to the feedback
  * variables, so a single setting covers both forms:
  *   RESEND_API_KEY + INTAKE_EMAIL_TO    (shared)
@@ -47,6 +51,7 @@ import {
 } from "@/lib/intake";
 import { cleanApplyRoles } from "@/lib/apply-roles";
 import { autoInviteEnabled, inviteEmail, mintInvite } from "@/lib/server/invite-issue";
+import { recordApplication } from "@/lib/server/applications";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -215,6 +220,18 @@ export async function POST(req: Request) {
     );
   }
   if (errors.length) console.warn("[apply] partial delivery", errors);
+
+  // Stored after delivery, for the same reason the receipt is: intake already
+  // has it, so a backend that is down costs a row and not the submission.
+  await recordApplication({
+    email: application.email,
+    roles: application.roles,
+    reason: application.reason,
+    emailOptIn: application.email_opt_in,
+    feedbackOptIn: application.feedback_opt_in,
+    network: application.network,
+    invited: Boolean(invite),
+  });
 
   // The invite, or the receipt that stands in for it. Sent only once the
   // application is safely recorded and deliberately not allowed to fail the

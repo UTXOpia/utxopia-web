@@ -50,24 +50,14 @@ export function autoInviteEnabled(): boolean {
 }
 
 /**
- * Mints a code and returns it, or null if anything goes wrong. Callers treat
- * null as "no code this time" and send the review receipt instead — an
- * application that was already recorded must not fail because the mint did.
+ * Which backend the apply flow talks to, and never the applicant's choice.
+ * INVITE_NETWORK is config; a value off the request would let a stranger aim
+ * both the mint and the write.
  */
-export async function mintInvite(email: string): Promise<Invite | null> {
-  const adminKey = process.env.UTXOPIA_INVITE_ADMIN_KEY?.trim();
-  if (!adminKey) return null;
-
-  // One network, fixed by config rather than by the applicant's query string:
-  // the code is minted against whatever backend this resolves to, so letting a
-  // submitted value pick it would let a stranger aim the mint.
+export function verifiedBackendUrl(): string | null {
   const networkId = (process.env.INVITE_NETWORK || "devnet-regtest") as NetworkId;
-  const days = Number(process.env.INVITE_CODE_DAYS || 14);
-  const app = (process.env.APP_URL || "https://www.utxopia.com").replace(/\/+$/, "");
-
-  let backendUrl: string;
   try {
-    backendUrl = getVaultNetworkConfig(
+    return getVaultNetworkConfig(
       networkId,
       getNetworkConfig(networkId),
       "verified",
@@ -76,6 +66,23 @@ export async function mintInvite(email: string): Promise<Invite | null> {
     console.error("[apply] no verified vault on", networkId, caught);
     return null;
   }
+}
+
+/**
+ * Mints a code and returns it, or null if anything goes wrong. Callers treat
+ * null as "no code this time" and send the review receipt instead — an
+ * application that was already recorded must not fail because the mint did.
+ */
+export async function mintInvite(email: string): Promise<Invite | null> {
+  const adminKey = process.env.UTXOPIA_INVITE_ADMIN_KEY?.trim();
+  if (!adminKey) return null;
+
+  const networkId = (process.env.INVITE_NETWORK || "devnet-regtest") as NetworkId;
+  const days = Number(process.env.INVITE_CODE_DAYS || 14);
+  const app = (process.env.APP_URL || "https://www.utxopia.com").replace(/\/+$/, "");
+
+  const backendUrl = verifiedBackendUrl();
+  if (!backendUrl) return null;
 
   // The expiry passed here is the expiry this code has forever: expires_at is
   // written only by the INSERT in mint, and no endpoint changes it later.
