@@ -31,7 +31,10 @@ const inputClass = cn(
  * admitting are two or three of them at once, and a required field that only
  * sorts an inbox is friction charged to the applicant.
  *
- * Still true, and still said plainly below: nothing here issues a code.
+ * Submitting now issues a code, so the done state has to say which mail is on
+ * its way — the invite, or the receipt that means a human is in the loop after
+ * all. The server decides that (mint can be off, or can fail) and reports it as
+ * `invited`; guessing here would promise a code that never arrives.
  */
 export function ApplyForm({ className }: { className?: string }) {
   const { networkId } = useChainEnvironment();
@@ -42,6 +45,7 @@ export function ApplyForm({ className }: { className?: string }) {
   const [emailOptIn, setEmailOptIn] = useState(false);
   const [feedbackOptIn, setFeedbackOptIn] = useState(false);
   const [status, setStatus] = useState<Status>("idle");
+  const [invited, setInvited] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const busy = status === "sending";
@@ -69,6 +73,7 @@ export function ApplyForm({ className }: { className?: string }) {
           typeof parsed?.error === "string" ? parsed.error : `failed (${response.status})`,
         );
       }
+      setInvited(parsed?.invited === true);
       setStatus("done");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "could not send that");
@@ -84,9 +89,18 @@ export function ApplyForm({ className }: { className?: string }) {
       >
         <Check className="mt-0.5 h-4 w-4 shrink-0 text-privacy" aria-hidden />
         <span className="text-caption leading-relaxed text-gray-light">
-          <strong className="text-foreground">Got it.</strong> A person reads every one of these,
-          usually within a couple of days. If we send a code it comes from a human reply to this
-          address — never from a link in a post, and never automatically.
+          {invited ? (
+            <>
+              <strong className="text-foreground">You&apos;re in.</strong> Your code is in your
+              inbox — check spam if it is not there in a minute. A code only ever reaches you by
+              email from us, never from a link in a post.
+            </>
+          ) : (
+            <>
+              <strong className="text-foreground">Got it.</strong> Yours needs a person, so give it
+              a day. The code arrives as a reply to this email.
+            </>
+          )}
         </span>
       </div>
     );
@@ -94,7 +108,7 @@ export function ApplyForm({ className }: { className?: string }) {
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
-      <Field label="Email" hint="where a code would go, if we send one">
+      <Field label="Email" hint="where your invite code goes">
         <input
           type="email"
           value={email}

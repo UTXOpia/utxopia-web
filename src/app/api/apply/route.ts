@@ -6,12 +6,18 @@
  * asks for: a long form in front of a stranger screens for patience, and the
  * answers it did collect were worth less than ten minutes on a call.
  *
- * This route only records answers — it never issues a
- * code. Auto-issuing on an email would give away the two things scarcity buys:
- * screening (most applications are meant to get a no) and a cohort that lands
- * inside one 48-hour window instead of trickling in, near-self-identifying, on
- * chain. `invite.rs` redeem() checks a code and a wallet signature and nothing
- * else, so anyone holding a code is in, permanently.
+ * This route records the answers and, when auto-issue is configured, mints a
+ * code and mails it on the spot. That reverses the position this file used to
+ * argue: scarcity bought screening and a cohort that landed inside one window,
+ * and both were worth paying for — but not with a two-day wait for admission to
+ * a devnet with no real money in it, which is what the delay actually costs
+ * now. `invite.rs` redeem() still checks a code and a wallet signature and
+ * nothing else, so anyone holding a code is in, permanently; the thing that
+ * keeps that bounded here is the rate limiter and nothing else.
+ *
+ * Auto-issue is opt-in and fails closed: no UTXOPIA_INVITE_ADMIN_KEY, or a mint
+ * that errors, and the applicant gets the review receipt instead. See
+ * `lib/server/invite-issue.ts`.
  *
  * Unlike feedback this form *is* identity — an email and how someone describes
  * themselves — so it stays as far from the vault as the code allows: no wallet,
@@ -40,6 +46,7 @@ import {
   sendEmail,
 } from "@/lib/intake";
 import { cleanApplyRoles } from "@/lib/apply-roles";
+import { autoInviteEnabled, inviteEmail, mintInvite } from "@/lib/server/invite-issue";
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -63,7 +70,7 @@ interface Application {
 
 function formatForHuman(a: Application): string {
   return [
-    `**beta application** — ${a.email}${a.feedback_opt_in ? "  ·  up for a 1-on-1" : ""}`,
+    `**Beta application** — ${a.email}${a.feedback_opt_in ? "  ·  up for a 1-on-1" : ""}`,
     "",
     `**They are:** ${a.roles.join(", ") || "—"}`,
     "",
@@ -77,7 +84,7 @@ function formatForHuman(a: Application): string {
 
 /** The same application as mail. Badges carry what decides whether it gets
  *  opened now: the self-description, and whether they offered a call. */
-function formatAsEmail(a: Application): string {
+function formatAsEmail(a: Application, autoIssued: boolean): string {
   return renderIntakeEmail({
     title: "New beta application",
     badges: [
@@ -93,7 +100,9 @@ function formatAsEmail(a: Application): string {
     meta: [
       `Network: ${a.network || "—"}`,
       `Received: ${a.received_at}`,
-      "Reply to this mail to reach the applicant — that reply is how a code goes out.",
+      autoIssued
+        ? "A code was minted and mailed automatically. Reply to this mail to reach the applicant."
+        : "No code went out — reply to this mail to reach the applicant, and that reply is how one goes.",
     ],
   });
 }
@@ -107,17 +116,19 @@ function formatAsEmail(a: Application): string {
  * way to deliver arbitrary content to an arbitrary inbox, over our domain and
  * our sender reputation. Everything here is fixed copy.
  *
- * The one thing it must land is how a code arrives — a human reply to this
- * thread — because "you have a code, click here" is the phishing mail someone
- * will eventually send in our name, and a person who knows what to expect is
- * the only defence that scales.
+ * Sent only when auto-issue is off or the mint failed — otherwise the applicant
+ * gets `inviteEmail` instead, and this is the apology for the delay.
+ *
+ * The one thing both of them must land is where a code comes from: mail from
+ * us, never a link in a post and never a wallet connection. "You have a code,
+ * click here" is the phishing mail someone will eventually send in our name,
+ * and a person who knows what to expect is the only defence that scales.
  */
 function confirmationEmail(): { subject: string; html: string; text: string } {
   const lines = [
-    "Thanks — your application is in, and a person will read it.",
-    "That usually takes a couple of days. Most applications get a no, and it is not personal: every admission writes a permanent entry on chain that nobody can remove, so the cohort stays small on purpose.",
-    "If we do send an invite code, it comes as a reply to this thread, from a person. Never from a link in a post, never automatically, and never from anyone asking you to connect a wallet to claim it. If you get one that does, it is not us.",
-    "Nothing about a wallet is attached to your application — no address, no balances.",
+    "Codes usually go out the moment you apply. Yours needs a person, so give it a day. Nothing went wrong on your end.",
+    "It will arrive as a reply to this email. Never from a link in a post, and never from anyone asking you to connect a wallet to claim it — if you get one of those, it is not us.",
+    "No wallet is attached to your application: no address, no balances.",
   ];
   return {
     subject: "We got your UTXOpia application",
@@ -181,11 +192,16 @@ export async function POST(req: Request) {
     user_agent: clean(req.headers.get("user-agent"), MAX_CONTEXT),
   };
 
+  // Minted before the application is recorded, so intake mail can say truthfully
+  // whether a code went out. A code with no record behind it is the cheaper
+  // failure: it is in the invite ledger under this email either way.
+  const invite = autoInviteEnabled() ? await mintInvite(application.email) : null;
+
   const { delivered, errors } = await deliver({
     entry: application,
     human: formatForHuman(application),
-    html: formatAsEmail(application),
-    subject: `beta application — ${application.email}`,
+    html: formatAsEmail(application, Boolean(invite)),
+    subject: `Beta application — ${application.email}`,
     replyTo: application.email,
     webhook,
     logPath,
@@ -200,29 +216,34 @@ export async function POST(req: Request) {
   }
   if (errors.length) console.warn("[apply] partial delivery", errors);
 
-  // Courtesy receipt, sent only once the application is safely recorded and
-  // deliberately not allowed to fail the request: the applicant has already
-  // done their part, and telling them it went wrong when it did not would cost
-  // us a second submission and them the belief that it works. Replies go to
-  // the intake inbox, which is the thread a code would arrive on.
+  // The invite, or the receipt that stands in for it. Sent only once the
+  // application is safely recorded and deliberately not allowed to fail the
+  // request: the applicant has already done their part, and telling them it
+  // went wrong when it did not would cost us a second submission and them the
+  // belief that it works. Replies go to the intake inbox either way.
   if (mail) {
     try {
-      const receipt = confirmationEmail();
+      const outgoing = invite ? inviteEmail(invite) : confirmationEmail();
       const res = await sendEmail({
         sink: mail,
         to: [email],
-        subject: receipt.subject,
-        text: receipt.text,
-        html: receipt.html,
+        subject: outgoing.subject,
+        text: outgoing.text,
+        html: outgoing.html,
         replyTo: mail.to[0],
       });
       if (!res.ok) {
+        // The code is already minted and cannot be un-minted. Log the plaintext
+        // so it can be sent by hand rather than expiring unused in the ledger —
+        // this is the one place it exists outside that mail.
         console.warn("[apply] confirmation not sent", res.status, await res.text());
+        if (invite) console.warn("[apply] unsent code for", email, invite.code);
       }
     } catch (caught) {
       console.warn("[apply] confirmation not sent", caught);
+      if (invite) console.warn("[apply] unsent code for", email, invite.code);
     }
   }
 
-  return NextResponse.json({ ok: true });
+  return NextResponse.json({ ok: true, invited: Boolean(invite) });
 }

@@ -78,6 +78,9 @@ export interface EmailRow {
   value: string;
   /** Stack the value under its label instead of beside it. For prose. */
   block?: boolean;
+  /** Monospace and larger. For a value that gets read character by character —
+   *  an invite code, a hash — where 0/O and 1/l have to be tellable apart. */
+  mono?: boolean;
 }
 
 function escapeHtml(value: string): string {
@@ -104,6 +107,7 @@ export function renderIntakeEmail({
   title,
   badges = [],
   intro = [],
+  cta,
   rows = [],
   meta = [],
 }: {
@@ -112,6 +116,9 @@ export function renderIntakeEmail({
   /** Prose paragraphs, before any rows. A message to a person rather than a
    *  record about one. */
   intro?: string[];
+  /** One action, between the prose and the rows. A table cell rather than a
+   *  styled <a>: Outlook on Windows drops padding on inline anchors. */
+  cta?: { label: string; url: string };
   rows?: EmailRow[];
   meta?: string[];
 }): string {
@@ -135,13 +142,25 @@ export function renderIntakeEmail({
     )
     .join("");
 
+  const ctaHtml = cta
+    ? `<tr><td style="padding:6px 0 20px 0;">` +
+      `<table role="presentation" cellpadding="0" cellspacing="0" border="0"><tr>` +
+      `<td style="background:${BRAND_PURPLE};border-radius:8px;">` +
+      `<a href="${escapeHtml(cta.url)}" style="display:inline-block;padding:11px 20px;` +
+      `font-size:14px;font-weight:600;color:#ffffff;text-decoration:none;">` +
+      `${escapeHtml(cta.label)}</a></td></tr></table></td></tr>`
+    : "";
+
   const rowHtml = rows
-    .map(({ label, value, block }) => {
+    .map(({ label, value, block, mono }) => {
       const body = escapeHtml(value || "—").replace(/\n/g, "<br>");
       const labelCell =
         `<div style="font-size:12px;font-weight:600;letter-spacing:.04em;text-transform:uppercase;` +
         `color:#6b7280;">${escapeHtml(label)}</div>`;
-      const valueCell = `<div style="font-size:14px;line-height:1.6;color:#111827;">${body}</div>`;
+      const valueCell = mono
+        ? `<div style="font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:17px;` +
+          `font-weight:600;letter-spacing:.06em;line-height:1.5;color:#111827;">${body}</div>`
+        : `<div style="font-size:14px;line-height:1.6;color:#111827;">${body}</div>`;
       return (
         `<tr><td style="padding:12px 0;border-top:1px solid #e5e7eb;">` +
         (block ? `${labelCell}<div style="height:6px;"></div>${valueCell}` : `${labelCell}${valueCell}`) +
@@ -187,6 +206,7 @@ export function renderIntakeEmail({
     `<tr><td style="padding:0 0 4px 0;font-size:18px;font-weight:700;color:#111827;">${escapeHtml(title)}</td></tr>`,
     badgeHtml,
     introHtml,
+    ctaHtml,
     rowHtml,
     metaHtml,
     `</table></td></tr>`,

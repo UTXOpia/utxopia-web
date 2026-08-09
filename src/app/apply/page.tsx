@@ -13,11 +13,11 @@ import { hrefWithChain } from "@/lib/network-config";
  * whoever redeems it first and admission is a permanent on-chain registration,
  * so a code in a public channel is a cohort with no upper bound.
  *
- * The scarcity stated here is real (a small cohort, most applications get a
- * no), and saying so plainly is what lets the page do its work without a
- * countdown, a queue position, or a referral tree. No number is named on
- * purpose: the figure we work to is an expectation, not a cap, and printing it
- * turns an estimate into a promise someone will hold us to.
+ * The page used to lead with scarcity — a small cohort, most applications get
+ * a no — which was true and was what let it work without a countdown or a
+ * referral tree. It no longer is: applying issues a code. What has to carry the
+ * page now is the same honesty pointed at the thing that is still permanent, so
+ * nobody redeems on the assumption that admission can be undone.
  */
 const HONEST = [
   {
@@ -29,8 +29,8 @@ const HONEST = [
     body: "Deposit, transfer and withdraw with our coordinator switched off, then tell us exactly what broke.",
   },
   {
-    title: "Most applications get a no.",
-    body: "Every admission writes a permanent on-chain entry nobody can remove, so a cohort is chosen once.",
+    title: "Redeeming is permanent.",
+    body: "Your code locks to the first wallet that uses it, and that writes an on-chain entry nobody can remove. Anyone can apply; nobody can undo it.",
   },
 ];
 
@@ -54,7 +54,8 @@ export default function ApplyPage() {
           </h1>
           <p className="text-body2 leading-relaxed text-gray-light">
             A shielded vault on Solana. Deposit, transfer privately, and withdraw to your own
-            registered address — without our approval. We want a small group to break it first.
+            registered address — without our approval. Apply and your code arrives by email. We
+            want people to break it before it holds anything real.
           </p>
         </div>
 
