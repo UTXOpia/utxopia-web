@@ -101,8 +101,9 @@ function Redeem() {
             Redeem your invite code
           </h1>
           <p className="text-body2 leading-relaxed text-gray-light">
-            Connect the wallet you want to be your membership, paste the code, and sign the message
-            it shows you. The signature is not a transaction and moves nothing.
+            {prefilled
+              ? "Your code is below. Choose the wallet you want to be your membership and sign the message it shows you — the signature is not a transaction and moves nothing."
+              : "Connect the wallet you want to be your membership, paste the code, and sign the message it shows you. The signature is not a transaction and moves nothing."}
           </p>
         </div>
 
@@ -183,8 +184,29 @@ function Redeem() {
                 />
               ) : (
                 <div className="flex flex-col items-start gap-3">
-                  <p className="text-caption text-gray-light">
-                    Connect the wallet that will hold your membership. It cannot be changed later.
+                  {/* Show the code before asking for a wallet.
+                   *
+                   * The invite mail tells people a code never comes from anyone
+                   * asking them to connect a wallet to claim it — which is the
+                   * phishing script, and worth saying. Landing them on a bare
+                   * connect button makes our own link read like the thing we
+                   * warned about, and gives no sign the code in the URL even
+                   * arrived. So the code confirms itself first, and the wallet
+                   * is the second step rather than the toll gate. */}
+                  {prefilled && (
+                    <div className="w-full rounded-[12px] border border-privacy/25 bg-privacy/5 px-3.5 py-3">
+                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray">
+                        Code from your invite
+                      </p>
+                      <p className="mt-1 break-all font-mono text-sm font-semibold tracking-wide text-foreground">
+                        {prefilled}
+                      </p>
+                    </div>
+                  )}
+                  <p className="text-caption leading-relaxed text-gray-light">
+                    {prefilled
+                      ? "Now choose the wallet that will hold your membership. It cannot be changed later, and connecting does not spend the code — you sign a message and confirm on the next step."
+                      : "Connect the wallet that will hold your membership. It cannot be changed later."}
                   </p>
                   <WalletButton />
                 </div>
@@ -201,7 +223,8 @@ function Redeem() {
           >
             Apply for a seat
           </Link>{" "}
-          — a person reads every application, and codes only ever come back by reply.
+          — applying sends a code to your email straight away. It only ever arrives that way,
+          never from a link in a post.
         </p>
 
         <p className="mt-2 text-caption text-gray">
