@@ -126,12 +126,15 @@ export async function mintInvite(email: string): Promise<Invite | null> {
 export function inviteEmail(invite: Invite): { subject: string; html: string; text: string } {
   const facts = FACTS.map((fact, index) => `${index + 1}. ${fact}`);
   const steps = NEXT_STEPS.map((step, index) => `${index + 1}. ${step}`);
-  const feedback = `${new URL(invite.link).origin}/feedback`;
   const intro = ["You're in the UTXOpia beta. Your code is below.", "First, four things you cannot undo:"];
   // Expiry is a re-confirmation checkpoint, not a rejection. Say so, or a
   // lapsed code reads as being quietly dropped.
   const expires = `${invite.expiryLabel}. If it lapses, reply and we will send a new one.`;
-  const ask = `Then tell us what broke — reply to this mail, or use ${feedback}. That is the whole reason you are here.`;
+  // No /feedback URL here: the page is gone and the dialog opens on an in-app
+  // event, so nothing a mail client can link to reaches it. Reply is the route
+  // that works from an inbox, and it lands in the same place.
+  const ask =
+    "Then tell us what broke — reply to this email, or use the feedback button in the app. That is the whole reason you are here.";
 
   return {
     subject: "Your UTXOpia beta invite",
