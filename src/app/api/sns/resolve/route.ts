@@ -22,6 +22,7 @@ const RECORDS_TTL_MS = 60_000;
 
 type ParentRecord = {
   subdomainKey: string;
+  owner: string;
   viewingPubKey: string; // hex
   mpk: string; // hex
   version: number;
@@ -56,6 +57,8 @@ async function fetchParentRecords(
     if (!parsed) continue;
     records.push({
       subdomainKey: account.pubkey.toBase58(),
+      // SPL Name Service header: parent(32) | owner(32) | class(32)
+      owner: new PublicKey(account.account.data.subarray(32, 64)).toBase58(),
       viewingPubKey: bytesToHex(parsed.viewingPubKey),
       mpk: bytesToHex(parsed.mpk),
       version: parsed.version,
@@ -97,17 +100,36 @@ export async function GET(request: NextRequest) {
       recordsCache.set(network, cached);
     }
 
-    const match = cached.records.find((r) => r.viewingPubKey === vkNorm);
+    const matches = cached.records.filter((r) => r.viewingPubKey === vkNorm);
+    if (matches.length === 0) {
+      return NextResponse.json({ success: true, registered: false });
+    }
+
+    const connection = new Connection(routeContext.config.solana.rpcUrl, "confirmed");
+
+    // A name change registers the new subdomain and releases the old one, and
+    // both carry the same viewing key — so a snapshot taken mid-change can hand
+    // back the released name. Confirm the matched accounts still exist, and drop
+    // the snapshot when one doesn't so the next caller re-reads the chain.
+    const infos = await connection.getMultipleAccountsInfo(
+      matches.map((m) => new PublicKey(m.subdomainKey)),
+    );
+    const live = matches.filter((_, i) => infos[i] !== null);
+    if (live.length !== matches.length) recordsCache.delete(network);
+    const match = live[0];
     if (!match) {
       return NextResponse.json({ success: true, registered: false });
     }
 
-    // Reverse-resolve the human-readable name for the one matched record only.
-    const connection = new Connection(routeContext.config.solana.rpcUrl, "confirmed");
+    // Reverse-resolve human-readable names for the live records only. Beyond the
+    // first, these are names whose release failed during an earlier change —
+    // they still resolve to this user and only their owner can release them.
     const parentPubkey = deriveParentDomainKey(sns);
-    const reverseKey = deriveReverseLookupKey(new PublicKey(match.subdomainKey), parentPubkey, sns);
-    const reverseAcct = await connection.getAccountInfo(reverseKey);
-    const name = reverseAcct ? parseSnsReverseName(reverseAcct.data) : null;
+    const reverseAccts = await connection.getMultipleAccountsInfo(
+      live.map((r) => deriveReverseLookupKey(new PublicKey(r.subdomainKey), parentPubkey, sns)),
+    );
+    const names = reverseAccts.map((acct) => (acct ? parseSnsReverseName(acct.data) : null));
+    const name = names[0];
 
     return NextResponse.json({
       success: true,
@@ -121,6 +143,11 @@ export async function GET(request: NextRequest) {
         complianceFlags: match.complianceFlags,
         auditorPubkey: match.auditorPubkey,
       },
+      staleNames: live.slice(1).map((r, i) => ({
+        name: names[i + 1],
+        subdomainKey: r.subdomainKey,
+        owner: r.owner,
+      })),
     });
   } catch (err) {
     const message = err instanceof Error ? err.message : "Failed to resolve SNS name";

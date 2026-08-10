@@ -47,11 +47,20 @@ const SNS_RESOLVE_CACHE_TTL_MS = 30 * 60 * 1_000;
 const SNS_RESOLVE_CACHE_PREFIX = "utxopia:sns-resolve:v1";
 const SNS_NAME_REGISTERED_EVENT = "utxopia:sns-name-registered";
 
+/** A second name that still resolves to this viewing key — left behind when the
+ *  release half of an earlier name change failed. Only its owner can release it. */
+export interface SnsStaleName {
+  name: string | null;
+  subdomainKey: string;
+  owner: string | null;
+}
+
 interface SnsNameRegisteredEventDetail {
   networkId: string;
   viewingKey: string;
   name: string;
   subdomainKey: string | null;
+  staleNames: SnsStaleName[];
 }
 
 interface CachedSnsResolve {
@@ -104,6 +113,10 @@ async function fetchSnsResolve(
 
   const request: Promise<SnsResolveSuccess> = (async () => {
     const query = new URLSearchParams({ network: networkId, vk: viewingKey });
+    // A forced lookup follows a change the caller just made on-chain, so the
+    // route's own records snapshot has to be bypassed too — clearing only the
+    // localStorage copy still reads a stale answer for the rest of its TTL.
+    if (force) query.set("refresh", "1");
     const response = await fetch(`/api/sns/resolve?${query.toString()}`);
     const body = await response.json().catch(() => null) as SnsResolveResponse | null;
     if (!response.ok || !body?.success) {
@@ -134,6 +147,7 @@ type SnsResolveResponse =
         complianceFlags: number;
         auditorPubkey: string | null;
       };
+      staleNames?: SnsStaleName[];
     }
   | { success: false; error: string };
 
@@ -154,6 +168,9 @@ interface UseSnsNameReturn {
   isLoading: boolean;
   isRegistering: boolean;
   error: string | null;
+  /** Names beyond the active one that still resolve to this user, left behind by
+   *  a name change whose release step failed. Empty in the normal case. */
+  staleNames: SnsStaleName[];
   /** Compliance-flag byte on the registered SNS subdomain (0 if none). */
   complianceFlags: number;
   /** Optional 32-byte auditor Solana pubkey published on the user's SNS. */
@@ -164,6 +181,8 @@ interface UseSnsNameReturn {
   registerSnsSubdomain: (name: string) => Promise<boolean>;
   /** Release (delete) a subdomain the active authority owns, relayer-sponsored. */
   deleteSnsSubdomain: (name: string) => Promise<boolean>;
+  /** Release a leftover name from `staleNames` and re-resolve. */
+  releaseStaleName: (name: string) => Promise<boolean>;
   /** Register `newName`, then release the current name. New name wins even if
    *  the old-name release fails (non-fatal warning surfaced via `error`). */
   changeSnsName: (newName: string) => Promise<boolean>;
@@ -196,6 +215,7 @@ export function useSnsName(): UseSnsNameReturn {
 
   const [registeredSnsName, setRegisteredSnsName] = useState<string | null>(null);
   const [hasRegisteredSnsName, setHasRegisteredSnsName] = useState(false);
+  const [staleNames, setStaleNames] = useState<SnsStaleName[]>([]);
   const [complianceFlags, setComplianceFlags] = useState(0);
   const [auditorPubkey, setAuditorPubkeyState] = useState<Uint8Array | null>(null);
   const [needsUpdate, setNeedsUpdate] = useState(false);
@@ -360,6 +380,7 @@ export function useSnsName(): UseSnsNameReturn {
           setHasRegisteredSnsName(true);
           setRegisteredSubdomainKey(null);
           setRegisteredSnsName(alphaName.handle);
+          setStaleNames([]);
           setComplianceFlags(0);
           setAuditorPubkeyState(null);
           setNeedsUpdate(false);
@@ -372,6 +393,7 @@ export function useSnsName(): UseSnsNameReturn {
       const body = await fetchSnsResolve(networkId, ourViewing, force);
 
       const record = body.registered ? body.record : null;
+      setStaleNames(body.registered ? body.staleNames ?? [] : []);
       if (record) {
         setHasRegisteredSnsName(true);
         setRegisteredSubdomainKey(new PublicKey(record.subdomainKey));
@@ -816,8 +838,19 @@ export function useSnsName(): UseSnsNameReturn {
     }
 
     await lookupMySnsName(true);
+
+    // The registration we just confirmed is authoritative. Re-assert it: the
+    // released name shares this viewing key, so a resolve that raced the
+    // release can still answer with the old name and would otherwise be cached
+    // as the current one for the full TTL.
+    if (snsConfig && !alphaDemoLedgerEnabled(networkId)) {
+      rememberRegisteredSnsName(
+        normalizedNew,
+        deriveSubdomainKey(normalizedNew, deriveParentDomainKey(snsConfig), snsConfig),
+      );
+    }
     return true;
-  }, [deleteSnsSubdomain, lookupMySnsName, registerSnsSubdomain, registeredSnsName]);
+  }, [deleteSnsSubdomain, lookupMySnsName, networkId, registerSnsSubdomain, registeredSnsName, rememberRegisteredSnsName, snsConfig]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {

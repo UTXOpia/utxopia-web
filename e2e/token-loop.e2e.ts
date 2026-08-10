@@ -261,6 +261,36 @@ function mineRegtest(blocks: number): void {
  *  /api/explorer/redemptions scans redemption PDAs — which complete_redemption
  *  closes, so a *successful* redemption vanishes from that feed.
  */
+/** A bech32 address as it appears anywhere in a blob of text or JS output. */
+const BTC_ADDRESS_RE = /\b(?:bcrt1|tb1|bc1)[02-9ac-hj-np-z]{20,}\b/i;
+
+/**
+ * The address the app is actually going to pay, read out of the form.
+ *
+ * On regtest the app pins the payout to the connected test wallet and
+ * pre-fills this field, so `E2E_BTC_REDEEM_ADDR` is ignored — which is correct
+ * product behaviour and used to make this test watch an address that was never
+ * going to be paid. It then polled it for ten minutes and reported a failure
+ * for a withdrawal that had already settled somewhere else.
+ *
+ * Returns null when the field is empty, i.e. the deployment lets the caller
+ * choose and the configured address is the real destination.
+ */
+function pinnedBtcDestination(): string | null {
+  let raw: string;
+  try {
+    raw = ab(
+      "eval",
+      `(() => { const el = document.querySelector('input[placeholder*="Bitcoin address" i]');`
+        + ` return el && 'value' in el ? el.value : ''; })()`,
+    );
+  } catch {
+    return null;
+  }
+  const match = raw.match(BTC_ADDRESS_RE);
+  return match ? match[0] : null;
+}
+
 function payoutSats(address: string): number {
   try {
     const raw = execSync(
@@ -541,7 +571,13 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
   }
   // regtest credits the vault directly via the faucet; testnet4 goes through the
   // wallet PSBT flow. Accept whichever this network actually renders.
-  waitForAnyText(["Private BTC balance updated", "submitted"], 60000);
+  // 60s expired mid-flight and reported a failure for a deposit that had
+  // already credited — the page was showing "Private BTC balance updated" by
+  // the time the failure was printed. The regtest faucet has to broadcast, mine
+  // to the configured confirmations, and wait for the header relay before the
+  // vault credit lands, and that runs past a minute whenever the Solana RPC
+  // makes it retry. Match the other legs rather than the optimistic case.
+  waitForAnyText(["Private BTC balance updated", "submitted"], 180000);
   screenshot("btc-deposit-submitted");
   console.log("  ✓ BTC deposit broadcast");
 
@@ -595,9 +631,6 @@ async function stepBtcDeposit(chain: ChainConfig, keys: DevKeys): Promise<void> 
  * we wait for it to show up in the withdrawal-status tracker.
  */
 async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
-  // Baseline first: a redemption that settled on an earlier run must not count
-  // as this one succeeding.
-  const payoutBefore = payoutSats(BTC_REDEEM_ADDR);
   const withdrawUrl = `${APP_URL}/vault/withdraw?network=${chain.network}`;
   console.log(`  → BTC redeem: navigating to ${withdrawUrl}`);
   injectDevKeysViaStorage(keys, withdrawUrl);
@@ -606,10 +639,25 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
 
   // Bitcoin is the default destination, but assert it rather than assume.
   selectCashOutDestination("bitcoin");
-  // NOTE: on regtest the app pins the payout to the connected test wallet and
-  // pre-fills this field ("Regtest safety: BTC withdrawals can only go to your
-  // connected test wallet"), so E2E_BTC_REDEEM_ADDR is ignored there.
-  ab("find", "label", "Bitcoin address", "fill", BTC_REDEEM_ADDR);
+
+  // Whatever the app pre-filled wins: on regtest it pins the payout to the
+  // connected test wallet, and overwriting it here would assert against an
+  // address the product was never going to pay.
+  const pinned = pinnedBtcDestination();
+  if (pinned) {
+    console.log(`  → destination pinned by the app: ${pinned}`);
+    if (pinned !== BTC_REDEEM_ADDR) {
+      console.log("    (E2E_BTC_REDEEM_ADDR ignored — regtest pins the payout)");
+    }
+  } else {
+    ab("find", "label", "Bitcoin address", "fill", BTC_REDEEM_ADDR);
+  }
+  const destination = pinned ?? BTC_REDEEM_ADDR;
+
+  // Baseline only once the destination is known, and before anything is
+  // submitted: a redemption that settled on an earlier run must not count as
+  // this one succeeding.
+  const payoutBefore = payoutSats(destination);
   ab("wait", "1000");
   ab("find", "label", "Amount", "fill", BTC_REDEEM_AMOUNT_BTC);
   ab("wait", "500");
@@ -627,7 +675,25 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
   // allow expired mid-proof, which reads as a product failure but is not one.
   waitForText("View on explorer", 180000);
   screenshot("btc-redeem-submitted");
-  console.log("  ✓ BTC redeem submitted; polling for BTC txid…");
+
+  // The success view names the destination. If it disagrees with what the form
+  // held, the modal is the truth — believe it rather than poll the wrong
+  // address, and say so loudly because it means the form was overridden late.
+  let watched = destination;
+  let baseline = payoutBefore;
+  const confirmedTo = ab("read").match(BTC_ADDRESS_RE)?.[0];
+  if (confirmedTo && confirmedTo !== destination) {
+    // The pre-submit baseline belongs to the address we are no longer watching,
+    // so it has to be retaken here. That is weaker — a payout landing between
+    // submit and this read would be counted as prior balance and time the run
+    // out — but settlement needs the redemption service plus mined blocks, so
+    // the window is seconds against a leg that takes minutes.
+    watched = confirmedTo;
+    baseline = payoutSats(watched);
+    console.log(`  ! modal paid ${watched}, not ${destination} — watching the modal's address`);
+    console.log(`    baseline retaken after submit: ${baseline} sats`);
+  }
+  console.log(`  ✓ BTC redeem submitted; watching ${watched} (baseline ${baseline} sats)`);
 
   // Poll the redemption feed for settlement. Not the UI: /vault renders no
   // withdrawal status at all, and on the activity page the status lives inside
@@ -642,9 +708,9 @@ async function stepBtcRedeem(chain: ChainConfig, keys: DevKeys): Promise<void> {
     // redemption needs the light client to finalise that block. Both stall
     // without this — nothing mines on regtest.
     mineRegtest(2);
-    const payoutNow = payoutSats(BTC_REDEEM_ADDR);
-    if (payoutNow > payoutBefore) {
-      console.log(`  → payout received: ${payoutNow - payoutBefore} sats`);
+    const payoutNow = payoutSats(watched);
+    if (payoutNow > baseline) {
+      console.log(`  → payout received: ${payoutNow - baseline} sats`);
       confirmed = true;
       break;
     }
