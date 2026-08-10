@@ -64,7 +64,10 @@ function parseHexBytes(value: string, expectedLength: number, field: string): Ui
 
 function normalizeSubdomain(name: string) {
   const subdomain = name.trim().toLowerCase();
-  if (!/^[a-z0-9][a-z0-9-]{0,31}$/.test(subdomain)) {
+  // Letters and digits only. Deliberately stricter than SNS and stricter than
+  // the delete route, which still accepts hyphens so a name registered before
+  // this rule can still be removed.
+  if (!/^[a-z0-9]{1,32}$/.test(subdomain)) {
     throw new Error("Invalid subdomain name");
   }
   if (subdomain.includes(".")) {

@@ -1,7 +1,12 @@
 import type { ChainId } from "@/lib/chain-registry";
 import type { NetworkId } from "@/lib/network-config";
 
-const SOL_HANDLE_RE = /^[a-z0-9][a-z0-9-]{0,31}$/;
+// Letters and digits only. SNS itself permits hyphens, but a private receive
+// name is read aloud, retyped from a screenshot and pasted into a send box —
+// and a hyphen in a name that already ends `.utxopia.sol` is one more thing to
+// get wrong for no gain. It also stops a lookalike of an existing handle being
+// claimed by inserting a dash.
+const SOL_HANDLE_RE = /^[a-z0-9]{1,32}$/;
 
 export type PrivateNameClaimResult = {
   normalizedName: string;
@@ -23,7 +28,7 @@ export function normalizePrivateNameHandle(input: string, _chain: ChainId) {
     ? withoutAt.slice(0, -1 * suffix.length)
     : withoutAt;
   if (!SOL_HANDLE_RE.test(handle)) {
-    throw new Error("Choose a Solana name with lowercase letters, numbers, or hyphens.");
+    throw new Error("Choose a name with lowercase letters and numbers only — no hyphens or spaces.");
   }
   return handle;
 }

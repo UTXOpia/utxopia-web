@@ -43,7 +43,7 @@ export function ChangeNameDialog({
 
   const isNameRegistered = sns.isNameRegistered;
   const clean = value.trim().toLowerCase();
-  const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
+  const nameValid = /^[a-z0-9]{1,32}$/.test(clean);
   const sameAsOld = clean === (oldName ?? "").trim().toLowerCase();
   const changing = sns.isRegistering || isSubmitting;
 
@@ -186,7 +186,7 @@ export function ChangeNameDialog({
               value={value}
               onChange={(e) => {
                 setLocalError(null);
-                setValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                setValue(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canChange) handleChange();

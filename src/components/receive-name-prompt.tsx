@@ -66,7 +66,7 @@ export function ReceiveNamePrompt() {
   }, [sns.hasRegisteredSnsName]);
 
   const clean = value.trim().toLowerCase();
-  const nameValid = /^[a-z0-9-]{1,32}$/.test(clean);
+  const nameValid = /^[a-z0-9]{1,32}$/.test(clean);
   const registering = sns.isRegistering || isSubmitting;
 
   useEffect(() => {
@@ -201,7 +201,7 @@ export function ReceiveNamePrompt() {
               value={value}
               onChange={(e) => {
                 setLocalError(null);
-                setValue(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, ""));
+                setValue(e.target.value.toLowerCase().replace(/[^a-z0-9]/g, ""));
               }}
               onKeyDown={(e) => {
                 if (e.key === "Enter" && canRegister) handleRegister();

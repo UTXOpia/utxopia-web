@@ -162,7 +162,11 @@ export default function VaultPage() {
       .replace(/[^a-z0-9]/gi, "")
       .slice(-4)
       .toLowerCase();
-    return tail.length === 4 ? `capy-${tail}` : null;
+    // No separator. `capy-a1b2.utxopia.sol` reads like a generated handle —
+    // three segments and a hyphen before anyone has typed anything — and the
+    // hyphen is the part people ask about. `capya1b2` is the same four
+    // characters of entropy and reads as one word.
+    return tail.length === 4 ? `capy${tail}` : null;
   }, [stealthAddressEncoded]);
 
   const parentDomain = getSnsConfig(networkConfig)?.parentDomain || "utxopia";

@@ -28,6 +28,7 @@ import {
   createRateLimiter,
   deliver,
   emailSink,
+  renderIntakeEmail,
   looksLikeEmail,
 } from "@/lib/intake";
 
@@ -63,6 +64,28 @@ function formatForHuman(entry: Entry): string {
     `page: ${entry.page || "—"}   network: ${entry.network || "—"}`,
     `at: ${entry.received_at}`,
   ].join("\n");
+}
+
+/** The same report as mail. Feedback used to send only the chat-formatted text
+ *  — `deliver` mails `human` verbatim when no html is given — so it arrived as
+ *  a bare wall of `contact:` / `page:` lines while applications got a branded
+ *  template. Same intake, same inbox; it should read the same. */
+function formatAsEmail(entry: Entry): string {
+  return renderIntakeEmail({
+    title: `New feedback — ${entry.kind}`,
+    badges: [entry.kind, ...(entry.wants_session ? ["Wants a 1-on-1"] : [])],
+    rows: [
+      { label: "What they said", value: entry.message, block: true },
+      { label: "Contact", value: entry.email ?? "— none given" },
+      { label: "Where", value: `${entry.page || "—"}  ·  ${entry.network || "—"}` },
+    ],
+    meta: [
+      `Received: ${entry.received_at}`,
+      entry.email
+        ? "Reply to this mail to reach them — it goes to the address above."
+        : "No address given, so this one cannot be replied to.",
+    ],
+  });
 }
 
 export async function POST(req: Request) {
@@ -123,7 +146,8 @@ export async function POST(req: Request) {
   const { delivered, errors } = await deliver({
     entry,
     human: formatForHuman(entry),
-    subject: `beta feedback — ${entry.kind}${entry.wants_session ? " · wants a 1-on-1" : ""}`,
+    html: formatAsEmail(entry),
+    subject: `Beta feedback — ${entry.kind}${entry.wants_session ? " · wants a 1-on-1" : ""}`,
     replyTo: entry.email,
     webhook,
     logPath,
