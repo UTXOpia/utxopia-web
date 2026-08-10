@@ -24,9 +24,7 @@ import { useSnsName } from "@/hooks/use-sns-name";
 import { useRelayerConfig } from "@/hooks/use-relayer-config";
 import { buildTransferParams } from "@/hooks/use-build-transfer-params";
 import { autoSelectNotes } from "@/components/send/_lifted/helpers";
-import { BackupRequiredCallout } from "@/components/vault/backup-required-callout";
 import { PAY_TOKENS } from "@/lib/supported-tokens";
-import { hasBackupForKeys } from "@/lib/vault-backup";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
 import { humanizeSpendError } from "@/lib/indexer-lag-error";
 import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
@@ -505,18 +503,6 @@ export function SendForm({
         : ctx.inboxError
           ? "Unavailable"
           : `${formatAmount(Number(totalAvailable), selectedPayToken.decimals)} ${displayToken}`;
-  const devSignerEnabled =
-    process.env.NEXT_PUBLIC_DEV_SIGNER === "1" &&
-    !chainEnv.networkId.includes("mainnet");
-  // An imported session already proves the user holds the recovery file — and
-  // its backup flag is keyed to a credential that no longer exists on this
-  // device, so gating on it would block the sweep the import was for.
-  const requiresBackup =
-    !!ctx.keys &&
-    ctx.inboxDepositCount > 0 &&
-    !devSignerEnabled &&
-    !ctx.isImportedSession &&
-    !hasBackupForKeys(ctx.keys);
   const isSubmittingInFlight =
     submitting ||
     (submitter.status !== "idle" &&
@@ -545,9 +531,6 @@ export function SendForm({
         throw new Error(
           "Vault locked. Sign in via the gear menu first.",
         );
-      }
-      if (requiresBackup) {
-        throw new Error("Back up your private vault before sending funds.");
       }
       if (recipientType === "spl_wallet") {
         const quotedBps = poolFees.fees?.withdrawalFeeBps;
@@ -726,7 +709,6 @@ export function SendForm({
     btcServiceFee,
     walletNetPayout,
     withdrawalFee,
-    requiresBackup,
     scheduleInboxRefresh,
     poolFees,
   ]);
@@ -807,9 +789,6 @@ export function SendForm({
           "Vault locked. Sign in via the gear menu first.",
         );
       }
-      if (requiresBackup) {
-        throw new Error("Back up your private vault before creating a claim link.");
-      }
       const linkToken = PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken) ?? selectedPayToken;
       const sats = parseDecimalToBaseUnits(input.amount, linkToken.decimals);
       if (!sats || sats <= 0) {
@@ -873,7 +852,6 @@ export function SendForm({
     },
     [
       ctx,
-      requiresBackup,
       relayerMeta,
       effectiveRelayerFee,
       submitter,
@@ -982,13 +960,12 @@ export function SendForm({
         </div>
       )}
 
-      <BackupRequiredCallout visible={requiresBackup} />
 
       {amountValid && (
         <button
           type="button"
           onClick={openReview}
-          disabled={requiresBackup || !relayerReady}
+          disabled={!relayerReady}
           className={cn(
             "w-full px-4 py-3 rounded-lg bg-foreground text-background text-sm font-medium flex items-center justify-center gap-2",
             "disabled:cursor-not-allowed disabled:opacity-50",
@@ -1010,7 +987,7 @@ export function SendForm({
           <button
             type="button"
             onClick={() => setLinkOpen(true)}
-            disabled={requiresBackup || !relayerReady}
+            disabled={!relayerReady}
             className={cn(
               "w-full px-4 py-3 rounded-lg bg-muted/40 border border-gray/15 text-sm font-medium flex items-center justify-center gap-2 hover:border-privacy/30",
               "disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:border-gray/15",
