@@ -102,8 +102,8 @@ function Redeem() {
           </h1>
           <p className="text-body2 leading-relaxed text-gray-light">
             {prefilled
-              ? "Your code is below. Choose the wallet you want to be your membership and sign the message it shows you — the signature is not a transaction and moves nothing."
-              : "Connect the wallet you want to be your membership, paste the code, and sign the message it shows you. The signature is not a transaction and moves nothing."}
+              ? "Your code is filled in below. Paste the Solana address you want to be your membership, and it is registered on chain for you — no wallet connection, no transaction, no fee."
+              : "Paste your code and the Solana address you want to be your membership. It is registered on chain for you — no wallet connection, no transaction, no fee."}
           </p>
         </div>
 
@@ -176,52 +176,41 @@ function Redeem() {
             </div>
 
             <div className="rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
-              {publicKey ? (
-                <RedeemInvite
-                  networkId={networkId}
-                  initialCode={prefilled}
-                  onRedeemed={(btc) => setJustJoined({ btc })}
-                />
-              ) : (
-                <div className="flex flex-col items-start gap-3">
-                  {/* Show the code before asking for a wallet.
-                   *
-                   * The invite mail tells people a code never comes from anyone
-                   * asking them to connect a wallet to claim it — which is the
-                   * phishing script, and worth saying. Landing them on a bare
-                   * connect button makes our own link read like the thing we
-                   * warned about, and gives no sign the code in the URL even
-                   * arrived. So the code confirms itself first, and the wallet
-                   * is the second step rather than the toll gate. */}
-                  {prefilled && (
-                    <div className="w-full rounded-[12px] border border-privacy/25 bg-privacy/5 px-3.5 py-3">
-                      <p className="text-[11px] font-medium uppercase tracking-wider text-gray">
-                        Code from your invite
-                      </p>
-                      <p className="mt-1 break-all font-mono text-sm font-semibold tracking-wide text-foreground">
-                        {prefilled}
-                      </p>
-                    </div>
-                  )}
-                  <p className="text-caption leading-relaxed text-gray-light">
-                    {prefilled
-                      ? "Now choose the wallet that will hold your membership. It cannot be changed later."
-                      : "Connect the wallet that will hold your membership. It cannot be changed later."}
+              {/* The form renders with or without a wallet. On testnet the
+                * membership address is typed, so requiring a connection first
+                * gated the whole page behind a step most people do not need —
+                * and made our own invite link open with the prompt the invite
+                * mail warns about. Connecting is still offered below, and is
+                * still the only route that proves the address is yours. */}
+              <RedeemInvite
+                networkId={networkId}
+                initialCode={prefilled}
+                showApplyLink={false}
+                onRedeemed={(btc) => setJustJoined({ btc })}
+              />
+
+              {!publicKey && (
+                <div className="mt-5 flex flex-col items-start gap-3 border-t border-gray/15 pt-5">
+                  <p className="text-caption font-semibold text-foreground">
+                    Rather connect a wallet?
+                  </p>
+                  {/* The offer worth making, stated as what it buys rather than
+                    * what it demands: a signature is the only thing that makes a
+                    * mistyped address impossible, and a typo here is permanent.
+                    *
+                    * The three reassurances are all true — the adapter asks only
+                    * for the public key, redeem() verifies a signed message
+                    * rather than a transaction, and register_exit_destination is
+                    * paid by the auditor keypair server-side. Left unsaid,
+                    * "connect wallet" reads as risk and a gas fee. */}
+                  <p className="text-caption leading-relaxed text-gray">
+                    Connecting proves the address is yours, so a mistyped one cannot cost you the
+                    code. It shares only your public address — no spending permission, no
+                    transaction, and no fee: we cover the on-chain registration.
                   </p>
                   <div className="wallet-cta w-full">
-                    <WalletButton label="Connect wallet to redeem" />
+                    <WalletButton label="Connect wallet instead" />
                   </div>
-                  {/* What the click actually costs, because nothing said so and
-                    * "connect wallet" reads as risk and a gas fee to anyone who
-                    * has met crypto before. All three are true: the adapter asks
-                    * only for the public key, redeem() verifies a signed message
-                    * rather than a transaction, and register_exit_destination is
-                    * paid by the auditor keypair server-side. */}
-                  <p className="text-caption leading-relaxed text-gray">
-                    Connecting shares only your public address — no spending permission. You sign a
-                    message, not a transaction, and pay no fee: we cover the on-chain
-                    registration. Your code is not spent until you confirm.
-                  </p>
                 </div>
               )}
             </div>

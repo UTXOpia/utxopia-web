@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "bun:test";
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { RedeemInvite } from "./redeem-invite";
 
 // No wallet provider is mounted, so `useWallet` yields the disconnected
@@ -20,9 +20,27 @@ describe("RedeemInvite", () => {
   it("never redeems on its own — the irreversible four have to be read first", () => {
     render(<RedeemInvite networkId="devnet-regtest" initialCode="ABCDE-FGHIJ-KLMNO-PQRST" />);
 
-    // No wallet connected, so the button stays disabled even with a code in hand.
+    // A code alone is not enough: the address that becomes the membership is
+    // still blank, and redeeming binds it permanently.
     const button = screen.getByRole("button", { name: "Redeem invite code" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
+  });
+
+  it("will not redeem to an address that is the wrong length", () => {
+    render(<RedeemInvite networkId="devnet-regtest" initialCode="ABCDE-FGHIJ-KLMNO-PQRST" />);
+    const address = screen.getByPlaceholderText(
+      "Paste the address that will be your membership",
+    );
+    const button = screen.getByRole("button", { name: "Redeem invite code" }) as HTMLButtonElement;
+
+    // Base58 with no checksum means length is the only cheap signal there is.
+    fireEvent.change(address, { target: { value: "9MFnVxiXKtb" } });
+    expect(button.disabled).toBe(true);
+
+    fireEvent.change(address, {
+      target: { value: "9MFnVxiXKtbduErMNm6gSsHdkBjUa5tcNpRQwZK12AnU" },
+    });
+    expect(button.disabled).toBe(false);
   });
 
   it("points people without a code at the application, not at a code", () => {

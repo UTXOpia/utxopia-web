@@ -18,10 +18,14 @@ type Status = "idle" | "signing" | "redeeming" | "done" | "error";
  *
  * Two things about the inputs are deliberate:
  *
- * - The Solana address is not a field. Redemption is authorised by signing a
- *   server-issued nonce with the connected wallet, so it can only ever be the
- *   wallet in front of us. Letting someone type an address they cannot sign for
- *   is exactly the hole that signature closes.
+ * - The Solana address is a field, and on testnet that is the default path. A
+ *   signature proves the wallet is yours; typing an address proves nothing, so
+ *   a typo that still decodes binds the membership to a key nobody holds and
+ *   the registry has no remove instruction. That trade is deliberate while
+ *   there is no value behind the membership, and the backend refuses it unless
+ *   UTXOPIA_INVITE_ALLOW_UNSIGNED is set — so it cannot follow us to a network
+ *   where a code in an inbox would be bearer value. Connecting a wallet still
+ *   works and is still the safer route.
  * - The bitcoin address is optional here, and permanent if given. A Solana
  *   exit alone already recovers every SPL asset in the vault without anyone's
  *   approval; only converting zkBTC back to bitcoin needs a registered script.
@@ -33,6 +37,7 @@ export function RedeemInvite({
   networkId,
   initialCode,
   onRedeemed,
+  showApplyLink = true,
   className,
 }: {
   networkId: NetworkId;
@@ -44,16 +49,25 @@ export function RedeemInvite({
    *  auto-submitted: redemption is permanent, and the four things nobody can
    *  undo are on the page above this form to be read first. */
   initialCode?: string;
+  /** The /redeem page says this itself, in fuller words, outside the card.
+   *  Everywhere else this component appears the prompt has nowhere else to go. */
+  showApplyLink?: boolean;
   className?: string;
 }) {
   const { publicKey, signMessage } = useWallet();
   const [code, setCode] = useState(initialCode ?? "");
+  const [typedWallet, setTypedWallet] = useState("");
   const [btcAddress, setBtcAddress] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
 
   const busy = status === "signing" || status === "redeeming";
-  const ready = code.trim().length > 0 && !busy;
+  // A connected wallet signs; otherwise the typed address is what we register.
+  const wallet = publicKey?.toBase58() ?? typedWallet.trim();
+  // Base58 has no checksum, so this only catches a mistyped *length* — it is a
+  // guard against an obviously wrong paste, not a proof of anything.
+  const walletLooksValid = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/.test(wallet);
+  const ready = code.trim().length > 0 && walletLooksValid && !busy;
 
   const post = async (action: string, body: unknown) => {
     const response = await fetch(
@@ -74,24 +88,30 @@ export function RedeemInvite({
   };
 
   const redeem = async () => {
-    if (!publicKey || !signMessage) return;
+    if (!walletLooksValid) return;
     setError(null);
     try {
-      setStatus("signing");
-      const wallet = publicKey.toBase58();
-      const challenge = await post("challenge", { wallet });
-      // The message is taken verbatim from the server — rebuilding it in the
-      // client would let the two drift and every signature would be rejected.
-      const signature = bs58.encode(
-        await signMessage(new TextEncoder().encode(challenge.message)),
-      );
+      // Signing only when there is a wallet that can. Without one the address
+      // is sent as typed and the backend decides whether that is allowed.
+      let signed: { nonce: string; signature: string } | null = null;
+      if (publicKey && signMessage) {
+        setStatus("signing");
+        const challenge = await post("challenge", { wallet });
+        // The message is taken verbatim from the server — rebuilding it in the
+        // client would let the two drift and every signature would be rejected.
+        signed = {
+          nonce: challenge.nonce,
+          signature: bs58.encode(
+            await signMessage(new TextEncoder().encode(challenge.message)),
+          ),
+        };
+      }
 
       setStatus("redeeming");
       await post("redeem", {
         code: code.trim(),
         wallet,
-        nonce: challenge.nonce,
-        signature,
+        ...(signed ?? {}),
         ...(btcAddress.trim() ? { btc_address: btcAddress.trim() } : {}),
       });
       setStatus("done");
@@ -141,6 +161,30 @@ export function RedeemInvite({
         />
       </label>
 
+      {!publicKey && (
+        <label className="flex flex-col gap-1">
+          <span className="text-caption text-gray-light">Your Solana address</span>
+          <input
+            value={typedWallet}
+            onChange={(event) => setTypedWallet(event.target.value)}
+            placeholder="Paste the address that will be your membership"
+            autoComplete="off"
+            spellCheck={false}
+            disabled={busy}
+            className={cn(
+              "min-h-10 rounded-[10px] border border-gray/20 bg-transparent px-3 py-2",
+              "font-mono text-caption text-foreground placeholder:text-gray",
+              "focus:border-gray/40 focus:outline-none disabled:opacity-60",
+            )}
+          />
+          <span className="text-caption text-gray">
+            Paste it — do not type it. A Solana address has no checksum, so a wrong one that still
+            looks valid registers your membership to a wallet nobody controls, permanently, and
+            spends the code. Nothing can undo that.
+          </span>
+        </label>
+      )}
+
       <label className="flex flex-col gap-1">
         <span className="text-caption text-gray-light">
           Bitcoin withdrawal address <span className="text-gray">(optional)</span>
@@ -165,11 +209,19 @@ export function RedeemInvite({
         </span>
       </label>
 
-      {publicKey && (
+      {publicKey ? (
         <p className="text-caption text-gray">
           Joining as <span className="font-mono">{publicKey.toBase58()}</span> — you&apos;ll be
           asked to sign a message to prove it&apos;s yours. It is not a transaction and moves nothing.
         </p>
+      ) : (
+        walletLooksValid && (
+          <p className="text-caption leading-relaxed text-gray">
+            Joining as <span className="font-mono break-all text-gray-light">{wallet}</span>. Read
+            it back against your wallet before you press the button — this is the last moment it
+            can be changed.
+          </p>
+        )
       )}
 
       {status === "error" && error && (
@@ -182,7 +234,7 @@ export function RedeemInvite({
       <button
         type="button"
         onClick={redeem}
-        disabled={!ready || !publicKey || !signMessage}
+        disabled={!ready}
         className={cn(
           "flex min-h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-gray/20",
           "px-3 py-2.5 text-caption font-semibold text-foreground transition-colors",
@@ -195,16 +247,18 @@ export function RedeemInvite({
           : "Redeem invite code"}
       </button>
 
-      <p className="text-caption text-gray">
-        Don&apos;t have a code?{" "}
-        <Link
-          href={hrefWithChain("/apply", networkId)}
-          className="underline underline-offset-4 hover:text-foreground"
-        >
-          Apply for a seat
-        </Link>
-        .
-      </p>
+      {showApplyLink && (
+        <p className="text-caption text-gray">
+          Don&apos;t have a code?{" "}
+          <Link
+            href={hrefWithChain("/apply", networkId)}
+            className="underline underline-offset-4 hover:text-foreground"
+          >
+            Apply for a seat
+          </Link>
+          .
+        </p>
+      )}
     </div>
   );
 }
