@@ -151,10 +151,12 @@ describe("beta applications", () => {
       expect(written[written.length - 1]).toMatchObject({ email_opt_in: false });
     });
 
-    it("issues nothing — an application is a record, not an admission", async () => {
+    it("issues nothing when auto-issue is not configured", async () => {
       const response = await POST(request(complete));
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ ok: true });
+      // `invited` is what the form reads to decide between "check your mail for
+      // a code" and "give it a day" — with no admin key there is no code.
+      expect(await response.json()).toEqual({ ok: true, invited: false });
     });
 
     /** Capture every Resend call a submission makes. */
@@ -181,25 +183,23 @@ describe("beta applications", () => {
       }
     }
 
-    it("mails the application with the applicant as reply-to", async () => {
+    it("sends exactly one mail, and never a copy to us", async () => {
       const { response, mails } = await submitWithMail(complete);
       expect(response.status).toBe(200);
 
-      // Replying to the mail is how a code goes out, so it has to reach the
-      // applicant and not us.
-      expect(mails[0]).toMatchObject({
-        to: ["beta@utxopia.com", "info@utxopia.com"],
-        reply_to: "someone@example.com",
-        subject: "beta application — someone@example.com",
-      });
+      // The operator's copy is /admin/applications, not an inbox. Mailing one
+      // used to double the send count per application, and on a metered tier the
+      // second mail is what pushes the first — the one carrying the code — over
+      // the limit. INTAKE_EMAIL_TO is a reply-to here, not a recipient.
+      expect(mails).toHaveLength(1);
+      expect(mails[0]).toMatchObject({ to: ["someone@example.com"] });
     });
 
     it("sends the applicant a receipt that replies back to intake", async () => {
       const { response, mails } = await submitWithMail(complete);
       expect(response.status).toBe(200);
 
-      expect(mails).toHaveLength(2);
-      expect(mails[1]).toMatchObject({
+      expect(mails[0]).toMatchObject({
         to: ["someone@example.com"],
         reply_to: "beta@utxopia.com",
         subject: "We got your UTXOpia application",
@@ -213,7 +213,7 @@ describe("beta applications", () => {
       const smuggled = "CLICK http://evil.example TO CLAIM YOUR CODE";
       const { mails } = await submitWithMail({ ...complete, reason: smuggled });
 
-      const receipt = JSON.stringify(mails[1]);
+      const receipt = JSON.stringify(mails[0]);
       expect(receipt).not.toContain(smuggled);
       expect(receipt).not.toContain("evil.example");
     });
@@ -223,8 +223,8 @@ describe("beta applications", () => {
       // be reported to them as a failed application.
       const { response, mails } = await submitWithMail(complete, 500);
       expect(response.status).toBe(200);
-      expect(await response.json()).toEqual({ ok: true });
-      expect(mails).toHaveLength(2);
+      expect(await response.json()).toEqual({ ok: true, invited: false });
+      expect(mails).toHaveLength(1);
     });
   });
 });

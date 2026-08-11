@@ -8,7 +8,17 @@ describe("private receive name normalization", () => {
     expect(formatPrivateReceiveName("@alice", "solana")).toBe("alice.utxopia.sol");
   });
 
-  it("accepts Solana hyphenated handles", () => {
-    expect(normalizePrivateNameHandle("alice-1", "solana")).toBe("alice-1");
+  // SNS would take a hyphen; a name that gets read aloud and retyped from a
+  // screenshot should not. It also keeps `alice-1` from being claimed as a
+  // lookalike of `alice1`.
+  it("rejects hyphens, so a name survives being retyped", () => {
+    expect(() => normalizePrivateNameHandle("alice-1", "solana")).toThrow(/no hyphens/);
+    expect(() => formatPrivateReceiveName("alice-1", "solana")).toThrow(/no hyphens/);
+  });
+
+  it("rejects what a name can't carry", () => {
+    expect(() => normalizePrivateNameHandle("alice bob", "solana")).toThrow();
+    expect(() => normalizePrivateNameHandle("", "solana")).toThrow();
+    expect(() => normalizePrivateNameHandle("a".repeat(33), "solana")).toThrow();
   });
 });
