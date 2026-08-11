@@ -3,18 +3,15 @@
  * Contains address validation, note selection, circuit estimation, and field reduction.
  */
 
-import { PublicKey } from "@solana/web3.js";
 import type { InboxNote } from "@/hooks/use-utxopia";
 
 // --- Constants ---
 
-export const MIN_PAY_SATS = 500;
 import { getActiveTokenId } from "@/lib/token-context";
 
 // Token ID is now computed dynamically from the active token's mint address.
 // This is a function call, not a constant — use ZKBTC_TOKEN_ID() in all call sites.
 export const ZKBTC_TOKEN_ID = getActiveTokenId;
-export const MAX_OUTPUTS = 8; // N+M<=10, need at least 1 input + 1 change
 export const SERVICE_FEE_SATS = 2000;
 export const RELAYER_FEE_SATS = 2000;
 export const SOLANA_MAX_TX_SIZE = 1232;
@@ -44,18 +41,6 @@ export const LOCAL_CIRCUITS = new Set([
   "3x1", "3x2",
   "4x1",
 ]);
-
-// --- Validation ---
-
-/** Validate a Solana base58 public key */
-export function isValidSolanaAddress(address: string): boolean {
-  try {
-    new PublicKey(address);
-    return true;
-  } catch {
-    return false;
-  }
-}
 
 // --- Field Reduction ---
 
@@ -131,40 +116,3 @@ import { PAY_TOKENS as PAY_TOKENS_LIST, type SupportedToken } from "@/lib/suppor
 
 export type PayToken = SupportedToken;
 export const PAY_TOKENS = PAY_TOKENS_LIST;
-
-// --- Types ---
-
-export type PayStep = "connect" | "compose" | "proving" | "success";
-export type OutputMode = "stealth" | "public" | "note" | "btc";
-
-export interface OutputRow {
-  id: string;
-  mode: OutputMode;
-  amount: string;
-  secretPhrase: string;
-  resolvedMeta: import("@utxopia/sdk").StealthMetaAddress | null;
-  resolvedName: string | null;
-  stealthError: string | null;
-  solanaAddress: string;
-  addressError: string | null;
-  btcAddress: string | null;
-  btcScriptPubKey: Uint8Array | null;
-  btcAddressError: string | null;
-}
-
-export function createOutputRow(mode: OutputMode = "stealth", defaultAddress = ""): OutputRow {
-  return {
-    id: crypto.randomUUID(),
-    mode,
-    amount: "",
-    secretPhrase: "",
-    resolvedMeta: null,
-    resolvedName: null,
-    stealthError: null,
-    solanaAddress: defaultAddress,
-    addressError: null,
-    btcAddress: null,
-    btcScriptPubKey: null,
-    btcAddressError: null,
-  };
-}
