@@ -8,6 +8,9 @@ import type { NetworkId } from "@/lib/network-config";
 // claimed by inserting a dash.
 const SOL_HANDLE_RE = /^[a-z0-9]{1,32}$/;
 
+/** The one spelling of the private-name suffix. Every surface imports this. */
+export const PRIVATE_NAME_SUFFIX = ".utxopia.sol";
+
 export type PrivateNameClaimResult = {
   normalizedName: string;
   digest?: string | null;
@@ -23,9 +26,8 @@ export type ClaimPrivateReceiveNameInput = {
 export function normalizePrivateNameHandle(input: string, _chain: ChainId) {
   const trimmed = input.trim().toLowerCase();
   const withoutAt = trimmed.startsWith("@") ? trimmed.slice(1) : trimmed;
-  const suffix = ".utxopia.sol";
-  const handle = withoutAt.endsWith(suffix)
-    ? withoutAt.slice(0, -1 * suffix.length)
+  const handle = withoutAt.endsWith(PRIVATE_NAME_SUFFIX)
+    ? withoutAt.slice(0, -1 * PRIVATE_NAME_SUFFIX.length)
     : withoutAt;
   if (!SOL_HANDLE_RE.test(handle)) {
     throw new Error("Choose a name with lowercase letters and numbers only — no hyphens or spaces.");
@@ -35,7 +37,7 @@ export function normalizePrivateNameHandle(input: string, _chain: ChainId) {
 
 export function formatPrivateReceiveName(handleOrName: string, chain: ChainId) {
   const handle = normalizePrivateNameHandle(handleOrName, chain);
-  return `${handle}.utxopia.sol`;
+  return `${handle}${PRIVATE_NAME_SUFFIX}`;
 }
 
 export async function claimPrivateReceiveName(input: ClaimPrivateReceiveNameInput): Promise<PrivateNameClaimResult> {

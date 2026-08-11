@@ -92,7 +92,6 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const [amount, setAmount] = useState("");
   const [resolvedMeta, setResolvedMeta] = useState<StealthMetaAddress | null>(null);
-  const [resolvedName, setResolvedName] = useState<string | null>(null);
   const [status, setStatus] = useState<ShieldStatus>("idle");
   const [error, setError] = useState<string | null>(null);
   const [txSig, setTxSig] = useState<string | null>(null);
@@ -143,9 +142,6 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, [setShowWalletPicker, walletPickerRef]);
-
-  // No auto-resolve — user clicks the Self button or types a recipient.
-  // This avoids resolvedMeta getting out of sync with the input value.
 
   const onMax = useCallback(() => {
     const max = handleMax();
@@ -631,9 +627,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
         {/* Recipient stealth address */}
         <StealthRecipientInput
-          onResolved={(meta, name) => { setResolvedMeta(meta); setResolvedName(name); }}
-          resolvedMeta={resolvedMeta}
-          resolvedName={resolvedName}
+          onResolved={(meta) => setResolvedMeta(meta)}
           error={error}
           onError={setError}
           label="Private destination"
@@ -820,9 +814,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
       {/* Recipient stealth address */}
       <StealthRecipientInput
-        onResolved={(meta, name) => { setResolvedMeta(meta); setResolvedName(name); }}
-        resolvedMeta={resolvedMeta}
-        resolvedName={resolvedName}
+        onResolved={(meta) => setResolvedMeta(meta)}
         error={error}
         onError={setError}
         label="Private destination"

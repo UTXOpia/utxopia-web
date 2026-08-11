@@ -24,7 +24,9 @@ export type RecipientDetectionContext = {
   chain?: "solana";
 };
 
-const SNS_SUFFIX = ".utxopia.sol";
+import { PRIVATE_NAME_SUFFIX } from "@/lib/names/private-name-claim";
+
+const SNS_SUFFIX = PRIVATE_NAME_SUFFIX;
 const STEALTH_META_PREFIX = "utxo:";
 // 96 bytes = spendingPubKey(32) + viewingPubKey(32) + mpk(32). See
 // sdk/src/keys.ts::decodeStealthMetaAddress.
@@ -62,9 +64,12 @@ function looksLikeSolanaPubkey(input: string): boolean {
   return looksLikeBase58(input, 32, 44) && input.length >= 43;
 }
 
+// The `utxo:` prefix is optional: the SDK decoder accepts bare hex, and users
+// paste it stripped often enough that rejecting it reads as a broken address.
 function looksLikeStealthMeta(input: string): boolean {
-  if (!input.startsWith(STEALTH_META_PREFIX)) return false;
-  const rest = input.slice(STEALTH_META_PREFIX.length);
+  const rest = input.startsWith(STEALTH_META_PREFIX)
+    ? input.slice(STEALTH_META_PREFIX.length)
+    : input;
   return rest.length === STEALTH_META_HEX_LEN && /^[0-9a-fA-F]+$/.test(rest);
 }
 

@@ -286,8 +286,6 @@ function RecipientInput({ output, onUpdate, defaultAddress: _defaultAddress, sel
         onResolved={(meta, name) =>
           onUpdate({ resolvedMeta: meta, resolvedName: name })
         }
-        resolvedMeta={output.resolvedMeta}
-        resolvedName={output.resolvedName}
         error={output.stealthError}
         onError={(err) => onUpdate({ stealthError: err })}
         icon={<Shield className="w-3.5 h-3.5 text-purple" />}

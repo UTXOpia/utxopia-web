@@ -1,7 +1,7 @@
 "use client";
 
 import { Check, X, Loader2, Clipboard } from "lucide-react";
-import { useCallback } from "react";
+import { useCallback, useId } from "react";
 import { cn } from "@/lib/utils";
 import { detectRecipient, type DetectionResult } from "./recipient-detect";
 
@@ -21,8 +21,16 @@ export interface RecipientInputProps {
   placeholder?: string;
   /** Name resolve state from the parent (only meaningful for stealth_sns). */
   snsStatus?: SnsStatus;
+  /** Parent-owned error text; wins over the derived status line. */
+  error?: string | null;
   className?: string;
   readOnly?: boolean;
+  /** Tighter padding, no label — for inline rows. */
+  compact?: boolean;
+  /** Rendered inside the field, on the left. */
+  icon?: React.ReactNode;
+  /** Replaces the clipboard button on the right (e.g. a "use my own address" action). */
+  action?: React.ReactNode;
 }
 
 function statusFor(
@@ -80,10 +88,17 @@ export function RecipientInput({
   label = "Recipient",
   placeholder = "Paste an address, @handle, or name.utxopia.sol",
   snsStatus = "idle",
+  error = null,
   className,
   readOnly = false,
+  compact = false,
+  icon,
+  action,
 }: RecipientInputProps) {
-  const { tone, label: statusLabel } = statusFor(value, snsStatus, detection);
+  const inputId = useId();
+  const derived = statusFor(value, snsStatus, detection);
+  const tone = error ? "bad" : derived.tone;
+  const statusLabel = error ?? derived.label;
 
   const onPasteFromClipboard = useCallback(async () => {
     try {
@@ -96,19 +111,28 @@ export function RecipientInput({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <label htmlFor="send-recipient" className="block text-xs text-muted-foreground">
-        {label}
-      </label>
+      {!compact && (
+        <label htmlFor={inputId} className="block text-xs text-muted-foreground">
+          {label}
+        </label>
+      )}
       <div className="relative">
+        {icon && (
+          <div className={cn("absolute top-1/2 -translate-y-1/2", compact ? "left-3" : "left-4")}>
+            {icon}
+          </div>
+        )}
         <input
-          id="send-recipient"
+          id={inputId}
           type="text"
           value={value}
           onChange={(e) => onChange(e.target.value)}
           readOnly={readOnly}
           placeholder={placeholder}
           className={cn(
-            "w-full px-3 py-3 pr-10 rounded-lg",
+            "w-full rounded-lg pr-10",
+            compact ? "py-2.5" : "py-3",
+            icon ? (compact ? "pl-9" : "pl-10") : "px-3",
             "bg-muted/40 border text-sm font-mono",
             "focus:outline-none focus:ring-2 focus:ring-privacy/40",
             readOnly && "cursor-default bg-muted/60 pr-3 text-muted-foreground",
@@ -120,16 +144,17 @@ export function RecipientInput({
           autoComplete="off"
           spellCheck={false}
         />
-        {!readOnly && (
-          <button
-            type="button"
-            onClick={onPasteFromClipboard}
-            aria-label="Paste from clipboard"
-            className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted/60 text-muted-foreground"
-          >
-            <Clipboard className="w-4 h-4" />
-          </button>
-        )}
+        {!readOnly &&
+          (action ?? (
+            <button
+              type="button"
+              onClick={onPasteFromClipboard}
+              aria-label="Paste from clipboard"
+              className="absolute right-2 top-1/2 -translate-y-1/2 p-1.5 rounded hover:bg-muted/60 text-muted-foreground"
+            >
+              <Clipboard className="w-4 h-4" />
+            </button>
+          ))}
       </div>
       {statusLabel && (
         <div
@@ -143,7 +168,7 @@ export function RecipientInput({
           {tone === "ok" && <Check className="w-3 h-3" />}
           {tone === "warn" && <Loader2 className="w-3 h-3 animate-spin" />}
           {tone === "bad" && <X className="w-3 h-3" />}
-          <span>{statusLabel}</span>
+          <span className="break-all">{statusLabel}</span>
         </div>
       )}
     </div>

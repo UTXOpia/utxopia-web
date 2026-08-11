@@ -6,7 +6,8 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import { PublicKey } from "@solana/web3.js";
 import { Bitcoin, Check, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { detectRecipient, type RecipientType } from "./recipient-detect";
+import { type RecipientType } from "./recipient-detect";
+import { useRecipientResolution } from "@/hooks/use-recipient-resolution";
 import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
 import { TokenSourcePicker } from "./token-source-picker";
@@ -69,9 +70,6 @@ type State = {
 
 type CashOutDestination = "bitcoin" | "solana";
 type SendFormMode = "send" | "cashout";
-
-/** Upper bound on name resolution before we stop spinning and show not_found. */
-const NAME_RESOLVE_TIMEOUT_MS = 12_000;
 
 const initial: State = {
   recipient: "",
@@ -346,20 +344,20 @@ export function SendForm({
       }
     });
   }, [mode, hasVaultKeys, refreshPrivateBalance, balanceLoadKey]);
-  const detection = useMemo(() => {
-    const result = detectRecipient(state.recipient, { chain: activeChainId });
-    if (mode !== "cashout" || result.type === "empty") return result;
-
-    if (result.type === cashOutRecipientType) return result;
-
-    return {
-      type: "invalid" as const,
-      confidence: "high" as const,
-      reason: state.cashOutDestination === "bitcoin"
-        ? "Enter a valid Bitcoin address"
-        : "Enter a valid Solana wallet address",
-    };
-  }, [state.recipient, state.cashOutDestination, activeChainId, cashOutRecipientType, mode]);
+  // Cash-out constrains the recipient to whichever chain the user picked;
+  // Send accepts anything the detection ladder recognizes.
+  const recipientAllow = useMemo<readonly RecipientType[] | undefined>(
+    () => (mode === "cashout" ? [cashOutRecipientType] : undefined),
+    [mode, cashOutRecipientType],
+  );
+  const recipientResolution = useRecipientResolution(state.recipient, {
+    chain: activeChainId,
+    allow: recipientAllow,
+    disallowedMessage: state.cashOutDestination === "bitcoin"
+      ? "Enter a valid Bitcoin address"
+      : "Enter a valid Solana wallet address",
+  });
+  const detection = recipientResolution.detection;
 
   // For BTC recipient, force zkBTC source.
   const effectiveToken =
@@ -367,63 +365,7 @@ export function SendForm({
       ? "zkBTC"
       : state.sourceToken;
 
-  // Preview-resolve name recipients so we can block Send if the name does not
-  // exist or has not published UTXOpia receive metadata.
-  type NameState =
-    | { kind: "idle" }
-    | { kind: "resolving" }
-    | {
-        kind: "found";
-        resolved: {
-          viewingPubKey: Uint8Array;
-          mpk: Uint8Array;
-          auditorPubkey?: Uint8Array;
-          complianceFlags?: number;
-        };
-      }
-    | { kind: "not_found" };
-  const [snsState, setSnsState] = useState<NameState>({ kind: "idle" });
-  useEffect(() => {
-    if (detection.type !== "stealth_sns") {
-      setSnsState((prev) => (prev.kind === "idle" ? prev : { kind: "idle" }));
-      return;
-    }
-    const input = state.recipient.trim();
-    if (!input) {
-      setSnsState((prev) => (prev.kind === "idle" ? prev : { kind: "idle" }));
-      return;
-    }
-    setSnsState({ kind: "resolving" });
-    let cancelled = false;
-    // Never leave the spinner running forever: if the name server is slow or
-    // unreachable, fall back to not_found so Send stays blocked but the user
-    // gets an actionable state instead of an indefinite "Resolving…".
-    const timeout = setTimeout(() => {
-      if (!cancelled) setSnsState({ kind: "not_found" });
-    }, NAME_RESOLVE_TIMEOUT_MS);
-    const settle = (next: NameState) => {
-      if (cancelled) return;
-      clearTimeout(timeout);
-      setSnsState(next);
-    };
-    let sub: string;
-    try {
-      sub = normalizePrivateNameHandle(input, "solana");
-    } catch {
-      clearTimeout(timeout);
-      setSnsState({ kind: "not_found" });
-      return;
-    }
-    void lookupSnsName(sub)
-      .then((r) => settle(r ? { kind: "found", resolved: r } : { kind: "not_found" }))
-      .catch(() => settle({ kind: "not_found" }));
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
-    };
-  }, [detection.type, state.recipient, lookupSnsName]);
-
-  const resolvedSns = detection.type === "stealth_sns" && snsState.kind === "found" ? snsState.resolved : null;
+  const resolvedSns = recipientResolution.sns;
   const showAuditorBadge =
     resolvedSns != null &&
     typeof resolvedSns.complianceFlags === "number" &&
@@ -461,7 +403,7 @@ export function SendForm({
     // Name records must actually resolve on-chain before we let the rest of
     // the form unlock — otherwise the user wastes time picking notes for
     // a recipient that doesn't exist.
-    (detection.type !== "stealth_sns" || snsState.kind === "found");
+    (detection.type !== "stealth_sns" || recipientResolution.status === "found");
 
   // Narrowed alias used by JSX + buildSendIntent; only meaningful when
   // recipientValid is true (the JSX gates on that before reading it).
@@ -886,7 +828,7 @@ export function SendForm({
             ? "Paste a Bitcoin address"
             : "Paste a Solana wallet address"
           : undefined}
-        snsStatus={snsState.kind}
+        snsStatus={recipientResolution.status}
         readOnly={locksRegtestBtcDestination}
       />
 
