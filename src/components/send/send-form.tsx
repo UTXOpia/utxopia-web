@@ -10,6 +10,7 @@ import { type RecipientType } from "./recipient-detect";
 import { useRecipientResolution } from "@/hooks/use-recipient-resolution";
 import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
+import { KnownDestinationCard } from "@/components/ui/known-destination-card";
 import { TokenSourcePicker } from "./token-source-picker";
 import { AmountField } from "./amount-field";
 import { FeeSummary } from "./fee-summary";
@@ -278,6 +279,26 @@ export function SendForm({
     mode === "cashout" &&
     state.cashOutDestination === "bitcoin" &&
     chainEnv.config.bitcoin.network === "regtest";
+
+  // Cashing out to Solana with a wallet already connected: offer that wallet
+  // rather than an empty box the user pastes their own address into. Note this
+  // publicly ties the withdrawal to the connected wallet, so Edit has to stay
+  // one tap away.
+  const connectedWallet = publicKey?.toBase58() ?? null;
+  const [editingDestination, setEditingDestination] = useState(false);
+  useEffect(() => {
+    if (mode !== "cashout" || state.cashOutDestination !== "solana" || !connectedWallet) return;
+    // Deliberately not keyed on state.recipient: this fills on connect and on
+    // each switch back to Solana, and never fights what the user then types.
+    dispatch({ type: "set_recipient", value: connectedWallet });
+    setEditingDestination(false);
+  }, [mode, state.cashOutDestination, connectedWallet]);
+  const showConnectedWalletCard =
+    mode === "cashout" &&
+    state.cashOutDestination === "solana" &&
+    !!connectedWallet &&
+    state.recipient === connectedWallet &&
+    !editingDestination;
 
   useEffect(() => {
     if (!locksRegtestBtcDestination) return;
@@ -814,6 +835,18 @@ export function SendForm({
         />
       )}
 
+      {showConnectedWalletCard ? (
+        <div className="space-y-1.5">
+          <span className="block text-xs text-muted-foreground">Solana wallet address</span>
+          <KnownDestinationCard
+            icon={<Wallet className="h-4 w-4 text-privacy" />}
+            title="My connected wallet"
+            value={connectedWallet!}
+            onEdit={() => setEditingDestination(true)}
+            editTestId="edit-destination"
+          />
+        </div>
+      ) : (
       <RecipientInput
         value={state.recipient}
         onChange={(v) => dispatch({ type: "set_recipient", value: v })}
@@ -831,6 +864,7 @@ export function SendForm({
         snsStatus={recipientResolution.status}
         readOnly={locksRegtestBtcDestination}
       />
+      )}
 
       {locksRegtestBtcDestination && (
         <p className={cn("text-xs", regtestAddressError ? "text-red-500" : "text-muted-foreground")}>

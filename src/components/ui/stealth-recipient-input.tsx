@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useRef } from "react";
-import { LockKeyhole, UserRound, Pencil } from "lucide-react";
+import { LockKeyhole, UserRound } from "lucide-react";
 import { cn } from "@/lib/utils";
 import {
   encodeStealthMetaAddress,
@@ -9,6 +9,7 @@ import {
   type StealthMetaAddress,
 } from "@utxopia/sdk";
 import { RecipientInput } from "@/components/send/recipient-input";
+import { KnownDestinationCard } from "@/components/ui/known-destination-card";
 import type { RecipientType } from "@/components/send/recipient-detect";
 import { useRecipientResolution } from "@/hooks/use-recipient-resolution";
 
@@ -84,31 +85,14 @@ export function StealthRecipientInput({
 
   if (defaultToSelf && selfEncoded && isValid && !showManualInput) {
     return (
-      <div className={className}>
-        <div className="rounded-[10px] border border-privacy/25 bg-privacy/8 px-3 py-3">
-          <div className="flex items-center justify-between gap-3">
-            <div className="flex min-w-0 items-center gap-2">
-              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-privacy/10">
-                <LockKeyhole className="h-4 w-4 text-privacy" />
-              </div>
-              <div className="min-w-0">
-                <p className="text-body2-semibold text-foreground">My private vault</p>
-                <p className="truncate font-mono text-[11px] text-gray/50">
-                  {selfEncoded.slice(0, 12)}...{selfEncoded.slice(-8)}
-                </p>
-              </div>
-            </div>
-            <button
-              type="button"
-              onClick={() => setShowManualInput(true)}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-[8px] border border-gray/15 bg-muted/40 px-2.5 py-1.5 text-[11px] text-gray-light transition-colors hover:border-privacy/30 hover:text-foreground"
-            >
-              <Pencil className="h-3 w-3" />
-              Edit
-            </button>
-          </div>
-        </div>
-      </div>
+      <KnownDestinationCard
+        className={className}
+        icon={<LockKeyhole className="h-4 w-4 text-privacy" />}
+        title="My private vault"
+        value={selfEncoded}
+        onEdit={() => setShowManualInput(true)}
+        editTestId="edit-destination"
+      />
     );
   }
 

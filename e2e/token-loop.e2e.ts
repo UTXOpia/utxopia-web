@@ -740,6 +740,10 @@ async function stepUnshield(chain: ChainConfig, keys: DevKeys, amount: string, a
 
   // The destination picker defaults to Bitcoin — switch to Solana first.
   selectCashOutDestination("solana");
+  // The dev wallet is connected (walletName is in localStorage), so the form
+  // offers it as the destination and there is no field until we ask to edit.
+  ab("find", "testid", "edit-destination", "click");
+  ab("wait", "300");
   ab("find", "label", "Solana wallet address", "fill", addr);
   ab("wait", "1000");
   selectSourceToken(SHIELDED_TOKEN);

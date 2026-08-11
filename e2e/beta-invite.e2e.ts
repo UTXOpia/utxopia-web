@@ -502,6 +502,9 @@ function stepExitDrill(devKeys: DevKeys, wallet: PublicKey): void {
   clickTestId("cash-out-destination-solana");
   clickTestId("token-source-trigger");
   clickTestId("token-source-zkSOL");
+  // Connected-wallet destination is pre-filled and collapsed; this drill pays
+  // out to that same wallet, so open it only to assert what it holds.
+  clickTestId("edit-destination");
   setInput('input[placeholder="Paste a Solana wallet address"]', wallet.toBase58());
   setInput('input[placeholder="0"]', WITHDRAW_AMOUNT);
 

@@ -12,6 +12,7 @@ beforeEach(() => {
 
 afterEach(() => {
   global.fetch = originalFetch;
+  mockPublicKey = null;
   cleanup();
 });
 
@@ -73,8 +74,10 @@ mock.module("@/hooks/use-sns-name", () => ({
 // Note: not mocking @/hooks/use-relayer-config — bun's mock.module is global,
 // and use-relayer-config.test.ts imports the real hook. Real useRelayerConfig
 // is render-safe (initial state returns defaults; fetch fires in useEffect).
+// Mutable so a test can render the connected-wallet path; reset in afterEach.
+let mockPublicKey: { toBase58: () => string } | null = null;
 mock.module("@solana/wallet-adapter-react", () => ({
-  useWallet: () => ({ publicKey: null }),
+  useWallet: () => ({ publicKey: mockPublicKey }),
 }));
 mock.module("next/navigation", () => ({
   useRouter: () => ({ push: () => {} }),
@@ -134,6 +137,24 @@ describe("SendForm", () => {
       target: { value: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM" },
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+  });
+
+  it("offers the connected wallet as the Solana cash-out destination, and lets it be changed", () => {
+    const wallet = "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM";
+    mockPublicKey = { toBase58: () => wallet };
+    render(<SendForm mode="cashout" />);
+
+    fireEvent.click(screen.getByRole("button", { name: /solana cash out/i }));
+    expect(screen.getByText("My connected wallet")).toBeDefined();
+    // Collapsed: no empty box to paste into until the user asks for one.
+    expect(screen.queryByLabelText(/solana wallet address/i)).toBeNull();
+
+    fireEvent.click(screen.getByTestId("edit-destination"));
+    const input = screen.getByLabelText(/solana wallet address/i) as HTMLInputElement;
+    expect(input.value).toBe(wallet);
+
+    fireEvent.change(input, { target: { value: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1" } });
+    expect(screen.queryByText("My connected wallet")).toBeNull();
   });
 
   it("uses the selected cash-out asset price for the USD preview", () => {
