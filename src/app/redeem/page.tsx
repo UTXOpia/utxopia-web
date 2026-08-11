@@ -223,7 +223,7 @@ function Redeem() {
             href={hrefWithChain("/apply", networkId)}
             className="underline underline-offset-4 hover:text-foreground"
           >
-            Apply for a seat
+            Apply for one
           </Link>{" "}
           — applying sends a code to your email straight away. It only ever arrives that way,
           never from a link in a post.
