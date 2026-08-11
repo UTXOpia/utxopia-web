@@ -33,6 +33,7 @@ import { useUTXOpia } from "@/hooks/use-utxopia";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StealthRecipientInput } from "@/components/ui/stealth-recipient-input";
+import { AmountField } from "@/components/send/amount-field";
 import { TextShimmer } from "@/components/ui/text-shimmer";
 import type { StealthMetaAddress } from "@utxopia/sdk";
 import { SHIELD_TOKENS } from "@/lib/supported-tokens";
@@ -589,37 +590,21 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
           )}
         </div>
 
-        {/* Amount + Token selector */}
-        <div className="space-y-2">
-          <div className="flex items-center justify-between">
-            <span className="text-caption text-gray">Amount</span>
-            <span className="text-caption text-gray/50">
-              {btcWallet.connected && btcWallet.balance !== null
-                ? `Balance: ${(btcWallet.balance / 1e8).toFixed(8)} BTC`
-                : btcWallet.connected ? <TextShimmer>Balance: loading…</TextShimmer> : ""}
-            </span>
-          </div>
-          <div className="flex items-center gap-2 p-3 bg-muted border border-gray/15 rounded-[12px] focus-within:border-btc/30 transition-colors">
-            <input
-              type="number"
-              value={btcAmount}
-              onChange={(e) => setBtcAmount(e.target.value)}
-              placeholder="0.00000000"
-              step="0.00000001"
-              className="flex-1 bg-transparent text-lg font-mono text-foreground placeholder:text-gray/30 outline-none min-w-0"
-            />
-            <button onClick={onMax}
-              className="px-2 py-1 rounded-[6px] bg-btc/10 border border-btc/20 text-[10px] font-semibold text-btc hover:bg-btc/20 transition-colors cursor-pointer uppercase tracking-wider">
-              Max
-            </button>
-            {tokenSelector}
-          </div>
-          {btcAmount && (
-            <p className="text-[10px] text-gray/50 pl-1">
-              {btcAmountSats.toLocaleString()} sats
-            </p>
-          )}
-        </div>
+        <AmountField
+          value={btcAmount}
+          onChange={setBtcAmount}
+          onMax={onMax}
+          decimals={selectedToken.decimals}
+          placeholder="0.00000000"
+          usdPerUnit={null}
+          availableLabel={
+            btcWallet.connected && btcWallet.balance !== null
+              ? `${(btcWallet.balance / 1e8).toFixed(8)} BTC`
+              : btcWallet.connected ? <TextShimmer>loading…</TextShimmer> : undefined
+          }
+          hint={btcAmount ? `${btcAmountSats.toLocaleString()} sats` : undefined}
+          tokenSelector={tokenSelector}
+        />
 
         {/* Without an identity for this pool the destination below is blank and
             the submit button is dead, with nothing on the page explaining why. */}
@@ -757,36 +742,26 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
       {/* Amount + Token selector */}
       <div className="space-y-2">
-        <div className="flex items-center justify-between">
-          <span className="text-caption text-gray">Amount</span>
-          <span className="text-caption text-gray/50">
-            {selectedToken.isSOL && solBalance !== null
-              ? `Public balance: ${(solBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`
+        <AmountField
+          value={amount}
+          onChange={setAmount}
+          onMax={onMax}
+          decimals={selectedToken.decimals}
+          placeholder="0.00"
+          testId="shield-amount"
+          usdPerUnit={null}
+          balanceLabel="Public balance"
+          availableLabel={
+            selectedToken.isSOL && solBalance !== null
+              ? `${(solBalance / LAMPORTS_PER_SOL).toFixed(4)} SOL`
               : splBalance !== null
-                ? `Public balance: ${(splBalance / (10 ** selectedToken.decimals)).toLocaleString(undefined, { maximumFractionDigits: selectedToken.decimals })} ${selectedToken.symbol}`
+                ? `${(splBalance / (10 ** selectedToken.decimals)).toLocaleString(undefined, { maximumFractionDigits: selectedToken.decimals })} ${selectedToken.symbol}`
                 : publicKey
-                  ? <TextShimmer>Public balance: loading…</TextShimmer>
-                  : "Public balance: Connect wallet"
-            }
-          </span>
-        </div>
-        <div className="flex items-center gap-2 p-3 bg-muted border border-gray/15 rounded-[12px] focus-within:border-privacy/30 transition-colors">
-          <input
-            data-testid="shield-amount"
-            type="number"
-            value={amount}
-            onChange={(e) => setAmount(e.target.value)}
-            placeholder="0.00"
-            className="flex-1 bg-transparent text-lg font-mono text-foreground placeholder:text-gray/30 outline-none min-w-0"
-          />
-          <button
-            onClick={onMax}
-            className="px-2 py-1 rounded-[6px] bg-privacy/10 border border-privacy/20 text-[10px] font-semibold text-privacy hover:bg-privacy/20 transition-colors cursor-pointer uppercase tracking-wider"
-          >
-            Max
-          </button>
-          {tokenSelector}
-        </div>
+                  ? <TextShimmer>loading…</TextShimmer>
+                  : "Connect wallet"
+          }
+          tokenSelector={tokenSelector}
+        />
         {showSplTestFunds && splFaucetToken && publicKey && (
           <SplTestFundsHelper
             token={splFaucetToken}

@@ -860,12 +860,6 @@ export function SendForm({
 
       {(recipientValid || mode === "cashout") && (
         <>
-          <TokenSourcePicker
-            recipientType={mode === "cashout" ? cashOutRecipientType : recipientType}
-            selected={effectiveToken}
-            onSelect={(s) => dispatch({ type: "set_token", value: s })}
-            displayPrivateAssets={mode === "cashout"}
-          />
           <AmountField
             value={state.amount}
             onChange={(v) => dispatch({ type: "set_amount", value: v })}
@@ -875,6 +869,16 @@ export function SendForm({
             feeBufferBaseUnits={BigInt(effectiveRelayerFee)}
             availableLabel={balanceLabel}
             usdPerUnit={usdPerUnit}
+            hint="From your private balance"
+            tokenSelector={
+              <TokenSourcePicker
+                variant="inline"
+                recipientType={mode === "cashout" ? cashOutRecipientType : recipientType}
+                selected={effectiveToken}
+                onSelect={(s) => dispatch({ type: "set_token", value: s })}
+                displayPrivateAssets={mode === "cashout"}
+              />
+            }
           />
           {btcAmountTooSmall && (
             <div className="text-xs text-red-500">

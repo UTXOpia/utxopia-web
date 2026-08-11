@@ -111,7 +111,7 @@ describe("SendForm", () => {
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
     expect(screen.getByText("Sign in to view")).toBeDefined();
     expect(screen.getAllByText("BTC").length).toBeGreaterThan(0);
-    expect(screen.getByText("Private balance")).toBeDefined();
+    expect(screen.getByText(/from your private balance/i)).toBeDefined();
     expect(screen.queryByText("zkBTC")).toBeNull();
 
     const bitcoinAddress = "bc1q9d4ywgfnd8h70q4thlsclpw0ymmqfumzgxlhpe";
@@ -140,7 +140,9 @@ describe("SendForm", () => {
     render(<SendForm mode="cashout" />);
 
     fireEvent.click(screen.getByRole("button", { name: /solana cash out/i }));
-    fireEvent.click(screen.getByRole("button", { name: /btc private balance/i }));
+    // The asset picker now lives inside the amount field: the trigger is a
+    // bare symbol pill, and only the menu rows carry the "Private balance" hint.
+    fireEvent.click(screen.getByRole("button", { name: "BTC" }));
     fireEvent.click(screen.getByRole("button", { name: /sol private balance/i }));
     fireEvent.change(screen.getByLabelText(/^amount$/i), {
       target: { value: "0.05" },

@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo } from "react";
+import { useId, useMemo } from "react";
 import { cn } from "@/lib/utils";
 
 export interface AmountFieldProps {
@@ -9,16 +9,31 @@ export interface AmountFieldProps {
   onChange: (next: string) => void;
   /** Number of decimals in the underlying base unit (sats=8, USDC=6, etc). */
   decimals: number;
-  /** Display unit shown next to the amount ("BTC", "USDC", etc.). */
-  unit: string;
-  /** Total available in base units (sats / minor units). */
-  availableBaseUnits: bigint;
+  /** Display unit shown next to the amount when there is no `tokenSelector`. */
+  unit?: string;
+  /** Total available in base units (sats / minor units). Unused with `onMax`. */
+  availableBaseUnits?: bigint;
   /** Subtracted from availableBaseUnits when "Max" is pressed. */
   feeBufferBaseUnits?: bigint;
-  /** Optional formatted balance shown beside the Amount label. */
-  availableLabel?: string;
+  /** Fills the field with the caller's own maximum, for flows that reserve
+   *  gas or dust themselves rather than from a plain base-unit balance. */
+  onMax?: () => void;
+  /** Balance shown beside the Amount label; a node so callers can shimmer it. */
+  availableLabel?: React.ReactNode;
+  /** Which balance `availableLabel` refers to — deposits spend a public one. */
+  balanceLabel?: string;
   /** USD value of one whole unit (used for the "≈ $X" preview). */
   usdPerUnit: number | null;
+  placeholder?: string;
+  testId?: string;
+  /**
+   * Asset picker rendered inside the field, replacing the static unit. Amount
+   * and asset are one decision; splitting them across two rows states the same
+   * asset twice and only makes one of them interactive.
+   */
+  tokenSelector?: React.ReactNode;
+  /** Trailing caption, e.g. which balance the amount is spent from. */
+  hint?: string;
   className?: string;
 }
 
@@ -42,12 +57,19 @@ export function AmountField({
   onChange,
   decimals,
   unit,
-  availableBaseUnits,
+  availableBaseUnits = 0n,
   feeBufferBaseUnits = 0n,
+  onMax,
   availableLabel,
+  balanceLabel = "Balance",
   usdPerUnit,
+  tokenSelector,
+  hint,
+  placeholder = "0",
+  testId,
   className,
 }: AmountFieldProps) {
+  const inputId = useId();
   const usdPreview = useMemo(() => {
     if (usdPerUnit == null) return null;
     const v = decimalToFloat(value);
@@ -57,6 +79,7 @@ export function AmountField({
   }, [value, usdPerUnit]);
 
   const onMaxClick = () => {
+    if (onMax) return onMax();
     const usable =
       availableBaseUnits > feeBufferBaseUnits
         ? availableBaseUnits - feeBufferBaseUnits
@@ -71,43 +94,54 @@ export function AmountField({
 
   return (
     <div className={cn("space-y-1.5", className)}>
-      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
-        <label htmlFor="send-amount">Amount</label>
-        {availableLabel && (
-          <span className="min-w-0 truncate text-right">
-            Balance: <span className="font-mono text-foreground/80">{availableLabel}</span>
-          </span>
-        )}
-      </div>
-      <div className="relative">
-        <input
-          id="send-amount"
-          type="text"
-          inputMode="decimal"
-          value={value}
-          onChange={(e) => handleChange(e.target.value)}
-          placeholder="0"
-          className={cn(
-            "w-full px-3 py-3 pr-32 rounded-lg",
-            "bg-muted/40 border border-gray/15 text-sm font-mono",
-            "focus:outline-none focus:ring-2 focus:ring-privacy/40",
+      {/* Max belongs to the balance, not the amount — and keeping it out of the
+          field leaves room for the asset picker on a phone-width row. */}
+      <div className="flex items-center justify-between gap-2 text-xs text-muted-foreground">
+        <label htmlFor={inputId}>Amount</label>
+        <div className="flex min-w-0 items-center gap-2">
+          {availableLabel && (
+            <span className="min-w-0 truncate text-right">
+              {balanceLabel}: <span className="font-mono text-foreground/80">{availableLabel}</span>
+            </span>
           )}
-          autoComplete="off"
-          spellCheck={false}
-        />
-        <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-          <span className="text-xs text-muted-foreground">{unit}</span>
           <button
             type="button"
             onClick={onMaxClick}
-            className="text-xs px-2 py-1 rounded bg-privacy/10 text-privacy hover:bg-privacy/15"
+            className="shrink-0 text-xs px-2 py-1 rounded bg-privacy/10 text-privacy hover:bg-privacy/15"
           >
             Max
           </button>
         </div>
       </div>
-      {usdPreview && (
-        <div className="text-xs text-muted-foreground">{usdPreview}</div>
+      <div
+        className={cn(
+          "flex items-center gap-2 rounded-lg pr-2",
+          "bg-muted/40 border border-gray/15",
+          "focus-within:ring-2 focus-within:ring-privacy/40",
+        )}
+      >
+        <input
+          id={inputId}
+          data-testid={testId}
+          type="text"
+          inputMode="decimal"
+          value={value}
+          onChange={(e) => handleChange(e.target.value)}
+          placeholder={placeholder}
+          className="min-w-0 flex-1 bg-transparent px-3 py-3 text-sm font-mono outline-none"
+          autoComplete="off"
+          spellCheck={false}
+        />
+        {tokenSelector ?? (
+          <span className="shrink-0 pr-1 text-xs text-muted-foreground">{unit}</span>
+        )}
+      </div>
+      {(usdPreview || hint) && (
+        <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
+          {usdPreview && <span>{usdPreview}</span>}
+          {usdPreview && hint && <span aria-hidden>·</span>}
+          {hint && <span>{hint}</span>}
+        </div>
       )}
     </div>
   );
