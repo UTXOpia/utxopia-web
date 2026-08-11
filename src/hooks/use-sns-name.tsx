@@ -427,6 +427,7 @@ export function useSnsName(): UseSnsNameReturn {
     name: string,
     subdomainKey: PublicKey | null,
     broadcast = true,
+    stale: SnsStaleName[] = [],
   ) => {
     if (!stealthAddress) return;
 
@@ -434,6 +435,7 @@ export function useSnsName(): UseSnsNameReturn {
     setRegisteredSnsName(name);
     setHasRegisteredSnsName(true);
     setRegisteredSubdomainKey(subdomainKey);
+    setStaleNames(stale);
     setNeedsUpdate(false);
     setComplianceFlags(0);
     setAuditorPubkeyState(null);
@@ -454,6 +456,7 @@ export function useSnsName(): UseSnsNameReturn {
           complianceFlags: 0,
           auditorPubkey: null,
         },
+        staleNames: stale,
       });
     }
 
@@ -464,6 +467,7 @@ export function useSnsName(): UseSnsNameReturn {
           viewingKey,
           name,
           subdomainKey: subdomainKey?.toBase58() ?? null,
+          staleNames: stale,
         },
       }));
     }
@@ -482,6 +486,7 @@ export function useSnsName(): UseSnsNameReturn {
         detail.name,
         detail.subdomainKey ? new PublicKey(detail.subdomainKey) : null,
         false,
+        detail.staleNames ?? [],
       );
     };
     window.addEventListener(SNS_NAME_REGISTERED_EVENT, handleRegisteredName);
@@ -830,10 +835,18 @@ export function useSnsName(): UseSnsNameReturn {
     }
 
     const normalizedNew = newName.trim().toLowerCase();
+    const orphans: SnsStaleName[] = [];
     if (oldName && oldName.trim().toLowerCase() !== normalizedNew) {
       const released = await deleteSnsSubdomain(oldName);
       if (!released) {
         setError("New name registered, but couldn't release the old one — retry from settings");
+        if (snsConfig) {
+          orphans.push({
+            name: oldName,
+            subdomainKey: deriveSubdomainKey(oldName, deriveParentDomainKey(snsConfig), snsConfig).toBase58(),
+            owner: activeAuthority?.publicKey.toBase58() ?? null,
+          });
+        }
       }
     }
 
@@ -842,15 +855,33 @@ export function useSnsName(): UseSnsNameReturn {
     // The registration we just confirmed is authoritative. Re-assert it: the
     // released name shares this viewing key, so a resolve that raced the
     // release can still answer with the old name and would otherwise be cached
-    // as the current one for the full TTL.
+    // as the current one for the full TTL. `orphans` keeps a failed release
+    // visible instead of letting the optimistic cache hide it.
     if (snsConfig && !alphaDemoLedgerEnabled(networkId)) {
       rememberRegisteredSnsName(
         normalizedNew,
         deriveSubdomainKey(normalizedNew, deriveParentDomainKey(snsConfig), snsConfig),
+        true,
+        orphans,
       );
     }
     return true;
-  }, [deleteSnsSubdomain, lookupMySnsName, networkId, registerSnsSubdomain, registeredSnsName, rememberRegisteredSnsName, snsConfig]);
+  }, [activeAuthority, deleteSnsSubdomain, lookupMySnsName, networkId, registerSnsSubdomain, registeredSnsName, rememberRegisteredSnsName, snsConfig]);
+
+  // Release a leftover name surfaced in `staleNames`. The relayer sponsors the
+  // fee, but the SPL delete instruction must be signed by the name's on-chain
+  // owner — which can be a different authority than the one connected now.
+  const releaseStaleName = useCallback(async (name: string): Promise<boolean> => {
+    const stale = staleNames.find((entry) => entry.name === name);
+    const active = activeAuthority?.publicKey.toBase58() ?? null;
+    if (stale?.owner && active && stale.owner !== active) {
+      setError(`"${name}" is owned by ${stale.owner.slice(0, 8)}… — connect that wallet to release it`);
+      return false;
+    }
+    const released = await deleteSnsSubdomain(name);
+    if (released) await lookupMySnsName(true);
+    return released;
+  }, [activeAuthority, deleteSnsSubdomain, lookupMySnsName, staleNames]);
 
   // Update existing SNS record with new stealth data format
   const updateSnsStealthData = useCallback(async (): Promise<boolean> => {
@@ -1120,6 +1151,7 @@ export function useSnsName(): UseSnsNameReturn {
     } else {
       setRegisteredSnsName(null);
       setHasRegisteredSnsName(false);
+      setStaleNames([]);
       setComplianceFlags(0);
       setAuditorPubkeyState(null);
     }
@@ -1143,6 +1175,7 @@ export function useSnsName(): UseSnsNameReturn {
     isLoading,
     isRegistering,
     error,
+    staleNames,
     complianceFlags,
     auditorPubkey,
     lookupMySnsName,
@@ -1150,6 +1183,7 @@ export function useSnsName(): UseSnsNameReturn {
     isNameRegistered,
     registerSnsSubdomain,
     deleteSnsSubdomain,
+    releaseStaleName,
     changeSnsName,
     updateSnsStealthData,
     setComplianceFlag,

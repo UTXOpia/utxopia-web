@@ -5,7 +5,7 @@ import Link from "next/link";
 import { Loader2, ChevronRight } from "lucide-react";
 import { PublicKey } from "@solana/web3.js";
 import { useUiMode } from "@/hooks/use-ui-mode";
-import { useSnsName } from "@/hooks/use-sns-name";
+import { useSnsName, type SnsStaleName } from "@/hooks/use-sns-name";
 import { cn } from "@/lib/utils";
 import { NetworkSelector } from "@/components/settings/network-selector";
 import { RelaySelector } from "@/components/settings/relay-selector";
@@ -346,6 +346,13 @@ function SnsNameRow() {
         </div>
       )}
 
+      <StaleNamesNotice
+        staleNames={sns.staleNames}
+        parentDomain={parentDomain}
+        busy={sns.isRegistering}
+        onRelease={sns.releaseStaleName}
+      />
+
       {sns.error && (
         <p className="text-xs text-error mt-2 font-mono break-all">{sns.error}</p>
       )}
@@ -353,6 +360,72 @@ function SnsNameRow() {
       {sns.hasRegisteredSnsName && (
         <ChangeNameDialog open={changeOpen} onOpenChange={setChangeOpen} />
       )}
+    </div>
+  );
+}
+
+/**
+ * Names left behind when the release half of a change never landed. They still
+ * resolve to this user, and which one senders get is arbitrary — so surface them
+ * with a release action instead of letting one silently shadow the current name.
+ */
+export function StaleNamesNotice({
+  staleNames,
+  parentDomain,
+  busy,
+  onRelease,
+}: {
+  staleNames: SnsStaleName[];
+  parentDomain: string;
+  busy: boolean;
+  onRelease: (name: string) => Promise<boolean>;
+}) {
+  const [releasing, setReleasing] = useState<string | null>(null);
+
+  if (staleNames.length === 0) return null;
+
+  async function handleRelease(name: string) {
+    setReleasing(name);
+    try {
+      await onRelease(name);
+    } finally {
+      setReleasing(null);
+    }
+  }
+
+  return (
+    <div className="mt-3 rounded-md border border-warning/25 bg-warning/10 px-3 py-2">
+      <p className="text-[11px] leading-4 text-gray-light">
+        {staleNames.length === 1 ? "An older name still resolves" : "Older names still resolve"}{" "}
+        to your account from a name change that didn&apos;t finish. Senders may be
+        shown either one — release what you no longer want.
+      </p>
+      <ul className="mt-2 space-y-1.5">
+        {staleNames.map((stale) => (
+          <li key={stale.subdomainKey} className="flex items-center justify-between gap-2">
+            <span className="text-[12px] font-mono text-gray-light truncate">
+              {stale.name ? `${stale.name}.${parentDomain}.sol` : `${stale.subdomainKey.slice(0, 8)}…`}
+            </span>
+            <button
+              type="button"
+              onClick={() => stale.name && handleRelease(stale.name)}
+              disabled={!stale.name || busy || releasing !== null}
+              className={cn(
+                "shrink-0 px-3 py-1.5 text-[11px] font-medium rounded-md transition-all",
+                !stale.name || busy || releasing !== null
+                  ? "bg-muted/40 text-gray cursor-not-allowed"
+                  : "bg-muted/40 text-gray-light hover:text-foreground hover:bg-muted/60",
+              )}
+            >
+              {stale.name !== null && releasing === stale.name ? "Releasing..." : "Release"}
+            </button>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-[10px] leading-4 text-gray">
+        Releasing needs a signature from the wallet that registered the name, and
+        frees it for anyone else to claim.
+      </p>
     </div>
   );
 }
