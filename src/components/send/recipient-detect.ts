@@ -73,6 +73,23 @@ function looksLikeStealthMeta(input: string): boolean {
   return rest.length === STEALTH_META_HEX_LEN && /^[0-9a-fA-F]+$/.test(rest);
 }
 
+/**
+ * Detection narrowed to what a surface actually accepts. A recipient the
+ * ladder recognizes but this flow cannot use is invalid *here*, and says so in
+ * the flow's own words.
+ */
+export function detectRecipientAllowing(
+  rawInput: string,
+  allow: readonly RecipientType[] | undefined,
+  disallowedMessage: string,
+  context: RecipientDetectionContext = {},
+): DetectionResult {
+  const result = detectRecipient(rawInput, context);
+  if (!allow || result.type === "empty" || result.type === "invalid") return result;
+  if (allow.includes(result.type as RecipientType)) return result;
+  return { type: "invalid", confidence: "high", reason: disallowedMessage };
+}
+
 export function detectRecipient(
   rawInput: string,
   context: RecipientDetectionContext = {},

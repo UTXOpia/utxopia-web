@@ -10,7 +10,7 @@ import { type RecipientType } from "./recipient-detect";
 import { useRecipientResolution } from "@/hooks/use-recipient-resolution";
 import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
-import { KnownDestinationCard } from "@/components/ui/known-destination-card";
+import { SolanaAddressField } from "@/components/ui/solana-address-field";
 import { TokenSourcePicker } from "./token-source-picker";
 import { AmountField } from "./amount-field";
 import { FeeSummary } from "./fee-summary";
@@ -280,25 +280,10 @@ export function SendForm({
     state.cashOutDestination === "bitcoin" &&
     chainEnv.config.bitcoin.network === "regtest";
 
-  // Cashing out to Solana with a wallet already connected: offer that wallet
-  // rather than an empty box the user pastes their own address into. Note this
-  // publicly ties the withdrawal to the connected wallet, so Edit has to stay
-  // one tap away.
-  const connectedWallet = publicKey?.toBase58() ?? null;
-  const [editingDestination, setEditingDestination] = useState(false);
-  useEffect(() => {
-    if (mode !== "cashout" || state.cashOutDestination !== "solana" || !connectedWallet) return;
-    // Deliberately not keyed on state.recipient: this fills on connect and on
-    // each switch back to Solana, and never fights what the user then types.
-    dispatch({ type: "set_recipient", value: connectedWallet });
-    setEditingDestination(false);
-  }, [mode, state.cashOutDestination, connectedWallet]);
-  const showConnectedWalletCard =
-    mode === "cashout" &&
-    state.cashOutDestination === "solana" &&
-    !!connectedWallet &&
-    state.recipient === connectedWallet &&
-    !editingDestination;
+  // Cashing out to Solana: SolanaAddressField offers the connected wallet
+  // rather than an empty box. That publicly ties the withdrawal to that wallet,
+  // so it keeps Edit one tap away.
+  const cashesOutToSolana = mode === "cashout" && state.cashOutDestination === "solana";
 
   useEffect(() => {
     if (!locksRegtestBtcDestination) return;
@@ -835,17 +820,11 @@ export function SendForm({
         />
       )}
 
-      {showConnectedWalletCard ? (
-        <div className="space-y-1.5">
-          <span className="block text-xs text-muted-foreground">Solana wallet address</span>
-          <KnownDestinationCard
-            icon={<Wallet className="h-4 w-4 text-privacy" />}
-            title="My connected wallet"
-            value={connectedWallet!}
-            onEdit={() => setEditingDestination(true)}
-            editTestId="edit-destination"
-          />
-        </div>
+      {cashesOutToSolana ? (
+        <SolanaAddressField
+          value={state.recipient}
+          onChange={(v) => dispatch({ type: "set_recipient", value: v })}
+        />
       ) : (
       <RecipientInput
         value={state.recipient}

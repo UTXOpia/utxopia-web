@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Droplets, ExternalLink, Wallet } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Droplets, ExternalLink } from "lucide-react";
 import { isHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { cn } from "@/lib/utils";
+import { SolanaAddressField } from "@/components/ui/solana-address-field";
 
 type FaucetToken = "USDC" | "USDT";
 type FaucetAmounts = Record<FaucetToken, number>;
@@ -232,28 +233,14 @@ function SplFaucetForm({
 
   return (
     <div className="space-y-4">
-      <div>
-        <label className="text-body2 text-gray-light pl-2 mb-2 block">Your Solana wallet address</label>
-        <div className="relative">
-          <Wallet className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray" />
-          <input
-            type="text"
-            value={address}
-            onChange={(e) => onAddressChange(e.target.value)}
-            placeholder="Paste your Solana wallet (base58)"
-            spellCheck={false}
-            className={cn(
-              "w-full p-3 pl-10 bg-muted border rounded-[12px]",
-              "text-body2 font-mono text-foreground placeholder:text-gray",
-              "outline-none transition-colors",
-              invalid ? "border-red-500/40 focus:border-red-500/60" : "border-gray/15 focus:border-warning/40",
-            )}
-          />
-        </div>
-        <p className={cn("text-caption mt-1 pl-2", invalid ? "text-red-400" : "text-gray")}>
-          {invalid ? "Enter a valid Solana address." : `Test ${token} is sent here; then shield it to go private.`}
-        </p>
-      </div>
+      <SolanaAddressField
+        value={address}
+        onChange={onAddressChange}
+        label="Your Solana wallet address"
+        help={invalid
+          ? "Enter a valid Solana address."
+          : `Test ${token} is sent here; then shield it to go private.`}
+      />
 
       <div>
         <label className="text-body2 text-gray-light pl-2 mb-2 block">Amount ({token})</label>

@@ -7,7 +7,7 @@ import {
   type StealthMetaAddress,
 } from "@utxopia/sdk";
 import {
-  detectRecipient,
+  detectRecipientAllowing,
   type DetectionResult,
   type RecipientType,
 } from "@/components/send/recipient-detect";
@@ -72,16 +72,16 @@ export function useRecipientResolution(
 
   const trimmed = input.trim();
 
-  const detection = useMemo<DetectionResult>(() => {
-    const result = detectRecipient(trimmed, { chain });
-    if (!allow || result.type === "empty" || result.type === "invalid") return result;
-    if (allow.includes(result.type as RecipientType)) return result;
-    return {
-      type: "invalid",
-      confidence: "high",
-      reason: disallowedMessage ?? "Not a supported recipient here",
-    };
-  }, [trimmed, chain, allow, disallowedMessage]);
+  const detection = useMemo<DetectionResult>(
+    () =>
+      detectRecipientAllowing(
+        trimmed,
+        allow,
+        disallowedMessage ?? "Not a supported recipient here",
+        { chain },
+      ),
+    [trimmed, chain, allow, disallowedMessage],
+  );
 
   const detectionType = detection.type;
   const detectionReason = detection.reason;

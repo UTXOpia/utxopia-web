@@ -155,6 +155,10 @@ describe("SendForm", () => {
 
     fireEvent.change(input, { target: { value: "5Q544fKrFoe6tsEbD7S8EmxGTJYAKtTVhAW5Q5pge4j1" } });
     expect(screen.queryByText("My connected wallet")).toBeNull();
+
+    // ...and one tap gets the connected wallet back.
+    fireEvent.click(screen.getByTestId("use-connected-wallet"));
+    expect(screen.getByText("My connected wallet")).toBeDefined();
   });
 
   it("uses the selected cash-out asset price for the USD preview", () => {

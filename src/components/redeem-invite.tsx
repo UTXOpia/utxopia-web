@@ -7,6 +7,7 @@ import bs58 from "bs58";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { cn } from "@/lib/utils";
+import { SolanaAddressField } from "@/components/ui/solana-address-field";
 
 type Status = "idle" | "signing" | "redeeming" | "done" | "error";
 
@@ -162,27 +163,18 @@ export function RedeemInvite({
       </label>
 
       {!publicKey && (
-        <label className="flex flex-col gap-1">
-          <span className="text-caption text-gray-light">Your Solana address</span>
-          <input
-            value={typedWallet}
-            onChange={(event) => setTypedWallet(event.target.value)}
-            placeholder="Paste the address that will be your membership"
-            autoComplete="off"
-            spellCheck={false}
-            disabled={busy}
-            className={cn(
-              "min-h-10 rounded-[10px] border border-gray/20 bg-transparent px-3 py-2",
-              "font-mono text-caption text-foreground placeholder:text-gray",
-              "focus:border-gray/40 focus:outline-none disabled:opacity-60",
-            )}
-          />
-          <span className="text-caption text-gray">
-            Paste it — do not type it. A Solana address has no checksum, so a wrong one that still
-            looks valid registers your membership to a wallet nobody controls, permanently, and
-            spends the code. Nothing can undo that.
-          </span>
-        </label>
+        // No connected-wallet default here: this address is registered on chain
+        // permanently, so it has to be an address the user consciously supplies
+        // after reading the warning — not one the form filled in for them.
+        <SolanaAddressField
+          value={typedWallet}
+          onChange={setTypedWallet}
+          label="Your Solana address"
+          placeholder="Paste the address that will be your membership"
+          useConnectedWallet={false}
+          disabled={busy}
+          help="Paste it — do not type it. A Solana address has no checksum, so a wrong one that still looks valid registers your membership to a wallet nobody controls, permanently, and spends the code. Nothing can undo that."
+        />
       )}
 
       <label className="flex flex-col gap-1">
