@@ -54,6 +54,19 @@ import {
 
 const exec = promisify(execFile);
 
+/**
+ * The faucet's one funding address, when pinned.
+ *
+ * A BTC deposit into the permissioned pool has no Solana signer, so the only
+ * identity the backend can gate on is the sending address — and it admits a
+ * deposit only when that address is a registered exit
+ * (BTC_REQUIRE_REGISTERED_EXIT). A wallet that rotates addresses can never
+ * satisfy that. Pinning one address, mining to it and returning change to it
+ * makes every faucet-funded deposit come from a destination the depositor can
+ * also ragequit back to. Unset keeps the old rotating behaviour.
+ */
+const FIXED_ADDRESS = process.env.REGTEST_FAUCET_ADDRESS?.trim() || "";
+
 const CONTAINER = process.env.REGTEST_FAUCET_DOCKER_CONTAINER || "utxopia-esplora-regtest";
 const DOCKER_BIN_CANDIDATES = [
   process.env.REGTEST_FAUCET_DOCKER_BIN,
@@ -377,6 +390,52 @@ function recordLimitHit(keys: string[]): void {
   saveLimitStore(limitStore);
 }
 
+interface PinnedUtxo {
+  txid: string;
+  vout: number;
+  amount: number;
+}
+
+/** Spendable UTXOs sitting on the pinned funding address. `listunspent` omits
+ *  immature coinbase, so what comes back is genuinely spendable. */
+async function pinnedUtxos(): Promise<PinnedUtxo[]> {
+  const json = await runBitcoinCli([
+    "listunspent",
+    "1",
+    "9999999",
+    JSON.stringify([FIXED_ADDRESS]),
+  ]);
+  return JSON.parse(json) as PinnedUtxo[];
+}
+
+/**
+ * Inputs for a send of `amountBtc`, drawn only from the pinned address.
+ *
+ * Explicit selection rather than the wallet's own coin selection: this wallet
+ * holds hundreds of UTXOs across a hundred addresses from before the address
+ * was pinned, and letting it choose would spend those instead — producing a
+ * deposit whose sending address the pool has no exit registered for, which the
+ * backend then holds. Largest-first so the common case is a single input.
+ */
+async function pinnedInputs(amountBtc: number): Promise<string> {
+  const utxos = (await pinnedUtxos()).sort((a, b) => b.amount - a.amount);
+  const target = amountBtc + 0.01; // fee headroom; regtest fees are negligible
+  const chosen: PinnedUtxo[] = [];
+  let total = 0;
+  for (const utxo of utxos) {
+    if (total >= target) break;
+    chosen.push(utxo);
+    total += utxo.amount;
+  }
+  if (total < target) {
+    throw new Error(
+      `pinned address ${FIXED_ADDRESS} holds ${total} BTC, needs ${target}. ` +
+        "Mine to it, or unset REGTEST_FAUCET_ADDRESS to use the whole wallet.",
+    );
+  }
+  return JSON.stringify(chosen.map(({ txid, vout }) => ({ txid, vout })));
+}
+
 /**
  * Ensure the regtest wallet has spendable balance. If `getbalance` returns 0
  * and AUTOMINE is enabled, mine `BOOTSTRAP_BLOCKS` to a fresh address so the
@@ -390,7 +449,12 @@ async function ensureWalletFunded(): Promise<string | null> {
   if (bootstrapState.confirmed) return null;
   let balanceStr: string;
   try {
-    balanceStr = await runBitcoinCli(["getbalance"]);
+    // With a pinned address the wallet's total is the wrong question: the
+    // faucet spends only that address's UTXOs, so a wallet holding thousands
+    // of BTC on other addresses is still unable to fund a single deposit.
+    balanceStr = FIXED_ADDRESS
+      ? String((await pinnedUtxos()).reduce((sum, u) => sum + u.amount, 0))
+      : await runBitcoinCli(["getbalance"]);
   } catch (e) {
     return `getbalance failed: ${e instanceof Error ? e.message : String(e)}`;
   }
@@ -407,7 +471,7 @@ async function ensureWalletFunded(): Promise<string | null> {
     );
   }
   try {
-    const miner = await runBitcoinCli(["getnewaddress"]);
+    const miner = FIXED_ADDRESS || (await runBitcoinCli(["getnewaddress"]));
     console.log(`[Faucet] Bootstrapping: mining ${BOOTSTRAP_BLOCKS} blocks to ${miner}`);
     await runBitcoinCli(["generatetoaddress", String(BOOTSTRAP_BLOCKS), miner]);
     bootstrapState.confirmed = true;
@@ -415,6 +479,17 @@ async function ensureWalletFunded(): Promise<string | null> {
   } catch (e) {
     return `bootstrap mining failed: ${e instanceof Error ? e.message : String(e)}`;
   }
+}
+
+/**
+ * The pinned funding address, or null when the faucet still rotates.
+ *
+ * Served rather than duplicated into a NEXT_PUBLIC_ variable so there is one
+ * source of truth: the address the faucet actually spends from is the only one
+ * worth registering as an exit, and a second copy could drift from it.
+ */
+export async function GET(): Promise<NextResponse> {
+  return NextResponse.json({ address: FIXED_ADDRESS || null });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -547,8 +622,22 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
       { [btcAddress]: Number(satsToBtcDecimal(amountSats)) },
       { data: opReturnHex },
     ]);
-    const rawHex = await runBitcoinCli(["createrawtransaction", "[]", outputs]);
-    const fundedJson = await runBitcoinCli(["fundrawtransaction", rawHex]);
+    const inputs = FIXED_ADDRESS
+      ? await pinnedInputs(Number(satsToBtcDecimal(amountSats)))
+      : "[]";
+    const rawHex = await runBitcoinCli(["createrawtransaction", inputs, outputs]);
+    // Change returns to the funding address and `add_inputs: false` forbids the
+    // wallet from reaching for any other UTXO, so every input and every output
+    // this faucet ever creates stays on the one address the pool knows.
+    const fundedJson = await runBitcoinCli(
+      FIXED_ADDRESS
+        ? [
+            "fundrawtransaction",
+            rawHex,
+            JSON.stringify({ changeAddress: FIXED_ADDRESS, add_inputs: false }),
+          ]
+        : ["fundrawtransaction", rawHex],
+    );
     const fundedHex = JSON.parse(fundedJson).hex;
     const signedJson = await runBitcoinCli(["signrawtransactionwithwallet", fundedHex]);
     const signed = JSON.parse(signedJson);
@@ -573,11 +662,13 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 2. Mine N blocks to a fresh miner address so the tracker sees a confirmed deposit.
+  // 2. Mine N blocks so the tracker sees a confirmed deposit. Rewards go to the
+  //    pinned address too, so the wallet refills without ever spending from an
+  //    address the pool has not seen.
   let minerAddr = "";
   let blocksMined = 0;
   try {
-    minerAddr = await runBitcoinCli(["getnewaddress"]);
+    minerAddr = FIXED_ADDRESS || (await runBitcoinCli(["getnewaddress"]));
     await runBitcoinCli(["generatetoaddress", String(CONFIRMATIONS), minerAddr]);
     blocksMined = CONFIRMATIONS;
   } catch (e) {

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
@@ -61,6 +61,24 @@ export function RedeemInvite({
   const [btcAddress, setBtcAddress] = useState("");
   const [status, setStatus] = useState<Status>("idle");
   const [error, setError] = useState<string | null>(null);
+  // On regtest the test bitcoin comes from one faucet address, and that is the
+  // address a deposit can be sent back to without asking anyone. Offering it
+  // saves the user inventing a destination they do not control — and it is the
+  // only one their faucet-funded deposits could ragequit to anyway.
+  const [faucetAddress, setFaucetAddress] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetch("/api/faucet/regtest", { cache: "no-store" })
+      .then((response) => (response.ok ? response.json() : null))
+      .then((body) => {
+        if (!cancelled && typeof body?.address === "string") setFaucetAddress(body.address);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const busy = status === "signing" || status === "redeeming";
   // A connected wallet signs; otherwise the typed address is what we register.
@@ -178,8 +196,19 @@ export function RedeemInvite({
       )}
 
       <label className="flex flex-col gap-1">
-        <span className="text-caption text-gray-light">
-          Bitcoin withdrawal address <span className="text-gray">(optional)</span>
+        <span className="flex items-center justify-between gap-2 text-caption text-gray-light">
+          <span>
+            Bitcoin withdrawal address <span className="text-gray">(optional)</span>
+          </span>
+          {faucetAddress && !btcAddress.trim() && !busy && (
+            <button
+              type="button"
+              onClick={() => setBtcAddress(faucetAddress)}
+              className="text-caption text-privacy underline underline-offset-2 hover:opacity-80"
+            >
+              use the test faucet address
+            </button>
+          )}
         </span>
         <input
           value={btcAddress}
