@@ -1,4 +1,5 @@
 import type { PolicyStage } from "@/lib/server/policy-coordinator";
+import type { PublicStageMark } from "@/lib/server/policy-public";
 
 const TERMINAL_FAILURES = new Set<PolicyStage>(["rejected", "failed"]);
 
@@ -21,6 +22,19 @@ interface PublicPolicyStatus {
   stage: PolicyStage;
   error?: string;
   approvalAccount?: string;
+  timeline?: PublicStageMark[];
+}
+
+/** Milliseconds from the request arriving to a verdict existing — the interval
+ *  spent inside the enclave, and the only number worth putting on screen.
+ *  Everything after it is Solana settlement, which PER does not change. */
+export function decisionMs(timeline: PublicStageMark[] | undefined): number | null {
+  if (!timeline?.length) return null;
+  const start = timeline[0];
+  const verdict = timeline.find((mark) =>
+    mark.stage === "approved" || mark.stage === "rejected",
+  );
+  return verdict ? verdict.atMs - start.atMs : null;
 }
 
 export function policyStageMessage(stage: PolicyStage): string {
@@ -85,7 +99,11 @@ export async function preparePolicyApproval(input: {
   /** Intent parts, in the order the asset program hashes them. */
   intentParts: Uint8Array[];
   onStage: (stage: PolicyStage) => void;
-}): Promise<{ requestId: string; approvalAccount: string }> {
+}): Promise<{
+  requestId: string;
+  approvalAccount: string;
+  timeline: PublicStageMark[];
+}> {
   const created = await parse(await fetch(policyUrl(input.networkId, input.vaultId), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -121,6 +139,7 @@ export async function preparePolicyApproval(input: {
   return {
     requestId: status.requestId,
     approvalAccount: status.approvalAccount,
+    timeline: status.timeline ?? [],
   };
 }
 

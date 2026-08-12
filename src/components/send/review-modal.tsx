@@ -6,6 +6,9 @@ import { cn } from "@/lib/utils";
 import { HoldButton } from "@/components/ui/hold-button";
 import { RelayControl } from "@/components/relay/relay-control";
 import type { SubmitStatus } from "@/hooks/use-joinsplit-submit";
+import { TeeAttestationBadge } from "@/components/auditor/tee-attestation-panel";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
 import {
   activeStepIndex,
   REVIEW_STEPS as STEPS,
@@ -71,6 +74,8 @@ export function ReviewModal({
   onViewActivity,
 }: ReviewModalProps) {
   const view = selectReviewView(status, busy, errorMessage);
+  const chainEnv = useChainEnvironment();
+  const { permissioned: poolPermissioned } = usePoolPermissioned();
 
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -176,6 +181,16 @@ export function ReviewModal({
               <p className="mt-4 border-t border-gray/10 pt-3 text-xs text-muted-foreground">
                 {statusMessage || "Keep this tab open until the payment is submitted."}
               </p>
+              {/* Same answer as on the deposit screen. A spend is where the
+                  policy check actually decides something, so leaving it out
+                  here would put the reassurance on the wrong screen. */}
+              {poolPermissioned && (
+                <TeeAttestationBadge
+                  networkId={chainEnv.networkId}
+                  vaultId={chainEnv.vaultId}
+                  className="mt-3"
+                />
+              )}
             </div>
           )}
 

@@ -13,16 +13,7 @@ import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 
 export const dynamic = "force-dynamic";
 
-function publicStatus(body: Record<string, unknown>) {
-  return {
-    requestId: body.requestId,
-    stage: body.stage,
-    ...(typeof body.approvalAccount === "string"
-      ? { approvalAccount: body.approvalAccount }
-      : {}),
-    ...(typeof body.error === "string" ? { error: body.error } : {}),
-  };
-}
+import { publicStatus } from "@/lib/server/policy-public";
 
 export async function POST(request: NextRequest) {
   const requestedNetwork = request.nextUrl.searchParams.get("network") as NetworkId | null

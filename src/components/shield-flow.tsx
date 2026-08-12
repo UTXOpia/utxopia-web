@@ -62,6 +62,7 @@ import {
   policyStageMessage,
   preparePolicyApproval,
 } from "@/lib/policy-approval";
+import { TeeAttestationBadge } from "@/components/auditor/tee-attestation-panel";
 import { RedeemInvite } from "@/components/redeem-invite";
 import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 
@@ -842,6 +843,15 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
             and finality remain on Solana.
           </span>
         </div>
+      )}
+
+      {/* …checked privately by what? The line above raises the question; this
+          answers it with something the reader can verify themselves. */}
+      {poolPermissioned && (
+        <TeeAttestationBadge
+          networkId={chainEnv.networkId}
+          vaultId={chainEnv.vaultId}
+        />
       )}
 
       {policyMessage && status === "processing" && (

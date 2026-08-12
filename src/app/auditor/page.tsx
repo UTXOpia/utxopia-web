@@ -27,6 +27,7 @@ import { decryptAuditorCiphertext, type AuditRecord } from "@utxopia/sdk";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { AuditorKeyInput } from "@/components/auditor/auditor-key-input";
 import { AuditorRecordsTable } from "@/components/auditor/auditor-records-table";
+import { TeeAttestationPanel } from "@/components/auditor/tee-attestation-panel";
 import { fetchAuditorCiphertexts } from "@/lib/chain-inbox";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { usePoolPermissioned } from "@/hooks/use-pool-permissioned";
@@ -175,6 +176,12 @@ export default function AuditorPage() {
         {/* No-permissioned-pool notice */}
         {!permissioned && (
           <NetworkNotice />
+        )}
+
+        {/* Which enclave decides policy for this pool. Only a permissioned
+            pool has one; Open Privacy takes no approval path at all. */}
+        {permissioned && (
+          <TeeAttestationPanel networkId={networkId} vaultId="verified" />
         )}
 
         {/* Viewing key input */}

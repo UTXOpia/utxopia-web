@@ -10,6 +10,7 @@ import {
   parseVaultId,
 } from "@/lib/vault-config";
 import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
+import { publicStatus } from "@/lib/server/policy-public";
 
 export const dynamic = "force-dynamic";
 
@@ -38,12 +39,5 @@ export async function GET(
   if (!response.ok) {
     return NextResponse.json(body, { status: response.status });
   }
-  return NextResponse.json({
-    requestId: body.requestId,
-    stage: body.stage,
-    ...(typeof body.approvalAccount === "string"
-      ? { approvalAccount: body.approvalAccount }
-      : {}),
-    ...(typeof body.error === "string" ? { error: body.error } : {}),
-  });
+  return NextResponse.json(publicStatus(body));
 }
