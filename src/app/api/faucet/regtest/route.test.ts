@@ -1,5 +1,9 @@
 import { describe, expect, it } from "bun:test";
-import { POST } from "./route";
+import { GET, POST } from "./route";
+import { faucetBackendUrl } from "@/lib/server/faucet-backend";
+import { getNetworkConfig } from "@/lib/network-config";
+import { getVaultNetworkConfig, parseVaultId } from "@/lib/vault-config";
+import type { NetworkConfig } from "@/lib/network-config";
 
 function request(body: Record<string, unknown>): Request {
   return new Request("https://app.utxopia.test/api/faucet/regtest?network=devnet-regtest", {
@@ -7,6 +11,13 @@ function request(body: Record<string, unknown>): Request {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(body),
   });
+}
+
+function getRequest(query = ""): Request {
+  return new Request(
+    `https://app.utxopia.test/api/faucet/regtest?network=devnet-regtest${query}`,
+    { cache: "no-store" },
+  );
 }
 
 describe("regtest BTC deposit faucet", () => {
@@ -54,5 +65,48 @@ describe("regtest BTC deposit faucet", () => {
       if (previousNetwork === undefined) delete process.env.UTXOPIA_BITCOIN_NETWORK;
       else process.env.UTXOPIA_BITCOIN_NETWORK = previousNetwork;
     }
+  });
+
+  it("reports the remaining daily allowance without spending one", async () => {
+    const stealthAddress = `utxo:${"22".repeat(96)}`;
+
+    const first = await GET(getRequest(`&stealthAddress=${stealthAddress}`) as never);
+    expect(first.status).toBe(200);
+    const before = await first.json();
+    expect(before).toMatchObject({ dailyLimit: 3, used: 0, remaining: 3 });
+
+    // Asking again must not consume the allowance it is reporting.
+    const second = await GET(getRequest(`&stealthAddress=${stealthAddress}`) as never);
+    expect(await second.json()).toMatchObject({ used: 0, remaining: 3 });
+  });
+
+  it("still answers callers that only want the funding address", async () => {
+    const response = await GET(getRequest() as never);
+    expect(response.status).toBe(200);
+    expect(await response.json()).toHaveProperty("address");
+  });
+});
+
+describe("faucet backend routing", () => {
+  const network = "devnet-regtest" as const;
+  const scoped = (vault: string) =>
+    getVaultNetworkConfig(
+      network,
+      getNetworkConfig(network, { applyEnvOverrides: false }) as NetworkConfig,
+      parseVaultId(vault),
+    );
+
+  // Open and Verified are separate backend processes, each validating the
+  // deposit against its own POOL_RECEIVE_ADDRESS, and the shared host routes an
+  // unprefixed path to Open. Losing the vault here sends a Verified deposit to
+  // Open, which answers "faucet configuration is outdated".
+  it("sends each vault's deposit to that vault's own backend", () => {
+    expect(faucetBackendUrl(network, scoped("verified"))).toContain("/verified");
+    expect(faucetBackendUrl(network, scoped("open"))).toContain("/open");
+  });
+
+  it("does not silently fall back to the unscoped host when a vault is known", () => {
+    const unscoped = faucetBackendUrl(network, null);
+    expect(faucetBackendUrl(network, scoped("verified"))).not.toBe(unscoped);
   });
 });

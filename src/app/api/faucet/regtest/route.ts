@@ -31,6 +31,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { execFile } from "node:child_process";
 import { promisify } from "node:util";
+import { createHash } from "node:crypto";
 import * as fs from "node:fs";
 import * as path from "node:path";
 import networks from "@/lib/networks.json";
@@ -41,7 +42,7 @@ import {
   type NetworkId,
 } from "@/lib/network-config";
 import { CHAIN_ADAPTERS } from "@/lib/chain-registry";
-import { getBackendUrl } from "@/lib/api/constants";
+import { faucetBackendUrl } from "@/lib/server/faucet-backend";
 import { applyBackendAuthHeaders } from "@/lib/server/backend-auth";
 import { getClientIp } from "@/lib/server/rate-limit";
 import { depositOpReturnContextForNetworkConfig } from "@/lib/deposit-op-return";
@@ -203,9 +204,11 @@ async function callBackendFaucet(
     address: string;
     amountSats: number;
     opReturn?: string;
+    recipientKey?: string;
   },
-): Promise<NextResponse | null> {
-  const backendUrl = process.env.REGTEST_FAUCET_BACKEND_URL || getBackendUrl(network);
+  config?: NetworkConfig | null,
+): Promise<{ response: NextResponse; succeeded: boolean } | null> {
+  const backendUrl = faucetBackendUrl(network, config);
   const headers = applyBackendAuthHeaders({ "Content-Type": "application/json" });
 
   let res: Response;
@@ -218,13 +221,16 @@ async function callBackendFaucet(
     });
   } catch (e) {
     if (REMOTE_FAUCET_MODE === "backend") {
-      return NextResponse.json(
-        {
-          ok: false,
-          error: `backend faucet unreachable: ${e instanceof Error ? e.message : String(e)}`,
-        },
-        { status: 502 },
-      );
+      return {
+        succeeded: false,
+        response: NextResponse.json(
+          {
+            ok: false,
+            error: `backend faucet unreachable: ${e instanceof Error ? e.message : String(e)}`,
+          },
+          { status: 502 },
+        ),
+      };
     }
     return null;
   }
@@ -244,7 +250,25 @@ async function callBackendFaucet(
     };
   }
 
-  return NextResponse.json(body, { status: res.status });
+  const succeeded =
+    res.ok && typeof body === "object" && body !== null && (body as { ok?: boolean }).ok === true;
+
+  // The backend reports a limit hit as a plain error string. Callers key their
+  // cooldown UI off `retryAfterSec`, so without this a backend 429 renders as a
+  // dead-end error with no countdown and a still-enabled button.
+  if (res.status === 429 && typeof body === "object" && body !== null) {
+    const withQuota = body as Record<string, unknown>;
+    if (typeof withQuota.retryAfterSec !== "number") {
+      const header = Number(res.headers.get("retry-after"));
+      withQuota.retryAfterSec = Number.isFinite(header) && header > 0
+        ? header
+        : Math.max(1, Math.ceil((nextLocalDayStartMs() - Date.now()) / 1000));
+      withQuota.dailyLimit ??= DAILY_LIMIT;
+      withQuota.remaining ??= 0;
+    }
+  }
+
+  return { succeeded, response: NextResponse.json(body, { status: res.status }) };
 }
 
 async function runBitcoinCli(args: string[]): Promise<string> {
@@ -375,6 +399,79 @@ function getLimitStatus(keys: string[]): { ok: true } | { ok: false; remaining: 
   return { ok: true };
 }
 
+/**
+ * Stable per-recipient quota key for the backend limiter.
+ *
+ * The backend can't identify the depositor from the deposit: the pool address
+ * is shared by everyone and the OP_RETURN carries a fresh ephemeral pubkey per
+ * call, so quotaing on either gives every request its own bucket. Hashing the
+ * private address gives it something that repeats without handing it the
+ * address itself.
+ */
+function recipientQuotaKey(stealthAddress: string): string {
+  return createHash("sha256").update(stealthAddress.toLowerCase()).digest("hex");
+}
+
+interface QuotaView {
+  dailyLimit: number;
+  used: number;
+  remaining: number;
+  /** Seconds until the allowance resets. 0 when untouched. */
+  resetAfterSec: number;
+}
+
+/** Quota per this route's own file-backed counter. */
+function localQuota(keys: string[]): QuotaView {
+  const day = todayKey();
+  let used = 0;
+  for (const key of keys) {
+    const entry = limitStore.entries.get(key);
+    if (entry?.day === day) used = Math.max(used, entry.count);
+  }
+  return {
+    dailyLimit: DAILY_LIMIT,
+    used: Math.min(used, DAILY_LIMIT),
+    remaining: Math.max(0, DAILY_LIMIT - used),
+    resetAfterSec: used > 0 ? Math.max(1, Math.ceil((nextLocalDayStartMs() - Date.now()) / 1000)) : 0,
+  };
+}
+
+/** Quota per the backend's limiter, or null if it can't answer. */
+async function backendQuota(
+  network: NetworkId,
+  params: { address: string; opReturn: string; recipientKey: string },
+  config?: NetworkConfig | null,
+): Promise<QuotaView | null> {
+  const backendUrl = faucetBackendUrl(network, config);
+  const query = new URLSearchParams({
+    address: params.address,
+    opReturn: params.opReturn,
+    recipientKey: params.recipientKey,
+  });
+  try {
+    const res = await fetch(`${backendUrl}/api/faucet/regtest/quota?${query.toString()}`, {
+      headers: applyBackendAuthHeaders({}),
+      cache: "no-store",
+    });
+    if (!res.ok) return null;
+    const body = (await res.json()) as Partial<Record<keyof QuotaView, number>>;
+    if (typeof body.remaining !== "number") return null;
+    return {
+      dailyLimit: body.dailyLimit ?? DAILY_LIMIT,
+      used: body.used ?? 0,
+      remaining: body.remaining,
+      resetAfterSec: body.resetAfterSec ?? 0,
+    };
+  } catch {
+    return null;
+  }
+}
+
+/** Whichever limiter rejects first is the one the user will actually hit. */
+function tighterQuota(a: QuotaView, b: QuotaView | null): QuotaView {
+  return b && b.remaining < a.remaining ? b : a;
+}
+
 function recordLimitHit(keys: string[]): void {
   const day = todayKey();
   const now = Date.now();
@@ -488,8 +585,51 @@ async function ensureWalletFunded(): Promise<string | null> {
  * source of truth: the address the faucet actually spends from is the only one
  * worth registering as an exit, and a second copy could drift from it.
  */
-export async function GET(): Promise<NextResponse> {
-  return NextResponse.json({ address: FIXED_ADDRESS || null });
+/**
+ * Also reports the caller's remaining daily allowance, so the UI can say how
+ * many drips are left instead of finding out by spending one and getting a 429.
+ *
+ * `stealthAddress` is optional — without it the answer covers the IP quota only,
+ * which is what the callers that just want `address` already get.
+ */
+export async function GET(req: NextRequest): Promise<NextResponse> {
+  const url = new URL(req.url);
+  const stealthAddress = (url.searchParams.get("stealthAddress") ?? "").trim();
+  const hasRecipient = /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress);
+
+  const quotaKeys = [limitKey("ip", getClientIp(req.headers))];
+  if (hasRecipient) quotaKeys.unshift(limitKey("recipient", stealthAddress));
+  let quota = localQuota(quotaKeys);
+
+  // In backend mode the deposit is sent by the backend, so its limiter is the
+  // one that will reject — ask it too and report whichever binds first.
+  if (REMOTE_FAUCET_MODE === "backend" && hasRecipient) {
+    try {
+      const network = getRequestNetwork(req);
+      let config = getRequestNetworkConfig(network);
+      const vaultId = parseVaultId(url.searchParams.get("vault"));
+      if (vaultsSupported(network) && "solana" in config) {
+        config = getVaultNetworkConfig(network, config as NetworkConfig, vaultId);
+      }
+      const deposit = await createDepositForStealth(stealthAddress, config);
+      quota = tighterQuota(
+        quota,
+        await backendQuota(
+          network,
+          {
+            address: deposit.btcAddress,
+            opReturn: hex(deposit.opReturnPayload),
+            recipientKey: recipientQuotaKey(stealthAddress),
+          },
+          config as NetworkConfig,
+        ),
+      );
+    } catch {
+      // Backend unreachable or address unusable — the local view still stands.
+    }
+  }
+
+  return NextResponse.json({ address: FIXED_ADDRESS || null, ...quota });
 }
 
 export async function POST(req: NextRequest): Promise<NextResponse> {
@@ -569,6 +709,8 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         error: `daily deposit limit reached: max ${DAILY_LIMIT} request${DAILY_LIMIT === 1 ? "" : "s"} per day`,
         retryAfterSec: quota.remaining,
         dailyLimit: DAILY_LIMIT,
+        used: DAILY_LIMIT,
+        remaining: 0,
       },
       { status: 429, headers: { "Retry-After": String(quota.remaining) } },
     );
@@ -589,13 +731,21 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   }
 
   if (REMOTE_FAUCET_MODE === "backend") {
-    const remote = await callBackendFaucet(activeNetwork, {
-      address: btcAddress,
-      amountSats,
-      opReturn: opReturnHex,
-    });
+    const remote = await callBackendFaucet(
+      activeNetwork,
+      {
+        address: btcAddress,
+        amountSats,
+        opReturn: opReturnHex,
+        recipientKey: recipientQuotaKey(stealthAddress),
+      },
+      activeConfig as NetworkConfig,
+    );
     if (remote) {
-      return remote;
+      // Record here too: this path returns before the local send, so without it
+      // the counter checked above is never written and the cap never binds.
+      if (remote.succeeded) recordLimitHit(quotaKeys);
+      return remote.response;
     }
   }
 
@@ -699,6 +849,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     opReturn: opReturnHex,
     amountSats,
     dailyLimit: DAILY_LIMIT,
+    remaining: localQuota(quotaKeys).remaining,
     blocksMined,
     minerAddress: minerAddr,
   });

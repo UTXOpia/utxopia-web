@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { AlertCircle, CheckCircle2, Droplets } from "lucide-react";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
@@ -29,8 +29,15 @@ interface FaucetResponse {
   opReturn?: string;
   amountSats?: number;
   dailyLimit?: number;
+  remaining?: number;
   retryAfterSec?: number;
   error?: string;
+}
+
+interface Quota {
+  dailyLimit: number;
+  remaining: number;
+  resetAfterSec: number;
 }
 
 /** Whole-unit countdown: a raw second count reads as a broken button once the
@@ -50,12 +57,40 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DripResult | null>(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
+  const [quota, setQuota] = useState<Quota | null>(null);
   const stealthAddress = useUTXOpiaStore((state) => state.stealthAddressEncoded);
   const privateBtcBalance = useUTXOpiaStore((state) => state.inboxBalancesByToken.zkBTC ?? 0n);
 
   useEffect(() => {
     setResult(null);
   }, [amountSats, stealthAddress]);
+
+  // Ask up front how many drips are left, so an exhausted allowance disables the
+  // button instead of being discovered by spending a click on a 429.
+  const refreshQuota = useCallback(async () => {
+    if (!stealthAddress) {
+      setQuota(null);
+      return;
+    }
+    const params = new URLSearchParams({ network, vault: vaultId, stealthAddress });
+    try {
+      const response = await fetch(`/api/faucet/regtest?${params.toString()}`, { cache: "no-store" });
+      if (!response.ok) return;
+      const body = (await response.json()) as Partial<Quota>;
+      if (typeof body.remaining !== "number" || typeof body.dailyLimit !== "number") return;
+      setQuota({
+        dailyLimit: body.dailyLimit,
+        remaining: body.remaining,
+        resetAfterSec: body.resetAfterSec ?? 0,
+      });
+    } catch {
+      // Quota is advisory — the route still enforces it on POST.
+    }
+  }, [network, vaultId, stealthAddress]);
+
+  useEffect(() => {
+    void refreshQuota();
+  }, [refreshQuota]);
 
   useEffect(() => {
     if (result?.kind !== "cooldown") {
@@ -128,6 +163,14 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         );
       }
 
+      if (typeof body.remaining === "number") {
+        setQuota((current) => ({
+          dailyLimit: body.dailyLimit ?? current?.dailyLimit ?? 3,
+          remaining: body.remaining!,
+          resetAfterSec: body.retryAfterSec ?? current?.resetAfterSec ?? 0,
+        }));
+      }
+
       if (response.status === 429 && typeof body.retryAfterSec === "number") {
         setResult({
           kind: "cooldown",
@@ -152,6 +195,7 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
           warning: body.warning,
           credited: false,
         });
+        void refreshQuota();
         void mineMissingConfirmations(body.blocksMined).finally(() => {
           void refreshUntilCredited(previousBalance);
         });
@@ -167,7 +211,8 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
   }
 
   const cooldownActive = result?.kind === "cooldown" && cooldownLeft > 0;
-  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive;
+  const exhausted = quota?.remaining === 0;
+  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive || exhausted;
 
   return (
     <div className="space-y-4">
@@ -207,7 +252,12 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
           )}
         />
         <p className="mt-1 pl-2 text-caption text-gray">
-          {(amountSats / 1e8).toFixed(8)} BTC. Limit: 3 deposits per day.
+          {(amountSats / 1e8).toFixed(8)} BTC.{" "}
+          {quota
+            ? exhausted
+              ? `No deposits left today — resets in ${formatCooldown(quota.resetAfterSec)}.`
+              : `${quota.remaining} of ${quota.dailyLimit} deposits left today.`
+            : "Limit: 3 deposits per day."}
         </p>
       </div>
 
@@ -234,7 +284,9 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
           ? "Creating Bitcoin transaction..."
           : cooldownActive
             ? `Try again in ${formatCooldown(cooldownLeft)}`
-            : "Get private test BTC"}
+            : exhausted
+              ? `Daily limit reached — resets in ${formatCooldown(quota?.resetAfterSec ?? 0)}`
+              : "Get private test BTC"}
       </button>
 
       {result?.kind === "ok" && (
