@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Mail, Presentation } from "lucide-react";
+import { ArrowUpRight, Mail, Presentation, Send } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useChainEnvironment } from "@/lib/chain-environment";
@@ -13,11 +13,11 @@ import { hrefWithChain } from "@/lib/network-config";
  * source and the date it was checked, or it doesn't go on the page.
  */
 
-const DECK_ID = "1KBxPXgU8ikoM853l5wBeggKZiElO4lhZaJsHmTN-62Y";
-// Needs link sharing = anyone with the link (viewer), or the frame renders a sign-in wall.
-const DECK_EMBED = `https://docs.google.com/presentation/d/${DECK_ID}/embed?start=false&loop=false&delayms=60000`;
-const DECK_URL = `https://docs.google.com/presentation/d/${DECK_ID}/preview`;
+// The deck lives at /pitch as a real page. The Google original is kept as a fallback.
+const DECK_URL =
+  "https://docs.google.com/presentation/d/1KBxPXgU8ikoM853l5wBeggKZiElO4lhZaJsHmTN-62Y/preview";
 const CONTACT_EMAIL = "albert@utxopia.com";
+const TELEGRAM = "amidoggy";
 
 // Re-check before editing any of these. Stale numbers on this page cost more than no numbers.
 const DATA_CHECKED = "13 August 2026";
@@ -122,11 +122,13 @@ export default function CareersPage() {
             Apply
           </a>
           <a
-            href="#deck"
+            href={`https://t.me/${TELEGRAM}`}
+            target="_blank"
+            rel="noopener noreferrer"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
           >
-            <Presentation className="h-3.5 w-3.5" />
-            Read the deck
+            <Send className="h-3.5 w-3.5" />
+            Telegram @{TELEGRAM}
           </a>
         </div>
 
@@ -199,15 +201,19 @@ export default function CareersPage() {
           today.
         </p>
 
-        <div className="overflow-hidden rounded-[16px] border border-gray/15 bg-card/50">
-          <iframe
-            src={DECK_EMBED}
-            title="UTXOpia pitch deck"
-            loading="lazy"
-            allowFullScreen
-            className="aspect-video w-full"
-          />
-        </div>
+        <Link
+          href="/pitch"
+          className="group flex items-center gap-4 rounded-[16px] border border-gray/15 bg-card/50 p-5 transition-colors hover:border-privacy/30"
+        >
+          <Presentation className="h-5 w-5 shrink-0 text-privacy/80" />
+          <div className="min-w-0 flex-1">
+            <p className="text-caption font-semibold text-foreground">Open the pitch deck</p>
+            <p className="mt-0.5 text-caption text-gray">
+              Ten slides, one screen each. Every slide is linkable — /pitch#8 is the traction slide.
+            </p>
+          </div>
+          <ArrowUpRight className="h-4 w-4 shrink-0 text-gray transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
+        </Link>
 
         <a
           href={DECK_URL}
@@ -215,7 +221,7 @@ export default function CareersPage() {
           rel="noopener noreferrer"
           className="mt-3 inline-flex items-center gap-1.5 text-caption text-gray underline underline-offset-4 transition-colors hover:text-foreground"
         >
-          Open the deck full screen
+          Or the original Google Slides version
           <ArrowUpRight className="h-3 w-3" />
         </a>
 
@@ -281,7 +287,7 @@ export default function CareersPage() {
         <div className="mt-12 rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
           <h2 className="text-heading6 font-semibold text-foreground">How to apply</h2>
           <p className="mt-2 text-caption leading-relaxed text-gray-light">
-            Email me. No CV needed — send three things:
+            Email or Telegram, whichever you prefer. No CV needed — send three things:
           </p>
           <ol className="mt-3 space-y-2">
             {APPLY.map((line, i) => (
@@ -296,13 +302,23 @@ export default function CareersPage() {
             waiting for something worth leaving for — write, and I&apos;ll show you everything: the
             code, the numbers, and the parts that are broken.
           </p>
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
-            className="mt-5 inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            {CONTACT_EMAIL}
-          </a>
+          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+            <a
+              href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
+              className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
+            >
+              <Mail className="h-3.5 w-3.5" />
+              {CONTACT_EMAIL}
+            </a>
+            <a
+              href={`https://t.me/${TELEGRAM}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
+            >
+              <Send className="h-3.5 w-3.5" />@{TELEGRAM}
+            </a>
+          </div>
         </div>
 
         <p className="mt-6 text-caption text-gray">
