@@ -1,9 +1,11 @@
 "use client";
 
 import Link from "next/link";
-import { ArrowUpRight, Mail, Presentation, Send } from "lucide-react";
+import { Download, Mail, Presentation, Send } from "lucide-react";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
+import { DeckEmbed } from "@/components/deck/deck-embed";
+import { CONTACT_EMAIL, DATA_CHECKED, DECK_PDF_URL, TELEGRAM, TELEGRAM_URL } from "@/lib/contact";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 
@@ -13,14 +15,6 @@ import { hrefWithChain } from "@/lib/network-config";
  * source and the date it was checked, or it doesn't go on the page.
  */
 
-// The deck lives at /pitch as a real page. The Google original is kept as a fallback.
-const DECK_URL =
-  "https://docs.google.com/presentation/d/1KBxPXgU8ikoM853l5wBeggKZiElO4lhZaJsHmTN-62Y/preview";
-const CONTACT_EMAIL = "albert@utxopia.com";
-const TELEGRAM = "amidoggy";
-
-// Re-check before editing any of these. Stale numbers on this page cost more than no numbers.
-const DATA_CHECKED = "13 August 2026";
 
 const FACTS = [
   ["Role", "Cofounder — growth, communications, distribution"],
@@ -122,7 +116,7 @@ export default function CareersPage() {
             Apply
           </a>
           <a
-            href={`https://t.me/${TELEGRAM}`}
+            href={TELEGRAM_URL}
             target="_blank"
             rel="noopener noreferrer"
             className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
@@ -201,29 +195,28 @@ export default function CareersPage() {
           today.
         </p>
 
-        <Link
-          href="/pitch"
-          className="group flex items-center gap-4 rounded-[16px] border border-gray/15 bg-card/50 p-5 transition-colors hover:border-privacy/30"
-        >
-          <Presentation className="h-5 w-5 shrink-0 text-privacy/80" />
-          <div className="min-w-0 flex-1">
-            <p className="text-caption font-semibold text-foreground">Open the pitch deck</p>
-            <p className="mt-0.5 text-caption text-gray">
-              Ten slides, one screen each. Every slide is linkable — /pitch#8 is the traction slide.
-            </p>
-          </div>
-          <ArrowUpRight className="h-4 w-4 shrink-0 text-gray transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5 group-hover:text-foreground" />
-        </Link>
+        <DeckEmbed />
 
-        <a
-          href={DECK_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="mt-3 inline-flex items-center gap-1.5 text-caption text-gray underline underline-offset-4 transition-colors hover:text-foreground"
-        >
-          Or the original Google Slides version
-          <ArrowUpRight className="h-3 w-3" />
-        </a>
+        <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-2 text-caption text-gray">
+          <Link
+            href="/pitch"
+            className="inline-flex items-center gap-1.5 underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            <Presentation className="h-3 w-3" />
+            Open full screen
+          </Link>
+          <a
+            href={DECK_PDF_URL}
+            download
+            className="inline-flex items-center gap-1.5 underline underline-offset-4 transition-colors hover:text-foreground"
+          >
+            <Download className="h-3 w-3" />
+            Download as PDF
+          </a>
+          <span className="text-gray/50">
+            Every slide is linkable — <span className="font-mono">/pitch#8</span> is traction.
+          </span>
+        </div>
 
         {/* ── Responsibilities ── */}
         <h2 className="mb-4 mt-14 text-heading6 font-semibold text-foreground">
@@ -311,7 +304,7 @@ export default function CareersPage() {
               {CONTACT_EMAIL}
             </a>
             <a
-              href={`https://t.me/${TELEGRAM}`}
+              href={TELEGRAM_URL}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
