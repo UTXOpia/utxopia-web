@@ -11,9 +11,24 @@ import type { NetworkConfig, NetworkId } from "@/lib/network-config";
  * "faucet configuration is outdated; refresh the app before trying again" —
  * the vault-scoped config carries the /verified prefix that avoids that.
  *
+ * REGTEST_FAUCET_BACKEND_URL overrides the host, not the vault: the prefix is
+ * carried across, because an override that silently drops it reintroduces
+ * exactly the bug above and the error message blames configuration.
+ *
  * Lives outside the route module because a Next.js route file may only export
  * handlers and route config.
  */
 export function faucetBackendUrl(network: NetworkId, config?: NetworkConfig | null): string {
-  return process.env.REGTEST_FAUCET_BACKEND_URL || config?.backend?.url || getBackendUrl(network);
+  const scoped = config?.backend?.url;
+  const override = process.env.REGTEST_FAUCET_BACKEND_URL?.trim();
+  if (!override) return scoped || getBackendUrl(network);
+
+  let prefix = "";
+  try {
+    if (scoped) prefix = new URL(scoped).pathname.replace(/\/+$/, "");
+  } catch {
+    prefix = "";
+  }
+  const host = override.replace(/\/+$/, "");
+  return prefix && !host.endsWith(prefix) ? `${host}${prefix}` : host;
 }

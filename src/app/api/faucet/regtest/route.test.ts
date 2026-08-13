@@ -109,4 +109,19 @@ describe("faucet backend routing", () => {
     const unscoped = faucetBackendUrl(network, null);
     expect(faucetBackendUrl(network, scoped("verified"))).not.toBe(unscoped);
   });
+  // A host override must not quietly undo vault scoping: dropping the prefix
+  // sends a Verified deposit to Open and resurrects the "outdated" error.
+  it("carries the vault prefix across a backend host override", () => {
+    const prev = process.env.REGTEST_FAUCET_BACKEND_URL;
+    process.env.REGTEST_FAUCET_BACKEND_URL = "https://api.example.test";
+    try {
+      expect(faucetBackendUrl(network, scoped("verified"))).toBe(
+        "https://api.example.test/verified",
+      );
+      expect(faucetBackendUrl(network, null)).toBe("https://api.example.test");
+    } finally {
+      if (prev === undefined) delete process.env.REGTEST_FAUCET_BACKEND_URL;
+      else process.env.REGTEST_FAUCET_BACKEND_URL = prev;
+    }
+  });
 });
