@@ -114,7 +114,7 @@ export default function PitchPage() {
             </span>
             <span
               className={`h-1.5 w-1.5 rounded-full transition-all ${
-                current === slide.n ? "scale-125 bg-privacy" : "bg-gray/30 group-hover:bg-gray/60"
+                current === slide.n ? "scale-125 bg-btc" : "bg-gray/30 group-hover:bg-gray/60"
               }`}
             />
           </button>

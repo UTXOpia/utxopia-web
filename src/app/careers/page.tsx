@@ -82,7 +82,7 @@ export default function CareersPage() {
       <div className="mx-auto max-w-2xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
         {/* ── Posting header ── */}
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray/15 bg-muted/20 px-3 py-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-privacy" />
+          <span className="h-1.5 w-1.5 rounded-full bg-btc" />
           <span className="text-[10px] font-medium uppercase tracking-wider text-gray">
             one open role
           </span>
@@ -180,7 +180,7 @@ export default function CareersPage() {
           . Go check them — that&apos;s the whole point.
         </p>
 
-        <p className="mt-5 rounded-[12px] border border-privacy/15 bg-privacy/[0.04] px-4 py-3 text-caption leading-relaxed text-gray-light">
+        <p className="mt-5 rounded-[12px] border border-btc/20 bg-btc/[0.05] px-4 py-3 text-caption leading-relaxed text-gray-light">
           The claim you&apos;d be defending: on 2026-08-04 we switched our own backend off and a
           member&apos;s bitcoin still left the vault. 46,803 sats, twice — the second run rebuilt
           from chain data alone. The system already survives its own creators disappearing.
@@ -241,7 +241,7 @@ export default function CareersPage() {
         <ul className="space-y-2">
           {FIT.map((line) => (
             <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-privacy" />
+              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-btc" />
               {line}
             </li>
           ))}
@@ -285,7 +285,7 @@ export default function CareersPage() {
           <ol className="mt-3 space-y-2">
             {APPLY.map((line, i) => (
               <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
-                <span className="font-mono text-privacy/70">{i + 1}</span>
+                <span className="font-mono text-btc">{i + 1}</span>
                 {line}
               </li>
             ))}

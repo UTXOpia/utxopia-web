@@ -31,17 +31,28 @@ export type Slide = {
   body?: React.ReactNode;
 };
 
+/**
+ * Two accents, each with a job: gold is bitcoin, purple is privacy. Purple
+ * appears on exactly one pillar and two lines, which is what stops it reading
+ * as decoration.
+ */
 const Card = ({
   icon: Icon,
   title,
   body,
+  accent = "btc",
 }: {
   icon?: React.ElementType;
   title: string;
   body: string;
+  accent?: "btc" | "privacy";
 }) => (
   <div className="rounded-[14px] border border-gray/15 bg-muted/30 p-3 @xl:p-4">
-    {Icon && <Icon className="mb-2 h-4 w-4 text-privacy/80 @xl:mb-3" />}
+    {Icon && (
+      <Icon
+        className={`mb-2 h-4 w-4 @xl:mb-3 ${accent === "privacy" ? "text-privacy/80" : "text-btc/80"}`}
+      />
+    )}
     <p className="text-caption font-semibold text-foreground">{title}</p>
     <p className="mt-1.5 text-caption leading-relaxed text-gray">{body}</p>
   </div>
@@ -68,7 +79,7 @@ export const SLIDES: Slide[] = [
         {["Private", "Non-custodial", "Programmable"].map((t) => (
           <span
             key={t}
-            className="rounded-full border border-privacy/20 bg-privacy/[0.06] px-3.5 py-1.5 text-caption text-privacy/90"
+            className="rounded-full border border-btc/25 bg-btc/[0.07] px-3.5 py-1.5 text-caption text-btc"
           >
             {t}
           </span>
@@ -174,16 +185,19 @@ export const SLIDES: Slide[] = [
       <Grid cols={3}>
         <Card
           icon={ShieldCheck}
+          accent="privacy"
           title="Groth16 JoinSplit proofs"
           body="Every transfer inside the vault is a zero-knowledge proof: nullifiers in, commitments out. The chain verifies correctness without learning anything else."
         />
         <Card
           icon={EyeOff}
+          accent="privacy"
           title="Nothing to link"
           body="No amounts, no sender, no recipient on chain. Your size, your entry timing and your internal moves stay yours."
         />
         <Card
           icon={Fingerprint}
+          accent="privacy"
           title="Stealth by default"
           body="Stealth addresses give recipient privacy on every payment. Privacy is the default state of the vault, not an opt-in feature."
         />
@@ -232,7 +246,7 @@ export const SLIDES: Slide[] = [
             Open to anyone with bitcoin and an SPV proof. No gatekeeper, no screening — the
             censorship-resistant heart of the system, and it will always exist.
           </p>
-          <p className="mt-3 text-caption text-privacy/80">
+          <p className="mt-3 text-caption text-privacy">
             Full shielded privacy: hidden amounts, senders and recipients.
           </p>
         </div>
@@ -242,7 +256,7 @@ export const SLIDES: Slide[] = [
             Same cryptography, different admission rule: deposits and participants pass screening
             and attestation before entry.
           </p>
-          <p className="mt-3 text-caption text-privacy/80">
+          <p className="mt-3 text-caption text-privacy">
             Institutions mix only with verified funds — an anonymity set their auditors can reason
             about and sign off on.
           </p>
@@ -280,7 +294,7 @@ export const SLIDES: Slide[] = [
             key={title}
             className="flex gap-3 rounded-[14px] border border-gray/15 bg-muted/30 p-3 @xl:gap-4 @xl:p-4"
           >
-            <span className="font-mono text-caption text-privacy/70">{i + 1}</span>
+            <span className="font-mono text-caption text-btc/70">{i + 1}</span>
             <div>
               <p className="text-caption font-semibold text-foreground">{title}</p>
               <p className="mt-1 text-caption leading-relaxed text-gray">{body}</p>
@@ -380,8 +394,8 @@ export function SlideBody({ slide }: { slide: Slide }) {
   return (
     <div className="@container mx-auto w-full max-w-3xl">
       <div className="mb-3 flex items-center gap-3 @xl:mb-5">
-        <span className="font-mono text-[10px] text-privacy/70">{pad(slide.n)}</span>
-        <span className="h-px w-6 bg-privacy/25" />
+        <span className="font-mono text-[10px] text-btc/70">{pad(slide.n)}</span>
+        <span className="h-px w-6 bg-btc/30" />
         <span className="text-[10px] font-medium uppercase tracking-[0.2em] text-gray">
           {slide.kicker}
         </span>
