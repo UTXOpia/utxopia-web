@@ -152,7 +152,9 @@ export default function PitchPage() {
             data-slide={slide.n}
             className="flex min-h-dvh snap-start flex-col justify-center px-6 py-24 sm:px-16 sm:py-28 lg:px-24"
           >
-            <SlideBody slide={slide} />
+            {/* Full screen means full screen: the slide grows with the display
+                instead of holding a 768px column inside a 1920px window. */}
+            <SlideBody slide={slide} className="lg:max-w-5xl xl:max-w-6xl 2xl:max-w-7xl" />
           </section>
         ))}
       </div>

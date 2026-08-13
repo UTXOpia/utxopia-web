@@ -13,6 +13,10 @@ import { hrefWithChain } from "@/lib/network-config";
  * One open role, posted as directly as the product is described. The page holds
  * itself to the rule it asks the reader to hold us to: every number carries its
  * source and the date it was checked, or it doesn't go on the page.
+ *
+ * Layout: prose stays at a readable measure, but the page doesn't — a wide
+ * screen gets a sticky facts rail, a full-width deck, and the card sections
+ * side by side, rather than one narrow column with empty margins.
  */
 
 
@@ -72,6 +76,9 @@ const SOURCES = [
   { label: "DefiLlama — chain TVL", href: "https://defillama.com/chains" },
 ];
 
+/** Prose measure. Wider than this and the eye loses the line. */
+const PROSE = "max-w-[65ch]";
+
 export default function CareersPage() {
   const { networkId } = useChainEnvironment();
 
@@ -79,115 +86,146 @@ export default function CareersPage() {
     <main className="min-h-screen bg-background">
       <SiteHeader />
 
-      <div className="mx-auto max-w-2xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32">
-        {/* ── Posting header ── */}
-        <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray/15 bg-muted/20 px-3 py-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-btc" />
-          <span className="text-[10px] font-medium uppercase tracking-wider text-gray">
-            one open role
-          </span>
-        </div>
-
-        <h1 className="mb-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
-          Cofounder — everything that isn&apos;t code
-        </h1>
-        <p className="text-body2 leading-relaxed text-gray-light">
-          The code works. Everything that isn&apos;t code, doesn&apos;t. That&apos;s the half
-          I&apos;m looking for — a cofounder, not a hire. To be direct before you read any
-          further: there is no salary, because there is no money yet. What there is, is real
-          equity, an equal say, and a raise we walk into together.
-        </p>
-
-        <dl className="mt-8 divide-y divide-gray/10 overflow-hidden rounded-[12px] border border-gray/15 bg-muted/20">
-          {FACTS.map(([k, v]) => (
-            <div key={k} className="flex flex-col gap-0.5 px-4 py-2.5 sm:flex-row sm:gap-4">
-              <dt className="text-caption font-medium text-gray sm:w-32 sm:shrink-0">{k}</dt>
-              <dd className="text-caption text-foreground">{v}</dd>
+      <div className="mx-auto max-w-6xl px-4 pb-20 pt-28 sm:px-6 sm:pt-32 2xl:max-w-7xl">
+        {/* ── Posting header + facts rail ──
+            Source order is the mobile order: headline, then the facts, then the
+            two ways to reply. On lg the rail is placed into column two, so it
+            sits beside the argument instead of interrupting it. */}
+        <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_19rem] lg:gap-12 2xl:grid-cols-[minmax(0,1fr)_21rem] 2xl:gap-16">
+          <div className="lg:col-start-1 lg:row-start-1">
+            <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-gray/15 bg-muted/20 px-3 py-1.5">
+              <span className="h-1.5 w-1.5 rounded-full bg-btc" />
+              <span className="text-[10px] font-medium uppercase tracking-wider text-gray">
+                one open role
+              </span>
             </div>
-          ))}
-        </dl>
 
-        <div className="mt-6 flex flex-col gap-3 sm:flex-row">
-          <a
-            href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
-          >
-            <Mail className="h-3.5 w-3.5" />
-            Apply
-          </a>
-          <a
-            href={TELEGRAM_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
-          >
-            <Send className="h-3.5 w-3.5" />
-            Telegram @{TELEGRAM}
-          </a>
-        </div>
+            <h1 className="mb-3 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl lg:text-4xl">
+              Cofounder — everything that isn&apos;t code
+            </h1>
+            <p className={`text-body2 leading-relaxed text-gray-light ${PROSE}`}>
+              The code works. Everything that isn&apos;t code, doesn&apos;t. That&apos;s the half
+              I&apos;m looking for — a cofounder, not a hire. To be direct before you read any
+              further: there is no salary, because there is no money yet. What there is, is real
+              equity, an equal say, and a raise we walk into together.
+            </p>
 
-        {/* ── Why the role exists. Every figure sourced and dated. ── */}
-        <h2 className="mb-4 mt-14 text-heading6 font-semibold text-foreground">
-          Why this role exists
-        </h2>
+            {/* ── Why the role exists. Every figure sourced and dated. ── */}
+            <h2 className="mb-4 mt-12 text-heading6 font-semibold text-foreground">
+              Why this role exists
+            </h2>
 
-        <div className="space-y-4 text-body2 leading-relaxed text-gray-light">
-          <p>
-            Bitcoin is the largest pool of capital in crypto and almost none of it does anything.
-            About <span className="text-foreground">91,332 BTC — 0.46% of circulating supply</span>{" "}
-            is deployed in bitcoin DeFi. Ethereum DeFi uses roughly{" "}
-            <span className="text-foreground">15% of circulating ETH</span>. Count generously —
-            Babylon staking plus every wrapped variant — and bitcoin still only reaches 0.8%.
-          </p>
-          <p>
-            It isn&apos;t that nobody tried. BTCFi TVL peaked near{" "}
-            <span className="text-foreground">$9.1B in October 2025</span>; by Q1 2026 L2 and
-            sidechain TVL had contracted <span className="text-foreground">over 74%</span>. Today
-            DefiLlama shows roughly <span className="text-foreground">$174M</span> across Stacks,
-            Rootstock, BOB, Merlin, Citrea, Core, BSquared and Bitlayer combined. The yields were
-            real. People walked anyway.
-          </p>
-          <p>
-            They walked because every path to productive bitcoin asks the holder to give something
-            up first: your keys to a custodian, your coins to a bridge multisig, or your privacy to
-            a public address that publishes your size, your timing and your counterparties forever.
-            If you bought bitcoin specifically so you wouldn&apos;t carry counterparty risk, that is
-            an absurd trade — and 99.5% of the supply is declining it.
-          </p>
-          <p>
-            UTXOpia removes the trade. Bitcoin on Solana, positions not published by default, and a
-            withdrawal destination registered up front that needs nobody&apos;s approval to reach —
-            not a reviewer&apos;s, not mine, not if this company is gone. It&apos;s written into the
-            on-chain program, not into my promises.
-          </p>
-        </div>
+            <div className={`space-y-4 text-body2 leading-relaxed text-gray-light ${PROSE}`}>
+              <p>
+                Bitcoin is the largest pool of capital in crypto and almost none of it does
+                anything. About{" "}
+                <span className="text-foreground">91,332 BTC — 0.46% of circulating supply</span>{" "}
+                is deployed in bitcoin DeFi. Ethereum DeFi uses roughly{" "}
+                <span className="text-foreground">15% of circulating ETH</span>. Count generously —
+                Babylon staking plus every wrapped variant — and bitcoin still only reaches 0.8%.
+              </p>
+              <p>
+                It isn&apos;t that nobody tried. BTCFi TVL peaked near{" "}
+                <span className="text-foreground">$9.1B in October 2025</span>; by Q1 2026 L2 and
+                sidechain TVL had contracted <span className="text-foreground">over 74%</span>.
+                Today DefiLlama shows roughly <span className="text-foreground">$174M</span> across
+                Stacks, Rootstock, BOB, Merlin, Citrea, Core, BSquared and Bitlayer combined. The
+                yields were real. People walked anyway.
+              </p>
+              <p>
+                They walked because every path to productive bitcoin asks the holder to give
+                something up first: your keys to a custodian, your coins to a bridge multisig, or
+                your privacy to a public address that publishes your size, your timing and your
+                counterparties forever. If you bought bitcoin specifically so you wouldn&apos;t
+                carry counterparty risk, that is an absurd trade — and 99.5% of the supply is
+                declining it.
+              </p>
+              <p>
+                UTXOpia removes the trade. Bitcoin on Solana, positions not published by default,
+                and a withdrawal destination registered up front that needs nobody&apos;s approval
+                to reach — not a reviewer&apos;s, not mine, not if this company is gone. It&apos;s
+                written into the on-chain program, not into my promises.
+              </p>
+            </div>
 
-        <p className="mt-4 text-caption leading-relaxed text-gray">
-          Figures checked {DATA_CHECKED}.{" "}
-          {SOURCES.map((s, i) => (
-            <span key={s.href}>
-              {i > 0 && " · "}
+            <p className={`mt-4 text-caption leading-relaxed text-gray ${PROSE}`}>
+              Figures checked {DATA_CHECKED}.{" "}
+              {SOURCES.map((s, i) => (
+                <span key={s.href}>
+                  {i > 0 && " · "}
+                  <a
+                    href={s.href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline underline-offset-4 hover:text-foreground"
+                  >
+                    {s.label}
+                  </a>
+                </span>
+              ))}
+              . Go check them — that&apos;s the whole point.
+            </p>
+
+            <p
+              className={`mt-5 rounded-[12px] border border-btc/20 bg-btc/[0.05] px-4 py-3 text-caption leading-relaxed text-gray-light ${PROSE}`}
+            >
+              The claim you&apos;d be defending: on 2026-08-04 we switched our own backend off and
+              a member&apos;s bitcoin still left the vault. 46,803 sats, twice — the second run
+              rebuilt from chain data alone. The system already survives its own creators
+              disappearing.
+            </p>
+          </div>
+
+          <aside className="mt-8 lg:col-start-2 lg:row-start-1 lg:mt-0">
+            <div className="lg:sticky lg:top-28">
+              <dl className="divide-y divide-gray/10 overflow-hidden rounded-[12px] border border-gray/15 bg-muted/20">
+                {FACTS.map(([k, v]) => (
+                  <div
+                    key={k}
+                    className="flex flex-col gap-0.5 px-4 py-2.5 sm:flex-row sm:gap-4 lg:flex-col lg:gap-1"
+                  >
+                    <dt className="text-caption font-medium text-gray sm:w-32 sm:shrink-0 lg:w-auto lg:text-[10px] lg:uppercase lg:tracking-wider">
+                      {k}
+                    </dt>
+                    <dd className="text-caption leading-relaxed text-foreground">{v}</dd>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="mt-4 flex flex-col gap-3 sm:flex-row lg:flex-col">
+                <a
+                  href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
+                >
+                  <Mail className="h-3.5 w-3.5" />
+                  Apply
+                </a>
+                <a
+                  href={TELEGRAM_URL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="inline-flex flex-1 items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
+                >
+                  <Send className="h-3.5 w-3.5" />
+                  Telegram @{TELEGRAM}
+                </a>
+              </div>
+
               <a
-                href={s.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="underline underline-offset-4 hover:text-foreground"
+                href={DECK_PDF_URL}
+                download
+                className="mt-3 hidden items-center justify-center gap-1.5 text-caption text-gray underline underline-offset-4 transition-colors hover:text-foreground lg:inline-flex"
               >
-                {s.label}
+                <Download className="h-3 w-3" />
+                Download the deck as PDF
               </a>
-            </span>
-          ))}
-          . Go check them — that&apos;s the whole point.
-        </p>
+            </div>
+          </aside>
+        </div>
 
-        <p className="mt-5 rounded-[12px] border border-btc/20 bg-btc/[0.05] px-4 py-3 text-caption leading-relaxed text-gray-light">
-          The claim you&apos;d be defending: on 2026-08-04 we switched our own backend off and a
-          member&apos;s bitcoin still left the vault. 46,803 sats, twice — the second run rebuilt
-          from chain data alone. The system already survives its own creators disappearing.
-        </p>
-
-        {/* ── The deck, inline ── */}
-        <h2 id="deck" className="mb-1 mt-14 scroll-mt-28 text-heading6 font-semibold text-foreground">
+        {/* ── The deck, inline. Full page width: at 672px every three-column
+            slide had to be scrolled through. ── */}
+        <h2 id="deck" className="mb-1 mt-16 scroll-mt-28 text-heading6 font-semibold text-foreground">
           The deck
         </h2>
         <p className="mb-4 text-caption text-gray">
@@ -219,10 +257,10 @@ export default function CareersPage() {
         </div>
 
         {/* ── Responsibilities ── */}
-        <h2 className="mb-4 mt-14 text-heading6 font-semibold text-foreground">
+        <h2 className="mb-4 mt-16 text-heading6 font-semibold text-foreground">
           What you&apos;d own
         </h2>
-        <div className="space-y-3">
+        <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
           {RESPONSIBILITIES.map((item) => (
             <div
               key={item.title}
@@ -234,87 +272,97 @@ export default function CareersPage() {
           ))}
         </div>
 
-        {/* ── Fit ── */}
-        <h2 className="mb-4 mt-12 text-heading6 font-semibold text-foreground">
-          You&apos;re a fit if
-        </h2>
-        <ul className="space-y-2">
-          {FIT.map((line) => (
-            <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-btc" />
-              {line}
-            </li>
-          ))}
-        </ul>
+        {/* ── Fit. The two lists are read against each other, so on a wide
+            screen they belong beside each other. ── */}
+        <div className="mt-14 grid gap-10 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <h2 className="mb-4 text-heading6 font-semibold text-foreground">
+              You&apos;re a fit if
+            </h2>
+            <ul className="space-y-2">
+              {FIT.map((line) => (
+                <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-btc" />
+                  {line}
+                </li>
+              ))}
+            </ul>
+          </div>
 
-        <h2 className="mb-4 mt-10 text-heading6 font-semibold text-foreground">
-          You&apos;re not, if
-        </h2>
-        <ul className="space-y-2">
-          {NOT_FIT.map((line) => (
-            <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray">
-              <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray/40" />
-              {line}
-            </li>
-          ))}
-        </ul>
-
-        {/* ── The constraint ── */}
-        <h2 className="mb-3 mt-12 text-heading6 font-semibold text-foreground">
-          How we talk about this
-        </h2>
-        <p className="text-body2 leading-relaxed text-gray-light">
-          No points, no airdrops, no paid influencers, no engagement farming. Not now, not later.
-          Every claim has to map to something a stranger can verify — every number on this page
-          carries its source and the date we checked it, and that is the standard for everything you
-          would publish. We say less than our competitors on purpose. If that reads as the
-          constraint you&apos;ve been waiting for rather than the one that annoys you, we&apos;ll
-          get on.
-        </p>
-        <p className="mt-4 text-body2 leading-relaxed text-gray-light">
-          You don&apos;t need to understand the cryptography — I do that part. You do need to be
-          able to defend it to a hostile reader, and making sure you can is my job.
-        </p>
-
-        {/* ── How to apply ── */}
-        <div className="mt-12 rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
-          <h2 className="text-heading6 font-semibold text-foreground">How to apply</h2>
-          <p className="mt-2 text-caption leading-relaxed text-gray-light">
-            Email or Telegram, whichever you prefer. No CV needed — send three things:
-          </p>
-          <ol className="mt-3 space-y-2">
-            {APPLY.map((line, i) => (
-              <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
-                <span className="font-mono text-btc">{i + 1}</span>
-                {line}
-              </li>
-            ))}
-          </ol>
-          <p className="mt-4 text-caption leading-relaxed text-gray">
-            If you&apos;re already building something, don&apos;t leave it. If you&apos;ve been
-            waiting for something worth leaving for — write, and I&apos;ll show you everything: the
-            code, the numbers, and the parts that are broken.
-          </p>
-          <div className="mt-5 flex flex-col gap-3 sm:flex-row">
-            <a
-              href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
-              className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
-            >
-              <Mail className="h-3.5 w-3.5" />
-              {CONTACT_EMAIL}
-            </a>
-            <a
-              href={TELEGRAM_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
-            >
-              <Send className="h-3.5 w-3.5" />@{TELEGRAM}
-            </a>
+          <div>
+            <h2 className="mb-4 text-heading6 font-semibold text-foreground">
+              You&apos;re not, if
+            </h2>
+            <ul className="space-y-2">
+              {NOT_FIT.map((line) => (
+                <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray">
+                  <span className="mt-1.5 h-1 w-1 shrink-0 rounded-full bg-gray/40" />
+                  {line}
+                </li>
+              ))}
+            </ul>
           </div>
         </div>
 
-        <p className="mt-6 text-caption text-gray">
+        {/* ── The constraint, next to the way in ── */}
+        <div className="mt-14 grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
+          <div>
+            <h2 className="mb-3 text-heading6 font-semibold text-foreground">
+              How we talk about this
+            </h2>
+            <p className="text-body2 leading-relaxed text-gray-light">
+              No points, no airdrops, no paid influencers, no engagement farming. Not now, not
+              later. Every claim has to map to something a stranger can verify — every number on
+              this page carries its source and the date we checked it, and that is the standard for
+              everything you would publish. We say less than our competitors on purpose. If that
+              reads as the constraint you&apos;ve been waiting for rather than the one that annoys
+              you, we&apos;ll get on.
+            </p>
+            <p className="mt-4 text-body2 leading-relaxed text-gray-light">
+              You don&apos;t need to understand the cryptography — I do that part. You do need to
+              be able to defend it to a hostile reader, and making sure you can is my job.
+            </p>
+          </div>
+
+          <div className="rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
+            <h2 className="text-heading6 font-semibold text-foreground">How to apply</h2>
+            <p className="mt-2 text-caption leading-relaxed text-gray-light">
+              Email or Telegram, whichever you prefer. No CV needed — send three things:
+            </p>
+            <ol className="mt-3 space-y-2">
+              {APPLY.map((line, i) => (
+                <li key={line} className="flex gap-3 text-caption leading-relaxed text-gray-light">
+                  <span className="font-mono text-btc">{i + 1}</span>
+                  {line}
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 text-caption leading-relaxed text-gray">
+              If you&apos;re already building something, don&apos;t leave it. If you&apos;ve been
+              waiting for something worth leaving for — write, and I&apos;ll show you everything:
+              the code, the numbers, and the parts that are broken.
+            </p>
+            <div className="mt-5 flex flex-col gap-3 sm:flex-row">
+              <a
+                href={`mailto:${CONTACT_EMAIL}?subject=Cofounder`}
+                className="inline-flex items-center justify-center gap-2 rounded-full bg-foreground px-5 py-3 text-xs font-semibold text-background transition-all hover:bg-white hover:shadow-[0_0_15px_rgba(255,255,255,0.12)]"
+              >
+                <Mail className="h-3.5 w-3.5" />
+                {CONTACT_EMAIL}
+              </a>
+              <a
+                href={TELEGRAM_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center justify-center gap-2 rounded-full border border-gray/20 px-5 py-3 text-xs font-semibold text-foreground transition-colors hover:bg-muted/50"
+              >
+                <Send className="h-3.5 w-3.5" />@{TELEGRAM}
+              </a>
+            </div>
+          </div>
+        </div>
+
+        <p className="mt-10 text-caption text-gray">
           Live today on devnet — public alpha, testnet only, unaudited. The code is{" "}
           <a
             href="https://github.com/UTXOpia"

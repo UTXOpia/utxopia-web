@@ -13,6 +13,7 @@ import {
   Users,
 } from "lucide-react";
 import { CONTACT_EMAIL, DATA_CHECKED, TELEGRAM, TELEGRAM_URL } from "@/lib/contact";
+import { cn } from "@/lib/utils";
 
 /**
  * The deck, once. /pitch renders these one per screen; DeckEmbed renders the
@@ -389,10 +390,15 @@ export const pad = (n: number) => String(n).padStart(2, "0");
  * One slide's content. The caller owns the box; this owns everything inside it.
  * Every size below is a container query, so the same markup reads correctly in
  * a 356px embed and on a 1440px screen.
+ *
+ * `className` is how a caller widens the slide — the cards want the room, so
+ * the ceiling belongs to whoever knows how much room there is. Running text
+ * keeps its own measure regardless, in `ch`, so a wider slide grows the grids
+ * and not the line length.
  */
-export function SlideBody({ slide }: { slide: Slide }) {
+export function SlideBody({ slide, className }: { slide: Slide; className?: string }) {
   return (
-    <div className="@container mx-auto w-full max-w-3xl">
+    <div className={cn("@container mx-auto w-full max-w-3xl", className)}>
       <div className="mb-3 flex items-center gap-3 @xl:mb-5">
         <span className="font-mono text-[10px] text-btc/70">{pad(slide.n)}</span>
         <span className="h-px w-6 bg-btc/30" />
@@ -401,12 +407,12 @@ export function SlideBody({ slide }: { slide: Slide }) {
         </span>
       </div>
 
-      <h2 className="text-lg font-semibold leading-tight tracking-tight text-foreground @lg:text-2xl @3xl:text-4xl">
+      <h2 className="max-w-[24ch] text-lg font-semibold leading-tight tracking-tight text-foreground @lg:text-2xl @3xl:text-4xl">
         {slide.title}
       </h2>
 
       {slide.lead && (
-        <p className="mt-3 text-caption leading-relaxed text-gray-light @xl:mt-4 @xl:text-body2">
+        <p className="mt-3 max-w-[68ch] text-caption leading-relaxed text-gray-light @xl:mt-4 @xl:text-body2">
           {slide.lead}
         </p>
       )}
@@ -414,7 +420,9 @@ export function SlideBody({ slide }: { slide: Slide }) {
       {slide.body && <div className="mt-5 @xl:mt-8">{slide.body}</div>}
 
       {slide.footnote && (
-        <p className="mt-5 text-caption leading-relaxed text-gray @xl:mt-8">{slide.footnote}</p>
+        <p className="mt-5 max-w-[70ch] text-caption leading-relaxed text-gray @xl:mt-8">
+          {slide.footnote}
+        </p>
       )}
     </div>
   );

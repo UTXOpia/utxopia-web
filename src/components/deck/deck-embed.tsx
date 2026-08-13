@@ -32,8 +32,11 @@ export function DeckEmbed() {
   return (
     <div>
       {/* 16:9 is the deck's ratio, but on a phone that leaves a 200px window
-          and turns every slide into four swipes. Mobile gets a taller frame. */}
-      <div className="aspect-[4/5] w-full overflow-hidden rounded-[16px] border border-gray/15 bg-card/50 sm:aspect-video">
+          and turns every slide into four swipes. Mobile gets a taller frame.
+          The max-height is the other end of the same problem: at full page
+          width 16:9 is taller than the viewport, so the frame stops growing
+          and goes slightly wide of the ratio instead. */}
+      <div className="aspect-[4/5] w-full overflow-hidden rounded-[16px] border border-gray/15 bg-card/50 sm:aspect-video sm:max-h-[min(72vh,620px)]">
         <div
           ref={ref}
           tabIndex={0}
@@ -50,15 +53,13 @@ export function DeckEmbed() {
           }}
           className="flex h-full snap-x snap-mandatory overflow-x-auto overflow-y-hidden outline-none [scrollbar-width:none] focus-visible:ring-1 focus-visible:ring-btc/40 [&::-webkit-scrollbar]:hidden"
         >
-          {/* px-5 and no more: the @container inside must clear the 512px that
-              three-column slides need, and the frame is only ~624px at 1440. */}
           {SLIDES.map((slide) => (
             <div
               key={slide.n}
-              className="flex h-full w-full shrink-0 snap-start overflow-y-auto px-5 py-6"
+              className="flex h-full w-full shrink-0 snap-start overflow-y-auto px-5 py-6 sm:px-10 sm:py-8"
             >
               <div className="m-auto w-full">
-                <SlideBody slide={slide} />
+                <SlideBody slide={slide} className="md:max-w-4xl xl:max-w-5xl" />
               </div>
             </div>
           ))}

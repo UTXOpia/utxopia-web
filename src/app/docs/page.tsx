@@ -471,7 +471,10 @@ export default function DocsPage() {
 
         {/* Content area */}
         <div className="flex-1 min-w-0">
-          <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
+          {/* Paragraphs are capped individually (max-w-xl/2xl), so widening the
+              column past 4xl buys width for the card grids and tables only —
+              the reading measure does not change. */}
+          <div className="max-w-4xl xl:max-w-5xl 2xl:max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 xl:px-12">
 
             <section className="pb-8 pt-24 sm:pb-10 sm:pt-28 lg:pt-32">
               <h1 className="text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
@@ -568,7 +571,7 @@ export default function DocsPage() {
               summary="The path from deposit to private note, transfer, and exit."
             >
               <FlowDiagram />
-              <div className="mt-8 space-y-4">
+              <div className="mt-8 grid gap-4 xl:grid-cols-2">
                 {protocolSteps.map((step) => (
                   <DocsSection key={step.id} id={step.id}>
                     <StepCard {...step} />
@@ -583,7 +586,7 @@ export default function DocsPage() {
               summary="Commitments, nullifiers, proofs, stealth addresses, spending keys, and viewing keys."
             >
               <h3 className="mb-4 text-base font-semibold text-foreground">Cryptography</h3>
-              <div className="space-y-4">
+              <div className="grid gap-4 xl:grid-cols-2">
                 {cryptoItems.map((item) => (
                   <DocsSection key={item.id} id={item.id}>
                     <CryptoCard {...item} />
@@ -645,7 +648,7 @@ export default function DocsPage() {
               title="Security"
               summary="Custody, Bitcoin verification, double-spend prevention, and the on-chain audit trail."
             >
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
                 {securityItems.map((item) => (
                   <SecurityCard key={item.title} {...item} />
                 ))}
