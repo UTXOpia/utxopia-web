@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { ChevronDown } from "lucide-react";
+import { ArrowLeft, ChevronDown } from "lucide-react";
 import { SLIDES, SlideBody, pad } from "@/components/deck/slides";
 
 /**
@@ -78,12 +78,22 @@ export default function PitchPage() {
 
   return (
     <div className="relative bg-background">
+      {/* Named for where it goes rather than "back": the deck is linked into
+          conversations directly, so a reader may not have come from /careers.
+          The label is dropped on narrow screens — a slide taller than the
+          viewport has to be scrolled through, and its text passes under this
+          pill on the way. Any fixed overlay occludes something; a wide one
+          covered a whole word rather than a couple of characters. */}
       <Link
         href="/careers"
-        className="fixed left-5 top-5 z-30 flex items-center gap-2 rounded-full border border-gray/15 bg-background/70 px-3 py-1.5 backdrop-blur-md transition-colors hover:border-gray/30 sm:left-8 sm:top-8"
+        aria-label="Back to careers"
+        className="group fixed left-5 top-5 z-30 flex items-center gap-2 rounded-full border border-gray/15 bg-background/70 py-1.5 pl-2.5 pr-2.5 backdrop-blur-md transition-colors hover:border-gray/30 sm:left-8 sm:top-8 sm:pr-3"
       >
+        <ArrowLeft className="h-3 w-3 text-gray transition-colors group-hover:text-foreground" />
         <Image src="/brand/logo-transparent-128.png" alt="" width={16} height={16} />
-        <span className="text-[10px] font-semibold tracking-tight text-foreground">UTXOpia</span>
+        <span className="hidden text-[10px] font-semibold tracking-tight text-foreground sm:inline">
+          Careers
+        </span>
       </Link>
 
       <div className="fixed bottom-5 left-5 z-30 rounded-full border border-gray/15 bg-background/80 px-2.5 py-1 font-mono text-[10px] text-gray backdrop-blur-md sm:bottom-8 sm:left-8">

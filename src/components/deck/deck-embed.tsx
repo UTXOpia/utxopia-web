@@ -71,7 +71,9 @@ export function DeckEmbed() {
           <span className="text-gray/40"> / {pad(SLIDES.length)}</span>
         </span>
 
-        <div className="flex items-center gap-1.5">
+        {/* The rail is ten small targets; on a phone the arrows do the same job
+            without crowding the labelled button out of the row. */}
+        <div className="hidden items-center gap-1.5 sm:flex">
           {SLIDES.map((slide, idx) => (
             <button
               key={slide.n}
@@ -102,11 +104,12 @@ export function DeckEmbed() {
           >
             <ChevronRight className="h-3 w-3" />
           </button>
+          {/* Lands on the slide being read, not back at the title. */}
           <Link
             href={`/pitch#${i + 1}`}
-            aria-label="Open the deck full screen"
-            className="rounded-full border border-gray/15 p-1.5 text-gray transition-colors hover:text-foreground"
+            className="ml-1 inline-flex items-center gap-1.5 rounded-full border border-gray/20 px-3 py-1.5 text-caption font-semibold text-foreground transition-colors hover:border-gray/40 hover:bg-muted/50"
           >
+            Full deck
             <Maximize2 className="h-3 w-3" />
           </Link>
         </div>
