@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useWallet } from "@solana/wallet-adapter-react";
@@ -19,6 +19,7 @@ import {
   hexToBytes,
 } from "@utxopia/sdk";
 import { AuthModal } from "@/components/auth-modal";
+import { HoldButton } from "@/components/ui/hold-button";
 import { buildTransferParams } from "@/hooks/use-build-transfer-params";
 import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
 import { usePasskey } from "@/hooks/use-passkey";
@@ -30,6 +31,7 @@ import {
   selectUnspentClaimNote,
 } from "@/lib/claim-flow";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { estimateJoinSplitDimensions } from "@/lib/prover/join-split-dimensions";
 import { networkChain, hrefWithChain } from "@/lib/network-config";
 import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { recordSubmittedTransaction } from "@/lib/transaction-activity";
@@ -95,6 +97,25 @@ function ClaimContent() {
   const receiveAmount = note
     ? BigInt(note.amount) - BigInt(effectiveRelayerFee)
     : 0n;
+
+  // The wasm/zkey pair is the slow part of a claim, and by the time a note is
+  // on screen its exact dimensions are known — download them while the user
+  // reads the amounts. Confirmation queues behind this, never re-downloads.
+  const { preloadCircuit } = submitter;
+  const warmCircuit = useCallback(() => {
+    if (!note || !relayerMetaLoaded) return;
+    const dimensions = estimateJoinSplitDimensions(
+      [BigInt(note.amount)],
+      receiveAmount,
+      BigInt(effectiveRelayerFee),
+    );
+    if (!dimensions) return;
+    void preloadCircuit(dimensions.nInputs, dimensions.nOutputs).catch((err) => {
+      console.warn("[Prover] Circuit preload failed; the claim will retry on confirm.", err);
+    });
+  }, [note, relayerMetaLoaded, effectiveRelayerFee, receiveAmount, preloadCircuit]);
+
+  useEffect(warmCircuit, [warmCircuit]);
 
   const handlePasskeyRegister = async () => {
     const seed = await registerPasskey();
@@ -188,6 +209,8 @@ function ClaimContent() {
     }
   };
 
+  const claiming =
+    submitter.status === "processing" || submitter.status === "submitting";
   const displayAmount = note
     ? formatAmount(Number(note.amount), token.decimals)
     : null;
@@ -301,15 +324,18 @@ function ClaimContent() {
                 Unlock destination vault
               </button>
             ) : (
-              <button
-                type="button"
-                onClick={() => void claimToVault()}
-                disabled={!relayerMetaLoaded || submitter.status === "processing" || submitter.status === "submitting"}
-                className="btn-primary w-full"
+              <HoldButton
+                variant="cta"
+                className="w-full"
+                onComplete={() => void claimToVault()}
+                onHoldStart={warmCircuit}
+                disabled={!relayerMetaLoaded || claiming}
               >
-                {(submitter.status === "processing" || submitter.status === "submitting") && <Loader2 className="w-5 h-5 animate-spin" />}
-                {submitter.statusMessage || "Claim to private vault"}
-              </button>
+                {claiming && <Loader2 className="w-5 h-5 animate-spin" />}
+                {claiming
+                  ? submitter.statusMessage || "Claiming..."
+                  : "Hold to claim"}
+              </HoldButton>
             )}
           </div>
         )}

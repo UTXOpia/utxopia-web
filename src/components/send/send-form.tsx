@@ -23,7 +23,7 @@ import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
 import { estimateJoinSplitDimensions } from "@/lib/prover/join-split-dimensions";
 import { useElapsedSeconds } from "@/hooks/use-elapsed-seconds";
 import { useSnsName } from "@/hooks/use-sns-name";
-import { useRelayerConfig } from "@/hooks/use-relayer-config";
+import { useRelayerConfig, resolveRelayerFee } from "@/hooks/use-relayer-config";
 import { buildTransferParams } from "@/hooks/use-build-transfer-params";
 import { autoSelectNotes } from "@/components/send/_lifted/helpers";
 import { PAY_TOKENS } from "@/lib/supported-tokens";
@@ -250,6 +250,9 @@ export function SendForm({
 } = {}) {
   const [state, dispatch] = useReducer(reducer, initial);
   const [linkOpen, setLinkOpen] = useState(false);
+  // The claim link picks its own asset: it has no recipient, so the form's
+  // token (which a BTC address can force to zkBTC) doesn't apply to it.
+  const [linkToken, setLinkToken] = useState("zkBTC");
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [regtestBtcAddress, setRegtestBtcAddress] = useState<string | null>(null);
@@ -393,6 +396,15 @@ export function SendForm({
     effectiveServiceFeeBps,
   } =
     useRelayerConfig(selectedPayToken, chainEnv.networkId);
+
+  const linkPayToken = useMemo(
+    () =>
+      PAY_TOKENS.find((t) => t.shieldedSymbol === linkToken) ?? PAY_TOKENS[0],
+    [linkToken],
+  );
+  const linkRelayerFee = resolveRelayerFee(relayerMeta, linkPayToken);
+  const linkNotes = useNoteAutoSelector(linkPayToken.shieldedSymbol, 0);
+  const linkAvailable = BigInt(linkNotes.totalAvailable);
 
   const amountSats = parseDecimalToBaseUnits(state.amount, selectedPayToken.decimals) ?? 0;
   const relayerReady = relayerMetaLoaded && Boolean(relayerMeta?.stealthMeta);
@@ -737,8 +749,9 @@ export function SendForm({
           "Vault locked. Sign in via the gear menu first.",
         );
       }
-      const linkToken = PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken) ?? selectedPayToken;
-      const sats = parseDecimalToBaseUnits(input.amount, linkToken.decimals);
+      const token = PAY_TOKENS.find((t) => t.shieldedSymbol === input.sourceToken) ?? linkPayToken;
+      const fee = resolveRelayerFee(relayerMeta, token);
+      const sats = parseDecimalToBaseUnits(input.amount, token.decimals);
       if (!sats || sats <= 0) {
         throw new Error("Enter a valid amount");
       }
@@ -749,7 +762,7 @@ export function SendForm({
       const noteKeys = await deriveKeysFromSeedCircuit(noteMaster);
       const noteMeta = createStealthMetaAddress(noteKeys);
 
-      const totalNeededLink = sats + effectiveRelayerFee;
+      const totalNeededLink = sats + fee;
       const linkAvail = ctx.inboxNotes.filter(
         (n) =>
           n.amount > 0n &&
@@ -773,10 +786,10 @@ export function SendForm({
         relayerMeta: relayerMeta?.stealthMeta
           ? decodeStealthMetaAddress(relayerMeta.stealthMeta)
           : undefined,
-        relayerFee: effectiveRelayerFee,
+        relayerFee: fee,
         boundChainId,
         privacyDomain,
-        tokenMint: linkToken.mint || undefined,
+        tokenMint: token.mint || undefined,
         recipient: { stealthMeta: noteMeta },
       });
 
@@ -801,10 +814,9 @@ export function SendForm({
     [
       ctx,
       relayerMeta,
-      effectiveRelayerFee,
       submitter,
       scheduleInboxRefresh,
-      selectedPayToken,
+      linkPayToken,
       boundChainId,
       chainEnv.networkId,
       privacyDomain,
@@ -945,7 +957,10 @@ export function SendForm({
 
           <button
             type="button"
-            onClick={() => setLinkOpen(true)}
+            onClick={() => {
+              setLinkToken(state.sourceToken);
+              setLinkOpen(true);
+            }}
             disabled={!relayerReady}
             className={cn(
               "w-full px-4 py-3 rounded-lg bg-muted/40 border border-gray/15 text-sm font-medium flex items-center justify-center gap-2 hover:border-privacy/30",
@@ -1022,11 +1037,20 @@ export function SendForm({
         open={linkOpen}
         onOpenChange={setLinkOpen}
         onGenerate={onGenerateClaimLink}
-        availableBaseUnits={totalAvailable}
-        decimals={selectedPayToken.decimals}
-        unit={selectedPayToken.unit}
-        usdPerUnit={usdPerUnit}
-        defaultToken={effectiveToken}
+        sourceToken={linkToken}
+        onSourceTokenChange={setLinkToken}
+        availableBaseUnits={linkAvailable}
+        availableLabel={
+          ctx.isLoading || linkNotes.isLoading
+            ? "Loading…"
+            : !ctx.hasKeys
+              ? "Sign in to view"
+              : `${formatAmount(Number(linkAvailable), linkPayToken.decimals)} ${linkPayToken.shieldedSymbol}`
+        }
+        feeBufferBaseUnits={BigInt(linkRelayerFee)}
+        decimals={linkPayToken.decimals}
+        unit={linkPayToken.shieldedSymbol}
+        usdPerUnit={tokenPrices[linkPayToken.priceKey] ?? null}
         progressMessage={submitter.statusMessage}
       />
 

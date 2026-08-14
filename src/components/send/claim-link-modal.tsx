@@ -19,11 +19,16 @@ export interface ClaimLinkModalProps {
     sourceToken: string;
     amount: string;
   }) => Promise<ClaimLinkResult>;
+  /** Controlled: every amount-side prop below must describe this token. */
+  sourceToken: string;
+  onSourceTokenChange: (symbol: string) => void;
   availableBaseUnits: bigint;
+  availableLabel?: React.ReactNode;
+  /** Relayer fee for `sourceToken`, reserved by "Max". */
+  feeBufferBaseUnits?: bigint;
   decimals: number;
   unit: string;
   usdPerUnit: number | null;
-  defaultToken?: string;
   progressMessage?: string;
 }
 
@@ -31,14 +36,16 @@ export function ClaimLinkModal({
   open,
   onOpenChange,
   onGenerate,
+  sourceToken,
+  onSourceTokenChange,
   availableBaseUnits,
+  availableLabel,
+  feeBufferBaseUnits = 0n,
   decimals,
   unit,
   usdPerUnit,
-  defaultToken = "zkBTC",
   progressMessage,
 }: ClaimLinkModalProps) {
-  const [sourceToken, setSourceToken] = useState(defaultToken);
   const [amount, setAmount] = useState("");
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<ClaimLinkResult | null>(null);
@@ -101,7 +108,11 @@ export function ClaimLinkModal({
               <TokenSourcePicker
                 recipientType={"claim_link"}
                 selected={sourceToken}
-                onSelect={setSourceToken}
+                onSelect={(symbol) => {
+                  if (symbol === sourceToken) return;
+                  setAmount(""); // the typed amount was in the old token's units
+                  onSourceTokenChange(symbol);
+                }}
               />
               <AmountField
                 value={amount}
@@ -109,6 +120,8 @@ export function ClaimLinkModal({
                 decimals={decimals}
                 unit={unit}
                 availableBaseUnits={availableBaseUnits}
+                availableLabel={availableLabel}
+                feeBufferBaseUnits={feeBufferBaseUnits}
                 usdPerUnit={usdPerUnit}
               />
               {busy && (
