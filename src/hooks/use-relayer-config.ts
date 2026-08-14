@@ -8,12 +8,25 @@ import {
 } from "@/components/send/_lifted/helpers";
 import type { NetworkId } from "@/lib/network-config";
 
-interface RelayerMeta {
+export interface RelayerMeta {
   stealthMeta: string | null;
   relayerFeeSats: number;
   relayerFees: Record<string, number>;
   serviceFeeSats: number;
   serviceFeeBps: number;
+}
+
+/**
+ * The relay quotes a fee per shielded asset, so a flow that spends a different
+ * token than the form's selection (claim links) must resolve its own fee —
+ * a sats-denominated fee applied to a 6-decimal token is off by 100x.
+ */
+export function resolveRelayerFee(
+  meta: RelayerMeta | null,
+  token: PayToken,
+): number {
+  if (!meta) return 0;
+  return meta.relayerFees[token.shieldedSymbol] ?? token.relayerFee;
 }
 
 export function useRelayerConfig(selectedToken: PayToken, networkId?: NetworkId) {
@@ -39,10 +52,7 @@ export function useRelayerConfig(selectedToken: PayToken, networkId?: NetworkId)
 
   // Derived values
   const relayerMetaLoaded = relayerMeta !== null;
-  const effectiveRelayerFee = relayerMetaLoaded
-    ? (relayerMeta.relayerFees[selectedToken.shieldedSymbol]
-        ?? selectedToken.relayerFee)
-    : 0;
+  const effectiveRelayerFee = resolveRelayerFee(relayerMeta, selectedToken);
   const effectiveServiceFee = relayerMeta?.serviceFeeSats ?? 0;
   const effectiveServiceFeeBps = relayerMeta?.serviceFeeBps ?? 0;
 

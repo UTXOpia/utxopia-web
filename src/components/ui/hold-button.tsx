@@ -11,11 +11,15 @@ import { cn } from "@/lib/utils";
  *  - "warning": destructive or sensitive action (exporting a viewing
  *    key, revealing a secret). Bitcoin orange so the user knows they're
  *    leaving the safe path.
+ *  - "cta": the page's main call to action (claiming). Wears the Zeus
+ *    gradient of `.btn-primary`, so the hold darkens as it fills.
  */
-export type HoldVariant = "primary" | "warning";
+export type HoldVariant = "primary" | "warning" | "cta";
 
 interface HoldButtonProps {
   onComplete: () => void;
+  /** Fired on press, before the hold completes — use it to warm slow work. */
+  onHoldStart?: () => void;
   holdDuration?: number;
   variant?: HoldVariant;
   children: React.ReactNode;
@@ -25,12 +29,17 @@ interface HoldButtonProps {
   disabled?: boolean;
 }
 
+/** `.btn-primary` brings its own padding/radius/type, so "cta" skips the
+ *  utility sizing the other variants need. */
+const SIZING = "px-4 py-3 rounded-lg text-sm font-medium";
+
 const VARIANT_STYLES: Record<
   HoldVariant,
   { base: string; progress: string }
 > = {
   primary: {
     base: cn(
+      SIZING,
       "bg-muted/60 text-foreground border border-gray/15",
       "hover:bg-muted/80 active:bg-muted",
     ),
@@ -38,15 +47,21 @@ const VARIANT_STYLES: Record<
   },
   warning: {
     base: cn(
+      SIZING,
       "bg-btc/10 text-btc border border-btc/20",
       "hover:bg-btc/15 active:bg-btc/20",
     ),
     progress: "bg-btc/30",
   },
+  cta: {
+    base: "btn-primary",
+    progress: "bg-black/12",
+  },
 };
 
 export function HoldButton({
   onComplete,
+  onHoldStart,
   holdDuration = 1500,
   variant = "primary",
   children,
@@ -62,6 +77,7 @@ export function HoldButton({
 
   const startHold = useCallback(() => {
     if (disabled) return;
+    onHoldStart?.();
     setHolding(true);
     setProgress(0);
     startTimeRef.current = Date.now();
@@ -79,7 +95,7 @@ export function HoldButton({
         onComplete();
       }
     }, 16);
-  }, [holdDuration, onComplete, disabled]);
+  }, [holdDuration, onComplete, onHoldStart, disabled]);
 
   const cancelHold = useCallback(() => {
     if (intervalRef.current) {
@@ -106,7 +122,6 @@ export function HoldButton({
       title={title ?? (fastConfirm ? "Dev signer: click to confirm" : undefined)}
       className={cn(
         "relative overflow-hidden select-none transition-colors duration-200",
-        "px-4 py-3 rounded-lg text-sm font-medium",
         "disabled:opacity-50 disabled:cursor-not-allowed",
         styles.base,
         className,
