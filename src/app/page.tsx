@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, ChevronRight, Github, Rocket, Send, ShieldCheck } from "lucide-react";
+import { ArrowRight, ArrowUpRight, ChevronRight, Github, Rocket, Send, ShieldCheck } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { getTokenBySymbol, tvlToUsd } from "@/lib/supported-tokens";
@@ -11,7 +11,7 @@ import { useExplorer } from "@/hooks/use-explorer";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { AnimatedCounter } from "@/components/ui/animated-counter";
+import { RollingNumber } from "@/components/ui/rolling-number";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
@@ -37,6 +37,10 @@ function fmtAmount(n: number) {
 
 function fmtUsd(n: number) {
   return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
+function fmtInt(n: number) {
+  return Math.round(n).toLocaleString();
 }
 
 function PoolCard({
@@ -73,10 +77,11 @@ function PoolCard({
         {loading ? (
           <span className="block h-9 w-40 animate-pulse rounded-lg bg-gray/10" />
         ) : (
-          <AnimatedCounter
+          <RollingNumber
             value={tvlUsd}
             format={fmtUsd}
-            className="block font-display text-[38px] font-semibold leading-none tracking-tight"
+            tint
+            className="font-display text-[38px] font-semibold tracking-tight"
           />
         )}
       </div>
@@ -220,11 +225,15 @@ function AnonymitySetViz({ commitments }: { commitments: number | null }) {
         <div className="h-3 w-[26px] rounded bg-privacy/55" />
         <div className="h-3 w-[26px] rounded bg-privacy/55" />
       </div>
+      {/* Leaves light left-to-right on a loop, so the set reads as still filling. */}
       <div className="flex gap-2.5">
-        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
-        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
-        <div className="h-2.5 w-4 rounded-sm bg-btc shadow-[0_0_12px_rgba(247,147,26,0.6)]" />
-        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
+        {[0, 1, 2, 3].map((i) => (
+          <div
+            key={i}
+            className="h-2.5 w-4 rounded-sm bg-gray/35 motion-safe:animate-[utx-leaf_3.2s_ease-in-out_infinite]"
+            style={{ animationDelay: `${i * 0.8}s` }}
+          />
+        ))}
       </div>
       <div className="font-mono text-[11px] text-gray">
         {commitments == null ? "your note, one of many" : `your note, one of ${commitments}`}
@@ -256,14 +265,6 @@ function SpendViz() {
 
 /* ── Verify ──────────────────────────────────────────────────────────────── */
 
-/** Trailing slice of the weekly commit history, dropping pre-repo empty weeks. */
-const ACTIVITY = (() => {
-  const a = repoFacts.commitActivity;
-  const first = a.findIndex((n) => n > 0);
-  return first === -1 ? a : a.slice(first);
-})();
-const ACTIVITY_MAX = Math.max(1, ...ACTIVITY);
-
 const SHOWN_ARTIFACTS = ["joinsplit_2x2.zkey", "joinsplit_1x1.zkey", "joinsplit_2x2.vkey.json"]
   .map((name) => repoFacts.artifacts.find((a) => a.path.endsWith(`/${name}`)))
   .filter((a): a is { path: string; sha256: string } => Boolean(a));
@@ -291,7 +292,6 @@ export default function Home() {
 
   const txCount = transactions.length;
   const tvlUsd = stats?.tokenTVL?.length ? tvlToUsd(stats.tokenTVL, prices) : 0;
-  const tvlDisplay = tvlUsd > 0 ? fmtUsd(tvlUsd) : "No TVL";
 
   const holdings: Holding[] = (stats?.tokenTVL ?? [])
     .map((t) => {
@@ -432,7 +432,8 @@ export default function Home() {
               />
               <Metric
                 label="Total value locked"
-                value={tvlDisplay}
+                value={tvlUsd > 0 ? tvlUsd : "No TVL"}
+                format={fmtUsd}
                 loading={isLoadingStats}
                 unavailable={statsUnavailable}
               />
@@ -563,20 +564,25 @@ export default function Home() {
                     </div>
                   ))}
                 </div>
-                <div className="mt-5 flex flex-wrap items-center gap-3.5">
+                {/* Inline rather than a link — there is no roadmap page to point at,
+                    and the whole sequence fits in one line. */}
+                <div className="mt-5 flex flex-wrap items-center gap-x-2 gap-y-1 font-mono text-[11px] tracking-[0.04em]">
+                  {["devnet + regtest", "bitcoin testnet", "audit + ika", "mainnet"].map(
+                    (stage, i) => (
+                      <span key={stage} className="flex items-center gap-2">
+                        {i > 0 && <span className="text-gray/50">→</span>}
+                        <span className={i === 0 ? "text-warning" : "text-gray"}>{stage}</span>
+                      </span>
+                    ),
+                  )}
+                </div>
+                <div className="mt-4">
                   <Link
                     href={faucetHref}
                     prefetch={false}
-                    className="rounded-[11px] border border-warning/35 bg-warning/[0.12] px-4 py-2.5 text-[13.5px] font-semibold text-warning transition-colors hover:bg-warning/20"
+                    className="inline-block rounded-[11px] border border-warning/35 bg-warning/[0.12] px-4 py-2.5 text-[13.5px] font-semibold text-warning transition-colors hover:bg-warning/20"
                   >
                     Get testnet funds
-                  </Link>
-                  <Link
-                    href={chainHref("/docs")}
-                    prefetch={false}
-                    className="text-[13.5px] font-semibold text-gray-light hover:text-foreground"
-                  >
-                    Read the roadmap to mainnet
                   </Link>
                 </div>
               </div>
@@ -613,27 +619,16 @@ export default function Home() {
                         href={r.url}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex items-center gap-3 rounded-[10px] border border-gray/15 bg-background px-3 py-2.5 transition-colors hover:border-privacy/35"
+                        className="group flex items-center gap-3 rounded-[10px] border border-gray/15 bg-background px-3 py-2.5 transition-colors hover:border-privacy/35"
                       >
                         <span className="truncate font-mono text-[11.5px] text-gray-light">
                           {r.name.split("/")[1]}
                         </span>
                         <span className="flex-1" />
                         <span className="shrink-0 font-mono text-[11px] text-gray">{r.head}</span>
+                        <ArrowUpRight className="h-3.5 w-3.5 shrink-0 text-gray transition-colors group-hover:text-privacy" />
                       </a>
                     ))}
-                  </div>
-                  <div className="flex h-11 items-end gap-[3px]" aria-hidden="true">
-                    {ACTIVITY.map((n, i) => (
-                      <div
-                        key={i}
-                        className="flex-1 rounded-sm bg-privacy/75"
-                        style={{ height: `${Math.max(4, (n / ACTIVITY_MAX) * 100)}%` }}
-                      />
-                    ))}
-                  </div>
-                  <div className="text-[12.5px] text-gray">
-                    Commit activity across all three, last {ACTIVITY.length} weeks
                   </div>
                   <div className="flex flex-wrap gap-2.5">
                     {["MIT", "TypeScript · Rust · Circom"].map((chip) => (
@@ -766,12 +761,15 @@ export default function Home() {
 function Metric({
   label,
   value,
+  format = fmtInt,
   loading,
   unavailable,
   color = "text-foreground",
 }: {
   label: string;
+  /** A string renders as-is — for placeholders like "No TVL" that can't roll. */
   value: number | string;
+  format?: (value: number) => string;
   loading: boolean;
   unavailable?: boolean;
   color?: string;
@@ -790,9 +788,9 @@ function Metric({
             —
           </span>
         ) : typeof value === "number" ? (
-          <AnimatedCounter
+          <RollingNumber
             value={value}
-            decimals={0}
+            format={format}
             className={`font-display text-[32px] font-semibold tracking-tight ${color}`}
           />
         ) : (

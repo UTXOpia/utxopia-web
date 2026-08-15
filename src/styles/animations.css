@@ -114,3 +114,19 @@
   0% { transform: translateX(-120%); }
   100% { transform: translateX(320%); }
 }
+
+/* Merkle leaves lighting up in turn — new commitments landing in the set. */
+@keyframes utx-leaf {
+  0%, 100% {
+    background-color: #8b8a9e59;
+    box-shadow: none;
+  }
+  10% {
+    background-color: #f7931a;
+    box-shadow: 0 0 12px rgba(247, 147, 26, 0.6);
+  }
+  30% {
+    background-color: #8b8a9e59;
+    box-shadow: none;
+  }
+}

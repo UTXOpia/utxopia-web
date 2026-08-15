@@ -14,7 +14,6 @@ import { join, dirname, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const web = join(dirname(fileURLToPath(import.meta.url)), "..");
-const WEEKS = 22;
 
 /** Repos behind the trust claims, ordered by how much they matter to a verifier. */
 const REPOS = [
@@ -24,22 +23,6 @@ const REPOS = [
 ];
 
 const git = (dir, ...args) => execFileSync("git", args, { cwd: dir, encoding: "utf8" });
-
-/** Weekly commit counts, oldest first, for the last WEEKS whole weeks. */
-function commitActivity(dir) {
-  const dates = git(dir, "log", `--since=${WEEKS} weeks ago`, "--format=%cI")
-    .split("\n")
-    .filter(Boolean)
-    .map((d) => new Date(d));
-  const now = Date.now();
-  const week = 7 * 24 * 3600 * 1000;
-  const buckets = new Array(WEEKS).fill(0);
-  for (const d of dates) {
-    const i = WEEKS - 1 - Math.floor((now - d.getTime()) / week);
-    if (i >= 0 && i < WEEKS) buckets[i]++;
-  }
-  return buckets;
-}
 
 /** Skips repos that aren't checked out beside web/ — the JSON is committed anyway. */
 function repoFacts() {
@@ -53,7 +36,6 @@ function repoFacts() {
         name: url.replace(/^.*github\.com[:/]/, "").replace(/\.git$/, ""),
         url: `https://github.com/${url.replace(/^.*github\.com[:/]/, "").replace(/\.git$/, "")}`,
         head: git(path, "rev-parse", "HEAD").trim().slice(0, 7),
-        activity: commitActivity(path),
       });
     } catch {
       console.warn(`repo-facts: skipping ${key} (${dir} is not a checkout)`);
@@ -87,11 +69,6 @@ const repos = repoFacts();
 const facts = {
   generatedAt: new Date().toISOString(),
   repos,
-  /** Per-week sum across every repo — what the sparkline draws. */
-  commitActivity: Array.from({ length: WEEKS }, (_, i) =>
-    repos.reduce((n, r) => n + r.activity[i], 0),
-  ),
-  activityWeeks: WEEKS,
   circuitCount: new Set(artifacts.map((a) => a.path.split("/")[2])).size,
   artifacts,
 };

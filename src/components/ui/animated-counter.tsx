@@ -10,8 +10,6 @@ interface AnimatedCounterProps {
   className?: string;
   prefix?: string;
   suffix?: string;
-  /** Overrides the default fixed-decimal rendering, e.g. for currency. */
-  format?: (value: number) => string;
 }
 
 /**
@@ -24,14 +22,14 @@ export function AnimatedCounter({
   className = "",
   prefix = "",
   suffix = "",
-  format,
 }: AnimatedCounterProps) {
   const ref = useRef<HTMLSpanElement>(null);
   const isInView = useInView(ref, { once: true, margin: "-40px" });
   const spring = useSpring(0, { duration: duration * 1000, bounce: 0 });
-  const render = (v: number) => `${prefix}${format ? format(v) : v.toFixed(decimals)}${suffix}`;
-  const display = useTransform(spring, render);
-  const [displayValue, setDisplayValue] = useState(render(0));
+  const display = useTransform(spring, (v) =>
+    `${prefix}${v.toFixed(decimals)}${suffix}`
+  );
+  const [displayValue, setDisplayValue] = useState(`${prefix}${(0).toFixed(decimals)}${suffix}`);
 
   useEffect(() => {
     if (isInView) {
