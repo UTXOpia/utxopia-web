@@ -103,9 +103,12 @@ interface StepCardProps {
   title: string;
   desc: string;
   detail: string;
+  /** What actually happens when the user runs this step, if the circuit-level
+   *  description above leaves the lived sequence unsaid. */
+  inPractice?: string[];
 }
 
-function StepCard({ num, icon: Icon, title, desc, detail }: StepCardProps) {
+function StepCard({ num, icon: Icon, title, desc, detail, inPractice }: StepCardProps) {
   return (
     <Card>
       <div className="flex flex-col">
@@ -119,6 +122,18 @@ function StepCard({ num, icon: Icon, title, desc, detail }: StepCardProps) {
         <p className="text-xs sm:text-sm text-gray font-light leading-relaxed mb-3">
           {desc}
         </p>
+        {inPractice && (
+          <ol className="mb-3 space-y-1.5 rounded-lg border border-gray/10 bg-background/40 px-3 py-2.5">
+            {inPractice.map((line, i) => (
+              <li key={line} className="flex gap-2 text-xs leading-relaxed text-gray">
+                <span className="shrink-0 font-mono text-[10px] text-gray/40">
+                  {String(i + 1).padStart(2, "0")}
+                </span>
+                {line}
+              </li>
+            ))}
+          </ol>
+        )}
         <div className="pt-2 border-t border-gray/5">
           <span className="text-[10px] font-mono text-gray/30">{detail}</span>
         </div>
@@ -283,8 +298,14 @@ function getProtocolSteps() {
     },
     {
       id: "joinsplit-transfer", num: "04", icon: Layers, title: PRODUCT_COPY.transactions.privateTransfer,
-      desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness, and Merkle membership — all without revealing any values. The same circuit works for supported assets including BTC, SOL, USDC, and USDT.",
-      detail: "Groth16 · 256 bytes · Token-agnostic circuit",
+      desc: "Every transfer uses a Groth16 zero-knowledge proof that consumes N input notes and produces M output notes. The proof verifies balance conservation, token consistency, nullifier uniqueness (the check that makes a second spend of the same note impossible), and Merkle membership — all without revealing any values. The same circuit works for supported assets including BTC, SOL, USDC, and USDT.",
+      inPractice: [
+        "The proof is built on your machine, in a web worker. The first transfer downloads the circuit keys, so it takes a few seconds — nothing is being sent anywhere while you wait.",
+        "A relayer submits the finished proof to Solana and pays the network fee, so spending never requires SOL in a wallet linked to you. It is paid by one of the transfer's own output notes, inside the same proof — it cannot alter the transfer or take more than that note.",
+        "Change comes back as a new note addressed to you. Spending 0.3 of a 1.0 note leaves you a fresh 0.7 note, which is why one balance is usually several notes.",
+        "What the chain shows: that a transfer happened, when, its nullifiers and new commitments, and the relayer's fee. Not the amount, not the sender, not the recipient.",
+      ],
+      detail: "Groth16 · 256 bytes · Browser-proved · Relayer-submitted",
     },
     {
       id: "name-resolution", num: "05", icon: AtSign, title: "Name Resolution",
