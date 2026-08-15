@@ -49,12 +49,15 @@ function PoolCard({
   loading,
   vaultHref,
   sendHref,
+  tokenHref,
 }: {
   holdings: Holding[];
   tvlUsd: number;
   loading: boolean;
   vaultHref: string;
   sendHref: string;
+  /** Per-token anonymity view — what a row click is actually asking about. */
+  tokenHref: (symbol: string) => string;
 }) {
   return (
     <div className="relative overflow-hidden rounded-[20px] border border-gray/20 bg-gradient-to-b from-card to-muted p-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)] motion-safe:animate-[utx-drift_7s_ease-in-out_infinite]">
@@ -115,7 +118,7 @@ function PoolCard({
                 className="shrink-0"
               >
                 <Link
-                  href={vaultHref}
+                  href={tokenHref(h.symbol)}
                   prefetch={false}
                   style={{ height: "var(--row-h)" }}
                   className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-gray/15 bg-muted px-3.5 transition-colors hover:border-privacy/40"
@@ -399,6 +402,7 @@ export default function Home() {
                 loading={isLoadingStats}
                 vaultHref={chainHref("/vault")}
                 sendHref={chainHref("/send")}
+                tokenHref={(symbol) => chainHref(`/pool/${symbol.toLowerCase()}`)}
               />
             </ScrollReveal>
           </div>
