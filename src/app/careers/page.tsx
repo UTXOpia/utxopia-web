@@ -10,61 +10,44 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 
 /**
- * One open role, posted as directly as the product is described. The page holds
- * itself to the rule it asks the reader to hold us to: every number carries its
- * source and the date it was checked, or it doesn't go on the page.
- *
- * Layout: prose stays at a readable measure, but the page doesn't — a wide
- * screen gets a sticky facts rail, a full-width deck, and the card sections
- * side by side, rather than one narrow column with empty margins.
+ * One open role. The page is deliberately short — the deck is the long version,
+ * and a cofounder posting that takes ten minutes to read is already a bad sign.
+ * The one rule it keeps: every number carries its source and the date it was
+ * checked, or it doesn't go on the page.
  */
-
 
 const FACTS = [
   ["Role", "Cofounder — growth, communications, distribution"],
   ["Compensation", "Equity only. No salary until we raise."],
-  ["Equity", "Cofounder-level, discussed as a number in the first call"],
+  ["Equity", "Cofounder-level, a number in the first call"],
   ["Location", "Remote"],
   ["Stage", "Devnet, public alpha, pre-seed, pre-revenue"],
   ["Team", "One technical founder. You'd be the second."],
 ] as const;
 
 const RESPONSIBILITIES = [
-  {
-    title: "Own how this gets explained",
-    body: "Turn hard technical results into writing people actually trust. The proofs are done; what they mean to someone who will never read a circuit is not.",
-  },
-  {
-    title: "Turn early users into proof",
-    body: "People are already breaking this on devnet. Their runs are the only traction claim we can make honestly — that has to become something a stranger can see.",
-  },
-  {
-    title: "Own distribution",
-    body: "Get in front of bitcoin holders, and the desks that hold bitcoin for other people. Idle treasury BTC is idle because somebody can't get sign-off; find those people.",
-  },
-  {
-    title: "Raise beside me",
-    body: "You'd be in the room with an equal say — pitching it with me, not building the deck for me.",
-  },
+  ["Own how this gets explained", "Turn hard technical results into writing people trust."],
+  ["Turn early users into proof", "People break this on devnet daily. Make that visible to strangers."],
+  ["Own distribution", "Bitcoin holders, and the desks holding bitcoin for other people."],
+  ["Raise beside me", "In the room with an equal say — not building the deck for me."],
 ];
 
 const FIT = [
-  "You can write, and you have something you wrote that changed someone's mind.",
-  "You've put a product in front of strangers and got them to use it — not just seen it.",
-  "You can hold a conversation with a bitcoin holder or an allocator without bluffing on the tech.",
-  "You'd rather say less than a competitor than say something you can't back.",
-  "You want ownership and a say, and you can live without a salary while we get there.",
+  "You've written something that changed someone's mind.",
+  "You've put a product in front of strangers and got them to use it.",
+  "You can talk to a bitcoin holder or an allocator without bluffing on the tech.",
+  "You want ownership, and you can go without salary until we raise.",
 ];
 
 const NOT_FIT = [
   "You want a defined scope and someone to approve it.",
   "Your growth playbook starts with points, airdrops or paid influencers.",
-  "You need salary certainty right now — that's completely reasonable, it just isn't this.",
+  "You need salary certainty now — reasonable, just not this.",
 ];
 
 const APPLY = [
-  "Something you wrote that changed someone's mind. Any format.",
-  "One thing on this page, or in the deck, that you think is wrong, unclear, or overclaimed.",
+  "Something you wrote that changed someone's mind.",
+  "One thing on this page, or in the deck, that's wrong or overclaimed.",
   "What you'd do in your first 30 days.",
 ];
 
@@ -104,51 +87,37 @@ export default function CareersPage() {
               Cofounder — everything that isn&apos;t code
             </h1>
             <p className={`text-body2 leading-relaxed text-gray-light ${PROSE}`}>
-              The code works. Everything that isn&apos;t code, doesn&apos;t. That&apos;s the half
-              I&apos;m looking for — a cofounder, not a hire. To be direct before you read any
-              further: there is no salary, because there is no money yet. What there is, is real
-              equity, an equal say, and a raise we walk into together.
+              The code works. Everything that isn&apos;t code, doesn&apos;t. No salary, because
+              there is no money yet — real equity, an equal say, and a raise we walk into together.
             </p>
 
             {/* ── Why the role exists. Every figure sourced and dated. ── */}
-            <h2 className="mb-4 mt-12 text-heading6 font-semibold text-foreground">
+            <h2 className="mb-3 mt-10 text-heading6 font-semibold text-foreground">
               Why this role exists
             </h2>
 
-            <div className={`space-y-4 text-body2 leading-relaxed text-gray-light ${PROSE}`}>
+            <div className={`space-y-3 text-body2 leading-relaxed text-gray-light ${PROSE}`}>
               <p>
                 Bitcoin is the largest pool of capital in crypto and almost none of it does
-                anything. About{" "}
-                <span className="text-foreground">91,332 BTC — 0.46% of circulating supply</span>{" "}
-                is deployed in bitcoin DeFi. Ethereum DeFi uses roughly{" "}
-                <span className="text-foreground">15% of circulating ETH</span>. Count generously —
-                Babylon staking plus every wrapped variant — and bitcoin still only reaches 0.8%.
+                anything: <span className="text-foreground">0.46% of supply</span> is deployed in
+                bitcoin DeFi, against roughly{" "}
+                <span className="text-foreground">15% of circulating ETH</span> in Ethereum DeFi.
+                BTCFi TVL peaked near <span className="text-foreground">$9.1B in October 2025</span>{" "}
+                and L2 and sidechain TVL has since contracted{" "}
+                <span className="text-foreground">over 74%</span>. The yields were real. People
+                walked anyway.
               </p>
               <p>
-                It isn&apos;t that nobody tried. BTCFi TVL peaked near{" "}
-                <span className="text-foreground">$9.1B in October 2025</span>; by Q1 2026 L2 and
-                sidechain TVL had contracted <span className="text-foreground">over 74%</span>.
-                Today DefiLlama shows roughly <span className="text-foreground">$174M</span> across
-                Stacks, Rootstock, BOB, Merlin, Citrea, Core, BSquared and Bitlayer combined. The
-                yields were real. People walked anyway.
-              </p>
-              <p>
-                They walked because every path to productive bitcoin asks the holder to give
-                something up first: your keys to a custodian, your coins to a bridge multisig, or
-                your privacy to a public address that publishes your size, your timing and your
-                counterparties forever. If you bought bitcoin specifically so you wouldn&apos;t
-                carry counterparty risk, that is an absurd trade — and 99.5% of the supply is
-                declining it.
-              </p>
-              <p>
-                UTXOpia removes the trade. Bitcoin on Solana, positions not published by default,
-                and a withdrawal destination registered up front that needs nobody&apos;s approval
-                to reach — not a reviewer&apos;s, not mine, not if this company is gone. It&apos;s
-                written into the on-chain program, not into my promises.
+                They walked because every path asks the holder to give something up first — keys to
+                a custodian, coins to a bridge multisig, or privacy to a public address. UTXOpia
+                removes the trade: bitcoin on Solana, positions private by default, and a withdrawal
+                destination registered up front that needs nobody&apos;s approval to reach. That
+                part is written into the on-chain program, not into my promises. Explaining it to
+                people who will never read a circuit is the job.
               </p>
             </div>
 
-            <p className={`mt-4 text-caption leading-relaxed text-gray ${PROSE}`}>
+            <p className={`mt-3 text-caption leading-relaxed text-gray ${PROSE}`}>
               Figures checked {DATA_CHECKED}.{" "}
               {SOURCES.map((s, i) => (
                 <span key={s.href}>
@@ -169,10 +138,9 @@ export default function CareersPage() {
             <p
               className={`mt-5 rounded-[12px] border border-btc/20 bg-btc/[0.05] px-4 py-3 text-caption leading-relaxed text-gray-light ${PROSE}`}
             >
-              The claim you&apos;d be defending: on 2026-08-04 we switched our own backend off and
-              a member&apos;s bitcoin still left the vault. 46,803 sats, twice — the second run
-              rebuilt from chain data alone. The system already survives its own creators
-              disappearing.
+              The claim you&apos;d be defending: on 2026-08-04 we switched our own backend off and a
+              member&apos;s bitcoin still left the vault. 46,803 sats, twice — the second run
+              rebuilt from chain data alone.
             </p>
           </div>
 
@@ -225,12 +193,11 @@ export default function CareersPage() {
 
         {/* ── The deck, inline. Full page width: at 672px every three-column
             slide had to be scrolled through. ── */}
-        <h2 id="deck" className="mb-1 mt-16 scroll-mt-28 text-heading6 font-semibold text-foreground">
+        <h2 id="deck" className="mb-1 mt-14 scroll-mt-28 text-heading6 font-semibold text-foreground">
           The deck
         </h2>
         <p className="mb-4 text-caption text-gray">
-          Ten slides — what it is, why bitcoin sits idle, how the vault works, and where it is
-          today.
+          Ten slides — what it is, why bitcoin sits idle, how the vault works, where it is today.
         </p>
 
         <DeckEmbed />
@@ -257,24 +224,21 @@ export default function CareersPage() {
         </div>
 
         {/* ── Responsibilities ── */}
-        <h2 className="mb-4 mt-16 text-heading6 font-semibold text-foreground">
+        <h2 className="mb-4 mt-14 text-heading6 font-semibold text-foreground">
           What you&apos;d own
         </h2>
         <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-          {RESPONSIBILITIES.map((item) => (
-            <div
-              key={item.title}
-              className="rounded-[12px] border border-gray/15 bg-muted/30 px-4 py-3"
-            >
-              <p className="text-caption font-semibold text-foreground">{item.title}</p>
-              <p className="mt-1 text-caption leading-relaxed text-gray">{item.body}</p>
+          {RESPONSIBILITIES.map(([title, body]) => (
+            <div key={title} className="rounded-[12px] border border-gray/15 bg-muted/30 px-4 py-3">
+              <p className="text-caption font-semibold text-foreground">{title}</p>
+              <p className="mt-1 text-caption leading-relaxed text-gray">{body}</p>
             </div>
           ))}
         </div>
 
         {/* ── Fit. The two lists are read against each other, so on a wide
             screen they belong beside each other. ── */}
-        <div className="mt-14 grid gap-10 lg:grid-cols-2 lg:gap-12">
+        <div className="mt-12 grid gap-10 lg:grid-cols-2 lg:gap-12">
           <div>
             <h2 className="mb-4 text-heading6 font-semibold text-foreground">
               You&apos;re a fit if
@@ -305,29 +269,26 @@ export default function CareersPage() {
         </div>
 
         {/* ── The constraint, next to the way in ── */}
-        <div className="mt-14 grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
+        <div className="mt-12 grid items-start gap-10 lg:grid-cols-2 lg:gap-12">
           <div>
             <h2 className="mb-3 text-heading6 font-semibold text-foreground">
               How we talk about this
             </h2>
             <p className="text-body2 leading-relaxed text-gray-light">
-              No points, no airdrops, no paid influencers, no engagement farming. Not now, not
-              later. Every claim has to map to something a stranger can verify — every number on
-              this page carries its source and the date we checked it, and that is the standard for
-              everything you would publish. We say less than our competitors on purpose. If that
-              reads as the constraint you&apos;ve been waiting for rather than the one that annoys
-              you, we&apos;ll get on.
+              No points, no airdrops, no paid influencers. Every claim maps to something a stranger
+              can verify, with its source and the date we checked it — that&apos;s the standard for
+              anything you&apos;d publish. We say less than our competitors on purpose.
             </p>
-            <p className="mt-4 text-body2 leading-relaxed text-gray-light">
+            <p className="mt-3 text-body2 leading-relaxed text-gray-light">
               You don&apos;t need to understand the cryptography — I do that part. You do need to
-              be able to defend it to a hostile reader, and making sure you can is my job.
+              defend it to a hostile reader, and making sure you can is my job.
             </p>
           </div>
 
           <div className="rounded-[20px] border border-gray/20 bg-card/60 p-5 sm:p-6">
             <h2 className="text-heading6 font-semibold text-foreground">How to apply</h2>
             <p className="mt-2 text-caption leading-relaxed text-gray-light">
-              Email or Telegram, whichever you prefer. No CV needed — send three things:
+              Email or Telegram. No CV — send three things:
             </p>
             <ol className="mt-3 space-y-2">
               {APPLY.map((line, i) => (
@@ -338,9 +299,8 @@ export default function CareersPage() {
               ))}
             </ol>
             <p className="mt-4 text-caption leading-relaxed text-gray">
-              If you&apos;re already building something, don&apos;t leave it. If you&apos;ve been
-              waiting for something worth leaving for — write, and I&apos;ll show you everything:
-              the code, the numbers, and the parts that are broken.
+              Write, and I&apos;ll show you everything: the code, the numbers, and the parts that
+              are broken.
             </p>
             <div className="mt-5 flex flex-col gap-3 sm:flex-row">
               <a
@@ -379,7 +339,7 @@ export default function CareersPage() {
           >
             docs
           </Link>
-          . Check the claims before you write.
+          .
         </p>
       </div>
 
