@@ -49,6 +49,20 @@ const RUN_BTC = process.env.RUN_BTC === "1";
 /** Run only the BTC legs (requires RUN_BTC=1). See runChain for why. */
 const SKIP_TOKEN_LOOP = process.env.SKIP_TOKEN_LOOP === "1";
 
+/** Run the transfer leg on its own, against whatever the vault already holds.
+ *  The shield leg exists to fund the loop; when the balance is already there it
+ *  is a minute of proving per run for nothing, and it drags the unshield
+ *  destination into a run that never spends it. */
+const TRANSFER_ONLY = process.env.TRANSFER_ONLY === "1";
+
+/** How many times the transfer leg repeats. Each pass is a separate proof and
+ *  a separate on-chain transaction; the note it spends is the change from the
+ *  previous one, so the balance walks down by TRANSFER_AMOUNT each time. */
+/** `|| 1` catches a non-numeric value: parseInt gives NaN, Math.max(1, NaN) is
+ *  NaN, and `i <= NaN` never runs — a typo would transfer nothing and still
+ *  exit green. */
+const TRANSFER_REPEAT = Math.max(1, parseInt(process.env.TRANSFER_REPEAT ?? "1", 10) || 1);
+
 /** Skip the deposit leg when the vault already holds zkBTC — the redeem leg
  *  only needs a balance, and re-depositing costs a 10-minute poll. */
 const SKIP_BTC_DEPOSIT = process.env.SKIP_BTC_DEPOSIT === "1";
@@ -93,7 +107,10 @@ const SHIELD_TOKEN = process.env.E2E_SHIELD_TOKEN ?? "SOL";
 const SHIELDED_TOKEN = `zk${SHIELD_TOKEN}`;
 
 const SHIELD_AMOUNT = "0.01";
-const TRANSFER_AMOUNT = "0.005";
+/** Overridable because a repeated transfer leg spends the balance down: the
+ *  default is sized for one pass after a shield, not for TRANSFER_REPEAT of
+ *  them against whatever is already in the vault. */
+const TRANSFER_AMOUNT = process.env.E2E_TRANSFER_AMOUNT ?? "0.005";
 const UNSHIELD_AMOUNT = "0.004";
 
 /** Stealth recipient for the transfer step.
@@ -779,6 +796,11 @@ async function runChain(chain: ChainConfig, keys: DevKeys): Promise<void> {
       // able to run them without the token loop first halves the browser work and
       // stops an unrelated SOL failure from gating them.
       console.log("\nToken loop SKIPPED (SKIP_TOKEN_LOOP=1).");
+    } else if (TRANSFER_ONLY) {
+      for (let i = 1; i <= TRANSFER_REPEAT; i++) {
+        console.log(`\n[${i}/${TRANSFER_REPEAT}] TRANSFER`);
+        await stepTransfer(chain, keys, TRANSFER_AMOUNT, TRANSFER_RECIPIENT);
+      }
     } else {
       console.log("\n[1/3] SHIELD");
       await stepShield(chain, keys, SHIELD_AMOUNT);
@@ -841,7 +863,7 @@ async function main(): Promise<void> {
   // Validate placeholder addresses haven't been left as-is
   if (
     TRANSFER_RECIPIENT.startsWith("REPLACE_") ||
-    SOL_UNSHIELD_ADDR.startsWith("REPLACE_")
+    (!TRANSFER_ONLY && SOL_UNSHIELD_ADDR.startsWith("REPLACE_"))
   ) {
     console.error(
       "ERROR: One or more placeholder addresses need replacing.\n" +
