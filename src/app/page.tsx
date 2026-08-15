@@ -611,7 +611,11 @@ export default function Home() {
             <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-[1.15fr_1fr_1fr]">
               <ScrollReveal delay={0.05}>
                 <div className="flex h-full flex-col gap-4 rounded-[18px] border border-gray/15 bg-muted/50 p-6">
-                  <span className="text-base font-semibold">Source</span>
+                  <span className="text-base font-semibold">Open source</span>
+                  <p className="m-0 text-sm leading-relaxed text-gray">
+                    Every circuit, program and key derivation has been public since the first
+                    commit. No closed cryptography, no audit-only release.
+                  </p>
                   <div className="flex flex-col gap-2">
                     {repoFacts.repos.map((r) => (
                       <a

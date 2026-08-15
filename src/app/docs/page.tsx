@@ -28,6 +28,7 @@ import {
   ChevronDown,
   ChevronRight,
   AlertTriangle,
+  AtSign,
   Send,
   ListChecks,
   ScrollText,
@@ -46,6 +47,7 @@ import { hrefWithChain } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getChainAdapter } from "@/lib/chain-registry";
 import { PRODUCT_COPY, PRODUCT_FEATURES, PRODUCT_TERMS } from "@/lib/product-language";
+import { PRIVATE_NAME_SUFFIX } from "@/lib/names/private-name-claim";
 
 /* ── Simple card wrapper ── */
 
@@ -285,12 +287,17 @@ function getProtocolSteps() {
       detail: "Groth16 · 256 bytes · Token-agnostic circuit",
     },
     {
-      id: "stealth-receive", num: "05", icon: Eye, title: "Stealth Receive",
+      id: "name-resolution", num: "05", icon: AtSign, title: "Name Resolution",
+      desc: `Senders can pay a human-readable ${PRIVATE_NAME_SUFFIX} name instead of a 96-byte meta-address. The name is an SNS subdomain whose on-chain record holds the recipient's viewing public key and MPK, so the sender's browser resolves the name, reads the record, and derives a one-time stealth address from it. Resolution happens entirely before the proof — the circuit and the ${program} never see a name.`,
+      detail: `SNS subdomain · v2 stealth record · ${PRIVATE_NAME_SUFFIX}`,
+    },
+    {
+      id: "stealth-receive", num: "06", icon: Eye, title: "Stealth Receive",
       desc: "Recipients use one-time stealth addresses generated via the Dual-Key Stealth Address Protocol (EIP-5564) — X25519 ECDH against the recipient's viewing public key. Each deposit or transfer creates a fresh, unlinkable address. The recipient scans announcements with their viewing key to find their notes.",
       detail: "DKSAP · X25519 ECDH · Ed25519 viewing keys",
     },
     {
-      id: "unshield-withdraw", num: "06", icon: Network, title: PRODUCT_COPY.actions.takeFundsOut,
+      id: "unshield-withdraw", num: "07", icon: Network, title: PRODUCT_COPY.actions.takeFundsOut,
       desc: `Take funds out in two ways: cash out supported assets to your ${wallet} (zkSOL returns native SOL), or withdraw zkBTC to a native Bitcoin address through an Ika dWallet controlled by this ${program}. The protocol calls the first operation an unshield. Both operations use a JoinSplit proof, and a nullifier prevents double-spending without revealing the note being spent.`,
       detail: "SPL: instant · BTC: Ika dWallet (Solana-controlled)",
     },
