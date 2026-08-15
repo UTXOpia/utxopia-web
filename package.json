@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "bun test",
+    "gen-repo-facts": "node scripts/gen-repo-facts.mjs",
     "copy-circuits": "CIRCUITS_DIR=${UTXOPIA_CIRCUITS_DIR:-../utxopia-circuits}; mkdir -p public/circuits/groth16 && for c in \"$CIRCUITS_DIR\"/build/joinsplit_*; do n=$(basename \"$c\"); mkdir -p public/circuits/groth16/$n/${n}_js && cp \"$c/${n}_js/${n}.wasm\" public/circuits/groth16/$n/${n}_js/ && cp \"$c/${n}.zkey\" public/circuits/groth16/$n/; done"
   },
   "dependencies": {

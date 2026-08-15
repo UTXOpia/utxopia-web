@@ -10,7 +10,8 @@ import { isHybridNetwork } from "@/lib/chain-registry";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 
-export function SiteHeader() {
+/** `top` shifts the pill down on pages that render a banner above it. */
+export function SiteHeader({ top = "top-4" }: { top?: "top-4" | "top-14" } = {}) {
   const [mobileOpen, setMobileOpen] = useState(false);
   const { networkId: network } = useChainEnvironment();
   const isHybrid = isHybridNetwork(network);
@@ -18,7 +19,7 @@ export function SiteHeader() {
 
   return (
     <>
-      <nav className="fixed top-4 left-0 w-full z-50 flex justify-center px-4">
+      <nav className={`fixed ${top} left-0 w-full z-50 flex justify-center px-4`}>
         <motion.div
           className="nav-pill px-2 py-2 sm:px-4 flex items-center transition-all duration-300"
           initial={{ y: -20, opacity: 0 }}
@@ -133,7 +134,7 @@ export function SiteHeader() {
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, y: -10 }}
               transition={{ duration: 0.2 }}
-              className="fixed top-16 left-4 right-4 z-50 md:hidden rounded-2xl border border-gray/10 bg-background/95 backdrop-blur-xl p-4 shadow-xl"
+              className={`fixed ${top === "top-14" ? "top-28" : "top-16"} left-4 right-4 z-50 md:hidden rounded-2xl border border-gray/10 bg-background/95 backdrop-blur-xl p-4 shadow-xl`}
             >
               <div className="space-y-1">
                 {[

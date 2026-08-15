@@ -1,264 +1,236 @@
 "use client";
 
-import React, { memo } from "react";
+import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Shield, Zap, Lock, ArrowRight, EyeOff, ShieldCheck, ChevronRight, Layers, Rocket } from "lucide-react";
+import { ArrowRight, Github, Rocket, Send } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
-import { tvlToUsd } from "@/lib/supported-tokens";
+import { getTokenBySymbol, tvlToUsd } from "@/lib/supported-tokens";
 import { useExplorer } from "@/hooks/use-explorer";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { ScrollReveal } from "@/components/ui/scroll-reveal";
-import { GradientBorderCard } from "@/components/ui/gradient-border-card";
 import { AnimatedCounter } from "@/components/ui/animated-counter";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { getChainAdapter } from "@/lib/chain-registry";
+import { getChainAdapter, isHybridNetwork } from "@/lib/chain-registry";
 import { hrefWithChain } from "@/lib/network-config";
+import repoFacts from "@/lib/repo-facts.json";
 
-/* ── Feature visualizations ── */
+const GITHUB_URL = "https://github.com/UTXOpia";
 
-const PrivacyViz = () => (
-  <div className="flex-1 w-full rounded-xl border border-privacy/10 bg-muted/20 flex flex-col items-center justify-center gap-3 p-6 overflow-hidden relative">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03),transparent)]" />
-    <div className="w-full space-y-2.5 z-10">
-      {[
-        { fromStart: "0xa3", fromMid: "f7e2", fromEnd: "c21b", toStart: "0x91", toMid: "d2b8", toEnd: "e8f4", amt: "0.0042", delay: 0 },
-        { fromStart: "0xb8", fromMid: "e1a3", fromEnd: "9a7c", toStart: "0x4d", toMid: "6fc7", toEnd: "2b1e", amt: "0.1500", delay: 100 },
-        { fromStart: "0xf2", fromMid: "c9d1", fromEnd: "5d3a", toStart: "0x7e", toMid: "8ba2", toEnd: "a4c6", amt: "0.0831", delay: 200 },
-      ].map((row, i) => (
-        <div
-          key={i}
-          className="flex items-center justify-between px-3 py-2 rounded-lg bg-background/40 border border-privacy/10"
-        >
-          <span className="text-[10px] font-mono text-privacy/40">
-            {row.fromStart}<span className="inline-block blur-[4px] text-privacy/80">{row.fromMid}</span>{row.fromEnd}
-          </span>
-          <span className="text-[8px] text-privacy/25">→</span>
-          <span className="text-[10px] font-mono text-privacy/40">
-            {row.toStart}<span className="inline-block blur-[4px] text-privacy/80">{row.toMid}</span>{row.toEnd}
-          </span>
-          <span className="text-[10px] font-mono text-privacy/80 blur-[4px]">{row.amt}</span>
-        </div>
-      ))}
-    </div>
-    <div className="flex items-center gap-2 z-10 mt-1">
-      <div className="w-1.5 h-1.5 rounded-full bg-privacy/60 animate-pulse" />
-      <span className="text-[9px] font-mono text-privacy/40">addresses & amounts hidden by ZK proof</span>
-    </div>
-  </div>
-);
+/* ── Hero: live pool composition ─────────────────────────────────────────── */
 
-const BackedViz = () => (
-  <div className="flex-1 w-full rounded-xl border border-privacy/10 bg-muted/20 flex flex-col items-center justify-center gap-4 p-6 relative overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(255,255,255,0.03),transparent)]" />
-    <div className="flex items-center gap-6 z-10">
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-2xl border border-privacy/25 bg-background/40 flex items-center justify-center">
-          <Layers className="w-7 h-7 text-privacy/70" />
-        </div>
-        <span className="text-[10px] font-mono text-privacy/50">Supported Assets</span>
-      </div>
-      <div className="flex flex-col items-center gap-1">
-        <div className="flex items-center gap-1">
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="w-2 h-0.5 rounded-full bg-privacy/40" />
-          ))}
-          <Lock className="w-3.5 h-3.5 text-privacy/50" />
-          {[0, 1, 2].map((i) => (
-            <div key={i} className="w-2 h-0.5 rounded-full bg-privacy/40" />
-          ))}
-        </div>
-        <span className="text-[8px] text-privacy/30">shield</span>
-      </div>
-      <div className="flex flex-col items-center gap-2">
-        <div className="w-14 h-14 rounded-2xl border border-privacy/25 bg-background/40 flex items-center justify-center">
-          <Shield className="w-8 h-8 text-privacy/70" aria-hidden="true" />
-        </div>
-        <span className="text-[10px] font-mono text-privacy/50">Shielded</span>
-      </div>
-    </div>
-    <div className="flex items-center gap-2 z-10">
-      <span className="text-[9px] font-mono text-privacy/40">any SPL token → private commitment</span>
-    </div>
-  </div>
-);
+interface Holding {
+  symbol: string;
+  name: string;
+  logo: string;
+  amount: number;
+  usd: number | null;
+}
 
-const SpeedViz = () => (
-  <div className="flex-1 w-full rounded-xl border border-sol/10 bg-muted/20 flex flex-col items-center justify-center gap-4 p-6 relative overflow-hidden">
-    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,rgba(153,69,255,0.04),transparent)]" />
-    <div className="w-full space-y-3 z-10">
-      {[
-        { label: "Confirmation", value: "~400ms", pct: 95 },
-        { label: "Proof Gen", value: "~2.1s", pct: 70 },
-        { label: "Settlement", value: "instant", pct: 100 },
-      ].map((metric, i) => (
-        <div key={metric.label} className="space-y-1.5">
-          <div className="flex items-center justify-between">
-            <span className="text-[10px] font-mono text-sol/40">{metric.label}</span>
-            <span className="text-[10px] font-mono text-sol/50">{metric.value}</span>
-          </div>
-          <div className="w-full h-1.5 rounded-full bg-background/40 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-sol/40"
-              style={{ width: `0%`, transition: `width 2.5s cubic-bezier(0.16, 1, 0.3, 1) ${i * 400 + 300}ms` }}
-              ref={(el) => {
-                if (el) {
-                  const obs = new IntersectionObserver(([e]) => {
-                    if (e.isIntersecting) {
-                      requestAnimationFrame(() => { el.style.width = `${metric.pct}%`; });
-                      obs.disconnect();
-                    }
-                  }, { threshold: 0.2 });
-                  obs.observe(el);
-                }
-              }}
-            />
-          </div>
-        </div>
-      ))}
-    </div>
-    <div className="flex items-center gap-2 z-10 mt-1">
-      <Zap className="w-3 h-3 text-sol/50" />
-      <span className="text-[9px] font-mono text-sol/40">high-throughput settlement</span>
-    </div>
-  </div>
-);
+function fmtAmount(n: number) {
+  return n.toLocaleString(undefined, { maximumFractionDigits: n < 1 ? 6 : 4 });
+}
 
-const ComplianceViz = () => (
-  <div className="flex-1 w-full rounded-xl border border-cyan/10 bg-muted/20 flex flex-col items-center justify-center gap-3 p-6 relative overflow-hidden">
-    <div className="absolute inset-0">
-      <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-r from-transparent via-cyan/5 to-transparent animate-[sweep_2s_ease-in-out_infinite]" />
-    </div>
-    <div className="w-full space-y-2.5 z-10">
-      {[
-        { label: "Origin Attested", status: "on-chain", checked: true },
-        { label: "View Key Delegated", status: "scoped", checked: true },
-        { label: "Audit Trail", status: "on-demand", checked: false },
-      ].map((item) => (
-        <div
-          key={item.label}
-          className="flex items-center justify-between px-3 py-2 rounded-lg bg-background/40 border border-cyan/10"
-        >
-          <div className="flex items-center gap-2">
-            <div className={`w-3.5 h-3.5 rounded border flex items-center justify-center ${
-              item.checked
-                ? "border-cyan/40 bg-cyan/15"
-                : "border-gray/20"
-            }`}>
-              {item.checked && (
-                <span className="text-[8px] text-cyan/70">✓</span>
-              )}
-            </div>
-            <span className="text-[10px] font-mono text-gray/45">{item.label}</span>
-          </div>
-          <span className={`text-[8px] font-mono ${
-            item.checked ? "text-cyan/40" : "text-gray/25"
-          }`}>{item.status}</span>
-        </div>
-      ))}
-    </div>
-    <div className="flex items-center gap-2 z-10 mt-1">
-      <ShieldCheck className="w-3 h-3 text-cyan/50" />
-      <span className="text-[9px] font-mono text-cyan/40">selective disclosure toolkit</span>
-    </div>
-  </div>
-);
+function fmtUsd(n: number) {
+  return `$${n.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
-const FeatureCard = memo(function FeatureCard({
-  icon: Icon, title, description, iconColor, hoverGlow, step, visualization: Viz,
-}: {
-  icon: React.ComponentType<{ className?: string }>;
-  title: string;
-  description: string;
-  iconColor: string;
-  hoverGlow: string;
-  step: string;
-  visualization: React.ComponentType;
-}) {
-  return (
-    <GradientBorderCard hoverGlow={hoverGlow} step={step} className="h-full">
-      <div className="flex flex-col h-full">
-        <div className="flex items-center gap-3 mb-1.5">
-          <div className="p-2 rounded-lg border border-gray/10 bg-muted/30 shrink-0">
-            <Icon className={`w-4 h-4 ${iconColor}`} />
-          </div>
-          <h3 className="text-lg font-semibold text-foreground">{title}</h3>
-        </div>
-        <p className="text-sm text-gray-light font-light mb-4 leading-relaxed">{description}</p>
-        <Viz />
-      </div>
-    </GradientBorderCard>
-  );
-});
-FeatureCard.displayName = "FeatureCard";
-
-const FEATURE_CARDS = [
-  { icon: EyeOff, title: "Private Transfers", description: "Proofs verify transfers without revealing sender, recipient, or amount.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "01", visualization: PrivacyViz },
-  { icon: Layers, title: "Shielded Assets", description: "Bitcoin and supported tokens become private commitments.", iconColor: "text-privacy", hoverGlow: "rgba(255, 255, 255, 0.08)", step: "02", visualization: BackedViz },
-  { icon: Zap, title: "Guided Flows", description: "Add funds, send privately, cash out, or withdraw BTC with clear transaction progress.", iconColor: "text-sol", hoverGlow: "rgba(153, 69, 255, 0.12)", step: "03", visualization: SpeedViz },
-  { icon: ShieldCheck, title: "Viewing Keys", description: "Share read-only activity with an auditor when needed.", iconColor: "text-cyan", hoverGlow: "rgba(0, 255, 255, 0.08)", step: "04", visualization: ComplianceViz },
-];
-
-function HomeMetric({
-  label,
-  value,
+function PoolCard({
+  holdings,
+  tvlDisplay,
   loading,
-  unavailable,
-  color,
+  networkId,
+  vaultHref,
+  sendHref,
 }: {
-  label: string;
-  value: number | string;
+  holdings: Holding[];
+  tvlDisplay: string;
   loading: boolean;
-  unavailable?: boolean;
-  color: string;
+  networkId: string;
+  vaultHref: string;
+  sendHref: string;
 }) {
   return (
-    <div className="text-center min-w-0 px-1 first:border-l-0 border-l border-gray/15">
-      <div className="h-7 flex items-center justify-center">
+    <div className="relative rounded-[20px] border border-gray/20 bg-gradient-to-b from-card to-muted p-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)] motion-safe:animate-[utx-drift_7s_ease-in-out_infinite]">
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2.5 text-[13px] font-semibold text-gray-light">
+          <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+          Shielded pool
+        </div>
+        <span className="rounded-md border border-gray/15 bg-muted px-2 py-1 font-mono text-[11px] text-gray">
+          {networkId}
+        </span>
+      </div>
+
+      <div className="mb-3 rounded-[14px] border border-gray/15 bg-background p-5">
+        <div className="mb-2 text-xs text-gray">Total value shielded</div>
         {loading ? (
-          <span
-            className="block h-5 w-12 rounded-[6px] bg-gray/10 animate-pulse"
-            aria-label={`Loading ${label.toLowerCase()}`}
-            role="status"
-          />
-        ) : unavailable ? (
-          <span
-            className="text-xl sm:text-2xl font-semibold text-gray/35"
-            aria-label={`${label} unavailable`}
-            title="Temporarily unavailable"
-          >
-            —
-          </span>
-        ) : typeof value === "number" ? (
-          <AnimatedCounter
-            value={value}
-            decimals={0}
-            className={`text-xl sm:text-2xl font-semibold tracking-normal ${color}`}
-          />
+          <span className="block h-9 w-40 animate-pulse rounded-lg bg-gray/10" />
         ) : (
-          <span className={`text-xl sm:text-2xl font-semibold tracking-normal whitespace-nowrap ${color}`}>
-            {value}
-          </span>
+          <div className="font-display text-[38px] font-semibold leading-none tracking-tight">
+            {tvlDisplay}
+          </div>
         )}
       </div>
-      <div className="text-xs text-gray">{label}</div>
+
+      <div className="mb-3.5 flex flex-col gap-2">
+        {loading ? (
+          [0, 1].map((i) => (
+            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-gray/[0.06]" />
+          ))
+        ) : holdings.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-gray/20 bg-muted px-3.5 py-4 text-center text-[13px] text-gray">
+            Nothing shielded yet. Be the first commitment in the tree.
+          </div>
+        ) : (
+          holdings.map((h) => (
+            <div
+              key={h.symbol}
+              className="flex items-center gap-3 rounded-xl border border-gray/15 bg-muted px-3.5 py-3"
+            >
+              <img src={h.logo} alt="" className="h-[26px] w-[26px] rounded-full" />
+              <div>
+                <div className="text-sm font-semibold">{h.symbol}</div>
+                <div className="text-[11.5px] text-gray">{h.name}</div>
+              </div>
+              <div className="flex-1" />
+              <div className="text-right">
+                <div className="font-mono text-[13px]">{fmtAmount(h.amount)}</div>
+                <div className="text-[11.5px] text-gray">{h.usd == null ? "—" : fmtUsd(h.usd)}</div>
+              </div>
+            </div>
+          ))
+        )}
+      </div>
+
+      <div className="grid grid-cols-2 gap-2.5">
+        <Link href={vaultHref} prefetch={false} className="btn-privacy text-center">
+          Shield
+        </Link>
+        <Link href={sendHref} prefetch={false} className="btn-tertiary text-center">
+          Send privately
+        </Link>
+      </div>
     </div>
   );
 }
 
-function FeatureCarousel() {
+/* ── How it works ────────────────────────────────────────────────────────── */
+
+function StepCard({
+  step,
+  stepColor,
+  title,
+  children,
+  body,
+}: {
+  step: string;
+  stepColor: string;
+  title: string;
+  children: React.ReactNode;
+  body: string;
+}) {
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-      {FEATURE_CARDS.map((card) => (
-        <FeatureCard key={card.step} {...card} />
+    <div className="flex h-full flex-col gap-5 rounded-[18px] border border-gray/15 bg-muted/50 p-7">
+      <div className="flex items-center gap-3">
+        <span
+          className={`rounded-md px-2 py-0.5 font-mono text-[11px] font-bold text-background ${stepColor}`}
+        >
+          {step}
+        </span>
+        <span className="text-base font-semibold">{title}</span>
+      </div>
+      <div className="flex h-[150px] flex-col justify-center gap-3.5 overflow-hidden rounded-xl border border-gray/15 bg-background p-4.5">
+        {children}
+      </div>
+      <p className="m-0 text-pretty text-[14.5px] leading-relaxed text-gray">{body}</p>
+    </div>
+  );
+}
+
+function DepositViz() {
+  return (
+    <>
+      <div className="flex items-center gap-3">
+        <img src="/tokens/btc.png" alt="" className="h-8 w-8 rounded-full" />
+        <div className="relative h-0.5 flex-1 overflow-hidden bg-gradient-to-r from-btc to-privacy">
+          <span className="absolute inset-y-0 left-0 w-[30%] bg-white/75 motion-safe:animate-[utx-sweep_2.6s_linear_infinite]" />
+        </div>
+        <div className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-privacy/35 bg-privacy/10 font-mono text-[13px] text-privacy">
+          C
+        </div>
+      </div>
+      <div className="font-mono text-[11px] leading-[1.7] text-gray">
+        <div>amount → Poseidon(v, r, pk)</div>
+        <div className="text-privacy">commitment 0x9e41…a7d2</div>
+      </div>
+    </>
+  );
+}
+
+function AnonymitySetViz({ commitments }: { commitments: number | null }) {
+  return (
+    <div className="flex flex-col items-center justify-center gap-2.5">
+      <div className="h-3.5 w-[30px] rounded bg-privacy/90" />
+      <div className="flex gap-5">
+        <div className="h-3 w-[26px] rounded bg-privacy/55" />
+        <div className="h-3 w-[26px] rounded bg-privacy/55" />
+      </div>
+      <div className="flex gap-2.5">
+        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
+        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
+        <div className="h-2.5 w-4 rounded-sm bg-btc shadow-[0_0_12px_rgba(247,147,26,0.6)]" />
+        <div className="h-2.5 w-4 rounded-sm bg-gray/35" />
+      </div>
+      <div className="font-mono text-[11px] text-gray">
+        {commitments == null ? "your note, one of many" : `your note, one of ${commitments}`}
+      </div>
+    </div>
+  );
+}
+
+function SpendViz() {
+  const rows = [
+    { k: "nullifier", v: "0x31c8…4b0f", cls: "text-foreground" },
+    { k: "proof", v: "valid", cls: "text-success" },
+    { k: "recipient", v: "stealth address", cls: "text-privacy" },
+  ];
+  return (
+    <div className="flex flex-col gap-2.5">
+      {rows.map((r, i) => (
+        <React.Fragment key={r.k}>
+          {i > 0 && <div className="h-px bg-gray/15" />}
+          <div className="flex items-center justify-between font-mono text-[11px]">
+            <span className="text-gray">{r.k}</span>
+            <span className={r.cls}>{r.v}</span>
+          </div>
+        </React.Fragment>
       ))}
     </div>
   );
 }
 
-/* ── Main Page ── */
+/* ── Verify ──────────────────────────────────────────────────────────────── */
+
+/** Trailing slice of the weekly commit history, dropping pre-repo empty weeks. */
+const ACTIVITY = (() => {
+  const a = repoFacts.commitActivity;
+  const first = a.findIndex((n) => n > 0);
+  return first === -1 ? a : a.slice(first);
+})();
+const ACTIVITY_MAX = Math.max(1, ...ACTIVITY);
+
+const SHOWN_ARTIFACTS = ["joinsplit_2x2.zkey", "joinsplit_1x1.zkey", "joinsplit_2x2.vkey.json"]
+  .map((name) => repoFacts.artifacts.find((a) => a.path.endsWith(`/${name}`)))
+  .filter((a): a is { path: string; sha256: string } => Boolean(a));
+
+function shortHash(sha: string) {
+  return `${sha.slice(0, 4)}…${sha.slice(-4)}`;
+}
+
+/* ── Page ────────────────────────────────────────────────────────────────── */
 
 export default function Home() {
   // The landing page has no pool scope, so its TVL is every pool's value.
@@ -272,250 +244,525 @@ export default function Home() {
   const { networkId, config } = useChainEnvironment();
   const chain = getChainAdapter(config);
   const chainName = chain.displayName;
-  const nativeToken = {
-    name: chain.nativeToken,
-    label: chain.displayName,
-    status: "Live",
-    logo: `/tokens/${chain.query}.png`,
-  };
   const chainHref = (href: string) => hrefWithChain(href, networkId);
+  const faucetHref = chainHref(isHybridNetwork(networkId) ? "/faucet" : "/docs");
+
   const txCount = transactions.length;
-  const tvlDisplay = (() => {
-    if (!stats?.tokenTVL?.length) return "No TVL";
-    const usd = tvlToUsd(stats.tokenTVL, prices);
-    return usd > 0
-      ? `$${usd.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
-      : "No TVL";
-  })();
+  const tvlUsd = stats?.tokenTVL?.length ? tvlToUsd(stats.tokenTVL, prices) : 0;
+  const tvlDisplay = tvlUsd > 0 ? fmtUsd(tvlUsd) : "No TVL";
+
+  const holdings: Holding[] = (stats?.tokenTVL ?? [])
+    .map((t) => {
+      const token = getTokenBySymbol(t.symbol);
+      const amount = Number(t.totalShielded) / 10 ** t.decimals;
+      let price = token ? (prices[token.priceKey] ?? null) : null;
+      if (price == null && (token?.priceKey === "usdc" || token?.priceKey === "usdt")) price = 1;
+      return {
+        symbol: t.symbol,
+        name: token?.name ?? t.symbol,
+        logo: token?.logo ?? `/tokens/${t.symbol.toLowerCase()}.png`,
+        amount,
+        usd: price == null ? null : amount * price,
+      };
+    })
+    .filter((h) => h.amount > 0)
+    .sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0))
+    .slice(0, 3);
+
+  const statsUnavailable = Boolean(statsError) || !stats;
 
   return (
     <main className="min-h-screen bg-background overflow-x-hidden">
-      <SiteHeader />
+      {/* ═══════════════ ALPHA BANNER ═══════════════ */}
+      <div className="fixed top-0 left-0 z-[60] flex w-full flex-wrap items-center justify-center gap-2.5 border-b border-gray/20 bg-muted px-4 py-2 text-[12.5px] font-medium text-gray-light">
+        <span className="h-1.5 w-1.5 rounded-full bg-warning animate-pulse" />
+        <span className="font-mono tracking-[0.08em] text-warning">PUBLIC ALPHA</span>
+        <span className="hidden text-gray sm:inline">
+          Devnet and regtest only. Do not send mainnet funds.
+        </span>
+        <span className="text-gray sm:hidden">Testnet only</span>
+        <Link href="#alpha" className="border-b border-gray/40 text-foreground hover:border-foreground">
+          What that means
+        </Link>
+      </div>
+
+      <SiteHeader top="top-14" />
 
       <div className="relative z-10">
         {/* ═══════════════ HERO ═══════════════ */}
-        <section className="min-h-[70vh] flex flex-col items-center justify-center px-4 pt-28 pb-12 relative">
-          <div className="max-w-4xl mx-auto text-center relative z-10">
-            <ScrollReveal delay={0.05}>
-              <div className="mb-5 inline-flex items-center gap-2 px-3 py-1 rounded-full border border-privacy/25 bg-privacy/5 backdrop-blur-sm">
-                <span className="w-1.5 h-1.5 rounded-full bg-privacy animate-pulse" />
-                <span className="text-[11px] font-mono uppercase tracking-[0.2em] text-privacy/90">
-                  Public Alpha
-                </span>
-                <span className="text-[11px] text-gray/70">
-                  testnet only
-                </span>
+        <section className="relative overflow-hidden px-6 pb-16 pt-36 sm:px-8 lg:pt-40">
+          <div className="pointer-events-none absolute -top-[280px] left-1/2 h-[600px] w-[900px] -translate-x-1/2 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(166,116,255,0.20),transparent_70%)]" />
+          <div className="pointer-events-none absolute -right-[120px] top-[60px] h-[520px] w-[520px] bg-[radial-gradient(50%_50%_at_50%_50%,rgba(247,147,26,0.10),transparent_70%)]" />
+
+          <div className="relative mx-auto grid max-w-[1180px] items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
+            <ScrollReveal>
+              <div className="flex flex-col items-start gap-6">
+                <div className="inline-flex items-center gap-2 rounded-full border border-privacy/25 bg-privacy/[0.08] py-1.5 pl-2 pr-3 font-mono text-xs font-semibold tracking-[0.06em] text-privacy">
+                  <span className="h-1.5 w-1.5 rounded-full bg-privacy" />
+                  ZERO-KNOWLEDGE · {chainName.toUpperCase()}
+                </div>
+
+                <h1 className="hero-title m-0 text-balance">
+                  Private.
+                  <br />
+                  <span className="text-privacy">Audit&#8209;ready.</span>
+                  <br />
+                  {chainName}.
+                </h1>
+
+                <p className="m-0 max-w-[480px] text-pretty text-lg leading-relaxed text-gray-light">
+                  One private vault for Bitcoin and supported {chainName} assets. Privacy by default,
+                  auditable on demand.
+                </p>
+
+                <div className="flex flex-wrap gap-3">
+                  <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                    <Link
+                      href={chainHref("/vault")}
+                      prefetch={false}
+                      className="btn-privacy btn-shimmer inline-flex"
+                    >
+                      <Rocket className="h-4 w-4" />
+                      Open private vault
+                      <ArrowRight className="h-4 w-4" />
+                    </Link>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                    <Link href="#how" className="btn-tertiary inline-flex">
+                      See how it works
+                    </Link>
+                  </motion.div>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2 pt-1 text-[13px] text-gray">
+                  {[
+                    { label: "Non‑custodial", cls: "bg-success/15 border-success/35" },
+                    { label: "Proofs generated in your browser", cls: "bg-privacy/15 border-privacy/35" },
+                    { label: "Open source", cls: "bg-btc/15 border-btc/35" },
+                  ].map((t) => (
+                    <span key={t.label} className="flex items-center gap-2">
+                      <span className={`h-3.5 w-3.5 rounded border ${t.cls}`} />
+                      {t.label}
+                    </span>
+                  ))}
+                </div>
               </div>
-            </ScrollReveal>
-            <ScrollReveal delay={0.1}>
-              <h1 className="hero-title text-foreground">
-                Private. <span className="text-privacy">Audit-ready.</span>{" "}
-                <span className="text-foreground">{chainName}.</span>
-              </h1>
             </ScrollReveal>
 
             <ScrollReveal delay={0.15}>
-              <p className="mt-6 text-base md:text-lg text-gray font-light max-w-lg mx-auto leading-relaxed">
-                One private vault for Bitcoin and supported {chainName} assets. Privacy by default, auditable on demand.
-              </p>
-            </ScrollReveal>
-
-            <ScrollReveal delay={0.2}>
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-4 text-caption text-gray">
-                <div className="flex items-center gap-1.5">
-                  <EyeOff className="w-4 h-4 text-privacy" />
-                  <span>Private by Default</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <ShieldCheck className="w-4 h-4 text-cyan" />
-                  <span>Auditable on Demand</span>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <Layers className="w-4 h-4 text-sol" />
-                  <span>Cross-Chain Assets</span>
-                </div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={0.25}>
-              <div className="mt-8 flex flex-col sm:flex-row items-center justify-center gap-3">
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href={chainHref("/vault")}
-                    prefetch={false}
-                    className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-2.5 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
-                  >
-                    <Rocket className="w-5 h-5" />
-                    Open Private Vault
-                    <ArrowRight className="w-5 h-5" />
-                  </Link>
-                </motion.div>
-                <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                  <Link
-                    href={chainHref("/docs")}
-                    prefetch={false}
-                    className="btn-tertiary btn-pill inline-flex items-center gap-2 px-5 py-2.5 border border-gray/10 backdrop-blur-md hover:bg-muted/50 hover:border-gray/20 transition-all"
-                  >
-                    <Shield className="w-4 h-4" />
-                    Read the Guide
-                  </Link>
-                </motion.div>
-              </div>
-            </ScrollReveal>
-
-            <ScrollReveal delay={0.3}>
-              <div className="pt-8 border-t border-gray/10 mt-8">
-                <div
-                  className="grid grid-cols-3 items-stretch w-full max-w-md mx-auto"
-                  aria-label="Network statistics"
-                >
-                  <HomeMetric
-                    label="Transactions"
-                    value={txCount}
-                    loading={isLoadingTransactions}
-                    unavailable={Boolean(transactionsError)}
-                    color="text-privacy"
-                  />
-                  <HomeMetric
-                    label="Commitments"
-                    value={stats?.totalCommitments ?? 0}
-                    loading={isLoadingStats}
-                    unavailable={Boolean(statsError) || !stats}
-                    color="text-foreground"
-                  />
-                  <HomeMetric
-                    label="Total Value Locked"
-                    value={tvlDisplay}
-                    loading={isLoadingStats}
-                    unavailable={Boolean(statsError) || !stats}
-                    color={tvlDisplay === "No TVL" ? "text-foreground/60" : "text-foreground"}
-                  />
-                </div>
-              </div>
+              <PoolCard
+                holdings={holdings}
+                tvlDisplay={tvlDisplay}
+                loading={isLoadingStats}
+                networkId={networkId}
+                vaultHref={chainHref("/vault")}
+                sendHref={chainHref("/send")}
+              />
             </ScrollReveal>
           </div>
         </section>
 
-        {/* ═══════════════ SUPPORTED TOKENS ═══════════════ */}
-        <section className="w-full py-10 px-4 sm:px-6 lg:px-8 relative">
-          <div className="max-w-5xl mx-auto relative z-10">
-            <ScrollReveal>
-              <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between mb-8 gap-4">
-                <div>
-              <h2 className="section-title text-3xl md:text-4xl text-foreground mb-2">
-                    Add <span className="text-privacy">Supported Assets</span>
-                  </h2>
-                  <p className="text-sm text-gray font-light">
-                    Deposit Bitcoin or shield supported Solana assets into your private vault.
-                  </p>
+        {/* ═══════════════ LIVE STATS ═══════════════ */}
+        <section className="px-6 pb-20 sm:px-8">
+          <ScrollReveal>
+            <div className="mx-auto grid max-w-[1180px] grid-cols-1 items-center gap-8 rounded-[18px] border border-gray/15 bg-muted/50 px-8 py-6 md:grid-cols-2 lg:grid-cols-[1fr_auto_auto_auto]">
+              <div className="flex flex-col gap-1.5">
+                <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.08em] text-gray">
+                  <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
+                  LIVE · {networkId.toUpperCase()}
                 </div>
-                <Link href={chainHref("/vault")} prefetch={false} className="text-sm text-privacy/70 hover:text-privacy transition-colors flex items-center gap-1 shrink-0">
-                  Add funds <ArrowRight className="w-3.5 h-3.5" />
-                </Link>
+                <div className="text-[12.5px] text-gray">
+                  Read from the indexer, updated continuously
+                </div>
               </div>
-            </ScrollReveal>
-            <ScrollReveal delay={0.1}>
-              <div className="flex gap-3 overflow-x-auto pb-2">
-                {[
-                  { name: "BTC", label: "Bitcoin", status: "Live", logo: "/tokens/btc.png" },
-                  nativeToken,
-                  { name: "USDC", label: "USD Coin", status: "Live", logo: "/tokens/usdc.png" },
-                  { name: "USDT", label: "Tether", status: "Live", logo: "/tokens/usdt.png" },
-                  { name: "ETH", label: "Ethereum", status: "Soon", logo: "/tokens/eth.png" },
-                  { name: "ZEC", label: "Zcash", status: "Soon", logo: "/tokens/zec.png" },
-                ].map((token) => (
-                  <div
-                    key={token.name}
-                    className={`flex items-center gap-3 px-4 py-3 rounded-[12px] border backdrop-blur-sm shrink-0 transition-all ${
-                      token.status === "Live"
-                        ? "bg-muted/30 border-gray/10 hover:border-privacy/20 hover:bg-privacy/5"
-                        : "bg-muted/15 border-gray/5 opacity-50"
-                    }`}
-                  >
-                    <span className="flex h-8 w-8 items-center justify-center rounded-full bg-background/70">
-                      <img
-                        src={token.logo}
-                        alt={token.name}
-                        className="object-contain h-8 w-8 rounded-full"
-                      />
-                    </span>
-                    <div>
-                      <p className="text-sm font-semibold text-foreground">{token.name}</p>
-                      <p className="text-[10px] text-gray/50">{token.label}</p>
-                    </div>
-                    {token.status === "Live" && (
-                      <span className="ml-1 h-1.5 w-1.5 rounded-full animate-pulse bg-privacy" />
-                    )}
-                  </div>
-                ))}
-              </div>
-            </ScrollReveal>
-          </div>
+
+              <Metric
+                label="Transactions"
+                value={txCount}
+                loading={isLoadingTransactions}
+                unavailable={Boolean(transactionsError)}
+              />
+              <Metric
+                label="Commitments in tree"
+                value={stats?.totalCommitments ?? 0}
+                loading={isLoadingStats}
+                unavailable={statsUnavailable}
+                color="text-privacy"
+              />
+              <Metric
+                label="Total value locked"
+                value={tvlDisplay}
+                loading={isLoadingStats}
+                unavailable={statsUnavailable}
+              />
+            </div>
+          </ScrollReveal>
         </section>
 
         {/* ═══════════════ HOW IT WORKS ═══════════════ */}
-        <section className="w-full py-14 px-4 sm:px-6 lg:px-8 relative overflow-hidden">
-          <div className="absolute inset-0 bg-gradient-to-b from-transparent via-muted/5 to-transparent pointer-events-none" />
-
-          <div className="max-w-7xl mx-auto relative z-10">
+        <section id="how" className="scroll-mt-32 px-6 pb-24 sm:px-8">
+          <div className="mx-auto max-w-[1180px]">
             <ScrollReveal>
-              <div className="text-center mb-12">
-                <h2 className="section-title text-3xl md:text-4xl text-foreground mb-3">
-                  How It <span className="text-privacy">Works</span>
+              <div className="mb-12 max-w-[620px]">
+                <div className="mb-3.5 font-mono text-[11.5px] tracking-[0.1em] text-privacy">
+                  HOW IT WORKS
+                </div>
+                <h2 className="section-title m-0 mb-3.5 text-balance text-3xl leading-[1.08] md:text-[42px]">
+                  Nothing is hidden from you. Everything is hidden from everyone else.
                 </h2>
-                <p className="text-sm text-gray font-light">
-                  Four layers of protection for your tokens on {chainName}.
+                <p className="m-0 text-pretty text-[17px] leading-relaxed text-gray">
+                  Three steps, all verifiable on chain. Your keys and your proofs never leave your
+                  device.
                 </p>
               </div>
             </ScrollReveal>
 
-            <FeatureCarousel />
+            <div className="grid gap-5 md:grid-cols-3">
+              <ScrollReveal delay={0.05}>
+                <StepCard
+                  step="01"
+                  stepColor="bg-btc"
+                  title="Deposit"
+                  body="Send BTC or shield a Solana asset. The chain records a commitment, not your amount or your address."
+                >
+                  <DepositViz />
+                </StepCard>
+              </ScrollReveal>
+              <ScrollReveal delay={0.1}>
+                <StepCard
+                  step="02"
+                  stepColor="bg-privacy"
+                  title="Join the set"
+                  body="Your commitment is inserted into a Merkle tree alongside every other one. Anonymity comes from the crowd, and the crowd is public."
+                >
+                  <AnonymitySetViz
+                    commitments={statsUnavailable ? null : (stats?.totalCommitments ?? null)}
+                  />
+                </StepCard>
+              </ScrollReveal>
+              <ScrollReveal delay={0.15}>
+                <StepCard
+                  step="03"
+                  stepColor="bg-success"
+                  title="Spend"
+                  body="A zero-knowledge proof shows the note was yours and unspent, without revealing which one. Share a viewing key when you need to prove it."
+                >
+                  <SpendViz />
+                </StepCard>
+              </ScrollReveal>
+            </div>
           </div>
         </section>
 
-        {/* ═══════════════ CTA ═══════════════ */}
-        <section className="w-full py-14 px-4 sm:px-6 relative overflow-hidden">
-          <div className="max-w-4xl mx-auto relative z-10">
-            <ScrollReveal variant="scaleIn">
-              <div className="rounded-[20px] border border-privacy/15 bg-gradient-to-br from-privacy/5 via-transparent to-purple/5 p-8 md:p-12 text-center relative overflow-hidden">
-                <div className="relative z-10">
-                  <h2 className="section-title text-3xl md:text-4xl text-foreground mb-3">
-                    Open Your <span className="text-privacy">Private Vault</span>
-                  </h2>
-                <p className="text-base text-gray font-light mb-8 max-w-md mx-auto">
-                    Add supported assets, send privately, and disclose activity only when you choose.
-                  </p>
-                  <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                      <Link
-                        href={chainHref("/vault")}
-                        prefetch={false}
-                        className="btn-privacy btn-pill btn-shimmer inline-flex items-center gap-2 px-7 py-3 text-base shadow-[0_0_20px_rgba(255,255,255,0.06)] hover:shadow-[0_0_35px_rgba(255,255,255,0.12)] transition-shadow"
-                      >
-                        <Rocket className="w-5 h-5" />
-                        Open Private Vault
-                        <ArrowRight className="w-5 h-5" />
-                      </Link>
-                    </motion.div>
-                    <motion.div whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.97 }}>
-                      <Link
-                        href={chainHref("/explorer")}
-                        prefetch={false}
-                        className="btn-tertiary btn-pill inline-flex items-center gap-2 px-5 py-3 border border-gray/10 backdrop-blur-md hover:bg-muted/50 hover:border-gray/20 transition-all"
-                      >
-                        View Explorer
-                        <ChevronRight className="w-4 h-4" />
-                      </Link>
-                    </motion.div>
-                  </div>
+        {/* ═══════════════ ASSETS + ALPHA HONESTY ═══════════════ */}
+        <section className="px-6 pb-24 sm:px-8">
+          <div className="mx-auto grid max-w-[1180px] items-stretch gap-5 lg:grid-cols-2">
+            <ScrollReveal>
+              <div className="flex h-full flex-col rounded-[18px] border border-gray/15 bg-muted/50 p-8">
+                <h3 className="section-title m-0 mb-2 text-2xl">Supported assets</h3>
+                <p className="m-0 mb-6 text-[14.5px] text-gray">
+                  Deposit Bitcoin or shield supported {chainName} assets into your private vault.
+                </p>
+                <div className="grid flex-1 auto-rows-fr gap-2.5 sm:grid-cols-2">
+                  {[
+                    { name: "BTC", label: "Bitcoin", live: true, logo: "/tokens/btc.png" },
+                    { name: chain.nativeToken, label: chainName, live: true, logo: `/tokens/${chain.query}.png` },
+                    { name: "USDC", label: "USD Coin", live: true, logo: "/tokens/usdc.png" },
+                    { name: "USDT", label: "Tether", live: true, logo: "/tokens/usdt.png" },
+                    { name: "ETH", label: "Soon", live: false, logo: "/tokens/eth.png" },
+                    { name: "ZEC", label: "Soon", live: false, logo: "/tokens/zec.png" },
+                  ].map((t) => (
+                    <div
+                      key={t.name}
+                      className={`flex items-center gap-3 rounded-xl bg-background px-3.5 py-3 ${
+                        t.live ? "border border-gray/15" : "border border-dashed border-gray/20 opacity-55"
+                      }`}
+                    >
+                      <img src={t.logo} alt="" className="h-[26px] w-[26px] rounded-full" />
+                      <div>
+                        <div className="text-sm font-semibold">{t.name}</div>
+                        <div className="text-[11.5px] text-gray">{t.label}</div>
+                      </div>
+                      <div className="flex-1" />
+                      {t.live && <span className="h-1.5 w-1.5 rounded-full bg-success" />}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </ScrollReveal>
+
+            <ScrollReveal delay={0.1}>
+              <div
+                id="alpha"
+                className="h-full scroll-mt-32 rounded-[18px] border border-warning/20 bg-gradient-to-b from-[#1c1610] to-muted/50 p-8"
+              >
+                <div className="mb-3.5 flex items-center gap-2.5">
+                  <span className="h-1.5 w-1.5 rounded-full bg-warning" />
+                  <span className="font-mono text-[11.5px] tracking-[0.09em] text-warning">
+                    WHERE WE ACTUALLY ARE
+                  </span>
+                </div>
+                <h3 className="section-title m-0 mb-2.5 text-2xl">Public alpha, on testnet</h3>
+                <p className="m-0 mb-6 text-pretty text-[14.5px] leading-relaxed text-gray-light">
+                  We would rather you trust us for the right reasons. Here is the honest state of the
+                  protocol.
+                </p>
+                <div className="flex flex-col gap-3">
+                  {[
+                    "Devnet and regtest only. Mainnet is not enabled and no real funds are at risk.",
+                    "Circuits are unaudited. An external review is the gate for mainnet, not a milestone after it.",
+                    "The anonymity set is small in alpha. With few users, privacy is limited by arithmetic, not intent.",
+                  ].map((line, i) => (
+                    <div
+                      key={i}
+                      className="flex items-start gap-3 rounded-xl border border-gray/15 bg-background p-3.5"
+                    >
+                      <span className="pt-0.5 font-mono text-[11px] text-warning">
+                        {String(i + 1).padStart(2, "0")}
+                      </span>
+                      <p className="m-0 text-sm leading-relaxed text-gray-light">{line}</p>
+                    </div>
+                  ))}
+                </div>
+                <div className="mt-5 flex flex-wrap items-center gap-3.5">
+                  <Link
+                    href={faucetHref}
+                    prefetch={false}
+                    className="rounded-[11px] border border-warning/35 bg-warning/[0.12] px-4 py-2.5 text-[13.5px] font-semibold text-warning transition-colors hover:bg-warning/20"
+                  >
+                    Get testnet funds
+                  </Link>
+                  <Link
+                    href={chainHref("/docs")}
+                    prefetch={false}
+                    className="text-[13.5px] font-semibold text-gray-light hover:text-foreground"
+                  >
+                    Read the roadmap to mainnet
+                  </Link>
                 </div>
               </div>
             </ScrollReveal>
           </div>
+        </section>
+
+        {/* ═══════════════ VERIFY ═══════════════ */}
+        <section id="verify" className="scroll-mt-32 px-6 pb-24 sm:px-8">
+          <div className="mx-auto max-w-[1180px]">
+            <ScrollReveal>
+              <div className="mb-11 max-w-[620px]">
+                <div className="mb-3.5 font-mono text-[11.5px] tracking-[0.1em] text-privacy">
+                  VERIFY, DO NOT TRUST
+                </div>
+                <h2 className="section-title m-0 mb-3.5 text-balance text-3xl leading-[1.08] md:text-[42px]">
+                  Every claim on this page is checkable.
+                </h2>
+                <p className="m-0 text-pretty text-[17px] leading-relaxed text-gray">
+                  The client, the circuits and the programs are public. Build them yourself and
+                  compare the hashes.
+                </p>
+              </div>
+            </ScrollReveal>
+
+            <div className="grid gap-5 md:grid-cols-2 lg:grid-cols-[1.15fr_1fr_1fr]">
+              <ScrollReveal delay={0.05}>
+                <div className="flex h-full flex-col gap-4 rounded-[18px] border border-gray/15 bg-muted/50 p-6">
+                  <span className="text-base font-semibold">Source</span>
+                  <div className="flex flex-col gap-2">
+                    {repoFacts.repos.map((r) => (
+                      <a
+                        key={r.key}
+                        href={r.url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex items-center gap-3 rounded-[10px] border border-gray/15 bg-background px-3 py-2.5 transition-colors hover:border-privacy/35"
+                      >
+                        <span className="truncate font-mono text-[11.5px] text-gray-light">
+                          {r.name.split("/")[1]}
+                        </span>
+                        <span className="flex-1" />
+                        <span className="shrink-0 font-mono text-[11px] text-gray">{r.head}</span>
+                      </a>
+                    ))}
+                  </div>
+                  <div className="flex h-11 items-end gap-[3px]" aria-hidden="true">
+                    {ACTIVITY.map((n, i) => (
+                      <div
+                        key={i}
+                        className="flex-1 rounded-sm bg-privacy/75"
+                        style={{ height: `${Math.max(4, (n / ACTIVITY_MAX) * 100)}%` }}
+                      />
+                    ))}
+                  </div>
+                  <div className="text-[12.5px] text-gray">
+                    Commit activity across all three, last {ACTIVITY.length} weeks
+                  </div>
+                  <div className="flex flex-wrap gap-2.5">
+                    {["MIT", "TypeScript · Rust · Circom"].map((chip) => (
+                      <span
+                        key={chip}
+                        className="rounded-[7px] border border-gray/15 bg-background px-2.5 py-1.5 font-mono text-[11.5px] text-gray-light"
+                      >
+                        {chip}
+                      </span>
+                    ))}
+                  </div>
+                  <div className="flex-1" />
+                  <a
+                    href={GITHUB_URL}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="inline-flex items-center gap-1.5 text-[13.5px] font-semibold text-privacy hover:text-foreground"
+                  >
+                    <Github className="h-3.5 w-3.5" />
+                    Browse the source →
+                  </a>
+                </div>
+              </ScrollReveal>
+
+              <ScrollReveal delay={0.1}>
+                <div className="flex h-full flex-col gap-4 rounded-[18px] border border-gray/15 bg-muted/50 p-6">
+                  <span className="text-base font-semibold">Circuit artifacts</span>
+                  <p className="m-0 text-sm leading-relaxed text-gray">
+                    {repoFacts.circuitCount} Groth16 circuits served to your browser, pinned by
+                    hash.
+                  </p>
+                  <div className="flex flex-col gap-2.5 font-mono text-[11.5px]">
+                    {SHOWN_ARTIFACTS.map((a) => (
+                      <div
+                        key={a.path}
+                        className="flex justify-between gap-3 rounded-[10px] border border-gray/15 bg-background px-3 py-2.5"
+                      >
+                        <span className="truncate text-gray">{a.path.split("/").pop()}</span>
+                        <span className="shrink-0">{shortHash(a.sha256)}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex-1" />
+                  <Link
+                    href={chainHref("/verify-proof")}
+                    prefetch={false}
+                    className="text-[13.5px] font-semibold text-privacy hover:text-foreground"
+                  >
+                    Reproduce the build →
+                  </Link>
+                </div>
+              </ScrollReveal>
+
+              <ScrollReveal delay={0.15}>
+                <div className="flex h-full flex-col gap-4 rounded-[18px] border border-gray/15 bg-muted/50 p-6">
+                  <span className="text-base font-semibold">Runs on your machine</span>
+                  <p className="m-0 text-sm leading-relaxed text-gray">
+                    Nothing that could deanonymise you leaves the browser.
+                  </p>
+                  <div className="flex flex-col gap-2.5 text-[13.5px]">
+                    {[
+                      "Keys derived locally",
+                      "Proofs built in a web worker",
+                      "No account, no email, no tracking",
+                      "Relayer never sees your notes",
+                    ].map((line) => (
+                      <div key={line} className="flex items-center gap-2.5 text-gray-light">
+                        <span className="font-mono text-success">✓</span>
+                        {line}
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex-1" />
+                  <Link
+                    href={chainHref("/architecture")}
+                    prefetch={false}
+                    className="text-[13.5px] font-semibold text-privacy hover:text-foreground"
+                  >
+                    Read the threat model →
+                  </Link>
+                </div>
+              </ScrollReveal>
+            </div>
+          </div>
+        </section>
+
+        {/* ═══════════════ CTA ═══════════════ */}
+        <section className="px-6 pb-24 sm:px-8">
+          <ScrollReveal variant="scaleIn">
+            <div className="relative mx-auto max-w-[1180px] overflow-hidden rounded-[22px] border border-gray/20 bg-[linear-gradient(140deg,#1b1526_0%,#131318_55%,#1a1410_100%)] px-8 py-16 md:px-12 md:py-[72px]">
+              <div className="pointer-events-none absolute -bottom-[220px] left-1/2 h-[420px] w-[700px] -translate-x-1/2 bg-[radial-gradient(50%_50%_at_50%_50%,rgba(166,116,255,0.18),transparent_70%)]" />
+              <div className="relative flex flex-col items-center gap-5 text-center">
+                <h2 className="section-title m-0 max-w-[640px] text-balance text-3xl leading-[1.06] md:text-[44px]">
+                  Try it with testnet funds. Judge it for yourself.
+                </h2>
+                <p className="m-0 max-w-[520px] text-pretty text-[17px] leading-relaxed text-gray-light">
+                  The faucet gives you devnet SOL and regtest BTC. Shield an asset, send it
+                  privately, then verify the proof in the explorer.
+                </p>
+                <div className="flex flex-wrap justify-center gap-3">
+                  <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                    <Link
+                      href={chainHref("/vault")}
+                      prefetch={false}
+                      className="btn-privacy btn-shimmer inline-flex"
+                    >
+                      <Send className="h-4 w-4" />
+                      Open private vault
+                    </Link>
+                  </motion.div>
+                  <motion.div whileHover={{ scale: 1.04 }} whileTap={{ scale: 0.97 }}>
+                    <Link href={faucetHref} prefetch={false} className="btn-tertiary inline-flex">
+                      Get testnet funds
+                    </Link>
+                  </motion.div>
+                </div>
+              </div>
+            </div>
+          </ScrollReveal>
         </section>
       </div>
 
       <SiteFooter />
     </main>
+  );
+}
+
+/* ── Stats bar metric ────────────────────────────────────────────────────── */
+
+function Metric({
+  label,
+  value,
+  loading,
+  unavailable,
+  color = "text-foreground",
+}: {
+  label: string;
+  value: number | string;
+  loading: boolean;
+  unavailable?: boolean;
+  color?: string;
+}) {
+  return (
+    <div className="flex flex-col gap-1 lg:border-l lg:border-gray/15 lg:pl-9">
+      <div className="flex h-9 items-center">
+        {loading ? (
+          <span
+            className="block h-7 w-20 animate-pulse rounded-md bg-gray/10"
+            role="status"
+            aria-label={`Loading ${label.toLowerCase()}`}
+          />
+        ) : unavailable ? (
+          <span className="font-display text-[32px] font-semibold text-gray/35" title="Temporarily unavailable">
+            —
+          </span>
+        ) : typeof value === "number" ? (
+          <AnimatedCounter
+            value={value}
+            decimals={0}
+            className={`font-display text-[32px] font-semibold tracking-tight ${color}`}
+          />
+        ) : (
+          <span className={`font-display text-[32px] font-semibold tracking-tight ${color}`}>
+            {value}
+          </span>
+        )}
+      </div>
+      <span className="text-[12.5px] text-gray">{label}</span>
+    </div>
   );
 }

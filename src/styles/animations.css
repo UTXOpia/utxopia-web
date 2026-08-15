@@ -102,3 +102,15 @@
   0% { transform: rotate(0deg); }
   100% { transform: rotate(360deg); }
 }
+
+/* Landing hero card idle float */
+@keyframes utx-drift {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-6px); }
+}
+
+/* Highlight travelling along the deposit → commitment wire */
+@keyframes utx-sweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(320%); }
+}

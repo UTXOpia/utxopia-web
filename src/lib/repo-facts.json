@@ -1,0 +1,259 @@
+{
+  "generatedAt": "2026-08-15T10:40:33.667Z",
+  "repos": [
+    {
+      "key": "programs",
+      "name": "UTXOpia/utxopia-solana-programs",
+      "url": "https://github.com/UTXOpia/utxopia-solana-programs",
+      "head": "01feeb0",
+      "activity": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        21,
+        8,
+        33,
+        3,
+        0,
+        0,
+        0,
+        3,
+        11,
+        7,
+        0
+      ]
+    },
+    {
+      "key": "circuits",
+      "name": "UTXOpia/utxopia-circuits",
+      "url": "https://github.com/UTXOpia/utxopia-circuits",
+      "head": "a2f1376",
+      "activity": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        5,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        4,
+        0,
+        3,
+        1
+      ]
+    },
+    {
+      "key": "web",
+      "name": "UTXOpia/utxopia-web",
+      "url": "https://github.com/UTXOpia/utxopia-web",
+      "head": "0230d7b",
+      "activity": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        77,
+        67,
+        33,
+        19,
+        5,
+        8,
+        2,
+        58,
+        29,
+        28,
+        36
+      ]
+    }
+  ],
+  "commitActivity": [
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    0,
+    103,
+    75,
+    66,
+    22,
+    5,
+    8,
+    2,
+    65,
+    40,
+    38,
+    37
+  ],
+  "activityWeeks": 22,
+  "circuitCount": 14,
+  "artifacts": [
+    {
+      "path": "circuits/groth16/joinsplit_1x1/joinsplit_1x1_js/joinsplit_1x1.wasm",
+      "sha256": "69f3424ec41b3c358fd57715982863ac7978258444f9baa7ba08785cf58db113"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x1/joinsplit_1x1.vkey.json",
+      "sha256": "1a355b2a2485b696c428722470b89d2f1d35f49e569b2101841bdd8667987082"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x1/joinsplit_1x1.zkey",
+      "sha256": "48e04b7d2c29dc1607211c1b371a718558ed7c1e9b7683264c11086fae0b8999"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x2/joinsplit_1x2_js/joinsplit_1x2.wasm",
+      "sha256": "34111d4d41eb4d8db4e899b40f7d66d1fec7050d2e98d9d322e1af6b8e42a5b8"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x2/joinsplit_1x2.vkey.json",
+      "sha256": "52cf62595aa4000331a831fdaa3af972e73762579f0fb543cf68d7c014367bbf"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x2/joinsplit_1x2.zkey",
+      "sha256": "6aaa241e752eefb19aa880eb185f4b8fe31033b2218cd9d10d2d8c45be5f8ccd"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x3/joinsplit_1x3_js/joinsplit_1x3.wasm",
+      "sha256": "5a0d0ef8400be0fdaff2b526975dd943e324265906ea5045cebfcb0954e64669"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x3/joinsplit_1x3.vkey.json",
+      "sha256": "9ccdfe3704d6dec25c3e2e8e3dca6d94f8fb33c6ce2e4ee1ab9f3c0ec9a40203"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x3/joinsplit_1x3.zkey",
+      "sha256": "9c7912ad187b1fb0d97f5f431567e988b2fb5b87a0f124a66846818638bf164d"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x4/joinsplit_1x4_js/joinsplit_1x4.wasm",
+      "sha256": "e694642eb23f83554c8dcd6049ea4057bf5440ed50f7b715819d2a95960745e0"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x4/joinsplit_1x4.vkey.json",
+      "sha256": "c0cc2bcdd11e85b230beeef3f9e8d91bac91ba8ededf1650cae7d3985d497a85"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_1x4/joinsplit_1x4.zkey",
+      "sha256": "680e11cafa52471e73269dc6fc84b5a30c51debe88cbda787623acbcbd52b56c"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x1/joinsplit_2x1_js/joinsplit_2x1.wasm",
+      "sha256": "155139ab7fd7e52174c5a676d3d1c77dc9665e3aa9b4cdcc6228f46dc788dfc5"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x1/joinsplit_2x1.vkey.json",
+      "sha256": "0e1e2ee10d55711654ac3a4c685e62639310745191ac62b6d8577a8c95104925"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x1/joinsplit_2x1.zkey",
+      "sha256": "0a79eee2fc05105b6d703f65a9efcab5b541f4997a7e805758e98d0299e1b540"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x2/joinsplit_2x2_js/joinsplit_2x2.wasm",
+      "sha256": "2daf9e2111b4844151555793e9e1dbbff3e1d7ddc3c54ff638ef532b8ab6ca85"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x2/joinsplit_2x2.vkey.json",
+      "sha256": "a419ab28761f1e6faa78bc7c856007c47f64b279e1251558103256e4a40ad585"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x2/joinsplit_2x2.zkey",
+      "sha256": "5f3705c886ab33c3ff698187d1219e53c19ae7346c52a4ae7c24f814072606a8"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x3/joinsplit_2x3_js/joinsplit_2x3.wasm",
+      "sha256": "b39ea9d3ec456b6a50ca9e395680c1a17d7f782595fc2a8f0913a3e036ce4e05"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x3/joinsplit_2x3.vkey.json",
+      "sha256": "170def54c5cfb76f4219ec324c020770ed469c8efe30c58687ba3f0c07532571"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_2x3/joinsplit_2x3.zkey",
+      "sha256": "949488b81d7757a6d478fa85c8951a8130a8ee079460536f8a449d52abf82cdb"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x1/joinsplit_3x1_js/joinsplit_3x1.wasm",
+      "sha256": "13203699dfe4dc322efdac95443d672692febdc863bc08aa51c1c341eae8a775"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x1/joinsplit_3x1.vkey.json",
+      "sha256": "74ab21bfd02771473a0a3271da217dcd1c8835e26d3eca3b8d7435ab5bc736bc"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x1/joinsplit_3x1.zkey",
+      "sha256": "2d2e0b86a8e09f3036e0ce804e629a4c0abf1bc2522979933a5cbacfd352d74b"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x2/joinsplit_3x2_js/joinsplit_3x2.wasm",
+      "sha256": "3969c7e3e49e6bea9abb2d039300041ae18b7ffdb1195553f950b112e2a54457"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x2/joinsplit_3x2.vkey.json",
+      "sha256": "d5bcf38f47d72dd4ff9b5382c1d71eff09e987facd26a3b4f8705897c9a46a64"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_3x2/joinsplit_3x2.zkey",
+      "sha256": "a2da6c7ebf0ef36c7f232f888737210925a0b79927fd38fbe4951b5df78c299e"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_4x1/joinsplit_4x1_js/joinsplit_4x1.wasm",
+      "sha256": "d95ccb068dad34ebe25fee9107424ce8bc10179879f564d31ab00933b45b75ea"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_4x1/joinsplit_4x1.vkey.json",
+      "sha256": "3aa8b3961060153c1cda8f9d401c5ed2b38438d0af5f2c29cd142726dd22a4e9"
+    },
+    {
+      "path": "circuits/groth16/joinsplit_4x1/joinsplit_4x1.zkey",
+      "sha256": "a6b2aa8fec8be0371c82a81f540063ab20c96e92d85ee3d452eb1a814ae769fd"
+    },
+    {
+      "path": "circuits/groth16/ownership/ownership.vkey.json",
+      "sha256": "b731fbe967417e9be8300ba523da96edddbd98c4e6c3f19bc7e868cd79995fdc"
+    },
+    {
+      "path": "circuits/groth16/range_sum_16/range_sum_16.vkey.json",
+      "sha256": "4da591450c7d5890ad6e8354277a6827fb4c5a1ae427655a21659f19e617ab60"
+    },
+    {
+      "path": "circuits/groth16/range_sum_4/range_sum_4.vkey.json",
+      "sha256": "04ae7bf017ba671ed7ebb6e77eb0f3f79e7840f6856dd95ce4f58425ea9de384"
+    },
+    {
+      "path": "circuits/groth16/range_sum/range_sum.vkey.json",
+      "sha256": "cad1bc1d156ede6921784efa7775e5713e78165c9f64807301aac565d3e91a36"
+    }
+  ]
+}
