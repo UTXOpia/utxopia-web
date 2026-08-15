@@ -45,6 +45,12 @@ export function SiteFooter() {
 
         <div className="flex items-center gap-4">
           <Link
+            href={hrefWithChain("/architecture", networkId)}
+            className="text-caption text-gray hover:text-foreground transition-colors"
+          >
+            Architecture
+          </Link>
+          <Link
             href={hrefWithChain("/careers", networkId)}
             className="text-caption text-gray hover:text-foreground transition-colors"
           >
