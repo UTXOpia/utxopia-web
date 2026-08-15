@@ -247,6 +247,7 @@ function SpendViz() {
     { k: "nullifier", v: "0x31c8…4b0f", cls: "text-foreground" },
     { k: "proof", v: "valid", cls: "text-success" },
     { k: "recipient", v: "stealth address", cls: "text-privacy" },
+    { k: "links to your deposit", v: "none", cls: "text-success" },
   ];
   return (
     <div className="flex flex-col gap-2.5">
@@ -487,12 +488,19 @@ export default function Home() {
                   step="03"
                   stepColor="bg-success"
                   title="Spend"
-                  body="A zero-knowledge proof shows the note was yours and unspent, without revealing which one. Share a viewing key when you need to prove it."
+                  body="The note leaves to a fresh address. The chain learns only that some note in the tree was spent — never which one, and nothing that ties the payment back to your deposit."
                 >
                   <SpendViz />
                 </StepCard>
               </ScrollReveal>
             </div>
+
+            <ScrollReveal delay={0.2}>
+              <p className="m-0 mt-5 text-[13.5px] leading-relaxed text-gray">
+                Need to prove a payment was yours? Share a viewing key. Disclosure is yours to give,
+                not ours to take.
+              </p>
+            </ScrollReveal>
           </div>
         </section>
 
