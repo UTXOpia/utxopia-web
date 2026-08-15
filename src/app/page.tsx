@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Github, Rocket, Send } from "lucide-react";
+import { ArrowRight, Github, Rocket, Send, ShieldCheck } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { getTokenBySymbol, tvlToUsd } from "@/lib/supported-tokens";
@@ -39,43 +39,47 @@ function fmtUsd(n: number) {
 
 function PoolCard({
   holdings,
-  tvlDisplay,
+  tvlUsd,
   loading,
-  networkId,
   vaultHref,
   sendHref,
 }: {
   holdings: Holding[];
-  tvlDisplay: string;
+  tvlUsd: number;
   loading: boolean;
-  networkId: string;
   vaultHref: string;
   sendHref: string;
 }) {
   return (
-    <div className="relative rounded-[20px] border border-gray/20 bg-gradient-to-b from-card to-muted p-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)] motion-safe:animate-[utx-drift_7s_ease-in-out_infinite]">
-      <div className="mb-4 flex items-center justify-between gap-3">
-        <div className="flex items-center gap-2.5 text-[13px] font-semibold text-gray-light">
-          <span className="h-1.5 w-1.5 rounded-full bg-success animate-pulse" />
-          Shielded pool
-        </div>
-        <span className="rounded-md border border-gray/15 bg-muted px-2 py-1 font-mono text-[11px] text-gray">
-          {networkId}
+    <div className="relative overflow-hidden rounded-[20px] border border-gray/20 bg-gradient-to-b from-card to-muted p-5 shadow-[0_24px_70px_rgba(0,0,0,0.5)] motion-safe:animate-[utx-drift_7s_ease-in-out_infinite]">
+      {/* Slow highlight passing over the card — reads as "still running". */}
+      <div
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-y-0 -left-1/2 w-1/2 skew-x-12 bg-gradient-to-r from-transparent via-white/[0.04] to-transparent motion-safe:animate-[utx-sweep_7s_ease-in-out_infinite]"
+      />
+
+      <div className="mb-4 flex items-center gap-2.5 text-[13px] font-semibold text-gray-light">
+        <span className="relative flex h-1.5 w-1.5">
+          <span className="absolute inline-flex h-full w-full rounded-full bg-success opacity-75 motion-safe:animate-ping" />
+          <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-success" />
         </span>
+        Shielded pool
       </div>
 
-      <div className="mb-3 rounded-[14px] border border-gray/15 bg-background p-5">
+      <div className="relative mb-3 rounded-[14px] border border-gray/15 bg-background p-5">
         <div className="mb-2 text-xs text-gray">Total value shielded</div>
         {loading ? (
           <span className="block h-9 w-40 animate-pulse rounded-lg bg-gray/10" />
         ) : (
-          <div className="font-display text-[38px] font-semibold leading-none tracking-tight">
-            {tvlDisplay}
-          </div>
+          <AnimatedCounter
+            value={tvlUsd}
+            format={fmtUsd}
+            className="block font-display text-[38px] font-semibold leading-none tracking-tight"
+          />
         )}
       </div>
 
-      <div className="mb-3.5 flex flex-col gap-2">
+      <div className="relative mb-3.5 flex flex-col gap-2">
         {loading ? (
           [0, 1].map((i) => (
             <div key={i} className="h-[52px] animate-pulse rounded-xl bg-gray/[0.06]" />
@@ -85,9 +89,12 @@ function PoolCard({
             Nothing shielded yet. Be the first commitment in the tree.
           </div>
         ) : (
-          holdings.map((h) => (
-            <div
+          holdings.map((h, i) => (
+            <motion.div
               key={h.symbol}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.45, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
               className="flex items-center gap-3 rounded-xl border border-gray/15 bg-muted px-3.5 py-3"
             >
               <img src={h.logo} alt="" className="h-[26px] w-[26px] rounded-full" />
@@ -100,12 +107,12 @@ function PoolCard({
                 <div className="font-mono text-[13px]">{fmtAmount(h.amount)}</div>
                 <div className="text-[11.5px] text-gray">{h.usd == null ? "—" : fmtUsd(h.usd)}</div>
               </div>
-            </div>
+            </motion.div>
           ))
         )}
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="relative grid grid-cols-2 gap-2.5">
         <Link href={vaultHref} prefetch={false} className="btn-privacy text-center">
           Shield
         </Link>
@@ -158,8 +165,8 @@ function DepositViz() {
         <div className="relative h-0.5 flex-1 overflow-hidden bg-gradient-to-r from-btc to-privacy">
           <span className="absolute inset-y-0 left-0 w-[30%] bg-white/75 motion-safe:animate-[utx-sweep_2.6s_linear_infinite]" />
         </div>
-        <div className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-privacy/35 bg-privacy/10 font-mono text-[13px] text-privacy">
-          C
+        <div className="flex h-8 w-8 items-center justify-center rounded-[9px] border border-privacy/35 bg-privacy/10 text-privacy">
+          <ShieldCheck className="h-4 w-4" />
         </div>
       </div>
       <div className="font-mono text-[11px] leading-[1.7] text-gray">
@@ -352,9 +359,8 @@ export default function Home() {
             <ScrollReveal delay={0.15}>
               <PoolCard
                 holdings={holdings}
-                tvlDisplay={tvlDisplay}
+                tvlUsd={tvlUsd}
                 loading={isLoadingStats}
-                networkId={networkId}
                 vaultHref={chainHref("/vault")}
                 sendHref={chainHref("/send")}
               />
