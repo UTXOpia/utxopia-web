@@ -81,12 +81,20 @@ function PoolCard({
         )}
       </div>
 
-      {/* Caps at ~3 rows so the card keeps its height however many assets land. */}
-      <div className="relative mb-3.5">
-        <div className="scrollbar-thin flex max-h-[180px] flex-col gap-2 overflow-y-auto pr-1">
+      {/* Exactly three rows visible, however many assets land. Rows are pinned to
+          --row-h so the cap is arithmetic rather than a guessed pixel height. */}
+      <div className="relative mb-3.5" style={{ ["--row-h" as string]: "60px" }}>
+        <div
+          className="scrollbar-thin flex flex-col gap-2 overflow-y-auto pr-1"
+          style={{ maxHeight: "calc(3 * var(--row-h) + 2 * 0.5rem)" }}
+        >
           {loading ? (
-            [0, 1].map((i) => (
-              <div key={i} className="h-[52px] shrink-0 animate-pulse rounded-xl bg-gray/[0.06]" />
+            [0, 1, 2].map((i) => (
+              <div
+                key={i}
+                className="shrink-0 animate-pulse rounded-xl bg-gray/[0.06]"
+                style={{ height: "var(--row-h)" }}
+              />
             ))
           ) : holdings.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray/20 bg-muted px-3.5 py-4 text-center text-[13px] text-gray">
@@ -104,7 +112,8 @@ function PoolCard({
                 <Link
                   href={vaultHref}
                   prefetch={false}
-                  className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-gray/15 bg-muted px-3.5 py-3 transition-colors hover:border-privacy/40"
+                  style={{ height: "var(--row-h)" }}
+                  className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-gray/15 bg-muted px-3.5 transition-colors hover:border-privacy/40"
                 >
                   {/* Share of pool, so the list reads as composition not just a list. */}
                   <span
