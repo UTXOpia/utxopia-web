@@ -20,6 +20,7 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithVault, vaultsSupported, type VaultId } from "@/lib/vault-config";
 import { useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { RedeemInvite } from "@/components/redeem-invite";
+import { VaultExplainer } from "@/components/vault/vault-explainer";
 import { useVerifiedMembership } from "@/hooks/use-verified-membership";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
@@ -65,12 +66,15 @@ export function VaultSourcePicker({ className }: { className?: string }) {
     if (!activeFunded) return null;
     const Icon = vaultId === "verified" ? ShieldCheck : Unlock;
     return (
-      <div className={cn("mb-4 flex items-center gap-1.5 px-1 text-[11px] text-gray/50", className)}>
-        From
-        <span className="inline-flex items-center gap-1 rounded-full border border-gray/15 bg-muted/40 px-2 py-0.5 text-foreground/80">
-          <Icon className={cn("h-3 w-3", vaultId === "verified" && "text-privacy")} />
-          {vaultId === "verified" ? "Verified" : "Open"}
-        </span>
+      <div className={cn("mb-4", className)}>
+        <div className="flex items-center gap-1.5 px-1 text-[11px] text-gray/50">
+          From
+          <span className="inline-flex items-center gap-1 rounded-full border border-gray/15 bg-muted/40 px-2 py-0.5 text-foreground/80">
+            <Icon className={cn("h-3 w-3", vaultId === "verified" && "text-privacy")} />
+            {vaultId === "verified" ? "Verified" : "Open"}
+          </span>
+        </div>
+        <VaultExplainer networkId={networkId} />
       </div>
     );
   }
@@ -107,6 +111,7 @@ export function VaultSourcePicker({ className }: { className?: string }) {
           );
         })}
       </div>
+      <VaultExplainer networkId={networkId} />
     </div>
   );
 }
@@ -194,6 +199,7 @@ export function VaultDestinationPicker({ className }: { className?: string }) {
           )}
         </div>
       )}
+      <VaultExplainer networkId={networkId} />
     </div>
   );
 }

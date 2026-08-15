@@ -32,7 +32,8 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
   open: {
     id: "open",
     name: "Open Privacy",
-    description: "Permissionless private transfers on Solana.",
+    // User-facing: rendered by VaultExplainer at the pool pickers.
+    description: "Anyone can use it. No invite, no approval.",
     permissioned: false,
     policyMode: "disabled",
     programId: "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",
@@ -45,7 +46,7 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
   verified: {
     id: "verified",
     name: "Verified Privacy",
-    description: "Private transfers with allowlist policy approval.",
+    description: "Invite only. Your wallet must be on the operator's allowlist.",
     permissioned: true,
     policyMode: "per",
     programId: "CvfSyACR8xemPdeJsB3D8Xh15rKUQ3b5c1PvnmABCBJp",

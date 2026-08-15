@@ -245,6 +245,13 @@ export function VaultTokenList({
           >
             switch to unlock
           </Link>
+          {". "}
+          <Link
+            href={hrefWithChain("/docs#pools", networkId)}
+            className="text-privacy/60 hover:text-privacy transition-colors"
+          >
+            Why two pools?
+          </Link>
         </p>
       )}
     </div>

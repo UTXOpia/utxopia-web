@@ -12,6 +12,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: "using-utxopia", label: "Quick Guide" },
   { id: "feature-reference", label: "All Features" },
+  { id: "pools", label: "Open & Verified" },
   { id: "terminology", label: "Key Terms" },
   { id: "overview", label: "Privacy Model" },
   { id: "protocol-flow", label: "How It Works" },

@@ -16,6 +16,7 @@ import { type LucideIcon } from "lucide-react";
 import {
   Shield,
   Lock,
+  Unlock,
   ArrowRight,
   ShieldCheck,
   TreePine,
@@ -483,6 +484,22 @@ export default function DocsPage() {
               <p className="mt-3 max-w-xl text-sm leading-relaxed text-gray sm:text-base">
                 Choose a task below. Open the reference topics only when you need more detail.
               </p>
+              <div className="mt-5 flex flex-wrap gap-2">
+                <Link
+                  href={hrefWithChain("/architecture", network)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray/15 px-3 py-1.5 text-xs text-gray transition-colors hover:border-gray/30 hover:text-foreground"
+                >
+                  <Network className="h-3 w-3" />
+                  Architecture diagrams
+                </Link>
+                <Link
+                  href={hrefWithChain("/architecture/magicblock", network)}
+                  className="inline-flex items-center gap-1.5 rounded-full border border-gray/15 px-3 py-1.5 text-xs text-gray transition-colors hover:border-gray/30 hover:text-foreground"
+                >
+                  <Layers className="h-3 w-3" />
+                  MagicBlock &amp; the Verified pool
+                </Link>
+              </div>
             </section>
 
             <DocsSection id="using-utxopia" className="pb-12">
@@ -540,6 +557,72 @@ export default function DocsPage() {
                   </Link>
                 ))}
               </div>
+            </ExpandableSection>
+
+            <ExpandableSection
+              id="pools"
+              title="Open &amp; Verified pools"
+              summary="Two separate privacy pools, same cryptography, different door."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                {[
+                  {
+                    icon: Unlock,
+                    name: "Open",
+                    tone: "text-gray/60",
+                    lead: "Permissionless. Anyone can deposit and spend — no invite, no approval, no screening.",
+                    points: [
+                      "Open to any wallet with a valid deposit.",
+                      "No operator can refuse or reverse a transfer.",
+                      "The default pool for every new vault.",
+                    ],
+                  },
+                  {
+                    icon: ShieldCheck,
+                    name: "Verified",
+                    tone: "text-privacy",
+                    lead: "Permissioned. Entry is invite-only and every wallet must be on the operator's allowlist.",
+                    points: [
+                      "Redeem an invite code to join.",
+                      "Each transfer is checked against the policy program before it lands.",
+                      "Built for participants who need an auditable counterparty set.",
+                    ],
+                  },
+                ].map((pool) => (
+                  <Card key={pool.name}>
+                    <div className="mb-2 flex items-center gap-2">
+                      <pool.icon className={`h-4 w-4 ${pool.tone}`} />
+                      <h3 className="text-sm font-semibold text-foreground">{pool.name}</h3>
+                    </div>
+                    <p className="text-sm leading-relaxed text-gray">{pool.lead}</p>
+                    <ul className="mt-3 space-y-1.5 border-t border-gray/5 pt-3">
+                      {pool.points.map((point) => (
+                        <li key={point} className="text-xs leading-relaxed text-gray/70">
+                          {point}
+                        </li>
+                      ))}
+                    </ul>
+                  </Card>
+                ))}
+              </div>
+              <Card className="mt-4">
+                <h3 className="mb-2 text-sm font-semibold text-foreground">
+                  The pools do not share funds
+                </h3>
+                <p className="text-sm leading-relaxed text-gray">
+                  Each pool is its own on-chain deposit pool, with its own commitment tree, its own
+                  Bitcoin custody address, and its own anonymity set. A balance in one is not
+                  spendable from the other — to move value across, cash out of one pool and deposit
+                  into the other. Your vault shows both balances, but only the pool you have
+                  unlocked reads as anything other than{" "}
+                  <span className="font-mono text-xs text-gray/70">Locked</span>.
+                </p>
+                <p className="mt-3 text-sm leading-relaxed text-gray">
+                  Keeping them separate is the point: mixing the two sets would hand every Verified
+                  participant the Open pool&apos;s admission rules, and every Open participant the
+                  Verified pool&apos;s screening.
+                </p>
+              </Card>
             </ExpandableSection>
 
             <ExpandableSection

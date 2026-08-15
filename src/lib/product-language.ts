@@ -198,6 +198,14 @@ export const PRODUCT_TERMS: ProductTerm[] = [
     meaning: "Redeem private zkBTC to a native Bitcoin address.",
   },
   {
+    term: "Open pool",
+    meaning: "The permissionless privacy pool. Anyone can deposit and spend — no invite, no approval.",
+  },
+  {
+    term: "Verified pool",
+    meaning: "The permissioned privacy pool. Entry is invite-only and every wallet must be on the operator's allowlist. It is a separate pool: funds never move between Open and Verified, and each keeps its own anonymity set.",
+  },
+  {
     term: PRODUCT_COPY.protocol.privateNote,
     meaning: "A spendable private output. A balance may contain several notes.",
   },
