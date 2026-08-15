@@ -4,7 +4,12 @@ import { useState, useEffect, useRef } from "react";
 import { usePasskey } from "@/hooks/use-passkey";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
-export function usePayFlowAuth(hasKeys: boolean) {
+/**
+ * @param autoOpen Pop the auth modal on mount when there are no keys. Right for
+ *   a flow the user came to in order to spend; wrong for a page that is useful
+ *   signed out, where an unprompted modal on arrival is just in the way.
+ */
+export function usePayFlowAuth(hasKeys: boolean, { autoOpen = true }: { autoOpen?: boolean } = {}) {
   const {
     isSupported: passkeySupported,
     hasCredential: hasPasskeyCredential,
@@ -35,12 +40,12 @@ export function usePayFlowAuth(hasKeys: boolean) {
   // Auto-open auth modal when no keys
   const authAutoOpenedRef = useRef(false);
   useEffect(() => {
-    if (!hasKeys && !authAutoOpenedRef.current) {
+    if (autoOpen && !hasKeys && !authAutoOpenedRef.current) {
       authAutoOpenedRef.current = true;
       setAuthModalOpen(true);
     }
     if (hasKeys) authAutoOpenedRef.current = false;
-  }, [hasKeys]);
+  }, [hasKeys, autoOpen]);
 
   return {
     authModalOpen,

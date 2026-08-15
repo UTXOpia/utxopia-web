@@ -5,6 +5,7 @@ import {
   buildHistogram,
   countExactDeposits,
   countSimilarDeposits,
+  isDecadeEdge,
   RECENT_MS,
   VERY_RECENT_MS,
 } from "../anonymity";
@@ -84,8 +85,43 @@ describe("histogram", () => {
     expect(buckets.reduce((n, b) => n + b.count, 0)).toBe(6);
   });
 
-  it("collapses to one bucket when every deposit is the same size", () => {
-    expect(buildHistogram(at(500, 500, 500))).toEqual([{ lo: 500, hi: 500, count: 3 }]);
+  it("collapses to one ladder rung when every deposit is the same size", () => {
+    expect(buildHistogram(at(500, 500, 500))).toEqual([{ lo: 500, hi: 1000, count: 3 }]);
+  });
+
+  it("puts every edge on the 1-2-5 ladder, not on the observed min and max", () => {
+    // A pool of 0.00998–0.998 SOL used to produce those exact edges as labels.
+    const buckets = buildHistogram(at(9_980_000, 12_000_000, 998_000_000));
+    expect(buckets[0].lo).toBe(5_000_000);
+    expect(buckets[buckets.length - 1].hi).toBe(1_000_000_000);
+    for (const b of buckets) {
+      const mantissa = b.lo / 10 ** Math.floor(Math.log10(b.lo) + 1e-9);
+      expect([1, 2, 5]).toContain(Math.round(mantissa));
+    }
+  });
+
+  it("keeps edges stable when a new outlier arrives", () => {
+    const before = buildHistogram(at(10_000_000, 12_000_000));
+    const after = buildHistogram(at(10_000_000, 12_000_000, 998_000_000));
+    expect(after[0].lo).toBe(before[0].lo);
+    expect(after.slice(0, before.length).map((b) => b.hi)).toEqual(before.map((b) => b.hi));
+  });
+
+  it("coarsens to whole decades rather than dropping range when rungs overflow", () => {
+    const buckets = buildHistogram(at(1, 1_000_000_000), 8);
+    expect(buckets.length).toBeLessThanOrEqual(10);
+    expect(buckets[0].lo).toBe(1);
+    expect(buckets[buckets.length - 1].hi).toBeGreaterThanOrEqual(1_000_000_000);
+    expect(buckets.every((b) => isDecadeEdge(b.lo))).toBe(true);
+    expect(buckets.reduce((n, b) => n + b.count, 0)).toBe(2);
+  });
+
+  it("labels only whole powers of ten as decade edges", () => {
+    expect(isDecadeEdge(100)).toBe(true);
+    expect(isDecadeEdge(1_000_000)).toBe(true);
+    expect(isDecadeEdge(200)).toBe(false);
+    expect(isDecadeEdge(500)).toBe(false);
+    expect(isDecadeEdge(0)).toBe(false);
   });
 
   it("returns nothing for an empty pool", () => {

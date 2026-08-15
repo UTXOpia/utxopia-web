@@ -11,13 +11,17 @@
 import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
-import { AlertTriangle, ArrowLeft, Info } from "lucide-react";
+import { AlertTriangle, ArrowLeft, Info, Key } from "lucide-react";
+import { useWallet } from "@solana/wallet-adapter-react";
+import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
-import { WalletButton } from "@/components/ui/wallet-button";
+import { AuthModal } from "@/components/auth-modal";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useSingleTokenActivity } from "@/hooks/use-token-activity";
-import { useTokenNotes, useUTXOpia, type InboxNote } from "@/hooks/use-utxopia";
+import { usePayFlowAuth } from "@/hooks/use-pay-flow-auth";
+import { useTokenNotes, useUTXOpiaKeys, type InboxNote } from "@/hooks/use-utxopia";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import {
   formatTokenAmount,
   getTokenBySymbol,
@@ -28,6 +32,7 @@ import {
   assessNote,
   bucketIndexOf,
   buildHistogram,
+  isDecadeEdge,
   SIMILAR_TOLERANCE,
   type DepositPoint,
   type NoteExposure,
@@ -135,14 +140,20 @@ function Distribution({
 
   return (
     <>
-      <div className="flex h-[130px] items-end gap-1.5">
+      {/* An empty bucket still draws a baseline sliver: a bar of literally zero
+          height reads as a hole in the axis rather than as "nothing here". */}
+      <div className="flex h-[130px] items-end gap-1.5 border-b border-gray/20">
         {buckets.map((b, i) => (
-          <div key={i} className="group relative flex h-full flex-1 flex-col justify-end">
+          <div key={b.lo} className="group relative flex h-full flex-1 flex-col justify-end">
             <div
               className={`rounded-t transition-colors ${
-                i === marked ? "bg-privacy" : "bg-gray/25 group-hover:bg-gray/40"
+                b.count === 0
+                  ? "bg-gray/15"
+                  : i === marked
+                    ? "bg-privacy"
+                    : "bg-gray/30 group-hover:bg-gray/45"
               }`}
-              style={{ height: `${Math.max(b.count > 0 ? 4 : 0, (b.count / peak) * 100)}%` }}
+              style={{ height: b.count === 0 ? "2px" : `${Math.max(4, (b.count / peak) * 100)}%` }}
             />
             <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-gray/20 bg-background px-2 py-1 font-mono text-[11px] text-gray-light group-hover:block">
               {b.count} × {formatTokenAmount(Math.round(b.lo), token)} –{" "}
@@ -151,10 +162,23 @@ function Distribution({
           </div>
         ))}
       </div>
-      <div className="mt-2 flex items-baseline justify-between font-mono text-[11px] text-gray">
-        <span>{formatTokenAmount(Math.round(buckets[0].lo), token)}</span>
-        <span className="px-2 text-center">deposit size · log scale</span>
-        <span>{formatTokenAmount(Math.round(buckets[buckets.length - 1].hi), token)}</span>
+      {/* A tick is centred on the edge it names, not on the bucket — except the
+          first, which would hang off the left of the chart. */}
+      <div className="flex h-4 gap-1.5 font-mono text-[10.5px] text-gray">
+        {buckets.map((b, i) => (
+          <span key={b.lo} className="relative min-w-0 flex-1">
+            {isDecadeEdge(b.lo) && (
+              <span
+                className={`absolute left-0 top-1 whitespace-nowrap ${i === 0 ? "" : "-translate-x-1/2"}`}
+              >
+                {formatTokenAmount(Math.round(b.lo), token)}
+              </span>
+            )}
+          </span>
+        ))}
+      </div>
+      <div className="mt-1 text-center font-mono text-[11px] text-gray">
+        deposit size · log scale
       </div>
       {marked >= 0 && (
         <p className="m-0 mt-3 text-[12.5px] text-privacy">
@@ -261,22 +285,64 @@ function YourPosition({
   depositsKnown: boolean;
   vaultHref: string;
 }) {
-  const { hasKeys, isWalletConnected } = useUTXOpia();
+  const { hasKeys, isLoading: keysLoading, error: keysError, deriveKeys } = useUTXOpiaKeys();
+  const wallet = useWallet();
+  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
+  // autoOpen off: this page is meant to be readable signed out, so the modal
+  // opens only when the user asks for it.
+  const auth = usePayFlowAuth(hasKeys, { autoOpen: false });
   const now = useNow();
 
-  if (!isWalletConnected || !hasKeys) {
+  if (!hasKeys) {
     return (
       <Card
         title="Your position"
-        subtitle={`Connect to check how exposed your own ${token.symbol} is. Everything below this card is public and needs no wallet.`}
+        subtitle={`Unlock to check how exposed your own ${token.symbol} is. Everything below this card is public and needs no wallet.`}
       >
         <div className="flex flex-col items-start gap-3.5 rounded-xl border border-gray/15 bg-background p-5">
           <p className="m-0 text-[13.5px] leading-relaxed text-gray">
             Your notes are decrypted in your browser. Which amount you hold is never sent anywhere —
             the check runs locally against the public deposit list.
           </p>
-          <WalletButton className="btn-privacy" label="Connect wallet" />
+          {/* Not a WalletButton: a connected wallet still has no vault keys until
+              they are derived, and that button would keep saying "Connect". */}
+          <button
+            type="button"
+            onClick={() => auth.setAuthModalOpen(true)}
+            disabled={keysLoading}
+            className="btn-privacy inline-flex items-center gap-2"
+          >
+            <Key className="h-4 w-4" />
+            {keysLoading ? "Unlocking…" : "Unlock private vault"}
+          </button>
         </div>
+        <AuthModal
+          open={auth.authModalOpen}
+          onOpenChange={auth.setAuthModalOpen}
+          auth={{
+            passkeySupported: auth.passkeySupported,
+            hasPasskeyCredential: auth.hasPasskeyCredential,
+            passkeyLoading: auth.passkeyLoading,
+            walletLoading: keysLoading,
+            walletConnected: wallet.connected,
+            error: keysError || auth.passkeyError,
+            onPasskeyRegister: () => void auth.handlePasskeyRegister(),
+            onPasskeyAuthenticate: () => void auth.handlePasskeyAuthenticate(),
+            onWalletConnect: () => {
+              auth.setAuthModalOpen(false);
+              setWalletModalVisible(true);
+            },
+            onWalletDeriveKeys: async () => {
+              await deriveKeys();
+              auth.setAuthModalOpen(false);
+            },
+            onViewOnlyLogin: (viewingKey) => {
+              void loadViewOnlyKeys(viewingKey);
+              auth.setAuthModalOpen(false);
+            },
+          }}
+        />
       </Card>
     );
   }

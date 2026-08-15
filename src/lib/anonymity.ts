@@ -86,29 +86,85 @@ export interface HistogramBucket {
   count: number;
 }
 
+/** Mantissas of the standard log-axis ladder: 1, 2, 5, 10, 20, 50, … */
+const LADDER = [1, 2, 5];
+/** Absorbs the float error in 10 ** log10(x) round-trips. */
+const EPS = 1e-9;
+
+function decadeOf(v: number): number {
+  return 10 ** Math.floor(Math.log10(v) + EPS);
+}
+
+/** Largest ladder value <= v. */
+function ladderFloor(v: number): number {
+  const decade = decadeOf(v);
+  const mantissa = v / decade;
+  let edge = decade;
+  for (const rung of LADDER) {
+    if (rung <= mantissa + EPS) edge = rung * decade;
+  }
+  return edge;
+}
+
+/** Next ladder value strictly above v (v is assumed to sit on the ladder). */
+function ladderNext(v: number): number {
+  const decade = decadeOf(v);
+  const mantissa = v / decade;
+  for (const rung of LADDER) {
+    if (rung > mantissa + EPS) return rung * decade;
+  }
+  return 10 * decade;
+}
+
+/** True when a bound is a whole power of ten — the only edges worth labelling. */
+export function isDecadeEdge(v: number): boolean {
+  return v > 0 && Math.abs(v / decadeOf(v) - 1) < EPS;
+}
+
 /**
- * Log-scale buckets. Deposit sizes are heavy-tailed — on a linear axis a single
- * whale drops every other deposit into bucket zero and the chart says nothing.
+ * Log-scale buckets on a 1-2-5 ladder.
+ *
+ * Log scale because deposit sizes are heavy-tailed: on a linear axis one whale
+ * drops every other deposit into bucket zero and the chart says nothing.
+ *
+ * The ladder — rather than slicing the observed min..max into N equal steps —
+ * because data-derived edges come out as "0.00998" and "0.998", which a reader
+ * cannot distinguish from 0.01 and 1. Round edges also keep the axis stable as
+ * deposits arrive, instead of every bar shifting when a new outlier lands.
+ *
+ * `maxBuckets` coarsens the ladder to whole decades rather than truncating the
+ * range, so a pool spanning many orders of magnitude stays fully shown.
  */
-export function buildHistogram(deposits: DepositPoint[], bucketCount = 12): HistogramBucket[] {
+export function buildHistogram(deposits: DepositPoint[], maxBuckets = 16): HistogramBucket[] {
   const amounts = deposits.map((d) => d.amount).filter((a) => a > 0);
-  if (amounts.length === 0 || bucketCount < 1) return [];
+  if (amounts.length === 0 || maxBuckets < 1) return [];
 
   const min = Math.min(...amounts);
   const max = Math.max(...amounts);
-  if (min === max) return [{ lo: min, hi: max, count: amounts.length }];
 
-  const logMin = Math.log10(min);
-  const step = (Math.log10(max) - logMin) / bucketCount;
-  const buckets: HistogramBucket[] = Array.from({ length: bucketCount }, (_, i) => ({
-    lo: 10 ** (logMin + i * step),
-    hi: 10 ** (logMin + (i + 1) * step),
+  const buildEdges = (next: (v: number) => number): number[] => {
+    const edges = [ladderFloor(min)];
+    while (edges[edges.length - 1] <= max + EPS) edges.push(next(edges[edges.length - 1]));
+    return edges;
+  };
+
+  let edges = buildEdges(ladderNext);
+  if (edges.length - 1 > maxBuckets) {
+    // Too many rungs — fall back to whole decades, which is 3x coarser.
+    edges = buildEdges((v) => decadeOf(v) * 10);
+  }
+
+  const buckets: HistogramBucket[] = edges.slice(0, -1).map((lo, i) => ({
+    lo,
+    hi: edges[i + 1],
     count: 0,
   }));
 
   for (const a of amounts) {
-    const raw = Math.floor((Math.log10(a) - logMin) / step);
-    buckets[Math.min(bucketCount - 1, Math.max(0, raw))].count += 1;
+    // Last bucket is inclusive of its upper bound, so `max` itself lands inside.
+    let i = buckets.findIndex((b) => a >= b.lo && a < b.hi);
+    if (i === -1) i = buckets.length - 1;
+    buckets[i].count += 1;
   }
   return buckets;
 }
