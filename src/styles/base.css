@@ -145,3 +145,27 @@ body {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--muted-foreground);
 }
+
+/* Thin scrollbar for scroll regions inside cards, where the 8px default
+   reads as chrome rather than an affordance. */
+.scrollbar-thin {
+  scrollbar-width: thin;
+  scrollbar-color: var(--zeus-gray) transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar {
+  width: 4px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb {
+  background: #8b8a9e59;
+  border-radius: 99px;
+}
+
+.scrollbar-thin::-webkit-scrollbar-thumb:hover {
+  background: var(--zeus-gray);
+}

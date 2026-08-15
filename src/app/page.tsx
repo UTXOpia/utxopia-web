@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { ArrowRight, Github, Rocket, Send, ShieldCheck } from "lucide-react";
+import { ArrowRight, ChevronRight, Github, Rocket, Send, ShieldCheck } from "lucide-react";
 import { usePoolStats } from "@/hooks/use-pool-stats";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { getTokenBySymbol, tvlToUsd } from "@/lib/supported-tokens";
@@ -27,6 +27,8 @@ interface Holding {
   logo: string;
   amount: number;
   usd: number | null;
+  /** Fraction of total TVL, 0–1. Drives the bar behind each row. */
+  share: number;
 }
 
 function fmtAmount(n: number) {
@@ -79,36 +81,60 @@ function PoolCard({
         )}
       </div>
 
-      <div className="relative mb-3.5 flex flex-col gap-2">
-        {loading ? (
-          [0, 1].map((i) => (
-            <div key={i} className="h-[52px] animate-pulse rounded-xl bg-gray/[0.06]" />
-          ))
-        ) : holdings.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-gray/20 bg-muted px-3.5 py-4 text-center text-[13px] text-gray">
-            Nothing shielded yet. Be the first commitment in the tree.
-          </div>
-        ) : (
-          holdings.map((h, i) => (
-            <motion.div
-              key={h.symbol}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.45, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
-              className="flex items-center gap-3 rounded-xl border border-gray/15 bg-muted px-3.5 py-3"
-            >
-              <img src={h.logo} alt="" className="h-[26px] w-[26px] rounded-full" />
-              <div>
-                <div className="text-sm font-semibold">{h.symbol}</div>
-                <div className="text-[11.5px] text-gray">{h.name}</div>
-              </div>
-              <div className="flex-1" />
-              <div className="text-right">
-                <div className="font-mono text-[13px]">{fmtAmount(h.amount)}</div>
-                <div className="text-[11.5px] text-gray">{h.usd == null ? "—" : fmtUsd(h.usd)}</div>
-              </div>
-            </motion.div>
-          ))
+      {/* Caps at ~3 rows so the card keeps its height however many assets land. */}
+      <div className="relative mb-3.5">
+        <div className="scrollbar-thin flex max-h-[180px] flex-col gap-2 overflow-y-auto pr-1">
+          {loading ? (
+            [0, 1].map((i) => (
+              <div key={i} className="h-[52px] shrink-0 animate-pulse rounded-xl bg-gray/[0.06]" />
+            ))
+          ) : holdings.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray/20 bg-muted px-3.5 py-4 text-center text-[13px] text-gray">
+              Nothing shielded yet. Be the first commitment in the tree.
+            </div>
+          ) : (
+            holdings.map((h, i) => (
+              <motion.div
+                key={h.symbol}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.45, delay: 0.15 + i * 0.1, ease: [0.22, 1, 0.36, 1] }}
+                className="shrink-0"
+              >
+                <Link
+                  href={vaultHref}
+                  prefetch={false}
+                  className="group relative flex items-center gap-3 overflow-hidden rounded-xl border border-gray/15 bg-muted px-3.5 py-3 transition-colors hover:border-privacy/40"
+                >
+                  {/* Share of pool, so the list reads as composition not just a list. */}
+                  <span
+                    aria-hidden="true"
+                    className="absolute inset-y-0 left-0 bg-privacy/[0.07] transition-[width,background-color] duration-700 ease-out group-hover:bg-privacy/[0.14]"
+                    style={{ width: `${h.share * 100}%` }}
+                  />
+                  <img src={h.logo} alt="" className="relative h-[26px] w-[26px] rounded-full" />
+                  <div className="relative">
+                    <div className="text-sm font-semibold">{h.symbol}</div>
+                    <div className="text-[11.5px] text-gray">{h.name}</div>
+                  </div>
+                  <div className="flex-1" />
+                  <div className="relative text-right">
+                    <div className="font-mono text-[13px]">{fmtAmount(h.amount)}</div>
+                    <div className="text-[11.5px] text-gray">
+                      {h.usd == null ? "—" : fmtUsd(h.usd)}
+                    </div>
+                  </div>
+                  <ChevronRight className="relative -mr-1 h-3.5 w-3.5 shrink-0 text-gray opacity-0 transition-opacity group-hover:opacity-100" />
+                </Link>
+              </motion.div>
+            ))
+          )}
+        </div>
+        {holdings.length > 3 && (
+          <div
+            aria-hidden="true"
+            className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-muted to-transparent"
+          />
         )}
       </div>
 
@@ -274,7 +300,7 @@ export default function Home() {
     })
     .filter((h) => h.amount > 0)
     .sort((a, b) => (b.usd ?? 0) - (a.usd ?? 0))
-    .slice(0, 3);
+    .map((h) => ({ ...h, share: tvlUsd > 0 && h.usd ? h.usd / tvlUsd : 0 }));
 
   const statsUnavailable = Boolean(statsError) || !stats;
 
@@ -675,7 +701,7 @@ export default function Home() {
                   </div>
                   <div className="flex-1" />
                   <Link
-                    href={chainHref("/architecture")}
+                    href={chainHref("/docs#security")}
                     prefetch={false}
                     className="text-[13.5px] font-semibold text-privacy hover:text-foreground"
                   >
