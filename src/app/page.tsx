@@ -543,25 +543,23 @@ export default function Home() {
                     WHERE WE ACTUALLY ARE
                   </span>
                 </div>
-                <h3 className="section-title m-0 mb-2.5 text-2xl">Public alpha, on testnet</h3>
-                <p className="m-0 mb-6 text-pretty text-[14.5px] leading-relaxed text-gray-light">
-                  We would rather you trust us for the right reasons. Here is the honest state of the
-                  protocol.
-                </p>
-                <div className="flex flex-col gap-3">
+                <h3 className="section-title m-0 mb-4 text-2xl">Public alpha</h3>
+                <div className="flex flex-col gap-2.5">
                   {[
-                    "Devnet and regtest only. Mainnet is not enabled and no real funds are at risk.",
-                    "Circuits are unaudited. An external review is the gate for mainnet, not a milestone after it.",
-                    "The anonymity set is small in alpha. With few users, privacy is limited by arithmetic, not intent.",
-                  ].map((line, i) => (
+                    ["Testnet only.", "Devnet and regtest. No real funds at risk."],
+                    ["Unaudited.", "External review gates mainnet."],
+                    ["Small anonymity set.", "Privacy is limited by arithmetic, not intent."],
+                  ].map(([lead, rest], i) => (
                     <div
                       key={i}
-                      className="flex items-start gap-3 rounded-xl border border-gray/15 bg-background p-3.5"
+                      className="flex items-baseline gap-3 rounded-xl border border-gray/15 bg-background px-3.5 py-3"
                     >
-                      <span className="pt-0.5 font-mono text-[11px] text-warning">
+                      <span className="font-mono text-[11px] text-warning">
                         {String(i + 1).padStart(2, "0")}
                       </span>
-                      <p className="m-0 text-sm leading-relaxed text-gray-light">{line}</p>
+                      <p className="m-0 text-sm leading-relaxed text-gray">
+                        <span className="font-semibold text-foreground">{lead}</span> {rest}
+                      </p>
                     </div>
                   ))}
                 </div>
