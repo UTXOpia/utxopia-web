@@ -6,7 +6,6 @@ import { PrivyProvider, useLogin, usePrivy } from "@privy-io/react-auth";
 import {
   toSolanaWalletConnectors,
   useCreateWallet,
-  useSignMessage,
   useSignTransaction,
   useWallets,
   type ConnectedStandardSolanaWallet,
@@ -43,7 +42,6 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
-  const { signMessage } = useSignMessage();
   const solanaChain = inferSolanaChain();
 
   const wallet = useMemo(() => findEmbeddedWallet(wallets), [wallets]);
@@ -83,22 +81,6 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     [signTransaction, solanaChain, wallets],
   );
 
-  const signPrivyMessage = useCallback(
-    async (message: Uint8Array) => {
-      const signingWallet = findEmbeddedWallet(wallets);
-      if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
-
-      const { signature } = await signMessage({ message, wallet: signingWallet });
-      // The envelope key is HKDF(signature), so a short or re-encoded signature
-      // silently produces a key nobody can reproduce. Fail here instead.
-      if (signature.length !== 64) {
-        throw new Error(`Unexpected Privy signature length: ${signature.length}`);
-      }
-      return signature;
-    },
-    [signMessage, wallets],
-  );
-
   const value = useMemo<PrivySolanaAuthority>(
     () => ({
       enabled: true,
@@ -108,9 +90,8 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       login: openLogin,
       ensureWallet,
       signTransaction: signPrivyTransaction,
-      signMessage: signPrivyMessage,
     }),
-    [authenticated, ensureWallet, openLogin, privyReady, publicKey, signPrivyTransaction, signPrivyMessage, walletsReady],
+    [authenticated, ensureWallet, openLogin, privyReady, publicKey, signPrivyTransaction, walletsReady],
   );
 
   return <PrivySolanaContext.Provider value={value}>{children}</PrivySolanaContext.Provider>;

@@ -3,7 +3,9 @@ import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@utxopia/sdk";
 import {
   EnvelopeIdentityError,
+  workingSeedFor,
   NoDeviceEnvelopeError,
+  VaultAlreadyHereError,
   WeakPassphraseError,
   adoptExistingSeed,
   armDevice,
@@ -42,7 +44,10 @@ describe("creating a vault", () => {
     });
     expect(created.recoveryString.startsWith("utxovault1")).toBe(true);
     expect(hasDeviceEnvelope(SCOPE)).toBe(true);
-    expect(created.metaAddress).toBe(await metaAddressFor(created.seed));
+    // The address comes from the scope's working seed, not the root the member
+    // keeps — that is what gives the guard something of its own to check.
+    expect(created.metaAddress).toBe(await metaAddressFor(await workingSeedFor(created.seed, SCOPE)));
+    expect(created.metaAddress).not.toBe(await metaAddressFor(created.seed));
   });
 
   it("never stores the recovery string", async () => {
@@ -58,7 +63,7 @@ describe("creating a vault", () => {
     expect(stored.some((v) => v?.includes(created.recoveryString))).toBe(false);
   });
 
-  it("gives every vault its own seed", async () => {
+  it("gives every vault its own identity from one root", async () => {
     const a = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     const b = await createVault({ scope: OTHER_SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     expect(a.metaAddress).not.toBe(b.metaAddress);
@@ -158,14 +163,38 @@ describe("restoring on a new device", () => {
     expect(hasDeviceEnvelope(SCOPE)).toBe(false);
   });
 
-  it("stops a correct passphrase against another vault's string", async () => {
-    const other = await createVault({ scope: OTHER_SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    // Same seed, but the guard was written for a different meta-address.
+  // The finding this exists for: a genuine string from the member's other pool
+  // used to decrypt cleanly here and overwrite this pool's wrapping. Scope is
+  // bound into the AEAD now, so it fails at the tag before anything is touched.
+  it("refuses a genuine string from the member's other vault", async () => {
+    const other = await createVault({
+      scope: OTHER_SCOPE,
+      passphrase: PASSPHRASE,
+      deviceKeyMaterial: device(1),
+      metaAddressFor,
+    });
+    await expect(
+      unlockWithRecoveryString({
+        scope: SCOPE,
+        recoveryString: other.recoveryString,
+        passphrase: PASSPHRASE,
+        deviceKeyMaterial: device(1),
+        metaAddressFor,
+      }),
+    ).rejects.toBeInstanceOf(EnvelopeUnlockError);
+    // and crucially left this scope's wrapping alone
+    expect(hasDeviceEnvelope(SCOPE)).toBe(false);
+  });
+
+  it("still stops a fabricated envelope whose guard names another vault", async () => {
+    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     const misleading = await buildRecoveryString({
-      seed: other.seed,
+      scope: SCOPE,
+      seed: created.seed,
       passphrase: PASSPHRASE,
       metaAddress: "utxo:somebodyelse",
     });
+    freshBrowser();
     await expect(
       unlockWithRecoveryString({
         scope: SCOPE,
@@ -175,12 +204,20 @@ describe("restoring on a new device", () => {
       }),
     ).rejects.toBeInstanceOf(EnvelopeIdentityError);
   });
+
+  it("refuses to create over a vault this browser already holds", async () => {
+    await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await expect(
+      createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor }),
+    ).rejects.toBeInstanceOf(VaultAlreadyHereError);
+  });
 });
 
 describe("changing the passphrase", () => {
   it("keeps the identity", async () => {
     const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     const next = await changePassphrase({
+      scope: SCOPE,
       seed: created.seed,
       metaAddress: created.metaAddress,
       nextPassphrase: "another long passphrase",
@@ -199,6 +236,7 @@ describe("changing the passphrase", () => {
   it("does not invalidate a string that is already out there", async () => {
     const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     await changePassphrase({
+      scope: SCOPE,
       seed: created.seed,
       metaAddress: created.metaAddress,
       nextPassphrase: "another long passphrase",
@@ -215,7 +253,7 @@ describe("changing the passphrase", () => {
   it("refuses a weak replacement", async () => {
     const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
     await expect(
-      changePassphrase({ seed: created.seed, metaAddress: created.metaAddress, nextPassphrase: "short" }),
+      changePassphrase({ scope: SCOPE, seed: created.seed, metaAddress: created.metaAddress, nextPassphrase: "short" }),
     ).rejects.toBeInstanceOf(WeakPassphraseError);
   });
 });
@@ -230,7 +268,7 @@ describe("adopting an identity that predates envelopes", () => {
       deviceKeyMaterial: device(3),
       metaAddressFor,
     });
-    expect(adopted.metaAddress).toBe(await metaAddressFor(existing));
+    expect(adopted.metaAddress).toBe(await metaAddressFor(await workingSeedFor(existing, SCOPE)));
 
     const unlocked = await unlockWithDevice({ scope: SCOPE, deviceKeyMaterial: device(3), metaAddressFor });
     expect(unlocked.seed).toEqual(existing);

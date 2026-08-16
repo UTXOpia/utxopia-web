@@ -13,11 +13,12 @@ import { MIN_PASSPHRASE_LENGTH } from "@/lib/vault-identity";
 // Short, unambiguous, easy to read back off a screen.
 //
 // Exactly 128 words, so each contributes 7 bits and `% WORDS.length` over a
-// uint32 carries no modulo bias — 2^32 divides evenly by 128. Six words is 42
-// bits, which against somebody holding the recovery string costs roughly
-// 2^42 × 125ms of argon2id: tens of thousands of core-years. The list length is
-// load-bearing; adding a word without adjusting the count reintroduces bias and
-// quietly changes the entropy this file claims.
+// uint32 carries no modulo bias — 2^32 divides evenly by 128. Eight words is 56
+// bits. The string is copied out of a password manager rather than typed, so
+// length here is nearly free, while the attacker this defends against already
+// holds the ciphertext and can spend as long as they like. The list length is
+// load-bearing: adding a word without adjusting the count reintroduces bias and
+// quietly changes the entropy this file claims, so a test asserts both.
 export const WORDS = [
   "amber", "anchor", "apple", "arrow", "autumn", "badge", "basin", "beacon",
   "birch", "bison", "bloom", "bramble", "bridge", "bronze", "candle", "canyon",
@@ -39,14 +40,61 @@ export const WORDS = [
 ];
 
 export const WORD_COUNT = WORDS.length;
-export const GENERATED_WORD_COUNT = 6;
+export const GENERATED_WORD_COUNT = 8;
 
+/**
+ * Drawn without replacement — log2(128·127·…·121) ≈ 55.8 bits, so the entropy
+ * cost against drawing with replacement is under a fifth of a bit. What it buys
+ * is that the meter and the generator agree: a repeated word is a real signal
+ * of a hand-picked passphrase, and a member should never be handed one that
+ * their own strength read-out then marks down.
+ */
 export function generatePassphrase(): string {
-  const picks = crypto.getRandomValues(new Uint32Array(GENERATED_WORD_COUNT));
-  return Array.from(picks, (n) => WORDS[n % WORD_COUNT]).join(" ");
+  const chosen: string[] = [];
+  while (chosen.length < GENERATED_WORD_COUNT) {
+    const [n] = crypto.getRandomValues(new Uint32Array(1));
+    const word = WORDS[n % WORD_COUNT];
+    if (!chosen.includes(word)) chosen.push(word);
+  }
+  return chosen.join(" ");
 }
 
-/** Rough guess-resistance, stated as time rather than a meaningless score. */
+/**
+ * Estimate the guessing entropy, and say what it buys.
+ *
+ * Counting words and character classes was worse than useless here: it rated
+ * "my dog loves cheese" and "aaaaaaaaaaaaaaaaaaa1" as strong, on the one screen
+ * where over-reporting costs a member their funds. This scores against the same
+ * measure the generator is built on, gives unknown words a deliberately modest
+ * allowance, and charges nothing for repeats.
+ */
+export function estimateBits(passphrase: string): number {
+  const trimmed = passphrase.trim();
+  if (!trimmed) return 0;
+
+  const tokens = trimmed.toLowerCase().split(/\s+/).filter(Boolean);
+  const unique = [...new Set(tokens)];
+  const listed = new Set(WORDS);
+
+  // A word off the list is worth its share of the list; anything else is
+  // treated as a short unpredictable run, not as free entropy.
+  let bits = unique.reduce(
+    (sum, token) => sum + (listed.has(token) ? Math.log2(WORD_COUNT) : Math.min(12, token.length * 2)),
+    0,
+  );
+  // A single long run of characters with no spaces: credit variety, modestly.
+  if (unique.length === 1) {
+    const variety =
+      Number(/[a-z]/.test(trimmed)) +
+      Number(/[A-Z]/.test(trimmed)) +
+      Number(/[0-9]/.test(trimmed)) +
+      Number(/[^a-zA-Z0-9]/.test(trimmed));
+    const distinct = new Set(trimmed).size;
+    bits = Math.min(bits, distinct * variety * 1.5);
+  }
+  return bits;
+}
+
 function strengthOf(passphrase: string): { label: string; tone: "weak" | "fair" | "strong"; hint: string } {
   const trimmed = passphrase.trim();
   if (trimmed.length < MIN_PASSPHRASE_LENGTH) {
@@ -56,20 +104,27 @@ function strengthOf(passphrase: string): { label: string; tone: "weak" | "fair" 
       hint: `At least ${MIN_PASSPHRASE_LENGTH} characters.`,
     };
   }
-  const words = trimmed.split(/\s+/).filter(Boolean).length;
-  const variety =
-    Number(/[a-z]/.test(trimmed)) +
-    Number(/[A-Z]/.test(trimmed)) +
-    Number(/[0-9]/.test(trimmed)) +
-    Number(/[^a-zA-Z0-9]/.test(trimmed));
 
-  if (words >= 4 || (trimmed.length >= 20 && variety >= 2)) {
-    return { label: "Strong", tone: "strong", hint: "Centuries to guess, even with your recovery string in hand." };
+  const bits = estimateBits(trimmed);
+  if (bits >= 55) {
+    return {
+      label: "Strong",
+      tone: "strong",
+      hint: "Out of reach even for somebody holding your recovery string.",
+    };
   }
-  if (words >= 3 || trimmed.length >= 16) {
-    return { label: "Fair", tone: "fair", hint: "Longer is better. Four unrelated words beats one clever one." };
+  if (bits >= 40) {
+    return {
+      label: "Fair",
+      tone: "fair",
+      hint: "Holds up against most attackers. Add a word or two to be sure.",
+    };
   }
-  return { label: "Weak", tone: "weak", hint: "Four unrelated words is easier to remember and far harder to guess." };
+  return {
+    label: "Weak",
+    tone: "weak",
+    hint: "Guessable by anyone who gets your recovery string. Use Generate one.",
+  };
 }
 
 interface PassphraseFieldProps {

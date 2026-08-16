@@ -16,6 +16,7 @@ import { useState } from "react";
 import { AlertCircle, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { PassphraseField } from "@/components/vault/passphrase-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
@@ -25,6 +26,8 @@ export function RecoverySection() {
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
   const hasSeed = useUTXOpiaStore((s) => s.vaultSeed !== null);
   const exportRecoveryString = useUTXOpiaStore((s) => s.exportRecoveryString);
+  const forgetVaultOnThisDevice = useUTXOpiaStore((s) => s.forgetVaultOnThisDevice);
+  const { authenticate } = usePasskey();
 
   const [task, setTask] = useState<Task>("idle");
   const [passphrase, setPassphrase] = useState("");
@@ -60,10 +63,31 @@ export function RecoverySection() {
     setError(null);
     setBusy(true);
     try {
-      setResult(await exportRecoveryString(passphrase));
+      // A recovery string is portable, permanent spend authority. Minting one
+      // straight off an unlocked tab would turn a few seconds of physical
+      // access into forever, with nothing on screen to notice afterwards — so
+      // the passkey answers again first.
+      const deviceKeyMaterial = await authenticate({ requirePrf: true }).catch((caught) => {
+        if (caught instanceof PrfUnavailableError) return undefined;
+        throw caught;
+      });
+      setResult(await exportRecoveryString(passphrase, deviceKeyMaterial ?? undefined));
       setPassphrase("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not build a recovery string.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const forget = async () => {
+    setError(null);
+    setBusy(true);
+    try {
+      await forgetVaultOnThisDevice();
+      reset();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Could not forget this vault.");
     } finally {
       setBusy(false);
     }
@@ -103,9 +127,15 @@ export function RecoverySection() {
             onClick={() => setTask("export")}
           />
           <SettingsAction
-            title="Change my passphrase"
-            detail="Issues a new string. The old one keeps working."
+            title="Issue a new recovery string"
+            detail="Under a new passphrase. The old string keeps working — only moving your funds retires it."
             onClick={() => setTask("change")}
+          />
+          <SettingsAction
+            title="Forget this vault on this device"
+            detail="Your recovery string becomes the only way back in, here and anywhere."
+            onClick={forget}
+            danger
           />
         </div>
       ) : (
@@ -147,7 +177,7 @@ export function RecoverySection() {
               )}
             >
               {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RotateCcw className="h-4 w-4" aria-hidden />}
-              {task === "export" ? "Show string" : "Change passphrase"}
+              {task === "export" ? "Show string" : "Issue new string"}
             </button>
             <button
               type="button"
@@ -168,21 +198,26 @@ function SettingsAction({
   title,
   detail,
   onClick,
+  danger,
 }: {
   title: string;
   detail: string;
   onClick: () => void;
+  danger?: boolean;
 }) {
   return (
     <button
       type="button"
       onClick={onClick}
       className={cn(
-        "flex min-h-[52px] flex-col justify-center rounded-[12px] border border-gray/15 px-4 py-2.5",
-        "bg-muted/25 hover:bg-muted/50 transition-colors cursor-pointer text-left",
+        "flex min-h-[52px] flex-col justify-center rounded-[12px] border px-4 py-2.5",
+        "transition-colors cursor-pointer text-left",
+        danger
+          ? "border-red-500/20 bg-red-500/5 hover:bg-red-500/10"
+          : "border-gray/15 bg-muted/25 hover:bg-muted/50",
       )}
     >
-      <span className="text-body2-semibold text-foreground">{title}</span>
+      <span className={cn("text-body2-semibold", danger ? "text-red-400" : "text-foreground")}>{title}</span>
       <span className="text-caption text-gray/60">{detail}</span>
     </button>
   );

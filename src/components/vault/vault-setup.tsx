@@ -11,18 +11,25 @@
  * had been robbed.
  */
 
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, KeyRound, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { useChainEnvironment } from "@/lib/chain-environment";
+import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { PassphraseField } from "@/components/vault/passphrase-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
-type Mode = "choose" | "create" | "restore" | "saved";
+type Mode = "choose" | "create" | "restore" | "saved" | "confirm-replace";
 
 export function VaultSetup({ onDone }: { onDone: () => void }) {
-  const { register: registerPasskey, authenticate: authenticatePasskey } = usePasskey();
+  const { register: registerPasskey, authenticate: authenticatePasskey, hasCredential: hasPasskeyCredential } = usePasskey();
+  const { networkId, vaultId } = useChainEnvironment();
+  const alreadyHere = useMemo(
+    () => hasDeviceEnvelope({ networkId, vaultId }),
+    [networkId, vaultId],
+  );
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
 
@@ -53,14 +60,22 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       // requirePrf: without it this hook hands back a seed whose encryption key
       // is rebuildable from plaintext localStorage, which would wrap the vault
       // seed under something already lying beside the ciphertext.
-      const deviceKeyMaterial = await registerPasskey({ requirePrf: true }).catch((caught) => {
+      //
+      // Reuse an existing credential rather than minting a second one:
+      // registering re-points the stored credential id, and every wrapping
+      // already on this device — the other vault, other networks, any legacy
+      // identity — was sealed under the first credential's PRF output.
+      const askDevice = hasPasskeyCredential ? authenticatePasskey : registerPasskey;
+      const deviceKeyMaterial = await askDevice({ requirePrf: true }).catch((caught) => {
         if (caught instanceof PrfUnavailableError) {
           setNotice(caught.message);
           return null;
         }
         throw caught;
       });
-      setRecoveryString(await createEnvelopeVault(passphrase, deviceKeyMaterial ?? undefined));
+      setRecoveryString(
+        await createEnvelopeVault(passphrase, deviceKeyMaterial ?? undefined, { replaceExisting: alreadyHere }),
+      );
       setPassphrase("");
       setMode("saved");
     });
@@ -98,7 +113,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         </p>
         <button
           type="button"
-          onClick={() => setMode("create")}
+          onClick={() => setMode(alreadyHere ? "confirm-replace" : "create")}
           className={cn(
             "flex min-h-[52px] items-center gap-3 rounded-[12px] border border-gray/20 px-4",
             "bg-muted/30 hover:bg-muted/60 transition-colors cursor-pointer text-left",
@@ -123,6 +138,53 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
             <span className="block text-body2-semibold text-foreground">Restore an existing vault</span>
             <span className="block text-caption text-gray/60">I have a recovery string</span>
           </span>
+        </button>
+      </div>
+    );
+  }
+
+  // Creating over an existing wrapping destroys the only copy of that vault
+  // this browser holds. Nothing warned about it before: "Create a new vault"
+  // sat first on the list, and the AuthModal opens itself on several routes.
+  if (mode === "confirm-replace") {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <div className="flex items-start gap-2 rounded-[12px] border border-red-500/25 bg-red-500/5 p-4">
+          <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+          <div>
+            <p className="text-caption font-semibold text-foreground">
+              This browser already holds a vault
+            </p>
+            <p className="mt-1 text-caption leading-relaxed text-gray">
+              Creating a new one replaces it here. If you have not saved that vault&apos;s recovery
+              string somewhere else, everything in it becomes unreachable — from this device and
+              every other one.
+            </p>
+          </div>
+        </div>
+        <button
+          type="button"
+          onClick={() => setMode("restore")}
+          className={cn(
+            "flex min-h-11 items-center justify-center rounded-[10px] px-4",
+            "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer hover:bg-white",
+          )}
+        >
+          Restore that vault instead
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("create")}
+          className="text-caption text-red-400/80 hover:text-red-400 transition-colors cursor-pointer"
+        >
+          I have its recovery string saved — replace it
+        </button>
+        <button
+          type="button"
+          onClick={() => setMode("choose")}
+          className="text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+        >
+          Back
         </button>
       </div>
     );

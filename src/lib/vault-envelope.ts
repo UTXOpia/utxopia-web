@@ -76,8 +76,8 @@ export interface VaultEnvelope {
 }
 
 export class EnvelopeUnlockError extends Error {
-  constructor() {
-    super("That passphrase does not match this recovery string.");
+  constructor(message = "That passphrase does not match this recovery string.") {
+    super(message);
     this.name = "EnvelopeUnlockError";
   }
 }
@@ -126,8 +126,19 @@ export function deriveFromPassphrase(
   });
 }
 
-/** HKDF whatever the factor produced — argon2 output, PRF output — into an AES key. */
-async function unlockKey(keyMaterial: Uint8Array): Promise<CryptoKey> {
+/**
+ * HKDF whatever the factor produced — argon2 output, PRF output — into an AES
+ * key.
+ *
+ * The envelope's salt and the scope both go in. The passkey path supplies the
+ * same key material every time, so without the salt a re-arm would reuse one
+ * key forever; without the scope, one pool's wrapping would open under another.
+ */
+async function unlockKey(
+  keyMaterial: Uint8Array,
+  salt: Uint8Array,
+  aad: Uint8Array,
+): Promise<CryptoKey> {
   const material = await crypto.subtle.importKey(
     "raw",
     keyMaterial as BufferSource,
@@ -135,13 +146,9 @@ async function unlockKey(keyMaterial: Uint8Array): Promise<CryptoKey> {
     false,
     ["deriveKey"],
   );
+  const info = new Uint8Array([...new TextEncoder().encode(`${HKDF_INFO}|`), ...aad]);
   return crypto.subtle.deriveKey(
-    {
-      name: "HKDF",
-      hash: "SHA-256",
-      salt: new Uint8Array(32),
-      info: new TextEncoder().encode(HKDF_INFO),
-    },
+    { name: "HKDF", hash: "SHA-256", salt: salt as BufferSource, info: info as BufferSource },
     material,
     { name: "AES-GCM", length: 256 },
     false,
@@ -154,14 +161,16 @@ export async function wrapSeed(input: {
   keyMaterial: Uint8Array;
   salt: Uint8Array;
   guard: Uint8Array;
+  /** Bound into the AEAD, so a wrapping cannot be opened under another scope. */
+  aad: Uint8Array;
   kdf?: { id: number; m: number; t: number; p: number };
 }): Promise<VaultEnvelope> {
   const kdf = input.kdf ?? KDF_V1;
-  const key = await unlockKey(input.keyMaterial);
+  const key = await unlockKey(input.keyMaterial, input.salt, input.aad);
   const nonce = crypto.getRandomValues(new Uint8Array(NONCE_BYTES));
   const ct = new Uint8Array(
     await crypto.subtle.encrypt(
-      { name: "AES-GCM", iv: nonce as BufferSource },
+      { name: "AES-GCM", iv: nonce as BufferSource, additionalData: input.aad as BufferSource },
       key,
       input.seed as BufferSource,
     ),
@@ -172,11 +181,12 @@ export async function wrapSeed(input: {
 export async function unwrapSeed(
   envelope: VaultEnvelope,
   keyMaterial: Uint8Array,
+  aad: Uint8Array,
 ): Promise<Uint8Array> {
-  const key = await unlockKey(keyMaterial);
+  const key = await unlockKey(keyMaterial, envelope.kdf.salt, aad);
   try {
     const plain = await crypto.subtle.decrypt(
-      { name: "AES-GCM", iv: envelope.nonce as BufferSource },
+      { name: "AES-GCM", iv: envelope.nonce as BufferSource, additionalData: aad as BufferSource },
       key,
       envelope.ct as BufferSource,
     );
@@ -186,9 +196,16 @@ export async function unwrapSeed(
   }
 }
 
-/** Refuse an unlock that lands on a different identity. */
+/**
+ * Refuse an unlock that lands on a different identity.
+ *
+ * `metaAddress` must be derived with the *scope* folded in, or this check is
+ * tautological: the address would be a pure function of the seed inside the
+ * envelope being checked, so the guard would reproduce itself and always pass.
+ */
 export function assertIdentity(envelope: VaultEnvelope, metaAddress: string): void {
   const actual = guardFor(metaAddress);
+  if (envelope.guard.length !== GUARD_BYTES) throw new EnvelopeIdentityError();
   if (!envelope.guard.every((b, i) => b === actual[i])) throw new EnvelopeIdentityError();
 }
 

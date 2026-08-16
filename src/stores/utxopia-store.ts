@@ -6,6 +6,7 @@ import {
   buildRecoveryString,
   clearDeviceEnvelope,
   createVault,
+  readDeviceEnvelope,
   unlockWithDevice,
   unlockWithRecoveryString,
   type VaultScope,
@@ -174,6 +175,12 @@ async function chainScopedPasskeySeed(
 }
 
 /** Scope + address deriver for the envelope layer, bound to the active chain. */
+const envelopeMetaAddressFor = async (workingSeed: Uint8Array): Promise<string> => {
+  const { stealthAddressEncoded } = await UTXOpiaClient.instance().loginWithSeed(workingSeed);
+  if (!stealthAddressEncoded) throw new Error("Could not derive a vault address from this seed.");
+  return stealthAddressEncoded;
+};
+
 async function envelopeContext(): Promise<{
   scope: VaultScope;
   metaAddressFor: (seed: Uint8Array) => Promise<string>;
@@ -181,30 +188,42 @@ async function envelopeContext(): Promise<{
   const env = await ensureChainEnvironment();
   return {
     scope: { networkId: env.networkId, vaultId: env.vaultId },
-    metaAddressFor: async (seed) => {
-      const { stealthAddressEncoded } = await UTXOpiaClient.instance().loginWithSeed(seed);
-      if (!stealthAddressEncoded) throw new Error("Could not derive a vault address from this seed.");
-      return stealthAddressEncoded;
-    },
+    metaAddressFor: envelopeMetaAddressFor,
   };
 }
 
-/** The seed is already loaded into the client by metaAddressFor; publish it. */
+/**
+ * Publish an unlocked identity.
+ *
+ * `metaAddressFor` has already logged the client in under the working seed, so
+ * the client's keys are the ones to take. Everything a previous identity could
+ * have left behind is reset in the same breath — an inbox carried across would
+ * paint the old balance under the new address, and `inboxHasLoaded` would
+ * suppress the skeleton that might otherwise have given it away.
+ */
 async function adoptSeedIntoSession(
   set: (partial: Partial<UTXOpiaState>) => void,
-  seed: Uint8Array,
+  rootSeed: Uint8Array,
 ): Promise<void> {
   const client = UTXOpiaClient.instance();
   set({
     keys: client.keys ?? null,
     viewOnlyKeys: null,
     isViewOnly: false,
+    isImportedSession: false,
+    passkeyNameOwnerSecret: null,
     stealthAddress: client.stealthAddress ?? null,
     stealthAddressEncoded: client.stealthAddressEncoded ?? null,
-    vaultSeed: seed,
+    vaultSeed: rootSeed,
     hasKeys: true,
     isLoading: false,
     error: null,
+    inboxNotes: [],
+    inboxTotalSats: 0n,
+    inboxBalancesByToken: {},
+    inboxDepositCount: 0,
+    inboxHasLoaded: false,
+    inboxError: null,
   });
 }
 
@@ -348,14 +367,18 @@ interface UTXOpiaState {
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   setIdentityRestoring: (restoring: boolean) => void;
   /** Envelope-backed identity (see lib/vault-identity). Memory only. */
-  createEnvelopeVault: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
+  createEnvelopeVault: (
+    passphrase: string,
+    deviceKeyMaterial?: Uint8Array,
+    opts?: { replaceExisting?: boolean },
+  ) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array) => Promise<void>;
   restoreEnvelopeVault: (
     recoveryString: string,
     passphrase: string,
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<void>;
-  exportRecoveryString: (passphrase: string) => Promise<string>;
+  exportRecoveryString: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
   /** Drop this browser's wrapping. Distinct from logging out: after this the
    *  recovery string is the only way back in, on any device. */
   forgetVaultOnThisDevice: () => Promise<void>;
@@ -692,13 +715,14 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
 
   setIdentityRestoring: (restoring) => set({ identityRestoring: restoring }),
 
-  createEnvelopeVault: async (passphrase, deviceKeyMaterial) => {
+  createEnvelopeVault: async (passphrase, deviceKeyMaterial, opts) => {
     const { scope, metaAddressFor } = await envelopeContext();
     const { seed, recoveryString } = await createVault({
       scope,
       passphrase,
       deviceKeyMaterial,
       metaAddressFor,
+      replaceExisting: opts?.replaceExisting,
     });
     await adoptSeedIntoSession(set, seed);
     return recoveryString;
@@ -711,9 +735,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       await adoptSeedIntoSession(set, seed);
     } catch (err) {
       // Same reason as the restore path: checking the guard means deriving the
-      // address, which means the client already holds that seed. A failed check
-      // must not leave it there.
-      if (UTXOpiaClient.isInitialized) UTXOpiaClient.instance().logout();
+      // address, which means the client already holds that seed by then.
+      get().clearKeys();
       throw err;
     }
   },
@@ -731,19 +754,33 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       await adoptSeedIntoSession(set, seed);
     } catch (err) {
       // metaAddressFor logs the client in to learn the address, so a failed
-      // guard check leaves a stranger's identity loaded. Put it back.
-      if (UTXOpiaClient.isInitialized) UTXOpiaClient.instance().logout();
+      // guard check leaves a stranger's identity loaded. clearKeys rather than
+      // client.logout(): the SDK zeroes its key object in place, and the store
+      // holds that same reference — logging out alone would blank the keys
+      // while leaving hasKeys, the address and the balance on screen.
+      get().clearKeys();
       throw err;
     }
   },
 
-  exportRecoveryString: async (passphrase) => {
+  exportRecoveryString: async (passphrase, deviceKeyMaterial) => {
     const seed = get().vaultSeed;
     const metaAddress = get().stealthAddressEncoded;
     if (!seed || !metaAddress) {
       throw new Error("Unlock your vault before exporting a recovery string.");
     }
-    return buildRecoveryString({ seed, passphrase, metaAddress });
+    const { scope } = await envelopeContext();
+
+    // A recovery string is portable, permanent spend authority. Minting one off
+    // an already-unlocked tab would turn a few seconds of physical access into
+    // forever, silently — so the passkey has to answer again first. Skipped
+    // only when this browser never held a wrapping to check against.
+    if (readDeviceEnvelope(scope)) {
+      if (!deviceKeyMaterial) throw new Error("Confirm with your passkey to build a recovery string.");
+      await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor: envelopeMetaAddressFor });
+    }
+
+    return buildRecoveryString({ scope, seed, passphrase, metaAddress });
   },
 
   forgetVaultOnThisDevice: async () => {

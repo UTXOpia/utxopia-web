@@ -16,9 +16,19 @@ describe("generated passphrase", () => {
     expect(new Set(WORDS).size).toBe(WORDS.length);
   });
 
-  it("carries at least 40 bits", () => {
+  it("carries at least 55 bits", () => {
     const bits = GENERATED_WORD_COUNT * Math.log2(WORD_COUNT);
-    expect(bits).toBeGreaterThanOrEqual(40);
+    expect(bits).toBeGreaterThanOrEqual(55);
+  });
+
+  it("scores a generated passphrase as strong and known-bad ones as not", async () => {
+    const { estimateBits } = await import("./passphrase-field");
+    expect(estimateBits(generatePassphrase())).toBeGreaterThanOrEqual(55);
+    // Both of these were rated "Strong / Centuries to guess" by the first
+    // version of the meter, on the one screen where that costs real money.
+    expect(estimateBits("my dog loves cheese")).toBeLessThan(40);
+    expect(estimateBits("aaaaaaaaaaaaaaaaaaa1")).toBeLessThan(40);
+    expect(estimateBits("amber amber amber amber amber amber")).toBeLessThan(40);
   });
 
   it("produces the advertised number of words", () => {

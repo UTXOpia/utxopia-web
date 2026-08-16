@@ -19,6 +19,8 @@ import {
 
 const META = "utxo:27b77aaa";
 const key = (byte: number) => new Uint8Array(32).fill(byte);
+const AAD = new TextEncoder().encode("utxopia:vault-scope:v1:solana:devnet:verified");
+const OTHER_AAD = new TextEncoder().encode("utxopia:vault-scope:v1:solana:devnet:open");
 
 const anEnvelope = (over: { keyMaterial?: Uint8Array; guard?: Uint8Array } = {}) =>
   wrapSeed({
@@ -26,36 +28,38 @@ const anEnvelope = (over: { keyMaterial?: Uint8Array; guard?: Uint8Array } = {})
     keyMaterial: over.keyMaterial ?? key(1),
     salt: newSalt(),
     guard: over.guard ?? guardFor(META),
+    aad: AAD,
   });
 
 describe("wrapping", () => {
   it("round-trips a seed", async () => {
     const seed = newSeed();
-    const envelope = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META) });
-    expect(await unwrapSeed(envelope, key(1))).toEqual(seed);
+    const envelope = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META), aad: AAD });
+    expect(await unwrapSeed(envelope, key(1), AAD)).toEqual(seed);
   });
 
   it("fails loudly on the wrong key instead of yielding a stranger's seed", async () => {
     const envelope = await anEnvelope();
-    await expect(unwrapSeed(envelope, key(2))).rejects.toBeInstanceOf(EnvelopeUnlockError);
+    await expect(unwrapSeed(envelope, key(2), AAD)).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
   it("rejects a tampered ciphertext", async () => {
     const envelope = await anEnvelope();
     envelope.ct[0] ^= 0xff;
-    await expect(unwrapSeed(envelope, key(1))).rejects.toBeInstanceOf(EnvelopeUnlockError);
+    await expect(unwrapSeed(envelope, key(1), AAD)).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
   it("re-wraps the same seed under a new key — changing a passphrase keeps the identity", async () => {
     const seed = newSeed();
-    const first = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META) });
+    const first = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META), aad: AAD });
     const second = await wrapSeed({
-      seed: await unwrapSeed(first, key(1)),
+      seed: await unwrapSeed(first, key(1), AAD),
       keyMaterial: key(9),
       salt: newSalt(),
       guard: guardFor(META),
+      aad: AAD,
     });
-    expect(await unwrapSeed(second, key(9))).toEqual(seed);
+    expect(await unwrapSeed(second, key(9), AAD)).toEqual(seed);
   });
 
   it("carries its kdf parameters so they can be raised later", async () => {
@@ -88,9 +92,17 @@ describe("recovery string", () => {
 
   it("still opens after being written down and typed back in", async () => {
     const seed = newSeed();
-    const envelope = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META) });
+    const envelope = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META), aad: AAD });
     const written = `  ${encodeEnvelope(envelope).replace(/(.{40})/g, "$1\n")}  `;
-    expect(await unwrapSeed(decodeEnvelope(written), key(1))).toEqual(seed);
+    expect(await unwrapSeed(decodeEnvelope(written), key(1), AAD)).toEqual(seed);
+  });
+
+  // The finding this exists for: with scope carried only by the storage key
+  // name, a genuine string from one pool decrypted cleanly under the other and
+  // overwrote its wrapping. The tag must fail, not the guard.
+  it("cannot be opened under another vault's scope", async () => {
+    const envelope = await anEnvelope();
+    await expect(unwrapSeed(envelope, key(1), OTHER_AAD)).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
   it("stays short enough that a member will actually save it", async () => {
