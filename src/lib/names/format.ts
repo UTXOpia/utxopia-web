@@ -1,26 +1,18 @@
 /**
- * Display forms of a registered receive name.
+ * Display form of a registered receive name.
  *
- * Every name lives under one parent domain, so repeating it on screen spends
- * most of the width on the part that never varies — and truncation then eats
- * the only part that identifies anyone. The handle form keeps the identity.
- *
- * `@name` is not a new notation: `normalizeSnsSubdomain` already strips a
- * leading `@`, and the recipient field has always accepted it, so a handle
- * shown here can be typed straight back in.
+ * The full name is what a sender types, so it is what the screen shows —
+ * measured at 390px the identity chip has roughly 206px of text budget and
+ * `milano.utxopia.sol` needs 130px, so the parent domain costs nothing worth
+ * shortening for. Names past ~16 characters truncate, and truncation keeps the
+ * identifying half.
  *
  * @module names/format
  */
 
-/** `milano` → `@milano`. For showing who someone is. */
-export function formatSnsHandle(name: string): string {
-  return `@${name.replace(/^@/, "")}`;
-}
-
 /**
- * `milano` → `milano.utxopia.sol`. The canonical name, which resolves in any
- * SNS-aware client rather than only where the `@` shorthand is understood —
- * so this is what gets copied, whatever the screen shows.
+ * `milano` → `milano.utxopia.sol`. Tolerates a leading `@` because the
+ * recipient field accepts that form and a value can arrive from there.
  */
 export function formatSnsFullName(name: string, parentDomain: string): string {
   return `${name.replace(/^@/, "")}.${parentDomain}.sol`;

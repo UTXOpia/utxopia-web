@@ -46,7 +46,7 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useStealthInbox } from "@/hooks/use-utxopia";
 import { notifyCopied } from "@/lib/notifications";
-import { formatSnsFullName, formatSnsHandle } from "@/lib/names/format";
+import { formatSnsFullName } from "@/lib/names/format";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { ReceiveNamePrompt } from "@/components/receive-name-prompt";
@@ -254,7 +254,7 @@ export default function VaultPage() {
                     >
                       <Globe className="w-3.5 h-3.5 text-privacy shrink-0" />
                       <span className="text-body2-semibold text-privacy truncate">
-                        {formatSnsHandle(registeredSnsName!)}
+                        {formatSnsFullName(registeredSnsName!, parentDomain)}
                       </span>
                       {snsCopied ? (
                         <Check className="w-3 h-3 text-green-400 shrink-0" />
