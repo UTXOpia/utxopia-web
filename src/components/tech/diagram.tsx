@@ -102,9 +102,16 @@ export function DiagramFrame({
           {title}
         </span>
         {note && (
-          <span className="font-mono text-[10px] text-gray/50">{note}</span>
+          <span className="font-mono text-[12px] text-gray/60">{note}</span>
         )}
       </figcaption>
+
+      {/* These diagrams are 880–960px wide inside a phone-width scroller. The
+          scrolling worked; nothing said so, and a diagram that runs off the
+          edge with no affordance reads as broken rather than as continued. */}
+      <p className="px-4 pt-2.5 font-mono text-[12px] text-gray/60 sm:hidden">
+        Scroll sideways to see all of it →
+      </p>
 
       <div className="overflow-x-auto px-2 py-3 sm:px-4 sm:py-4">
         <svg
@@ -126,7 +133,7 @@ export function DiagramFrame({
                 className="h-2 w-2 rounded-full"
                 style={{ background: stroke(l.tone, 70) }}
               />
-              <span className="font-mono text-[10px] text-gray/60">
+              <span className="font-mono text-[12px] text-gray/70">
                 {l.label}
               </span>
             </span>
