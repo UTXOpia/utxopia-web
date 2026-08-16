@@ -43,8 +43,8 @@ function Section({
       <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
         {title}
       </h2>
-      <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-light">{plain}</p>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray">{intro}</p>
+      <p className="mt-3 max-w-[38em] text-base leading-relaxed text-gray-light">{plain}</p>
+      <p className="mt-3 max-w-[38em] text-sm leading-relaxed text-gray">{intro}</p>
       {children}
     </section>
   );
@@ -88,13 +88,13 @@ export default function MagicBlockPage() {
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             MagicBlock as a private policy coprocessor
           </h1>
-          <p className="mt-5 max-w-2xl text-lg leading-relaxed text-foreground">
+          <p className="mt-5 max-w-[38em] text-lg leading-relaxed text-foreground">
             Some pools have to check a payment against a policy before it is
             allowed. Doing that check on a public blockchain tells everyone you
             asked — before anyone has answered. So the check happens somewhere
             sealed, and only the verdict comes back out.
           </p>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray sm:text-base">
+          <p className="mt-4 max-w-[38em] text-sm leading-relaxed text-gray sm:text-base">
             Precisely: the Verified pool needs someone to sign off on a spend
             without that sign-off — or its reasoning — becoming public. UTXOpia
             does that by delegating exactly one account to a MagicBlock ephemeral
@@ -132,7 +132,7 @@ export default function MagicBlockPage() {
           <h2 className="text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
             The words on this page
           </h2>
-          <p className="mt-3 max-w-2xl text-base leading-relaxed text-gray-light">
+          <p className="mt-3 max-w-[38em] text-base leading-relaxed text-gray-light">
             Five terms do most of the work. You can read everything below once
             you have these.
           </p>

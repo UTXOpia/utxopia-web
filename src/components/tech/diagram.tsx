@@ -96,7 +96,10 @@ export function DiagramFrame({
   children: ReactNode;
 }) {
   return (
-    <figure className="my-6 rounded-xl border border-gray/10 bg-muted/20">
+    // Figures break out past the prose column on wide screens. The measure that
+    // suits a paragraph starves a schematic: at the text width these render at
+    // 0.93 scale, so a nominal 9.5px label reaches the reader at 8.8px.
+    <figure className="my-6 rounded-xl border border-gray/10 bg-muted/20 lg:-mx-8 xl:-mx-20">
       <figcaption className="flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1 border-b border-gray/10 px-4 py-3 sm:px-5">
         <span className="text-xs font-semibold tracking-tight text-foreground sm:text-sm">
           {title}
@@ -114,12 +117,21 @@ export function DiagramFrame({
       </p>
 
       <div className="overflow-x-auto px-2 py-3 sm:px-4 sm:py-4">
+        {/* Below sm the diagram is inside a scroller already, so rendering it
+            larger costs the reader nothing and is the only lever that reaches
+            the label type: the geometry is fixed and the tightest label has
+            1.05x of room inside its own box, so the glyphs cannot grow in
+            place. Scaling the whole canvas moves every label together and
+            cannot overflow anything. */}
         <svg
           viewBox={viewBox}
           role="img"
           aria-label={title}
-          style={{ minWidth }}
-          className="h-auto w-full"
+          style={{
+            ["--dgm-w" as string]: `${minWidth}px`,
+            ["--dgm-w-narrow" as string]: `${Math.round(minWidth * 1.4)}px`,
+          }}
+          className="h-auto w-full min-w-[var(--dgm-w-narrow)] sm:min-w-[var(--dgm-w)]"
         >
           {children}
         </svg>
