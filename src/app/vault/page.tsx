@@ -46,6 +46,7 @@ import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { useSnsName } from "@/hooks/use-sns-name";
 import { useStealthInbox } from "@/hooks/use-utxopia";
 import { notifyCopied } from "@/lib/notifications";
+import { formatSnsFullName, formatSnsHandle } from "@/lib/names/format";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { OnboardingModal } from "@/components/onboarding-modal";
 import { ReceiveNamePrompt } from "@/components/receive-name-prompt";
@@ -241,13 +242,19 @@ export default function VaultPage() {
                   {/* Identity chip */}
                   {hasRegisteredSnsName ? (
                     <button
-                      onClick={() => { copySns(`${registeredSnsName}.${parentDomain}.sol`); notifyCopied(`.${parentDomain}.sol name`); }}
+                      onClick={() => {
+                        const full = formatSnsFullName(registeredSnsName!, parentDomain);
+                        copySns(full);
+                        // Name what actually landed on the clipboard: the chip
+                        // shows the handle but the full name is what is copied.
+                        notifyCopied(full);
+                      }}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-privacy/10 hover:bg-privacy/15 transition-colors group cursor-pointer min-w-0"
-                      title={`Copy .${parentDomain}.sol name`}
+                      title={`Copy ${formatSnsFullName(registeredSnsName!, parentDomain)}`}
                     >
                       <Globe className="w-3.5 h-3.5 text-privacy shrink-0" />
                       <span className="text-body2-semibold text-privacy truncate">
-                        {registeredSnsName}.{parentDomain}.sol
+                        {formatSnsHandle(registeredSnsName!)}
                       </span>
                       {snsCopied ? (
                         <Check className="w-3 h-3 text-green-400 shrink-0" />

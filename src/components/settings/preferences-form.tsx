@@ -15,6 +15,7 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 import { claimPrivateReceiveName } from "@/lib/names/private-name-claim";
 import { getSnsConfig } from "@/lib/names/sns";
+import { formatSnsHandle } from "@/lib/names/format";
 import { ChangeNameDialog } from "@/components/change-name-dialog";
 
 /**
@@ -269,8 +270,13 @@ function SnsNameRow() {
         {!editing && (
           <div className="flex items-center gap-2 min-w-0">
             {fullName && (
-              <span className="text-[12px] font-mono text-privacy truncate">
-                {fullName}
+              // Handle on screen, full name in the tooltip — this is the same
+              // identity as the vault header and has to read the same way.
+              <span
+                title={fullName}
+                className="text-[12px] font-mono text-privacy truncate"
+              >
+                {formatSnsHandle(sns.registeredSnsName!)}
               </span>
             )}
             <button
