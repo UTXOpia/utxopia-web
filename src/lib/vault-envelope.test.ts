@@ -105,6 +105,39 @@ describe("recovery string", () => {
     expect(() => decodeEnvelope(truncated)).toThrow(EnvelopeFormatError);
   });
 
+  // The header travels with the string, so anyone who can hand a member a
+  // string can propose the cost it will be opened at.
+  it("refuses cost parameters outside the supported range", async () => {
+    const envelope = await anEnvelope();
+    const bytes = Array.from(
+      Uint8Array.from(atob(encodeEnvelope(envelope).slice(10).replace(/-/g, "+").replace(/_/g, "/") + "="), (c) =>
+        c.charCodeAt(0),
+      ),
+    );
+    const reencode = (patched: number[]) =>
+      "utxovault1" +
+      btoa(String.fromCharCode(...patched)).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+
+    const absurdMemory = [...bytes];
+    new DataView(new Uint8Array(absurdMemory).buffer); // shape check
+    absurdMemory[2] = 0xff;
+    absurdMemory[3] = 0xff;
+    absurdMemory[4] = 0xff;
+    absurdMemory[5] = 0xff;
+    expect(() => decodeEnvelope(reencode(absurdMemory))).toThrow(EnvelopeFormatError);
+
+    const noWork = [...bytes];
+    noWork[2] = 1;
+    noWork[3] = 0;
+    noWork[4] = 0;
+    noWork[5] = 0;
+    expect(() => decodeEnvelope(reencode(noWork))).toThrow(EnvelopeFormatError);
+
+    const unknownKdf = [...bytes];
+    unknownKdf[1] = 9;
+    expect(() => decodeEnvelope(reencode(unknownKdf))).toThrow(EnvelopeFormatError);
+  });
+
   it("round-trips through the device storage form too", async () => {
     const envelope = await anEnvelope();
     expect(envelopeFromHex(envelopeToHex(envelope))).toEqual(envelope);

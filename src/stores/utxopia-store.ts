@@ -706,8 +706,16 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
 
   unlockEnvelopeVault: async (deviceKeyMaterial) => {
     const { scope, metaAddressFor } = await envelopeContext();
-    const { seed } = await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor });
-    await adoptSeedIntoSession(set, seed);
+    try {
+      const { seed } = await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor });
+      await adoptSeedIntoSession(set, seed);
+    } catch (err) {
+      // Same reason as the restore path: checking the guard means deriving the
+      // address, which means the client already holds that seed. A failed check
+      // must not leave it there.
+      if (UTXOpiaClient.isInitialized) UTXOpiaClient.instance().logout();
+      throw err;
+    }
   },
 
   restoreEnvelopeVault: async (recoveryString, passphrase, deviceKeyMaterial) => {

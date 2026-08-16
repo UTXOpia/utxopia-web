@@ -10,10 +10,15 @@ import { Dices, Eye, EyeOff } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { MIN_PASSPHRASE_LENGTH } from "@/lib/vault-identity";
 
-// Short, unambiguous, easy to read back off a screen. Four words from this list
-// is ~46 bits — well past what an attacker holding the string can chew through
-// at argon2id speed, and still typeable.
-const WORDS = [
+// Short, unambiguous, easy to read back off a screen.
+//
+// Exactly 128 words, so each contributes 7 bits and `% WORDS.length` over a
+// uint32 carries no modulo bias — 2^32 divides evenly by 128. Six words is 42
+// bits, which against somebody holding the recovery string costs roughly
+// 2^42 × 125ms of argon2id: tens of thousands of core-years. The list length is
+// load-bearing; adding a word without adjusting the count reintroduces bias and
+// quietly changes the entropy this file claims.
+export const WORDS = [
   "amber", "anchor", "apple", "arrow", "autumn", "badge", "basin", "beacon",
   "birch", "bison", "bloom", "bramble", "bridge", "bronze", "candle", "canyon",
   "cedar", "cinder", "clover", "cobalt", "comet", "copper", "coral", "cotton",
@@ -29,13 +34,16 @@ const WORDS = [
   "sorrel", "spruce", "stellar", "sumac", "summit", "tallow", "tamarind", "teal",
   "thicket", "thistle", "timber", "topaz", "trellis", "tundra", "umber", "vellum",
   "verbena", "vessel", "willow", "windrow", "yarrow", "zenith",
+  "alcove", "brine", "cobble", "drift", "elder", "fjord", "gully", "harvest",
+  "kelp", "lichen",
 ];
 
-const GENERATED_WORDS = 4;
+export const WORD_COUNT = WORDS.length;
+export const GENERATED_WORD_COUNT = 6;
 
 export function generatePassphrase(): string {
-  const picks = crypto.getRandomValues(new Uint32Array(GENERATED_WORDS));
-  return Array.from(picks, (n) => WORDS[n % WORDS.length]).join(" ");
+  const picks = crypto.getRandomValues(new Uint32Array(GENERATED_WORD_COUNT));
+  return Array.from(picks, (n) => WORDS[n % WORD_COUNT]).join(" ");
 }
 
 /** Rough guess-resistance, stated as time rather than a meaningless score. */

@@ -52,6 +52,16 @@ const STRING_PREFIX = "utxovault1";
  */
 export const KDF_V1 = { id: 1, m: 19456, t: 2, p: 1 } as const;
 
+/**
+ * Bounds on the cost parameters carried inside a string.
+ *
+ * The header is attacker-supplied — anyone can hand a member a string and ask
+ * them to paste it. The upper bound stops a pasted string from asking the
+ * browser for terabytes; the lower bound stops one from claiming a cost so
+ * small that it silently trains a member to accept a weak wrapping as normal.
+ */
+const KDF_LIMITS = { m: [8192, 262144], t: [1, 16], p: [1, 4] } as const;
+
 export interface VaultEnvelope {
   v: 1;
   kdf: { id: number; m: number; t: number; p: number; salt: Uint8Array };
@@ -223,15 +233,21 @@ function unpack(bytes: Uint8Array): VaultEnvelope {
     throw new EnvelopeFormatError(`expected ${PACKED_BYTES} bytes, got ${bytes.length}`);
   }
   if (bytes[0] !== 1) throw new EnvelopeFormatError(`unknown version ${bytes[0]}`);
+  if (bytes[1] !== KDF_V1.id) throw new EnvelopeFormatError(`unknown key derivation ${bytes[1]}`);
 
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const kdf = { id: bytes[1], m: view.getUint32(2, true), t: bytes[6], p: bytes[7] };
+  for (const [name, [low, high]] of Object.entries(KDF_LIMITS)) {
+    const value = kdf[name as keyof typeof KDF_LIMITS];
+    if (value < low || value > high) {
+      throw new EnvelopeFormatError(`${name}=${value} is outside the supported range`);
+    }
+  }
+
   return {
     v: 1,
     kdf: {
-      id: bytes[1],
-      m: view.getUint32(2, true),
-      t: bytes[6],
-      p: bytes[7],
+      ...kdf,
       salt: bytes.slice(8, 8 + SALT_BYTES),
     },
     nonce: bytes.slice(8 + SALT_BYTES, 8 + SALT_BYTES + NONCE_BYTES),

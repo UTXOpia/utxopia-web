@@ -112,15 +112,18 @@ export function RecoverySection() {
         <div className="flex flex-col gap-3 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
           <p className="text-caption leading-relaxed text-gray">
             {task === "export"
-              ? "Enter your passphrase to build the string. It locks the string, so it has to be the same one you will use to restore."
+              ? "Choose the passphrase that will lock this string. It can be the one you already use, or a new one — whatever you pick here is what unlocks this copy."
               : "Choose a new passphrase. It will lock the new string — your vault, address and balance do not change."}
           </p>
 
+          {/* Both tasks choose the lock on a string that is about to exist, so
+              both get the generator and the strength read-out. Nothing is being
+              verified against — there is no stored copy to check a passphrase
+              against, by design. */}
           <PassphraseField
             value={passphrase}
             onChange={setPassphrase}
-            label={task === "export" ? "Passphrase" : "New passphrase"}
-            verifyOnly={task === "export"}
+            label={task === "export" ? "Passphrase for this string" : "New passphrase"}
             disabled={busy}
             autoFocus
           />
