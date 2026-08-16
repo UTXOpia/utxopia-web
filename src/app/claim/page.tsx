@@ -203,6 +203,7 @@ function ClaimContent() {
         tokenSymbol: token.shieldedSymbol,
         signature: result.signature,
       });
+      useUTXOpiaStore.getState().expectInboxSoon();
       window.setTimeout(() => void ctx.refreshInbox(undefined, true), 1_500);
     } catch (claimError) {
       setError(claimError instanceof Error ? claimError.message : "Claim failed.");

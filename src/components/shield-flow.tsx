@@ -30,6 +30,7 @@ import {
   EXIT_KIND_SOLANA_OWNER,
 } from "@/lib/solana/pdas";
 import { useUTXOpia } from "@/hooks/use-utxopia";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { Shield, ChevronDown, Loader2, AlertCircle, LogOut, Wallet, Copy, Check, Info, ExternalLink, RefreshCw } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { StealthRecipientInput } from "@/components/ui/stealth-recipient-input";
@@ -399,6 +400,9 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         });
       }
 
+      // Nothing here refreshed the inbox, so a deposit used to sit invisible
+      // until the next idle poll — the one wait where a minute is unmistakable.
+      useUTXOpiaStore.getState().expectInboxSoon();
       setStatus("done");
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : "Add funds failed");

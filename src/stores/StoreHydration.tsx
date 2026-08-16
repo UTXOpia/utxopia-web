@@ -3,8 +3,17 @@
 import { useEffect, useRef, useCallback, type JSX } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
+import { getPendingFaucetActivities } from "@/lib/faucet-activity";
 import { useBitcoinWalletStore } from "./bitcoin-wallet-store";
 import { useUTXOpiaStore } from "./utxopia-store";
+
+/** Right after the member's own deposit, send or claim. */
+const ACTING_MS = 5_000;
+/** A BTC deposit is in flight — minutes of travel, so a middle gear. */
+const PENDING_BTC_MS = 15_000;
+const IDLE_MS = 60_000;
+/** How long a pending BTC deposit counts as an active wait. */
+const BTC_WINDOW_MS = 20 * 60_000;
 
 /**
  * Component to hydrate Zustand stores on mount.
@@ -42,7 +51,12 @@ export function StoreHydration(): JSX.Element {
   // pool and the deposit all said the new one. The deposit then landed in the
   // right pool encrypted to the wrong identity: unspendable from either vault
   // view, and invisible in both, because each view scans only its own pool.
-  const { networkId, vaultId } = useChainEnvironment();
+  const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
+  const stealthAddress = useUTXOpiaStore((s) => s.stealthAddressEncoded);
+  // Subscribed, not read through getState(): opening the window has to rebuild
+  // the pending timer, or a deposit still waits out the minute that was already
+  // scheduled before switching to the fast gear.
+  const fastRefreshUntil = useUTXOpiaStore((s) => s.fastRefreshUntil);
   const envIdentity = `${networkId}:${vaultId}`;
   const lastEnvIdentityRef = useRef(envIdentity);
   const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
@@ -120,19 +134,45 @@ export function StoreHydration(): JSX.Element {
     }
   }, [hasAnyKeys]);
 
-  // Auto-refresh balances every 60s when keys are available and page is visible
+  // Auto-refresh balances when keys are available and the page is visible.
   const refreshAll = useCallback(() => {
     if (!hasAnyKeys) return;
     refreshInbox();
     if (walletPubkey) refreshPublicBalance(walletPubkey);
   }, [hasAnyKeys, refreshInbox, walletPubkey, refreshPublicBalance]);
 
+  // The cadence is adaptive rather than a flat minute. Idle stays at 60s: a
+  // faster floor buys nothing, because every tick re-reads the whole
+  // announcement feed and the sibling vault re-decrypts it. The two cases worth
+  // paying for are both "the member is waiting for something they just did".
+  const nextDelayMs = useCallback(() => {
+    if (document.hidden) return IDLE_MS;
+    if (Date.now() < fastRefreshUntil) return ACTING_MS;
+    // The faucet ledger holds entries for an hour; only the first minutes of a
+    // BTC deposit are a wait worth polling hard for.
+    const waitingOnBtc = getPendingFaucetActivities({
+      networkId,
+      stealthAddress,
+      currentPoolAddress: networkConfig.bitcoin.poolAddress,
+    }).some((activity) => Date.now() - activity.createdAt < BTC_WINDOW_MS);
+    return waitingOnBtc ? PENDING_BTC_MS : IDLE_MS;
+  }, [fastRefreshUntil, networkId, stealthAddress, networkConfig.bitcoin.poolAddress]);
+
   useEffect(() => {
     if (!hasAnyKeys) return;
 
-    const interval = setInterval(() => {
-      if (!document.hidden) refreshAll();
-    }, 60_000);
+    let cancelled = false;
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    // Self-scheduling rather than setInterval: the delay is recomputed after
+    // every tick, so a window opening or closing takes effect immediately.
+    const schedule = () => {
+      if (cancelled) return;
+      timer = setTimeout(() => {
+        if (!document.hidden) refreshAll();
+        schedule();
+      }, nextDelayMs());
+    };
+    schedule();
 
     // Also refresh when tab becomes visible after being hidden
     const onVisibility = () => {
@@ -141,10 +181,11 @@ export function StoreHydration(): JSX.Element {
     document.addEventListener("visibilitychange", onVisibility);
 
     return () => {
-      clearInterval(interval);
+      cancelled = true;
+      if (timer) clearTimeout(timer);
       document.removeEventListener("visibilitychange", onVisibility);
     };
-  }, [hasAnyKeys, refreshAll]);
+  }, [hasAnyKeys, refreshAll, nextDelayMs]);
 
   return <></>;
 }

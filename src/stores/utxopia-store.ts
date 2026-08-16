@@ -267,6 +267,11 @@ interface UTXOpiaState {
    *  screen. Reset on logout and on every vault/network switch. */
   inboxHasLoaded: boolean;
   inboxError: string | null;
+  /** Poll the inbox hard until this timestamp. Set by the flows where the
+   *  member has just done something and is waiting for the result — the only
+   *  moments the 60s idle cadence is actually felt. Cleared early when a note
+   *  lands, so the window costs nothing once the wait is over. */
+  fastRefreshUntil: number;
   /** Keys were dropped for a vault/network switch and are being restored from
    *  the warm cache. Distinguishes "signed out" from "swapping identity", which
    *  otherwise look identical (no keys) and flash the sign-in hero mid-switch. */
@@ -291,6 +296,8 @@ interface UTXOpiaState {
   importBackupKeys: (raw: string) => Promise<void>;
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   setIdentityRestoring: (restoring: boolean) => void;
+  /** Open a fast-poll window (default 2 minutes). */
+  expectInboxSoon: (ms?: number) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
   startRealtimeInbox: () => () => void;
   refreshPublicBalance: (walletPubkey?: PublicKey) => Promise<void>;
@@ -322,6 +329,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   inboxLoading: false,
   inboxHasLoaded: false,
   inboxError: null,
+  fastRefreshUntil: 0,
   identityRestoring: false,
   publicZkbtcBalance: 0n,
   activeWithdrawals: [],
@@ -619,6 +627,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
 
   setIdentityRestoring: (restoring) => set({ identityRestoring: restoring }),
 
+  expectInboxSoon: (ms = 120_000) => set({ fastRefreshUntil: Date.now() + ms }),
+
   refreshInbox: async (_connection, force) => {
     const { keys, viewOnlyKeys, isViewOnly } = get();
     if (!keys && !viewOnlyKeys) {
@@ -786,6 +796,8 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           balancesByToken[sym] = (balancesByToken[sym] ?? 0n) + BigInt(note.amount ?? 0);
         }
 
+        // The thing being waited for has arrived; stop paying for the wait.
+        const landed = unspentNotes.length > get().inboxDepositCount;
         set({
           inboxNotes: notes,
           inboxTotalSats: totalSats,
@@ -793,6 +805,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           inboxDepositCount: unspentNotes.length,
           inboxLoading: false,
           inboxHasLoaded: true,
+          ...(landed ? { fastRefreshUntil: 0 } : {}),
         });
       } catch (err) {
         console.error("[UTXOpia] Inbox error:", err);

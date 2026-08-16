@@ -17,6 +17,7 @@ import { FeeSummary } from "./fee-summary";
 import { ReviewModal } from "./review-modal";
 import { ClaimLinkModal, type ClaimLinkResult } from "./claim-link-modal";
 import { useUTXOpia } from "@/hooks/use-utxopia";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useTokenPrices } from "@/hooks/use-token-prices";
 import { useNoteAutoSelector } from "@/hooks/use-note-auto-selector";
 import { useJoinSplitSubmit } from "@/hooks/use-joinsplit-submit";
@@ -472,6 +473,9 @@ export function SendForm({
   // Re-fetch inbox + public balance shortly after a submit lands. Run on a
   // staggered schedule so we catch confirmation across slow RPC paths.
   const scheduleInboxRefresh = useCallback(() => {
+    // Keep the global poll in its fast gear past this stagger, in case the note
+    // takes longer than ten seconds to be indexed.
+    useUTXOpiaStore.getState().expectInboxSoon();
     for (const delay of [2000, 5000, 10000]) {
       setTimeout(() => {
         ctx.refreshInbox(undefined, true);
