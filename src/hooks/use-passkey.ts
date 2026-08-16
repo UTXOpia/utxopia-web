@@ -34,6 +34,31 @@ function getRpId(): string {
   return window.location.hostname;
 }
 
+export interface SeedRequest {
+  /**
+   * Refuse the fallback-seed path.
+   *
+   * Without PRF this hook falls back to a random seed encrypted under a key
+   * derived from the credential id — and the credential id sits in plaintext
+   * localStorage beside it, so anyone who can read the profile can rebuild that
+   * key. That is adequate as a biometric gate, and useless as the wrapping key
+   * for a vault envelope: it would encrypt the seed under something already
+   * lying next to the ciphertext.
+   *
+   * Callers wrapping key material pass this and handle the refusal.
+   */
+  requirePrf?: boolean;
+}
+
+export class PrfUnavailableError extends Error {
+  constructor() {
+    super(
+      "This browser cannot store a vault key safely. Your vault still works — you will need your recovery string each time you open it here.",
+    );
+    this.name = "PrfUnavailableError";
+  }
+}
+
 function getStoredCredentialId(): string | null {
   try {
     return localStorage.getItem(CREDENTIAL_STORAGE_KEY);
@@ -144,8 +169,8 @@ export interface UsePasskeyReturn {
   hasCredential: boolean;
   isLoading: boolean;
   error: string | null;
-  register: () => Promise<Uint8Array | null>;
-  authenticate: () => Promise<Uint8Array | null>;
+  register: (opts?: SeedRequest) => Promise<Uint8Array | null>;
+  authenticate: (opts?: SeedRequest) => Promise<Uint8Array | null>;
   clearCredential: () => void;
 }
 
@@ -160,7 +185,7 @@ export function usePasskey(): UsePasskeyReturn {
     setHasCredential(!!getStoredCredentialId());
   }, []);
 
-  const register = useCallback(async (): Promise<Uint8Array | null> => {
+  const register = useCallback(async (opts?: SeedRequest): Promise<Uint8Array | null> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -223,6 +248,7 @@ export function usePasskey(): UsePasskeyReturn {
       }
 
       if (!seed) {
+        if (opts?.requirePrf) throw new PrfUnavailableError();
         // Truly no PRF — generate random seed and encrypt in localStorage.
         // The passkey serves as a biometric gate; the seed is encrypted at rest.
         // This path is browser-bound (no cross-device recovery).
@@ -254,7 +280,7 @@ export function usePasskey(): UsePasskeyReturn {
     }
   }, []);
 
-  const authenticate = useCallback(async (): Promise<Uint8Array | null> => {
+  const authenticate = useCallback(async (opts?: SeedRequest): Promise<Uint8Array | null> => {
     setIsLoading(true);
     setError(null);
     try {
@@ -289,6 +315,7 @@ export function usePasskey(): UsePasskeyReturn {
       let seed = tryExtractPrfOutput(credential.clientExtensionResults);
 
       if (!seed) {
+        if (opts?.requirePrf) throw new PrfUnavailableError();
         // PRF not available — load encrypted fallback seed from localStorage
         const credId = storedId || credential.id;
         seed = await loadFallbackSeed(credId);

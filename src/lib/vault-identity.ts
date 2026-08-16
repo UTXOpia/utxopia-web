@@ -110,7 +110,13 @@ export async function buildRecoveryString(input: {
 export async function createVault(input: {
   scope: VaultScope;
   passphrase: string;
-  deviceKeyMaterial: Uint8Array;
+  /**
+   * Omitted when this browser cannot supply key material worth wrapping under
+   * (see PrfUnavailableError). The vault is still created and still has a
+   * recovery string; it simply is not remembered here, which is the honest
+   * outcome rather than a wrapping anyone reading the profile could open.
+   */
+  deviceKeyMaterial?: Uint8Array;
   metaAddressFor: MetaAddressFor;
 }): Promise<{ seed: Uint8Array; metaAddress: string; recoveryString: string }> {
   assertPassphrase(input.passphrase);
@@ -118,7 +124,14 @@ export async function createVault(input: {
   const metaAddress = await input.metaAddressFor(seed);
 
   const recoveryString = await buildRecoveryString({ seed, passphrase: input.passphrase, metaAddress });
-  await armDevice({ scope: input.scope, seed, metaAddress, deviceKeyMaterial: input.deviceKeyMaterial });
+  if (input.deviceKeyMaterial) {
+    await armDevice({
+      scope: input.scope,
+      seed,
+      metaAddress,
+      deviceKeyMaterial: input.deviceKeyMaterial,
+    });
+  }
 
   return { seed, metaAddress, recoveryString };
 }

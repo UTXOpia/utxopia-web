@@ -348,7 +348,7 @@ interface UTXOpiaState {
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   setIdentityRestoring: (restoring: boolean) => void;
   /** Envelope-backed identity (see lib/vault-identity). Memory only. */
-  createEnvelopeVault: (passphrase: string, deviceKeyMaterial: Uint8Array) => Promise<string>;
+  createEnvelopeVault: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array) => Promise<void>;
   restoreEnvelopeVault: (
     recoveryString: string,

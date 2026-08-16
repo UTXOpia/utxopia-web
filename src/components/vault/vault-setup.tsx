@@ -12,9 +12,9 @@
  */
 
 import { useState } from "react";
-import { AlertCircle, ArrowLeft, KeyRound, Loader2, RotateCcw } from "lucide-react";
+import { AlertCircle, ArrowLeft, KeyRound, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
-import { usePasskey } from "@/hooks/use-passkey";
+import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { PassphraseField } from "@/components/vault/passphrase-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
@@ -32,6 +32,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   const [recoveryString, setRecoveryString] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const run = async (work: () => Promise<void>) => {
     setError(null);
@@ -49,18 +50,30 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
     run(async () => {
       // The passkey both gates this device and supplies the key material its
       // wrapping is encrypted under, so it has to come before the wrapping.
-      const deviceKeyMaterial = await registerPasskey();
-      if (!deviceKeyMaterial) throw new Error("This device did not provide a passkey.");
-      setRecoveryString(await createEnvelopeVault(passphrase, deviceKeyMaterial));
+      // requirePrf: without it this hook hands back a seed whose encryption key
+      // is rebuildable from plaintext localStorage, which would wrap the vault
+      // seed under something already lying beside the ciphertext.
+      const deviceKeyMaterial = await registerPasskey({ requirePrf: true }).catch((caught) => {
+        if (caught instanceof PrfUnavailableError) {
+          setNotice(caught.message);
+          return null;
+        }
+        throw caught;
+      });
+      setRecoveryString(await createEnvelopeVault(passphrase, deviceKeyMaterial ?? undefined));
       setPassphrase("");
       setMode("saved");
     });
 
   const handleRestore = () =>
     run(async () => {
-      // Arming this device is optional — a restore that cannot register a
-      // passkey should still open the vault for this session rather than fail.
-      const deviceKeyMaterial = (await authenticatePasskey().catch(() => null)) ?? undefined;
+      // Arming this device is optional — a restore that cannot do it safely
+      // should still open the vault for this session rather than fail, and
+      // should say why the next visit will ask again.
+      const deviceKeyMaterial = await authenticatePasskey({ requirePrf: true }).catch((caught) => {
+        if (caught instanceof PrfUnavailableError) setNotice(caught.message);
+        return null;
+      });
       await restoreEnvelopeVault(recoveryInput, passphrase, deviceKeyMaterial ?? undefined);
       setPassphrase("");
       setRecoveryInput("");
@@ -69,7 +82,8 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
 
   if (mode === "saved") {
     return (
-      <div className="flex flex-col gap-4">
+      <div className="flex flex-col gap-3">
+        {notice && <Notice text={notice} />}
         <RecoveryStringCard value={recoveryString} onConfirmed={onDone} confirmLabel="Open my vault" />
       </div>
     );
@@ -167,6 +181,8 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         </p>
       )}
 
+      {notice && <Notice text={notice} />}
+
       {error && (
         <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
           <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
@@ -193,6 +209,16 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
             ? "Create vault"
             : "Restore vault"}
       </button>
+    </div>
+  );
+}
+
+/** A limitation of this browser, not an error the member caused. */
+function Notice({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-2.5">
+      <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+      <span className="text-caption leading-relaxed text-gray">{text}</span>
     </div>
   );
 }

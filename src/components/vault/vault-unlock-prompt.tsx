@@ -45,7 +45,10 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
     setError(null);
     setBusy(true);
     try {
-      const deviceKeyMaterial = await authenticate();
+      // A wrapping only exists here if PRF produced its key, so requiring PRF
+      // now turns a browser that quietly lost it into a clear failure rather
+      // than an unlock attempt with the wrong key material.
+      const deviceKeyMaterial = await authenticate({ requirePrf: true });
       if (!deviceKeyMaterial) throw new Error("That passkey did not unlock this vault.");
       await unlockEnvelopeVault(deviceKeyMaterial);
     } catch (caught) {
