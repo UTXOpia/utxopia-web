@@ -197,6 +197,32 @@ function Distribution({
 
 /* ── your position ───────────────────────────────────────────────────────── */
 
+const BAND_PCT = Math.round(SIMILAR_TOLERANCE * 100);
+
+/** One measurement. `title` carries the long form for anyone who hovers. */
+function Chip({
+  tone,
+  title,
+  children,
+}: {
+  tone: "warn" | "ok";
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <span
+      title={title}
+      className={`cursor-help rounded-md border px-2 py-1 font-mono text-[11.5px] ${
+        tone === "warn"
+          ? "border-warning/35 bg-warning/[0.08] text-warning"
+          : "border-gray/20 bg-muted/60 text-gray-light"
+      }`}
+    >
+      {children}
+    </span>
+  );
+}
+
 function NoteRow({
   amount,
   token,
@@ -210,7 +236,46 @@ function NoteRow({
    *  count would then read zero, which is a wrong answer, not a safe one. */
   depositsKnown: boolean;
 }) {
-  const band = Math.round(SIMILAR_TOLERANCE * 100);
+  // A finding is prose only when it asks the reader to do something. Repeating
+  // "this is fine" in full sentences on every note buries the one that isn't.
+  const warnings: React.ReactNode[] = [];
+  if (!depositsKnown) {
+    warnings.push(
+      <>
+        <strong>Amount checks unavailable.</strong> The public deposit list did not load, so this
+        note cannot be compared against the pool. Treat that as unknown, not as safe.
+      </>,
+    );
+  } else {
+    if (exposure.isFingerprint) {
+      warnings.push(
+        <>
+          <strong>Unique amount.</strong> Exactly one public deposit carries this figure — almost
+          certainly the one that created this note. Withdrawing it in full links the two however
+          large the pool is. Split it, or leave a remainder behind.
+        </>,
+      );
+    }
+    if (exposure.isThin && !exposure.isFingerprint) {
+      warnings.push(
+        <>
+          <strong>Thin crowd.</strong> Few deposits are near this size, so matching a withdrawal
+          back to it is a short guess-list.
+        </>,
+      );
+    }
+  }
+  // The age is printed above; only the hour where timing alone pairs a deposit
+  // with a withdrawal earns a sentence of its own.
+  if (exposure.isVeryRecent) {
+    warnings.push(
+      <>
+        <strong>Under an hour old.</strong> Timing alone pairs a deposit with a withdrawal. Waiting
+        is the cheapest privacy you can buy.
+      </>,
+    );
+  }
+
   return (
     <div className="rounded-xl border border-gray/15 bg-background p-4">
       <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -218,54 +283,48 @@ function NoteRow({
         <span className="text-[12px] text-gray">held {fmtAge(exposure.ageMs)}</span>
       </div>
 
-      <div className="mt-3 flex flex-col gap-2">
+      <div className="mt-2.5 flex flex-wrap gap-1.5">
         {!depositsKnown ? (
-          <Finding tone="caution">
-            <strong>Amount checks unavailable.</strong> The public deposit list did not load, so
-            this note cannot be compared against the pool right now. Treat that as unknown, not as
-            safe.
-          </Finding>
-        ) : exposure.isFingerprint ? (
-          <Finding tone="warn">
-            <strong>Unique amount.</strong> Exactly one public deposit carries this figure — almost
-            certainly the one that created this note. Withdrawing the full amount links the two
-            however large the pool is. Split it, or leave a remainder behind.
-          </Finding>
-        ) : exposure.exactCount === 0 ? (
-          <Finding tone="ok">
-            <strong>No matching deposit.</strong> Nothing in the public deposit list carries this
-            exact amount, so there is no deposit to pair a full withdrawal against.
-          </Finding>
+          <Chip tone="warn" title="The public deposit list did not load.">
+            no data
+          </Chip>
         ) : (
-          <Finding tone="ok">
-            <strong>Shared amount.</strong> {exposure.exactCount} deposits carry this exact figure.
-          </Finding>
+          <>
+            <Chip
+              tone={exposure.isFingerprint ? "warn" : "ok"}
+              title={
+                exposure.isFingerprint
+                  ? "Exactly one public deposit carries this amount — almost certainly this note's own."
+                  : exposure.exactCount === 0
+                    ? "No public deposit carries this exact amount, so a full withdrawal has no deposit to pair against."
+                    : `${exposure.exactCount} public deposits carry this exact amount.`
+              }
+            >
+              {exposure.isFingerprint
+                ? "unique amount"
+                : exposure.exactCount === 0
+                  ? "no exact match"
+                  : `${exposure.exactCount} exact`}
+            </Chip>
+            <Chip
+              tone={exposure.isThin ? "warn" : "ok"}
+              title={`Public deposits within ±${BAND_PCT}% of this amount — the band an observer allows for fees.`}
+            >
+              {exposure.similarCount} look-alike{exposure.similarCount === 1 ? "" : "s"}
+            </Chip>
+          </>
         )}
-
-        {depositsKnown && (
-          <Finding tone={exposure.isThin ? "warn" : "ok"}>
-            <strong>
-              {exposure.similarCount} look-alike deposit{exposure.similarCount === 1 ? "" : "s"}
-            </strong>{" "}
-            within ±{band}% of this amount.{" "}
-            {exposure.isThin
-              ? "That is a short guess-list for anyone matching withdrawals to deposits."
-              : "An observer matching by size has that many candidates to choose between."}
-          </Finding>
-        )}
-
-        {exposure.isVeryRecent ? (
-          <Finding tone="warn">
-            <strong>Under an hour old.</strong> Timing alone pairs a deposit with a withdrawal.
-            Waiting is the cheapest privacy you can buy.
-          </Finding>
-        ) : exposure.isRecent ? (
-          <Finding tone="caution">
-            <strong>Less than a day old.</strong> A same-day withdrawal narrows the candidate
-            deposits to the ones near it in time.
-          </Finding>
-        ) : null}
       </div>
+
+      {warnings.length > 0 && (
+        <div className="mt-2.5 flex flex-col gap-2">
+          {warnings.map((w, i) => (
+            <Finding key={i} tone="warn">
+              {w}
+            </Finding>
+          ))}
+        </div>
+      )}
     </div>
   );
 }
@@ -388,6 +447,27 @@ function YourPosition({
           />
         ))}
       </div>
+
+      {/* Defined once. These terms mean the same thing on every note, so
+          repeating them per row pushed the one warning that matters off screen. */}
+      {depositsKnown && (
+        <dl className="m-0 mt-4 flex flex-col gap-1.5 text-[12.5px] leading-relaxed text-gray">
+          <div>
+            <dt className="inline font-mono text-gray-light">exact</dt>{" "}
+            <dd className="m-0 inline">
+              — public deposits carrying this figure precisely. One means the note&apos;s own
+              deposit, which a full withdrawal pairs straight back to it.
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-mono text-gray-light">look-alikes</dt>{" "}
+            <dd className="m-0 inline">
+              — deposits within ±{BAND_PCT}% of it, the band an observer allows for fees. This is
+              the crowd a size-based match has to pick from.
+            </dd>
+          </div>
+        </dl>
+      )}
     </Card>
   );
 }
