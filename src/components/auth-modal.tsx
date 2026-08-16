@@ -2,8 +2,9 @@
 
 import { useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Fingerprint, Wallet, X, Eye, Upload } from "lucide-react";
+import { Fingerprint, Wallet, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { VaultSetup } from "@/components/vault/vault-setup";
 
 export interface AuthState {
   passkeySupported: boolean;
@@ -39,6 +40,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   const [importError, setImportError] = useState<string | null>(null);
   const isLoading = passkeyLoading || walletLoading || importing;
   const [showViewOnly, setShowViewOnly] = useState(false);
+  const [showEnvelopeSetup, setShowEnvelopeSetup] = useState(false);
   const [viewingKeyInput, setViewingKeyInput] = useState("");
 
   const handleImport = async (file: File | undefined) => {
@@ -113,6 +115,39 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
 
           {/* Options */}
           <div className="p-6 space-y-3">
+            {/* Envelope vault — create or restore. Offered above the legacy
+                paths because it is the only one where forgetting a passphrase
+                or losing a device is recoverable without us. */}
+            {showEnvelopeSetup ? (
+              <VaultSetup
+                onDone={() => {
+                  setShowEnvelopeSetup(false);
+                  onOpenChange(false);
+                }}
+              />
+            ) : (
+              <>
+              <button
+                onClick={() => setShowEnvelopeSetup(true)}
+                disabled={isLoading}
+                className={cn(
+                  "w-full flex items-center gap-4 p-4 rounded-[14px]",
+                  "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
+                  "hover:border-privacy/30 disabled:opacity-40",
+                  "transition-all duration-200 cursor-pointer text-left",
+                )}
+              >
+                <ShieldCheck className="w-5 h-5 text-privacy shrink-0" aria-hidden />
+                <span>
+                  <span className="block text-body2-semibold text-foreground">
+                    Vault with recovery string
+                  </span>
+                  <span className="block text-caption text-gray/60">
+                    Works on any device you can reach
+                  </span>
+                </span>
+              </button>
+
             {/* Passkey */}
             {passkeySupported && (
               <button
@@ -296,6 +331,8 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                 {importError && (
                   <p className="px-1 text-caption text-red-400">{importError}</p>
                 )}
+              </>
+            )}
               </>
             )}
           </div>

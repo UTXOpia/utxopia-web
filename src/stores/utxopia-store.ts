@@ -3,6 +3,14 @@
 import { create } from "zustand";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
+  buildRecoveryString,
+  clearDeviceEnvelope,
+  createVault,
+  unlockWithDevice,
+  unlockWithRecoveryString,
+  type VaultScope,
+} from "@/lib/vault-identity";
+import {
   UTXOpiaClient,
   hexToBytes,
   bytesToHex,
@@ -165,6 +173,41 @@ async function chainScopedPasskeySeed(
   return new Uint8Array(await crypto.subtle.digest("SHA-256", material));
 }
 
+/** Scope + address deriver for the envelope layer, bound to the active chain. */
+async function envelopeContext(): Promise<{
+  scope: VaultScope;
+  metaAddressFor: (seed: Uint8Array) => Promise<string>;
+}> {
+  const env = await ensureChainEnvironment();
+  return {
+    scope: { networkId: env.networkId, vaultId: env.vaultId },
+    metaAddressFor: async (seed) => {
+      const { stealthAddressEncoded } = await UTXOpiaClient.instance().loginWithSeed(seed);
+      if (!stealthAddressEncoded) throw new Error("Could not derive a vault address from this seed.");
+      return stealthAddressEncoded;
+    },
+  };
+}
+
+/** The seed is already loaded into the client by metaAddressFor; publish it. */
+async function adoptSeedIntoSession(
+  set: (partial: Partial<UTXOpiaState>) => void,
+  seed: Uint8Array,
+): Promise<void> {
+  const client = UTXOpiaClient.instance();
+  set({
+    keys: client.keys ?? null,
+    viewOnlyKeys: null,
+    isViewOnly: false,
+    stealthAddress: client.stealthAddress ?? null,
+    stealthAddressEncoded: client.stealthAddressEncoded ?? null,
+    vaultSeed: seed,
+    hasKeys: true,
+    isLoading: false,
+    error: null,
+  });
+}
+
 function walletStorageOwner(walletPubkey: string, vaultId: VaultId): string {
   return vaultId === "open" ? walletPubkey : `${walletPubkey}:vault:${vaultId}`;
 }
@@ -254,6 +297,10 @@ interface UTXOpiaState {
   isLoading: boolean;
   error: string | null;
   hasKeys: boolean;
+  /** The envelope seed for this session. Memory only — never persisted in the
+   *  clear, and held at all so a member can re-export their recovery string or
+   *  change their passphrase without a second unlock ceremony. */
+  vaultSeed: Uint8Array | null;
   /** Keys came from an imported recovery file, so they exist only in memory —
    *  nothing was written to localStorage and a reload logs the user out. */
   isImportedSession: boolean;
@@ -300,6 +347,18 @@ interface UTXOpiaState {
   importBackupKeys: (raw: string) => Promise<void>;
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
   setIdentityRestoring: (restoring: boolean) => void;
+  /** Envelope-backed identity (see lib/vault-identity). Memory only. */
+  createEnvelopeVault: (passphrase: string, deviceKeyMaterial: Uint8Array) => Promise<string>;
+  unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array) => Promise<void>;
+  restoreEnvelopeVault: (
+    recoveryString: string,
+    passphrase: string,
+    deviceKeyMaterial?: Uint8Array,
+  ) => Promise<void>;
+  exportRecoveryString: (passphrase: string) => Promise<string>;
+  /** Drop this browser's wrapping. Distinct from logging out: after this the
+   *  recovery string is the only way back in, on any device. */
+  forgetVaultOnThisDevice: () => Promise<void>;
   /** Open a fast-poll window (default 2 minutes). */
   expectInboxSoon: (ms?: number) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
@@ -326,6 +385,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   error: null,
   hasKeys: false,
   isImportedSession: false,
+  vaultSeed: null,
   inboxNotes: [],
   inboxTotalSats: 0n,
   inboxBalancesByToken: {},
@@ -619,6 +679,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       error: null,
       hasKeys: false,
       isImportedSession: false,
+      vaultSeed: null,
       inboxNotes: [],
       inboxTotalSats: 0n,
       inboxBalancesByToken: {},
@@ -630,6 +691,58 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   },
 
   setIdentityRestoring: (restoring) => set({ identityRestoring: restoring }),
+
+  createEnvelopeVault: async (passphrase, deviceKeyMaterial) => {
+    const { scope, metaAddressFor } = await envelopeContext();
+    const { seed, recoveryString } = await createVault({
+      scope,
+      passphrase,
+      deviceKeyMaterial,
+      metaAddressFor,
+    });
+    await adoptSeedIntoSession(set, seed);
+    return recoveryString;
+  },
+
+  unlockEnvelopeVault: async (deviceKeyMaterial) => {
+    const { scope, metaAddressFor } = await envelopeContext();
+    const { seed } = await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor });
+    await adoptSeedIntoSession(set, seed);
+  },
+
+  restoreEnvelopeVault: async (recoveryString, passphrase, deviceKeyMaterial) => {
+    const { scope, metaAddressFor } = await envelopeContext();
+    try {
+      const { seed } = await unlockWithRecoveryString({
+        scope,
+        recoveryString,
+        passphrase,
+        deviceKeyMaterial,
+        metaAddressFor,
+      });
+      await adoptSeedIntoSession(set, seed);
+    } catch (err) {
+      // metaAddressFor logs the client in to learn the address, so a failed
+      // guard check leaves a stranger's identity loaded. Put it back.
+      if (UTXOpiaClient.isInitialized) UTXOpiaClient.instance().logout();
+      throw err;
+    }
+  },
+
+  exportRecoveryString: async (passphrase) => {
+    const seed = get().vaultSeed;
+    const metaAddress = get().stealthAddressEncoded;
+    if (!seed || !metaAddress) {
+      throw new Error("Unlock your vault before exporting a recovery string.");
+    }
+    return buildRecoveryString({ seed, passphrase, metaAddress });
+  },
+
+  forgetVaultOnThisDevice: async () => {
+    const { scope } = await envelopeContext();
+    clearDeviceEnvelope(scope);
+    get().clearKeys();
+  },
 
   expectInboxSoon: (ms = 120_000) => set({ fastRefreshUntil: Date.now() + ms }),
 

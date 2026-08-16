@@ -3,6 +3,7 @@
 import { Settings as SettingsIcon } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { PreferencesForm } from "@/components/settings/preferences-form";
+import { RecoverySection } from "@/components/settings/recovery-section";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
 
@@ -25,7 +26,10 @@ export default function SettingsPage() {
       title="Preferences"
       description="Choose a network, manage your receive name, select a relayer, and configure disclosure."
     >
-      <PreferencesForm />
+      <div className="flex flex-col gap-8">
+        <PreferencesForm />
+        <RecoverySection />
+      </div>
     </FlowPageLayout>
   );
 }
