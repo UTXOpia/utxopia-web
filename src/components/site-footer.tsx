@@ -17,7 +17,7 @@ export function SiteFooter() {
   // whatever happened to be underneath, which is how the tagline landed below
   // the 4.5:1 bar.
   return (
-    <footer className="w-full border-t border-gray/10 bg-background py-12 px-6 relative overflow-hidden">
+    <footer className="w-full border-t border-gray/10 bg-background py-8 sm:py-12 px-6 relative overflow-hidden">
       {/* Subtle top gradient line */}
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-privacy/20 to-transparent" />
 
@@ -43,34 +43,37 @@ export function SiteFooter() {
           </span>
         </Link>
 
-        {/* gray on the footer's translucent fill measured 2.5:1 median, under
-            the 4.5:1 body-text bar. The lighter token clears it. */}
-        <div className="text-caption text-gray-light">
+        {/* A marketing line, so it yields first: on a phone the footer's job is
+            navigation, and this was taking the most prominent slot to say the
+            least useful thing. */}
+        <div className="hidden sm:block text-caption text-gray-light">
           Private transfers for supported assets on {chainName}
         </div>
 
-        <div className="flex items-center gap-4">
+        {/* Wraps and centres rather than staying a rigid row. At 390px the old
+            fixed row could not fit its contents, so it broke a phrase across
+            two lines and left the icon aligned against nothing. */}
+        <div className="flex flex-wrap items-center justify-center gap-x-4">
           <Link
             href={hrefWithChain("/architecture", networkId)}
-            className="text-caption text-gray hover:text-foreground transition-colors"
+            className="inline-flex min-h-11 items-center px-1 text-caption text-gray hover:text-foreground transition-colors"
           >
             Architecture
           </Link>
           <Link
             href={hrefWithChain("/careers", networkId)}
-            className="text-caption text-gray hover:text-foreground transition-colors"
+            className="inline-flex min-h-11 items-center px-1 text-caption text-gray hover:text-foreground transition-colors"
           >
             Careers
           </Link>
-          <span className="text-caption text-gray/60">
-            Public alpha · Testnet only · Unaudited
-          </span>
+          {/* min-h-11 on all three: the marks are small but the targets are not,
+              and 18px-tall text links are not tappable. */}
           <a
             href="https://github.com/UTXOpia"
             target="_blank"
             rel="noopener noreferrer"
             aria-label="GitHub"
-            className="p-2 rounded-full text-gray hover:text-foreground hover:bg-muted/50 transition-colors"
+            className="inline-flex min-h-11 min-w-11 items-center justify-center rounded-full text-gray hover:text-foreground hover:bg-muted/50 transition-colors"
           >
             <Github className="w-4 h-4" />
           </a>
