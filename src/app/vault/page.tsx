@@ -60,6 +60,7 @@ import { VaultTokenList } from "@/components/vault/vault-token-list";
 import { ViewKeyModal } from "@/components/vault/view-key-modal";
 import { SnsNameTip } from "@/components/vault/sns-name-tip";
 import { VaultFirstSteps } from "@/components/vault/vault-first-steps";
+import { VaultUnlockPrompt, useHasLocalVault } from "@/components/vault/vault-unlock-prompt";
 import { useSiblingVaultAddress, useSiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 import { usePendingBtcDeposits } from "@/hooks/use-pending-btc-deposits";
 import { hasBackupForKeys } from "@/lib/vault-backup";
@@ -120,6 +121,7 @@ export default function VaultPage() {
     siblingBalances.status === "ready" &&
     Object.values(siblingBalances.balancesByToken).some((amount) => amount > 0n);
   const identityRestoring = useUTXOpiaStore((s) => s.identityRestoring);
+  const hasLocalVault = useHasLocalVault();
   // Skeleton once, on the first scan of an identity. Everything after that —
   // the 60s poll, a tab refocus, a vault switch — repaints numbers in place.
   const balancesFirstLoad = !inboxHasLoaded;
@@ -390,7 +392,11 @@ export default function VaultPage() {
           )}
 
           {/* ═══ Hero Balance ═══ */}
-          {!keys && !isViewOnly && !identityRestoring ? (
+          {!keys && !isViewOnly && !identityRestoring && hasLocalVault ? (
+            /* A vault exists in this browser — offer to reopen it, not to start
+               over. The seed is memory-only, so this is every reload. */
+            <VaultUnlockPrompt onSignInInstead={() => setAuthModalOpen(true)} />
+          ) : !keys && !isViewOnly && !identityRestoring ? (
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
               <div className="mb-5 flex items-center justify-center">
