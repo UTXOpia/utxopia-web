@@ -22,6 +22,8 @@ interface VaultBalanceProps {
 }
 
 const COUNT_MS = 550;
+const SPLIT_LINE_CLASS =
+  "mt-1.5 text-[11px] text-gray/45 font-mono flex items-center justify-center gap-1";
 
 /** Tween a number toward its new value. Skips the first assignment (a count-up
  *  from zero on every page load is noise) and snaps moves too small to see.
@@ -152,8 +154,8 @@ export function VaultBalance({
               <RefreshCw className={cn("w-3 h-3", pending && "animate-spin")} />
             </button>
           </p>
-          {showSplit && (
-            <p className="mt-1.5 text-[11px] text-gray/45 font-mono flex items-center justify-center gap-1">
+          {showSplit ? (
+            <p className={SPLIT_LINE_CLASS}>
               {pricesLive ? `Open $${usd(openUsd)}` : "Open"}
               <span className="text-gray/30">·</span>
               <ShieldCheck className="w-3 h-3 text-privacy/70" />
@@ -161,7 +163,16 @@ export function VaultBalance({
                 {pricesLive ? `Verified $${usd(verifiedUsd)}` : "Verified"}
               </span>
             </p>
-          )}
+          ) : sibling?.status === "loading" ? (
+            // The sibling vault is still being read and may yet produce this
+            // row. Hold its height rather than letting the card — and
+            // everything under it — grow a line once the answer arrives. Same
+            // markup, just invisible, so the reservation cannot drift from the
+            // real thing.
+            <p className={cn(SPLIT_LINE_CLASS, "invisible")} aria-hidden>
+              Open · Verified
+            </p>
+          ) : null}
         </motion.div>
       )}
     </div>
