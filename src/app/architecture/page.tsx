@@ -34,13 +34,13 @@ function Section({
 }) {
   return (
     <section id={id} className="scroll-mt-24 border-t border-gray/10 py-10 sm:py-14">
-      <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-privacy/70">
+      <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-privacy/70">
         {eyebrow}
       </p>
       <h2 className="mt-2 text-xl font-semibold tracking-tight text-foreground sm:text-2xl">
         {title}
       </h2>
-      <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray">{intro}</p>
+      <p className="mt-3 max-w-[38em] text-sm leading-relaxed text-gray">{intro}</p>
       {children}
     </section>
   );
@@ -51,10 +51,10 @@ function Facts({ rows }: { rows: [string, string][] }) {
     <dl className="mt-6 grid gap-px overflow-hidden rounded-xl border border-gray/10 bg-gray/10 sm:grid-cols-2">
       {rows.map(([k, v]) => (
         <div key={k} className="bg-background px-4 py-3">
-          <dt className="font-mono text-[10px] uppercase tracking-[0.12em] text-gray/50">
+          <dt className="font-mono text-[11px] uppercase tracking-[0.12em] text-gray/70">
             {k}
           </dt>
-          <dd className="mt-1 text-xs leading-relaxed text-gray-light">{v}</dd>
+          <dd className="mt-1 text-[13px] leading-relaxed text-gray-light">{v}</dd>
         </div>
       ))}
     </dl>
@@ -71,13 +71,13 @@ export default function ArchitecturePage() {
 
       <div className="mx-auto max-w-4xl px-4 pt-28 pb-4 sm:px-6 sm:pt-32 lg:max-w-5xl lg:px-8">
         <section className="pb-6">
-          <p className="font-mono text-[10px] uppercase tracking-[0.18em] text-privacy/70">
+          <p className="font-mono text-[11px] uppercase tracking-[0.18em] text-privacy/70">
             Technical overview
           </p>
           <h1 className="mt-2 text-2xl font-semibold tracking-tight text-foreground sm:text-3xl">
             How bitcoin becomes a shielded note on Solana
           </h1>
-          <p className="mt-4 max-w-2xl text-sm leading-relaxed text-gray sm:text-base">
+          <p className="mt-4 max-w-[38em] text-sm leading-relaxed text-gray sm:text-base">
             Four moving parts: an SPV light client that lets Solana read Bitcoin,
             a Groth16 JoinSplit circuit that moves value without naming it, an
             Ika dWallet that holds the vault under threshold custody, and — on
@@ -181,7 +181,7 @@ export default function ArchitecturePage() {
           <h2 className="text-xl font-semibold tracking-tight text-foreground">
             Next: private policy on the Verified pool
           </h2>
-          <p className="mt-3 max-w-2xl text-sm leading-relaxed text-gray">
+          <p className="mt-3 max-w-[38em] text-sm leading-relaxed text-gray">
             Everything above is common to both pools. The Verified pool adds one
             more step before an asset instruction runs — an approval that is
             decided inside a MagicBlock ephemeral rollup and committed back to

@@ -129,7 +129,12 @@ export function DiagramFrame({
           aria-label={title}
           style={{
             ["--dgm-w" as string]: `${minWidth}px`,
-            ["--dgm-w-narrow" as string]: `${Math.round(minWidth * 1.4)}px`,
+            // Derived from the viewBox, not from minWidth: rendered scale is
+            // width ÷ viewBox width, and the two props differ per diagram, so
+            // multiplying minWidth gave 1.34 on one page and 1.09 on another.
+            ["--dgm-w-narrow" as string]: `${Math.round(
+              (parseFloat(viewBox.split(/\s+/)[2]) || minWidth) * 1.35,
+            )}px`,
           }}
           className="h-auto w-full min-w-[var(--dgm-w-narrow)] sm:min-w-[var(--dgm-w)]"
         >
