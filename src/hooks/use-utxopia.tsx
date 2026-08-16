@@ -67,6 +67,7 @@ export function useUTXOpia() {
     inboxBalancesByToken: store.inboxBalancesByToken,
     inboxDepositCount: store.inboxDepositCount,
     inboxLoading: store.inboxLoading,
+    inboxHasLoaded: store.inboxHasLoaded,
     inboxError: store.inboxError,
     refreshInbox,
 
@@ -103,6 +104,7 @@ export function useStealthInbox() {
     balancesByToken: ctx.inboxBalancesByToken,
     depositCount: ctx.inboxDepositCount,
     isLoading: ctx.inboxLoading,
+    hasLoaded: ctx.inboxHasLoaded,
     error: ctx.inboxError,
     refresh: ctx.refreshInbox,
     hasKeys: ctx.hasKeys,

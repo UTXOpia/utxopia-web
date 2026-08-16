@@ -15,7 +15,7 @@ import {
   type ScannedNote,
 } from "@utxopia/sdk";
 import { useChainEnvironment, type ChainEnvironment } from "@/lib/chain-environment";
-import { getNetworkConfig } from "@/lib/network-config";
+import { getNetworkConfig, type NetworkId } from "@/lib/network-config";
 import {
   getVaultNetworkConfig,
   siblingVaultId,
@@ -116,85 +116,94 @@ export function useSiblingVaultAddress(): string | null {
   return address;
 }
 
-export function useSiblingVaultBalances(): SiblingVaultBalances {
-  const { networkId, vaultId } = useChainEnvironment();
-  const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
-  const isViewOnly = useUTXOpiaStore((s) => s.isViewOnly);
-  const sibling = siblingVaultId(vaultId);
-  const supported = vaultsSupported(networkId);
+// ---------------------------------------------------------------------------
+// Module-level cache.
+//
+// The scan is expensive (announcement fetch + trial-decrypt of every
+// announcement + nullifier fetch) and this hook has four call sites across
+// three routes. Held in component state it re-ran from scratch on every
+// navigation, and twice over whenever two consumers mounted together — which
+// is what the wallet reads as "loading again". Cached per network+vault and
+// shared by every subscriber, so a route change repaints from memory and the
+// poll runs once regardless of how many components are listening.
+// ---------------------------------------------------------------------------
 
-  const [status, setStatus] = useState<SiblingVaultStatus>(
-    supported ? "loading" : "unsupported",
-  );
-  const [balancesByToken, setBalancesByToken] = useState<Record<string, bigint>>({});
-  const [notes, setNotes] = useState<InboxNote[]>([]);
-  const [refreshTick, setRefreshTick] = useState(0);
-  const generation = useRef(0);
+interface CacheEntry {
+  status: SiblingVaultStatus;
+  balancesByToken: Record<string, bigint>;
+  notes: InboxNote[];
+  fetchedAt: number;
+}
 
-  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
+const LOADING_ENTRY: CacheEntry = { status: "loading", balancesByToken: {}, notes: [], fetchedAt: 0 };
 
-  useEffect(() => {
-    if (!supported || isViewOnly || !hasKeys) {
-      setStatus(supported ? "locked" : "unsupported");
-      setBalancesByToken({});
-      setNotes([]);
-      return;
-    }
+const cache = new Map<string, CacheEntry>();
+const listeners = new Map<string, Set<() => void>>();
+const inflight = new Map<string, Promise<void>>();
+const timers = new Map<string, ReturnType<typeof setInterval>>();
+/** Identity the cache belongs to. A different login must not read these. */
+let cachedIdentity: string | null = null;
 
-    const gen = ++generation.current;
-    let cancelled = false;
-    const live = () => !cancelled && generation.current === gen;
+function publish(key: string, entry: CacheEntry) {
+  cache.set(key, entry);
+  listeners.get(key)?.forEach((notify) => notify());
+}
 
-    const run = async () => {
-      try {
-        const keys = await loadWarmVaultKeys(networkId, sibling);
-        if (!live()) return;
-        if (!keys) {
-          setStatus("locked");
-          setBalancesByToken({});
-          setNotes([]);
-          return;
+async function scanSibling(
+  key: string,
+  networkId: NetworkId,
+  sibling: VaultId,
+  force: boolean,
+): Promise<void> {
+  const cached = cache.get(key);
+  if (!force && cached && Date.now() - cached.fetchedAt < REFRESH_INTERVAL_MS) return;
+  const running = inflight.get(key);
+  if (running) return running;
+
+  const run = (async () => {
+    try {
+      const keys = await loadWarmVaultKeys(networkId, sibling);
+      if (!keys) {
+        publish(key, { status: "locked", balancesByToken: {}, notes: [], fetchedAt: Date.now() });
+        return;
+      }
+
+      const base = getNetworkConfig(networkId);
+      const env: ChainEnvironment = {
+        networkId,
+        vaultId: sibling,
+        config: getVaultNetworkConfig(networkId, base, sibling),
+      };
+
+      const source = await fetchInboxSource(env);
+
+      const scanned: Array<ScannedNote & { tokenSymbol: string }> = [];
+      const seenLeaves = new Set<number>();
+      for (const { symbol, tokenId } of siblingScanTargets(env)) {
+        const results = await scanUnifiedNotes(keys, source.announcements, tokenId);
+        for (const note of results) {
+          if (seenLeaves.has(note.leafIndex)) continue;
+          seenLeaves.add(note.leafIndex);
+          scanned.push({ ...note, tokenSymbol: symbol });
         }
+      }
 
-        setStatus((prev) => (prev === "ready" ? prev : "loading"));
+      // Both vaults share one program, so nullifier PDAs are program-global —
+      // but the backend indexes them per pool, so this must ask for the
+      // sibling's own vault or every sibling note comes back unspent.
+      const spentPdas = scanned.length
+        ? await fetchSpentNullifierPDAs("", networkId, sibling)
+        : new Set<string>();
 
-        const base = getNetworkConfig(networkId);
-        const env: ChainEnvironment = {
-          networkId,
-          vaultId: sibling,
-          config: getVaultNetworkConfig(networkId, base, sibling),
-        };
+      const withSpent = scanned.map((note) => {
+        const hashHex = Buffer.from(computeNullifierHashForNote(keys, note)).toString("hex");
+        return { ...note, nullifierHash: hashHex, isSpent: spentPdas.has(nullifierHashToPDA(hashHex)) };
+      });
 
-        const source = await fetchInboxSource(env);
-        if (!live()) return;
-
-        const scanned: Array<ScannedNote & { tokenSymbol: string }> = [];
-        const seenLeaves = new Set<number>();
-        for (const { symbol, tokenId } of siblingScanTargets(env)) {
-          const results = await scanUnifiedNotes(keys, source.announcements, tokenId);
-          for (const note of results) {
-            if (seenLeaves.has(note.leafIndex)) continue;
-            seenLeaves.add(note.leafIndex);
-            scanned.push({ ...note, tokenSymbol: symbol });
-          }
-        }
-        if (!live()) return;
-
-        // Both vaults share one program, so nullifier PDAs are program-global —
-        // but the backend indexes them per pool, so this must ask for the
-        // sibling's own vault or every sibling note comes back unspent.
-        const spentPdas = scanned.length
-          ? await fetchSpentNullifierPDAs("", networkId, sibling)
-          : new Set<string>();
-        if (!live()) return;
-
-        const withSpent = scanned.map((note) => {
-          const hashHex = Buffer.from(computeNullifierHashForNote(keys, note)).toString("hex");
-          return { ...note, nullifierHash: hashHex, isSpent: spentPdas.has(nullifierHashToPDA(hashHex)) };
-        });
-
-        setBalancesByToken(sumUnspentByToken(withSpent));
-        setNotes(withSpent.map((note, index) => {
+      publish(key, {
+        status: "ready",
+        balancesByToken: sumUnspentByToken(withSpent),
+        notes: withSpent.map((note, index) => {
           const commitmentHex = Buffer.from(note.commitment)
             .toString("hex")
             .toLowerCase()
@@ -206,21 +215,98 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
             createdAt: note.blockTime ? note.blockTime * 1000 : Date.now(),
             vaultId: sibling,
           };
-        }));
-        setStatus("ready");
-      } catch {
-        if (!live()) return;
-        setStatus("error");
+        }),
+        fetchedAt: Date.now(),
+      });
+    } catch {
+      // Keep the last good numbers on screen; a failed poll is not new truth.
+      const prev = cache.get(key);
+      publish(key, prev?.status === "ready" ? prev : { ...LOADING_ENTRY, status: "error" });
+    } finally {
+      inflight.delete(key);
+    }
+  })();
+
+  inflight.set(key, run);
+  return run;
+}
+
+export function useSiblingVaultBalances(): SiblingVaultBalances {
+  const { networkId, vaultId } = useChainEnvironment();
+  const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
+  const isViewOnly = useUTXOpiaStore((s) => s.isViewOnly);
+  // Identifies the logged-in vault identity: it changes on logout and on any
+  // switch, and stale balances from a previous identity must never be shown.
+  const identity = useUTXOpiaStore((s) => s.stealthAddressEncoded) ?? "";
+  const sibling = siblingVaultId(vaultId);
+  const supported = vaultsSupported(networkId);
+  const active = supported && !isViewOnly && hasKeys;
+  const key = `${networkId}:${sibling}`;
+
+  const [entry, setEntry] = useState<CacheEntry>(() =>
+    // cachedIdentity is checked here too: the effect clears a foreign identity's
+    // cache, but that is one paint later — long enough to flash its numbers.
+    !active
+      ? { ...LOADING_ENTRY, status: supported ? "locked" : "unsupported" }
+      : cachedIdentity === identity
+        ? cache.get(key) ?? LOADING_ENTRY
+        : LOADING_ENTRY,
+  );
+  const [refreshTick, setRefreshTick] = useState(0);
+
+  const refresh = useCallback(() => setRefreshTick((t) => t + 1), []);
+  // Only the run triggered by refresh() bypasses the freshness window; a plain
+  // remount reads the cache.
+  const handledTick = useRef(refreshTick);
+
+  useEffect(() => {
+    if (!active) {
+      setEntry({ ...LOADING_ENTRY, status: supported ? "locked" : "unsupported" });
+      return;
+    }
+
+    if (cachedIdentity !== identity) {
+      cachedIdentity = identity;
+      cache.clear();
+    }
+
+    const read = () => setEntry(cache.get(key) ?? LOADING_ENTRY);
+    read();
+
+    let set = listeners.get(key);
+    if (!set) {
+      set = new Set();
+      listeners.set(key, set);
+    }
+    set.add(read);
+
+    const forced = refreshTick !== handledTick.current;
+    handledTick.current = refreshTick;
+    void scanSibling(key, networkId, sibling, forced);
+
+    if (!timers.has(key)) {
+      timers.set(
+        key,
+        setInterval(() => void scanSibling(key, networkId, sibling, true), REFRESH_INTERVAL_MS),
+      );
+    }
+
+    return () => {
+      set!.delete(read);
+      if (set!.size === 0) {
+        listeners.delete(key);
+        const timer = timers.get(key);
+        if (timer) clearInterval(timer);
+        timers.delete(key);
       }
     };
+  }, [active, supported, identity, key, networkId, sibling, refreshTick]);
 
-    void run();
-    const interval = setInterval(() => void run(), REFRESH_INTERVAL_MS);
-    return () => {
-      cancelled = true;
-      clearInterval(interval);
-    };
-  }, [supported, isViewOnly, hasKeys, networkId, sibling, refreshTick]);
-
-  return { status, vaultId: sibling, balancesByToken, notes, refresh };
+  return {
+    status: entry.status,
+    vaultId: sibling,
+    balancesByToken: entry.balancesByToken,
+    notes: entry.notes,
+    refresh,
+  };
 }

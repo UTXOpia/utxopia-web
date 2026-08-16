@@ -96,6 +96,7 @@ export default function VaultPage() {
     balancesByToken,
     depositCount,
     isLoading: isLoadingInbox,
+    hasLoaded: inboxHasLoaded,
     refresh: refreshInbox,
   } = useStealthInbox();
 
@@ -116,6 +117,11 @@ export default function VaultPage() {
   const siblingHasFunds =
     siblingBalances.status === "ready" &&
     Object.values(siblingBalances.balancesByToken).some((amount) => amount > 0n);
+  const identityRestoring = useUTXOpiaStore((s) => s.identityRestoring);
+  // Skeleton once, on the first scan of an identity. Everything after that —
+  // the 60s poll, a tab refocus, a vault switch — repaints numbers in place.
+  const balancesFirstLoad = !inboxHasLoaded;
+  const balancesRefreshing = isLoadingInbox || siblingBalances.status === "loading";
   const siblingLabel = siblingBalances.vaultId === "verified" ? "Verified" : "Open";
   // Vault-switch key reset moved to StoreHydration — it has to cover every page
   // that can switch vaults, and /vault/deposit is the one that actually does.
@@ -368,7 +374,7 @@ export default function VaultPage() {
           )}
 
           {/* ═══ Hero Balance ═══ */}
-          {!keys && !isViewOnly ? (
+          {!keys && !isViewOnly && !identityRestoring ? (
             /* Not connected — centered CTA */
             <div className="flex flex-col items-center py-10">
               <div className="mb-5 flex items-center justify-center">
@@ -403,7 +409,8 @@ export default function VaultPage() {
             <>
               <VaultBalance
                 balancesByToken={balancesByToken}
-                isLoading={isLoadingInbox}
+                isLoading={balancesFirstLoad}
+                isRefreshing={balancesRefreshing}
                 tokenPrices={tokenPrices}
                 onRefresh={refreshInbox}
                 vaultId={vaultId}
@@ -467,7 +474,7 @@ export default function VaultPage() {
               <VaultTokenList
                 balancesByToken={balancesByToken}
                 depositCount={depositCount}
-                isLoading={isLoadingInbox}
+                isLoading={balancesFirstLoad}
                 networkId={networkId}
                 vaultId={vaultId}
                 tokenPrices={tokenPrices}

@@ -22,6 +22,8 @@ import type { SiblingVaultBalances } from "@/hooks/use-sibling-vault-balances";
 interface VaultTokenListProps {
   balancesByToken: Record<string, bigint>;
   depositCount: number;
+  /** First scan of this identity only — a background poll must not blank rows
+   *  that already hold real numbers. */
   isLoading: boolean;
   networkId: NetworkId;
   vaultId: VaultId;
@@ -172,7 +174,7 @@ export function VaultTokenList({
                   </div>
                   <div className="text-right">
                     {isLoading ? (
-                      <Loader2 className="w-4 h-4 animate-spin text-privacy ml-auto" />
+                      <div className="ml-auto h-3.5 w-[72px] rounded-full bg-gray/10 animate-pulse" />
                     ) : hasBalance ? (
                       <>
                         <p className="text-body2-semibold text-foreground font-mono">

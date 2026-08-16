@@ -261,7 +261,16 @@ interface UTXOpiaState {
   inboxBalancesByToken: Record<string, bigint>;
   inboxDepositCount: number;
   inboxLoading: boolean;
+  /** One successful scan has landed for the current identity+vault. Views use
+   *  this — not inboxLoading — to decide between a skeleton and the real
+   *  numbers, so a background poll never blanks a balance that is already on
+   *  screen. Reset on logout and on every vault/network switch. */
+  inboxHasLoaded: boolean;
   inboxError: string | null;
+  /** Keys were dropped for a vault/network switch and are being restored from
+   *  the warm cache. Distinguishes "signed out" from "swapping identity", which
+   *  otherwise look identical (no keys) and flash the sign-in hero mid-switch. */
+  identityRestoring: boolean;
 
   // Public zkBTC balance (SPL Token-2022)
   publicZkbtcBalance: bigint;
@@ -281,6 +290,7 @@ interface UTXOpiaState {
   loadViewOnlyKeys: (encoded: string) => Promise<void>;
   importBackupKeys: (raw: string) => Promise<void>;
   clearKeys: (walletPubkey?: string, opts?: { keepSession?: boolean }) => void;
+  setIdentityRestoring: (restoring: boolean) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
   startRealtimeInbox: () => () => void;
   refreshPublicBalance: (walletPubkey?: PublicKey) => Promise<void>;
@@ -310,7 +320,9 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   inboxBalancesByToken: {},
   inboxDepositCount: 0,
   inboxLoading: false,
+  inboxHasLoaded: false,
   inboxError: null,
+  identityRestoring: false,
   publicZkbtcBalance: 0n,
   activeWithdrawals: [],
 
@@ -599,15 +611,24 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       inboxTotalSats: 0n,
       inboxBalancesByToken: {},
       inboxDepositCount: 0,
+      inboxHasLoaded: false,
       inboxError: null,
       publicZkbtcBalance: 0n,
     });
   },
 
+  setIdentityRestoring: (restoring) => set({ identityRestoring: restoring }),
+
   refreshInbox: async (_connection, force) => {
     const { keys, viewOnlyKeys, isViewOnly } = get();
     if (!keys && !viewOnlyKeys) {
-      set({ inboxNotes: [], inboxTotalSats: 0n, inboxBalancesByToken: {}, inboxDepositCount: 0 });
+      set({
+        inboxNotes: [],
+        inboxTotalSats: 0n,
+        inboxBalancesByToken: {},
+        inboxDepositCount: 0,
+        inboxHasLoaded: false,
+      });
       return;
     }
 
@@ -636,6 +657,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
             inboxTotalSats: 0n,
             inboxBalancesByToken: {},
             inboxDepositCount: 0,
+            inboxHasLoaded: false,
           });
         }
         if (viewOnlyKeys) {
@@ -770,6 +792,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           inboxBalancesByToken: balancesByToken,
           inboxDepositCount: unspentNotes.length,
           inboxLoading: false,
+          inboxHasLoaded: true,
         });
       } catch (err) {
         console.error("[UTXOpia] Inbox error:", err);
@@ -880,6 +903,7 @@ export function useStealthInbox() {
     balancesByToken: store.inboxBalancesByToken,
     depositCount: store.inboxDepositCount,
     isLoading: store.inboxLoading,
+    hasLoaded: store.inboxHasLoaded,
     error: store.inboxError,
     refresh: store.refreshInbox,
     startRealtime: store.startRealtimeInbox,

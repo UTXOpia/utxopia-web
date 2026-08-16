@@ -46,14 +46,23 @@ export function StoreHydration(): JSX.Element {
   const envIdentity = `${networkId}:${vaultId}`;
   const lastEnvIdentityRef = useRef(envIdentity);
   const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
+  const setIdentityRestoring = useUTXOpiaStore((s) => s.setIdentityRestoring);
   useEffect(() => {
     if (lastEnvIdentityRef.current !== envIdentity) {
       lastEnvIdentityRef.current = envIdentity;
       hasHydratedRef.current = false;
       hasPasskeyHydratedRef.current = false;
+      // Flag the gap: for the few frames between dropping the old keys and
+      // restoring the new ones the store looks signed out, and the vault would
+      // otherwise swap the balance for the "Create private vault" hero mid-switch.
+      setIdentityRestoring(true);
       clearKeys(undefined, { keepSession: true });
     }
-  }, [envIdentity, clearKeys]);
+  }, [envIdentity, clearKeys, setIdentityRestoring]);
+
+  useEffect(() => {
+    if (hasAnyKeys) setIdentityRestoring(false);
+  }, [hasAnyKeys, setIdentityRestoring]);
 
   useEffect(() => {
     // Hydrate Bitcoin wallet from localStorage
@@ -67,9 +76,9 @@ export function StoreHydration(): JSX.Element {
   useEffect(() => {
     if (walletPubkey && isPoseidonReady && !keys && !hasHydratedRef.current) {
       hasHydratedRef.current = true;
-      hydrateKeys(walletPubkey);
+      void hydrateKeys(walletPubkey).finally(() => setIdentityRestoring(false));
     }
-  }, [walletPubkey, isPoseidonReady, keys, hydrateKeys, envIdentity]);
+  }, [walletPubkey, isPoseidonReady, keys, hydrateKeys, envIdentity, setIdentityRestoring]);
 
   // Auto-hydrate passkey keys for the active chain. Runs independently of the
   // wallet (a passkey user may also have a Solana wallet auto-connected — the
@@ -78,9 +87,9 @@ export function StoreHydration(): JSX.Element {
   useEffect(() => {
     if (isPoseidonReady && !keys && !hasPasskeyHydratedRef.current) {
       hasPasskeyHydratedRef.current = true;
-      hydratePasskeyKeys();
+      void hydratePasskeyKeys().finally(() => setIdentityRestoring(false));
     }
-  }, [isPoseidonReady, keys, hydratePasskeyKeys, envIdentity]);
+  }, [isPoseidonReady, keys, hydratePasskeyKeys, envIdentity, setIdentityRestoring]);
 
   // Reset hydration flag when wallet disconnects
   useEffect(() => {
