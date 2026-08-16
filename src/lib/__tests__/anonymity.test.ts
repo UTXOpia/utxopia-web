@@ -3,6 +3,7 @@ import {
   assessNote,
   bucketIndexOf,
   buildHistogram,
+  countDepositsAtLeast,
   countExactDeposits,
   countSimilarDeposits,
   isDecadeEdge,
@@ -35,6 +36,38 @@ describe("exact deposits", () => {
   });
 });
 
+describe("deposits big enough to be the source", () => {
+  it("counts deposits at or above the amount", () => {
+    expect(countDepositsAtLeast(at(50, 100, 150, 200), 100)).toBe(3);
+  });
+
+  it("excludes every deposit below it, however close", () => {
+    expect(countDepositsAtLeast(at(99, 99.999), 100)).toBe(0);
+  });
+
+  it("flags a note no other deposit could have funded", () => {
+    const now = 1_700_000_000_000;
+    const e = assessNote(1_000, now - RECENT_MS * 5, at(1_000, 500, 100), now);
+    expect(e.atLeastCount).toBe(1);
+    expect(e.isSoleSource).toBe(true);
+  });
+
+  it("does not flag it once a larger deposit lands", () => {
+    const now = 1_700_000_000_000;
+    const e = assessNote(1_000, now - RECENT_MS * 5, at(1_000, 5_000), now);
+    expect(e.atLeastCount).toBe(2);
+    expect(e.isSoleSource).toBe(false);
+  });
+
+  it("counts a bigger crowd than the look-alike band does", () => {
+    const now = 1_700_000_000_000;
+    // 2_000 and 9_000 are outside ±2% of 1_000 but could still fund it.
+    const e = assessNote(1_000, now, at(1_000, 2_000, 9_000, 10), now);
+    expect(e.similarCount).toBe(1);
+    expect(e.atLeastCount).toBe(3);
+  });
+});
+
 describe("assessNote", () => {
   const now = 1_700_000_000_000;
 
@@ -60,6 +93,22 @@ describe("assessNote", () => {
   it("calls a thin crowd thin", () => {
     expect(assessNote(1_000, now, at(1_000, 1_000), now).isThin).toBe(true);
     expect(assessNote(1_000, now, at(1_000, 1_000, 1_000, 1_000, 1_000), now).isThin).toBe(false);
+  });
+
+  it("does not call a small note exposed just for having no same-size neighbours", () => {
+    // The real case: a 0.00006 SOL note in a pool of 0.01 SOL deposits. No
+    // look-alikes, but every deposit could have funded it.
+    const pool = at(...Array.from({ length: 38 }, () => 10_000_000));
+    const e = assessNote(60_000, now, pool, now);
+    expect(e.similarCount).toBe(0);
+    expect(e.atLeastCount).toBe(38);
+    expect(e.isThin).toBe(false);
+  });
+
+  it("still calls it thin when the big-enough set is genuinely small", () => {
+    const e = assessNote(1_000_000, now, at(1_000_000, 2_000_000, 10), now);
+    expect(e.atLeastCount).toBe(2);
+    expect(e.isThin).toBe(true);
   });
 
   it("separates very recent from recent", () => {

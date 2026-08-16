@@ -256,11 +256,19 @@ function NoteRow({
         </>,
       );
     }
-    if (exposure.isThin && !exposure.isFingerprint) {
+    if (exposure.isSoleSource) {
       warnings.push(
         <>
-          <strong>Thin crowd.</strong> Few deposits are near this size, so matching a withdrawal
-          back to it is a short guess-list.
+          <strong>Largest in the pool.</strong> No other deposit is big enough to have funded this
+          note on its own, so moving the full amount points at the one that did. Send less than the
+          next deposit down, or wait for a larger one to land.
+        </>,
+      );
+    } else if (exposure.isThin) {
+      warnings.push(
+        <>
+          <strong>Thin crowd.</strong> Only {exposure.atLeastCount} deposits are large enough to
+          have funded this note, so moving it leaves a short guess-list.
         </>,
       );
     }
@@ -306,11 +314,19 @@ function NoteRow({
                   ? "no exact match"
                   : `${exposure.exactCount} exact`}
             </Chip>
+            {/* Informational only: a small note having no same-size neighbours
+                is normal and says nothing about the real candidate set. */}
             <Chip
-              tone={exposure.isThin ? "warn" : "ok"}
-              title={`Public deposits within ±${BAND_PCT}% of this amount — the band an observer allows for fees.`}
+              tone="ok"
+              title={`Public deposits within ±${BAND_PCT}% of this amount — the band an observer allows for fees when matching a whole deposit to a whole withdrawal.`}
             >
               {exposure.similarCount} look-alike{exposure.similarCount === 1 ? "" : "s"}
+            </Chip>
+            <Chip
+              tone={exposure.isThin ? "warn" : "ok"}
+              title="Public deposits at least this size. Any one of them could have funded this note on its own, so it is the candidate list an observer starts from. Smaller deposits can still combine, so it is not a floor."
+            >
+              {exposure.atLeastCount} big enough
             </Chip>
           </>
         )}
@@ -464,6 +480,14 @@ function YourPosition({
             <dd className="m-0 inline">
               — deposits within ±{BAND_PCT}% of it, the band an observer allows for fees. This is
               the crowd a size-based match has to pick from.
+            </dd>
+          </div>
+          <div>
+            <dt className="inline font-mono text-gray-light">big enough</dt>{" "}
+            <dd className="m-0 inline">
+              — deposits at least this size. Moving an amount means at least that much went in, so
+              anything smaller drops off the list outright. Several smaller deposits can still
+              combine, so treat it as where an observer starts, not as a floor.
             </dd>
           </div>
         </dl>

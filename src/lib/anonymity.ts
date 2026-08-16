@@ -23,8 +23,8 @@ export interface DepositPoint {
  *  deposit — wide enough to absorb protocol and relayer fees. */
 export const SIMILAR_TOLERANCE = 0.02;
 
-/** Below this many look-alike deposits, matching is a short guess-list. */
-export const THIN_SIMILAR_SET = 5;
+/** Below this many candidate deposits, matching is a short guess-list. */
+export const THIN_CROWD = 5;
 
 export const VERY_RECENT_MS = 60 * 60 * 1000;
 export const RECENT_MS = 24 * 60 * 60 * 1000;
@@ -46,14 +46,37 @@ export function countExactDeposits(deposits: DepositPoint[], amount: number): nu
   return deposits.reduce((n, d) => (d.amount === amount ? n + 1 : n), 0);
 }
 
+/**
+ * Deposits big enough to have funded this note on their own.
+ *
+ * A firmer bound than the look-alike band: to move X you must have put in at
+ * least X, so every deposit below X drops out of the candidate list outright,
+ * whatever the fee assumptions. Not a hard floor in the other direction though
+ * — notes merge, so several smaller deposits can also add up to X.
+ */
+export function countDepositsAtLeast(deposits: DepositPoint[], amount: number): number {
+  return deposits.reduce((n, d) => (d.amount >= amount ? n + 1 : n), 0);
+}
+
 export interface NoteExposure {
   similarCount: number;
   exactCount: number;
+  /** Deposits at least this size — the candidate sources in the simple case. */
+  atLeastCount: number;
   ageMs: number;
   /** Exactly one deposit carries this amount — almost certainly this note's own. */
   isFingerprint: boolean;
-  /** Too few look-alikes for the crowd to hide in. */
+  /**
+   * Too few candidate deposits to hide among.
+   *
+   * Measured on the big-enough set, not the look-alike band: a small note has
+   * few deposits its own size but every larger one could have funded it, and
+   * calling that exposed was a false alarm.
+   */
   isThin: boolean;
+  /** At most one deposit is big enough to be the source, and it is probably
+   *  this note's own — a stronger tell than a thin look-alike band. */
+  isSoleSource: boolean;
   isVeryRecent: boolean;
   isRecent: boolean;
 }
@@ -66,13 +89,16 @@ export function assessNote(
 ): NoteExposure {
   const similarCount = countSimilarDeposits(deposits, amount);
   const exactCount = countExactDeposits(deposits, amount);
+  const atLeastCount = countDepositsAtLeast(deposits, amount);
   const ageMs = Math.max(0, nowMs - createdAtMs);
   return {
     similarCount,
     exactCount,
+    atLeastCount,
     ageMs,
     isFingerprint: exactCount === 1,
-    isThin: similarCount < THIN_SIMILAR_SET,
+    isThin: atLeastCount < THIN_CROWD,
+    isSoleSource: atLeastCount === 1,
     isVeryRecent: ageMs < VERY_RECENT_MS,
     isRecent: ageMs < RECENT_MS,
   };
