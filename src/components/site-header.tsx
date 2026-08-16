@@ -21,7 +21,9 @@ export function SiteHeader({ top = "top-4" }: { top?: "top-4" | "top-14" } = {})
     <>
       <nav className={`fixed ${top} left-0 w-full z-50 flex justify-center px-4`}>
         <motion.div
-          className="nav-pill px-2 py-2 sm:px-4 flex items-center transition-all duration-300"
+          // `transition-all` animated height and width as well, so every reflow
+          // of the pill's contents ran as a layout animation.
+          className="nav-pill px-2 py-2 sm:px-4 flex items-center transition-colors duration-300"
           initial={{ y: -20, opacity: 0 }}
           animate={{ y: 0, opacity: 1 }}
           transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
@@ -45,7 +47,9 @@ export function SiteHeader({ top = "top-4" }: { top?: "top-4" | "top-14" } = {})
             <span className="text-sm font-semibold tracking-tight text-foreground group-hover:text-privacy transition-colors">
               UTXOpia
             </span>
-            <span className="ml-0.5 px-1.5 py-0.5 rounded-full border border-privacy/30 bg-privacy/10 text-[9px] font-mono uppercase tracking-[0.15em] text-privacy/90 leading-none select-none">
+            {/* 11px floor: this is a status label people are meant to read, and
+                letterspaced 9px caps fail on small screens. */}
+            <span className="ml-0.5 px-1.5 py-0.5 rounded-full border border-privacy/30 bg-privacy/10 text-[11px] font-mono uppercase tracking-[0.15em] text-privacy/90 leading-none select-none">
               Alpha
             </span>
           </Link>

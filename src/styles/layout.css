@@ -64,14 +64,25 @@
   border-color: transparent rgba(247, 147, 26, 0.3) rgba(247, 147, 26, 0.3) transparent;
 }
 
-/* Floating pill navigation */
+/* Floating pill navigation.
+ *
+ * The fill is the page background, not a white tint. At rgba(255,255,255,0.03)
+ * the pill was effectively clear: page content scrolling underneath stayed
+ * legible through it, so headings and figures read as smeared rather than
+ * hidden — a detector pass measured 1.1:1 on text caught behind it. Blur alone
+ * cannot fix that; something has to be opaque enough to occlude. */
 .nav-pill {
-  background: rgba(255, 255, 255, 0.03);
-  backdrop-filter: blur(16px);
+  background: color-mix(in srgb, var(--background) 88%, transparent);
+  backdrop-filter: blur(16px) saturate(1.15);
   border: 1px solid rgba(255, 255, 255, 0.08);
   border-radius: 9999px;
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.3);
-  transition: all 0.3s ease;
+  /* Named properties, not `all`: `all` animates height and width too, so any
+     reflow of the pill's contents ran through the compositor as a layout
+     animation. Only the two the hover state actually changes are needed. */
+  transition:
+    transform 0.3s ease,
+    border-color 0.3s ease;
 }
 
 .nav-pill:hover {

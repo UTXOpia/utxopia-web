@@ -111,8 +111,11 @@ export function notifyStealthReceived(amount: number) {
  * Show a notification when text is copied to clipboard
  */
 export function notifyCopied(label: string) {
+  // 2s was not long enough to read the label back. These now carry the actual
+  // string copied — an address or a full receive name — and confirming you
+  // grabbed the right one is the whole point of showing it.
   toast.success(`${label} copied`, {
-    duration: 2000,
+    duration: 4000,
   });
 }
 

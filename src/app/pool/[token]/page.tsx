@@ -83,12 +83,19 @@ function Stat({ label, value, hint }: { label: string; value: string; hint?: str
     <div className="rounded-xl border border-gray/15 bg-background px-4 py-3.5">
       <div className="font-display text-[24px] font-semibold tracking-tight">{value}</div>
       <div className="mt-0.5 text-[12.5px] text-gray">{label}</div>
-      {hint && <div className="mt-1 text-[11.5px] leading-snug text-gray/70">{hint}</div>}
+      {hint && <div className="mt-1 text-[12px] leading-snug text-gray/70">{hint}</div>}
     </div>
   );
 }
 
-/** Colour carries severity, so every line states its severity in words too. */
+/**
+ * A rule, not a card. This sits inside a note row which sits inside a section,
+ * and giving it its own border and fill made that three nested containers deep
+ * — visual noise that competed with the warning instead of carrying it. The
+ * accent rule and colour do the same job with one less box.
+ *
+ * Colour carries severity, so every line states its severity in words too.
+ */
 function Finding({
   tone,
   children,
@@ -98,13 +105,13 @@ function Finding({
 }) {
   const style =
     tone === "warn"
-      ? "border-warning/35 bg-warning/[0.08] text-warning"
+      ? "border-warning/60 text-warning"
       : tone === "caution"
-        ? "border-gray/25 bg-background text-gray-light"
-        : "border-success/30 bg-success/[0.07] text-success";
+        ? "border-gray/40 text-gray-light"
+        : "border-success/50 text-success";
   return (
     <div
-      className={`flex items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-[13px] leading-relaxed ${style}`}
+      className={`flex items-start gap-2.5 border-l-2 py-0.5 pl-3 text-[13px] leading-relaxed ${style}`}
     >
       {tone === "warn" ? (
         <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
@@ -155,7 +162,7 @@ function Distribution({
               }`}
               style={{ height: b.count === 0 ? "2px" : `${Math.max(4, (b.count / peak) * 100)}%` }}
             />
-            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-gray/20 bg-background px-2 py-1 font-mono text-[11px] text-gray-light group-hover:block">
+            <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-gray/20 bg-background px-2 py-1 font-mono text-[12px] text-gray-light group-hover:block">
               {b.count} × {formatTokenAmount(Math.round(b.lo), token)} –{" "}
               {formatTokenAmount(Math.round(b.hi), token)}
             </div>
@@ -164,7 +171,7 @@ function Distribution({
       </div>
       {/* A tick is centred on the edge it names, not on the bucket — except the
           first, which would hang off the left of the chart. */}
-      <div className="flex h-4 gap-1.5 font-mono text-[10.5px] text-gray">
+      <div className="flex h-4 gap-1.5 font-mono text-[12px] text-gray">
         {buckets.map((b, i) => (
           <span key={b.lo} className="relative min-w-0 flex-1">
             {isDecadeEdge(b.lo) && (
@@ -177,7 +184,7 @@ function Distribution({
           </span>
         ))}
       </div>
-      <div className="mt-1 text-center font-mono text-[11px] text-gray">
+      <div className="mt-1 text-center font-mono text-[12px] text-gray">
         deposit size · log scale
       </div>
       {marked >= 0 && (
@@ -212,7 +219,7 @@ function Chip({
   return (
     <span
       title={title}
-      className={`cursor-help rounded-md border px-2 py-1 font-mono text-[11.5px] ${
+      className={`cursor-help rounded-md border px-2 py-1 font-mono text-[12px] ${
         tone === "warn"
           ? "border-warning/35 bg-warning/[0.08] text-warning"
           : "border-gray/20 bg-muted/60 text-gray-light"
@@ -556,7 +563,7 @@ export default function PoolTokenPage() {
           <img src={token.logo} alt="" className="h-11 w-11 rounded-full" />
           <div>
             <h1 className="section-title m-0 text-[30px] leading-tight">{token.name}</h1>
-            <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[11.5px] text-gray">
+            <div className="mt-1 flex flex-wrap items-center gap-2 font-mono text-[12px] text-gray">
               <span>{token.symbol}</span>
               <span className="text-gray/40">·</span>
               <span>{vaultLabel} pool</span>
@@ -620,12 +627,15 @@ export default function PoolTokenPage() {
             subtitle="Ranked by how often it is the thing that breaks anonymity. Pool size is not first."
           >
             <div className="flex flex-col gap-2.5">
+              {/* A ranked list, so it is built as one — dividers and the number
+                  carry the order. Boxing each entry made four cards inside a
+                  card and implied four separate objects rather than a sequence. */}
               {LEAKS.map(([lead, rest], i) => (
                 <div
                   key={lead}
-                  className="flex items-baseline gap-3 rounded-xl border border-gray/15 bg-background px-3.5 py-3"
+                  className="flex items-baseline gap-3 border-t border-gray/12 py-3 first:border-t-0 first:pt-0"
                 >
-                  <span className="font-mono text-[11px] text-privacy">
+                  <span className="font-mono text-[12px] text-privacy">
                     {String(i + 1).padStart(2, "0")}
                   </span>
                   <p className="m-0 text-[13.5px] leading-relaxed text-gray">

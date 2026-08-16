@@ -12,8 +12,12 @@ export function SiteFooter() {
   const { networkId, config } = useChainEnvironment();
   const chainName = getChainAdapter(config).displayName;
 
+  // Opaque, not translucent. Nothing scrolls behind the last element on the
+  // page, so the blur bought no effect — it only made text contrast depend on
+  // whatever happened to be underneath, which is how the tagline landed below
+  // the 4.5:1 bar.
   return (
-    <footer className="w-full border-t border-gray/10 bg-background/80 backdrop-blur-lg py-12 px-6 relative overflow-hidden">
+    <footer className="w-full border-t border-gray/10 bg-background py-12 px-6 relative overflow-hidden">
       {/* Subtle top gradient line */}
       <div className="absolute top-0 left-0 w-full h-px bg-gradient-to-r from-transparent via-privacy/20 to-transparent" />
 
@@ -39,7 +43,9 @@ export function SiteFooter() {
           </span>
         </Link>
 
-        <div className="text-caption text-gray">
+        {/* gray on the footer's translucent fill measured 2.5:1 median, under
+            the 4.5:1 body-text bar. The lighter token clears it. */}
+        <div className="text-caption text-gray-light">
           Private transfers for supported assets on {chainName}
         </div>
 
