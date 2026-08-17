@@ -32,11 +32,13 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   );
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
+  const verifyRecoveryString = useUTXOpiaStore((s) => s.verifyRecoveryString);
 
   const [mode, setMode] = useState<Mode>("choose");
   const [passphrase, setPassphrase] = useState("");
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryString, setRecoveryString] = useState("");
+  const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -95,11 +97,60 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       onDone();
     });
 
+  // Nothing anywhere stores a verifier, so a typo in the passphrase would stay
+  // invisible until a restore months later, with no old device left to fall
+  // back on. Typing it back here proves the pair opens, at the one moment it
+  // still costs nothing to find out.
+  const handleConfirm = () =>
+    run(async () => {
+      await verifyRecoveryString(recoveryString, confirmPassphrase);
+      setConfirmPassphrase("");
+      onDone();
+    });
+
   if (mode === "saved") {
     return (
       <div className="flex flex-col gap-3">
         {notice && <Notice text={notice} />}
-        <RecoveryStringCard value={recoveryString} onConfirmed={onDone} confirmLabel="Open my vault" />
+        <RecoveryStringCard value={recoveryString} />
+
+        <div className="flex flex-col gap-2.5 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
+          <p className="text-caption leading-relaxed text-gray">
+            <span className="font-semibold text-foreground">Now prove it opens.</span> Type your
+            passphrase once more. Nobody stores it, so this is the only chance to find out you saved
+            the right one.
+          </p>
+
+          <PassphraseField
+            value={confirmPassphrase}
+            onChange={setConfirmPassphrase}
+            label="Passphrase"
+            verifyOnly
+            autoFocus
+            disabled={busy}
+          />
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+              <span className="text-caption text-red-400">{error}</span>
+            </div>
+          )}
+
+          <button
+            type="button"
+            onClick={handleConfirm}
+            disabled={busy || !confirmPassphrase}
+            className={cn(
+              "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
+              "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
+              "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
+            )}
+          >
+            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {busy ? "Checking…" : "Open my vault"}
+          </button>
+        </div>
       </div>
     );
   }

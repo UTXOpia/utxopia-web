@@ -9,6 +9,7 @@ import {
   readDeviceEnvelope,
   unlockWithDevice,
   unlockWithRecoveryString,
+  verifyRecoveryString,
   type VaultScope,
 } from "@/lib/vault-identity";
 import {
@@ -379,6 +380,8 @@ interface UTXOpiaState {
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<void>;
   exportRecoveryString: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
+  /** Prove a freshly issued string opens with the passphrase the member typed. */
+  verifyRecoveryString: (recoveryString: string, passphrase: string) => Promise<void>;
   /** Drop this browser's wrapping. Distinct from logging out: after this the
    *  recovery string is the only way back in, on any device. */
   forgetVaultOnThisDevice: () => Promise<void>;
@@ -781,6 +784,13 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
 
     return buildRecoveryString({ scope, seed, passphrase, metaAddress });
+  },
+
+  verifyRecoveryString: async (recoveryString, passphrase) => {
+    const metaAddress = get().stealthAddressEncoded;
+    if (!metaAddress) throw new Error("Unlock your vault first.");
+    const { scope } = await envelopeContext();
+    await verifyRecoveryString({ scope, recoveryString, passphrase, metaAddress });
   },
 
   forgetVaultOnThisDevice: async () => {

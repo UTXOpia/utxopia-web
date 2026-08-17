@@ -17,6 +17,7 @@ import {
   readDeviceEnvelope,
   unlockWithDevice,
   unlockWithRecoveryString,
+  verifyRecoveryString,
 } from "./vault-identity";
 import { EnvelopeUnlockError } from "./vault-envelope";
 
@@ -210,6 +211,46 @@ describe("restoring on a new device", () => {
     await expect(
       createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor }),
     ).rejects.toBeInstanceOf(VaultAlreadyHereError);
+  });
+});
+
+describe("proving a new string opens", () => {
+  it("passes for the passphrase it was built with", async () => {
+    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await expect(
+      verifyRecoveryString({
+        scope: SCOPE,
+        recoveryString: created.recoveryString,
+        passphrase: PASSPHRASE,
+        metaAddress: created.metaAddress,
+      }),
+    ).resolves.toBeUndefined();
+  });
+
+  // The whole point: a typo at creation is otherwise invisible until a restore
+  // months later, with no old device left.
+  it("catches a typo the member would not discover for months", async () => {
+    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await expect(
+      verifyRecoveryString({
+        scope: SCOPE,
+        recoveryString: created.recoveryString,
+        passphrase: `${PASSPHRASE} `.replace("arch ", "arcg "),
+        metaAddress: created.metaAddress,
+      }),
+    ).rejects.toBeInstanceOf(EnvelopeUnlockError);
+  });
+
+  it("leaves nothing behind — it is a check, not an unlock", async () => {
+    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const before = readDeviceEnvelope(SCOPE);
+    await verifyRecoveryString({
+      scope: SCOPE,
+      recoveryString: created.recoveryString,
+      passphrase: PASSPHRASE,
+      metaAddress: created.metaAddress,
+    });
+    expect(readDeviceEnvelope(SCOPE)).toEqual(before!);
   });
 });
 

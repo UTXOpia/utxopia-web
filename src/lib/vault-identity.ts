@@ -228,6 +228,34 @@ export async function armDevice(input: {
   );
 }
 
+/**
+ * Prove a string and a passphrase actually open together, without side effects.
+ *
+ * Nothing stores a verifier, by design — which means a typo at creation is
+ * invisible until the member restores on a new device, possibly months later,
+ * with no old device left to fall back on. Checking here costs one argon2 run
+ * at the only moment it is cheap.
+ *
+ * The guard comparison needs no derivation: the envelope was written for a
+ * known address, so comparing against that address's guard is enough, and
+ * skipping the SDK keeps this free of the login side effects the unlock paths
+ * necessarily have.
+ */
+export async function verifyRecoveryString(input: {
+  scope: VaultScope;
+  recoveryString: string;
+  passphrase: string;
+  metaAddress: string;
+}): Promise<void> {
+  const envelope = decodeEnvelope(input.recoveryString);
+  await unwrapSeed(
+    envelope,
+    deriveFromPassphrase(input.passphrase.trim(), envelope.kdf.salt, envelope.kdf),
+    scopeTag(input.scope),
+  );
+  assertIdentity(envelope, input.metaAddress);
+}
+
 export class NoDeviceEnvelopeError extends Error {
   constructor() {
     super("This browser has no vault yet. Restore from your recovery string.");
