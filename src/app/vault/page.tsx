@@ -82,6 +82,7 @@ export default function VaultPage() {
   const { copied: snsCopied, copy: copySns } = useCopyToClipboard();
   const { copied: stealthCopied, copy: copyStealth } = useCopyToClipboard();
   const { copied: viewKeyCopied, copy: copyViewKey } = useCopyToClipboard();
+  const { copied: siblingCopied, copy: copySibling } = useCopyToClipboard();
   const {
     registeredSnsName,
     hasRegisteredSnsName,
@@ -264,7 +265,7 @@ export default function VaultPage() {
                     </button>
                   ) : (
                     <button
-                      onClick={() => { copyStealth(stealthAddressEncoded || ""); notifyCopied("Private address"); }}
+                      onClick={() => copyStealth(stealthAddressEncoded || "")}
                       className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-privacy/10 hover:bg-privacy/15 transition-colors group cursor-pointer min-w-0"
                       title="Copy private address"
                     >
@@ -318,14 +319,18 @@ export default function VaultPage() {
             <div className="flex items-center gap-3 mb-4 px-1">
               {hasRegisteredSnsName && (
                 <button
-                  onClick={() => { copyStealth(stealthAddressEncoded || ""); notifyCopied("Private address"); }}
+                  onClick={() => copyStealth(stealthAddressEncoded || "")}
                   className="flex items-center gap-1 group cursor-pointer"
                   title="Copy private address"
                 >
                   <code className="text-[11px] font-mono text-gray/35 group-hover:text-gray/55 transition-colors">
                     {stealthAddressEncoded ? `${stealthAddressEncoded.slice(0, 10)}...${stealthAddressEncoded.slice(-8)}` : ""}
                   </code>
-                  <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                  {stealthCopied ? (
+                    <Check className="w-2.5 h-2.5 text-green-400 shrink-0" />
+                  ) : (
+                    <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                  )}
                 </button>
               )}
               {!isPasskeyUser && isLoadingSnsName && (
@@ -336,7 +341,7 @@ export default function VaultPage() {
               )}
               {siblingAddressEncoded && siblingHasFunds && (
                 <button
-                  onClick={() => { copyStealth(siblingAddressEncoded); notifyCopied(`${siblingLabel} address`); }}
+                  onClick={() => copySibling(siblingAddressEncoded)}
                   className="flex items-center gap-1 group cursor-pointer"
                   title={`Copy ${siblingLabel} receive address — ${siblingLabel} funds live in a separate privacy pool`}
                 >
@@ -348,7 +353,11 @@ export default function VaultPage() {
                   <code className="text-[11px] font-mono text-gray/35 group-hover:text-gray/55 transition-colors">
                     {`${siblingAddressEncoded.slice(0, 10)}...${siblingAddressEncoded.slice(-8)}`}
                   </code>
-                  <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                  {siblingCopied ? (
+                    <Check className="w-2.5 h-2.5 text-green-400 shrink-0" />
+                  ) : (
+                    <Copy className="w-2.5 h-2.5 text-gray/25 group-hover:text-gray/45 transition-colors shrink-0" />
+                  )}
                 </button>
               )}
             </div>
