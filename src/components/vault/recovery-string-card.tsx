@@ -6,10 +6,42 @@
 // nobody can reissue it.
 
 import { useState } from "react";
-import { Check, Copy, KeyRound } from "lucide-react";
+import { QRCodeSVG } from "qrcode.react";
+import { Check, Copy, Download, KeyRound, QrCode } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
 import { notifyCopied } from "@/lib/notifications";
+
+/**
+ * Getting 133 characters onto a second device is the whole friction of this
+ * design, and it is the step people skip. So the string is offered three ways:
+ * copied for a password manager, as a file for anyone whose cloud drive syncs
+ * on its own, and as a QR the phone camera reads — no scanner needed on our
+ * side, since every modern camera app offers to copy the text it sees.
+ */
+function downloadRecoveryString(value: string) {
+  const stamp = new Date().toISOString().slice(0, 10);
+  const blob = new Blob(
+    [
+      "UTXOpia vault recovery string\n",
+      `Saved ${stamp}\n\n`,
+      `${value}\n\n`,
+      "This alone cannot open your vault — it needs the passphrase you chose.\n",
+      "Keep the passphrase somewhere else.\n",
+    ],
+    { type: "text/plain" },
+  );
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  // The date is in the name because that is all a member sees in their
+  // downloads folder six months later, at the moment they need it.
+  link.download = `utxopia-recovery-${stamp}.txt`;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
 
 interface RecoveryStringCardProps {
   value: string;
@@ -21,6 +53,7 @@ interface RecoveryStringCardProps {
 export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved it" }: RecoveryStringCardProps) {
   const { copied, copy } = useCopyToClipboard();
   const [acknowledged, setAcknowledged] = useState(false);
+  const [showQr, setShowQr] = useState(false);
 
   return (
     <div className="flex flex-col gap-3 rounded-[12px] border border-privacy/25 bg-privacy/5 p-4">
@@ -36,26 +69,40 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
         </div>
       </div>
 
-      <code className="block break-all rounded-[8px] border border-gray/15 bg-background/60 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-foreground/90">
-        {value}
-      </code>
+      {showQr ? (
+        <div className="flex flex-col items-center gap-2 rounded-[8px] border border-gray/15 bg-white px-3 py-4">
+          {/* On white regardless of theme: a QR inverted for dark mode is a QR
+              half the phone cameras in the world will not read. */}
+          <QRCodeSVG value={value} size={188} level="M" marginSize={2} />
+          <p className="text-center text-[11px] leading-relaxed text-black/60">
+            Point your other phone&apos;s camera at this, then paste what it copies.
+          </p>
+        </div>
+      ) : (
+        <code className="block break-all rounded-[8px] border border-gray/15 bg-background/60 px-3 py-2.5 font-mono text-[11px] leading-relaxed text-foreground/90">
+          {value}
+        </code>
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
-        <button
-          type="button"
+        <SaveAction
           onClick={() => {
             copy(value);
             notifyCopied("Recovery string");
           }}
-          className={cn(
-            "inline-flex min-h-9 items-center gap-1.5 rounded-[9px] px-3",
-            "border border-gray/20 bg-muted/40 text-caption text-foreground",
-            "hover:bg-muted/70 transition-colors cursor-pointer",
-          )}
-        >
-          {copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-          {copied ? "Copied" : "Copy"}
-        </button>
+          icon={copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
+          label={copied ? "Copied" : "Copy"}
+        />
+        <SaveAction
+          onClick={() => setShowQr((shown) => !shown)}
+          icon={<QrCode className="h-3.5 w-3.5" />}
+          label={showQr ? "Show text" : "QR"}
+        />
+        <SaveAction
+          onClick={() => downloadRecoveryString(value)}
+          icon={<Download className="h-3.5 w-3.5" />}
+          label="File"
+        />
 
         {onConfirmed && (
           <button
@@ -88,5 +135,30 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
         </label>
       )}
     </div>
+  );
+}
+
+function SaveAction({
+  onClick,
+  icon,
+  label,
+}: {
+  onClick: () => void;
+  icon: React.ReactNode;
+  label: string;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "inline-flex min-h-9 items-center gap-1.5 rounded-[9px] px-3",
+        "border border-gray/20 bg-muted/40 text-caption text-foreground",
+        "hover:bg-muted/70 transition-colors cursor-pointer",
+      )}
+    >
+      {icon}
+      {label}
+    </button>
   );
 }
