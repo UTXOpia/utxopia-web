@@ -198,6 +198,7 @@ export function useJoinSplitSubmit() {
         signature?: string;
         error?: string;
         policyRequestId?: string;
+        logs?: string[];
       };
 
       const onFailover = (failedUrl: string, nextUrl: string, err: unknown) => {
@@ -260,6 +261,9 @@ export function useJoinSplitSubmit() {
       }
 
       if (!relayResult.success) {
+        // Program logs are the only account of *why* the relay rejected this;
+        // they don't belong in the member-facing message but must not be dropped.
+        if (relayResult.logs?.length) console.error("[Submit] Relay logs:", relayResult.logs);
         throw new Error(relayResult.error || "Transaction failed");
       }
       if (!relayResult.signature) {

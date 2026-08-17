@@ -56,6 +56,7 @@ import { networkForChain } from "@/lib/chain-registry";
 import { isNativeSolMint } from "@/lib/solana/native-sol";
 import { resolvePolicyApproval } from "@/lib/server/policy-coordinator";
 import { resolveRegisteredExits } from "@/lib/server/exit-registry";
+import { describeProgramError } from "@/lib/program-error";
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -539,11 +540,19 @@ export async function POST(request: NextRequest) {
     const logs = (errObj && 'logs' in errObj ? errObj.logs : null)
       ?? (errObj && 'transactionError' in errObj ? (errObj.transactionError as Record<string, unknown>)?.logs : null)
       ?? null;
+    // In production the raw message stays server-side (it can carry the relayer
+    // pubkey and RPC URL), but a decoded program error and the transaction's own
+    // logs are public on-chain data — and without them a 500 here is
+    // undebuggable from the outside.
+    const rawMessage = error instanceof Error ? error.message : "Unknown error";
+    const isDevEnv = process.env.NODE_ENV === "development";
     return NextResponse.json(
       {
         success: false,
-        error: process.env.NODE_ENV === "development" ? (error instanceof Error ? error.message : "Unknown error") : "Transaction failed",
-        logs: process.env.NODE_ENV === "development" ? logs : undefined,
+        error: isDevEnv
+          ? rawMessage
+          : describeProgramError(rawMessage) ?? "Transaction failed",
+        logs: logs ?? undefined,
       },
       { status: 500 }
     );
