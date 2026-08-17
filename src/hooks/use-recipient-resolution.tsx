@@ -41,12 +41,33 @@ export interface RecipientResolution {
   sns: SnsStealthAddress | null;
   /** Display name (`alice.utxopia.sol`); null for a pasted meta-address. */
   name: string | null;
+  /**
+   * `utxo:`-prefixed fingerprint of the resolved record, for showing the user
+   * *which* address a name landed on. Built from viewing key + mpk — the two
+   * keys a name actually publishes — not from `encodeStealthMetaAddress`,
+   * whose leading 32 bytes are the zeroed spending key.
+   */
+  address: string | null;
   error: string | null;
 }
 
 type Settled = Omit<RecipientResolution, "detection">;
 
-const SETTLED_IDLE: Settled = { status: "idle", meta: null, sns: null, name: null, error: null };
+const SETTLED_IDLE: Settled = {
+  status: "idle",
+  meta: null,
+  sns: null,
+  name: null,
+  address: null,
+  error: null,
+};
+
+function fingerprint(viewingPubKey: Uint8Array, mpk: Uint8Array): string {
+  const hex = [...viewingPubKey, ...mpk]
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+  return `utxo:${hex}`;
+}
 
 /**
  * One resolution path for every surface that takes a recipient: detection ladder,
@@ -89,11 +110,13 @@ export function useRecipientResolution(
   useEffect(() => {
     if (detectionType === "stealth_meta") {
       try {
+        const meta = decodeStealthMetaAddress(trimmed);
         setSettled({
           status: "found",
-          meta: decodeStealthMetaAddress(trimmed),
+          meta,
           sns: null,
           name: null,
+          address: fingerprint(meta.viewingPubKey, meta.mpk),
           error: null,
         });
       } catch (err) {
@@ -160,6 +183,7 @@ export function useRecipientResolution(
                   },
                   sns: record,
                   name: fullName,
+                  address: fingerprint(record.viewingPubKey, record.mpk),
                   error: null,
                 }
               : notFound,

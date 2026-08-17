@@ -124,6 +124,7 @@ export function StealthRecipientInput({
       onChange={setRecipient}
       detection={resolution.detection}
       snsStatus={resolution.status}
+      resolvedAddress={resolution.address}
       error={error && !isValid ? error : null}
       label={label}
       placeholder={`alice.${parentDomain}.sol, @alice or utxo:...`}

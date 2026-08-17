@@ -857,6 +857,7 @@ export function SendForm({
             : "Paste a Solana wallet address"
           : undefined}
         snsStatus={recipientResolution.status}
+        resolvedAddress={recipientResolution.address}
         readOnly={locksRegtestBtcDestination}
       />
       )}

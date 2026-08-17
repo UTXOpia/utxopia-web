@@ -3,6 +3,7 @@
 import { Check, X, Loader2, Clipboard } from "lucide-react";
 import { useCallback, useId } from "react";
 import { cn } from "@/lib/utils";
+import { truncateMiddle } from "@/lib/utils/formatting";
 import { detectRecipient, type DetectionResult } from "./recipient-detect";
 
 /**
@@ -21,6 +22,8 @@ export interface RecipientInputProps {
   placeholder?: string;
   /** Name resolve state from the parent (only meaningful for stealth_sns). */
   snsStatus?: SnsStatus;
+  /** `utxo:` fingerprint of the resolved record, shown next to "Resolved". */
+  resolvedAddress?: string | null;
   /** Parent-owned error text; wins over the derived status line. */
   error?: string | null;
   className?: string;
@@ -37,6 +40,7 @@ function statusFor(
   value: string,
   snsStatus: SnsStatus,
   detectionOverride?: DetectionResult,
+  resolvedAddress?: string | null,
 ): {
   detection: DetectionResult;
   tone: "neutral" | "ok" | "warn" | "bad";
@@ -58,7 +62,15 @@ function statusFor(
       };
     }
     if (snsStatus === "found") {
-      return { detection, tone: "ok", label: "Resolved" };
+      return {
+        detection,
+        tone: "ok",
+        // Show which address the name landed on, so a re-registered or
+        // wrong-vault name is visible before the user sends.
+        label: resolvedAddress
+          ? `Resolved · utxo:${truncateMiddle(resolvedAddress.replace(/^utxo:/, ""), 6)}`
+          : "Resolved",
+      };
     }
   }
   if (detection.type === "empty") {
@@ -88,6 +100,7 @@ export function RecipientInput({
   label = "Recipient",
   placeholder = "Paste an address, @handle, or name.utxopia.sol",
   snsStatus = "idle",
+  resolvedAddress = null,
   error = null,
   className,
   readOnly = false,
@@ -96,7 +109,7 @@ export function RecipientInput({
   action,
 }: RecipientInputProps) {
   const inputId = useId();
-  const derived = statusFor(value, snsStatus, detection);
+  const derived = statusFor(value, snsStatus, detection, resolvedAddress);
   const tone = error ? "bad" : derived.tone;
   const statusLabel = error ?? derived.label;
 

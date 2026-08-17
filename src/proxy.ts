@@ -86,8 +86,22 @@ function addSecurityHeaders(response: NextResponse) {
   } catch {
     circuitOrigin = "";
   }
+  // The browser talks to whatever RPC the client config resolves to; if it
+  // isn't in connect-src every on-chain read (SNS resolve included) dies as a
+  // CSP violation, which the UI can only report as "name not found".
+  let rpcOrigin = "";
+  try {
+    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "";
+    rpcOrigin = rpcUrl ? new URL(rpcUrl).origin : "";
+  } catch {
+    rpcOrigin = "";
+  }
   const connectSrc = [
     "'self'",
+    "https://*.rpcpool.com",
+    "wss://*.rpcpool.com",
+    rpcOrigin,
+    rpcOrigin.replace(/^https:/, "wss:"),
     "https://api.binance.com",
     "https://api.coingecko.com",
     "https://*.helius-rpc.com",
