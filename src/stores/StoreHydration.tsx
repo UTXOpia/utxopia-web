@@ -4,6 +4,9 @@ import { useEffect, useRef, useCallback, type JSX } from "react";
 import { useWallet } from "@solana/wallet-adapter-react";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { getPendingFaucetActivities } from "@/lib/faucet-activity";
+import type { NetworkId } from "@/lib/network-config";
+import type { VaultId } from "@/lib/vault-config";
+import { publishVaultScan, readVaultScan, vaultScanKey } from "@/lib/vault-scan-cache";
 import { useBitcoinWalletStore } from "./bitcoin-wallet-store";
 import { useUTXOpiaStore } from "./utxopia-store";
 
@@ -14,6 +17,23 @@ const PENDING_BTC_MS = 15_000;
 const IDLE_MS = 60_000;
 /** How long a pending BTC deposit counts as an active wait. */
 const BTC_WINDOW_MS = 20 * 60_000;
+
+/** Hand the vault being left to the scan cache, before clearKeys drops it. */
+function stashActiveScan(envIdentity: string): void {
+  const [networkId, vaultId] = envIdentity.split(":") as [NetworkId, VaultId];
+  const { inboxNotes, inboxBalancesByToken, inboxHasLoaded, stealthAddressEncoded } =
+    useUTXOpiaStore.getState();
+  if (!inboxHasLoaded || !stealthAddressEncoded) return;
+  publishVaultScan(vaultScanKey(networkId, vaultId), {
+    status: "ready",
+    owner: stealthAddressEncoded,
+    balancesByToken: inboxBalancesByToken,
+    // Tag the notes with the vault they came from: views that read a note's
+    // vault fall back to the active one, which after the switch is the wrong one.
+    notes: inboxNotes.map((note) => ({ ...note, vaultId })),
+    fetchedAt: Date.now(),
+  });
+}
 
 /**
  * Component to hydrate Zustand stores on mount.
@@ -63,10 +83,17 @@ export function StoreHydration(): JSX.Element {
   const rescopeVaultSeed = useUTXOpiaStore((s) => s.rescopeVaultSeed);
   const setIdentityRestoring = useUTXOpiaStore((s) => s.setIdentityRestoring);
   useEffect(() => {
-    if (lastEnvIdentityRef.current !== envIdentity) {
+    const previous = lastEnvIdentityRef.current;
+    if (previous !== envIdentity) {
       lastEnvIdentityRef.current = envIdentity;
       hasHydratedRef.current = false;
       hasPasskeyHydratedRef.current = false;
+      // The vault being left was just scanned; the vault being entered was too,
+      // by the sibling hook. Trade them through the scan cache instead of
+      // dropping both — clearKeys is about to wipe this one, and without the
+      // hand-off the switch pays for two full re-scans to end up where it
+      // already was.
+      stashActiveScan(previous);
       // Flag the gap: for the few frames between dropping the old keys and
       // restoring the new ones the store looks signed out, and the vault would
       // otherwise swap the balance for the "Create private vault" hero mid-switch.
@@ -77,10 +104,17 @@ export function StoreHydration(): JSX.Element {
       // through to the passkey hydration below when there is no root — a
       // legacy identity, or a session that never unlocked one.
       void rescopeVaultSeed().then((rescoped) => {
-        if (rescoped) setIdentityRestoring(false);
+        if (!rescoped) return;
+        // Now that the new identity is derived, the cached scan can be checked
+        // against it and adopted; the revalidating fetch repaints in place.
+        const cached = readVaultScan(networkId, vaultId);
+        if (cached?.status === "ready") {
+          useUTXOpiaStore.getState().adoptVaultScan(cached);
+        }
+        setIdentityRestoring(false);
       });
     }
-  }, [envIdentity, clearKeys, rescopeVaultSeed, setIdentityRestoring]);
+  }, [envIdentity, networkId, vaultId, clearKeys, rescopeVaultSeed, setIdentityRestoring]);
 
   useEffect(() => {
     if (hasAnyKeys) setIdentityRestoring(false);

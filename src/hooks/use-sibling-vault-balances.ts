@@ -22,14 +22,21 @@ import {
 } from "@/lib/vault-config";
 import { fetchInboxSource, planTokenScan, scanByTokenPlan } from "@/lib/chain-inbox";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
+import {
+  hasVaultScanListeners,
+  isScanLogin,
+  LOADING_SCAN,
+  peekVaultScan,
+  publishVaultScan,
+  setScanLogin,
+  subscribeVaultScan,
+  vaultScanKey,
+  type VaultScanEntry,
+  type VaultScanStatus,
+} from "@/lib/vault-scan-cache";
 import { loadWarmVaultKeys, useUTXOpiaStore, type InboxNote } from "@/stores/utxopia-store";
 
-export type SiblingVaultStatus =
-  | "unsupported" // network has no dual vaults
-  | "locked" // sibling identity not warmed this session (wallet flow / view-only)
-  | "loading"
-  | "ready"
-  | "error";
+export type SiblingVaultStatus = VaultScanStatus;
 
 export interface SiblingVaultBalances {
   status: SiblingVaultStatus;
@@ -91,37 +98,18 @@ export function useSiblingVaultAddress(): string | null {
 }
 
 // ---------------------------------------------------------------------------
-// Module-level cache.
-//
 // The scan is expensive (announcement fetch + trial-decrypt of every
 // announcement + nullifier fetch) and this hook has four call sites across
 // three routes. Held in component state it re-ran from scratch on every
 // navigation, and twice over whenever two consumers mounted together — which
-// is what the wallet reads as "loading again". Cached per network+vault and
-// shared by every subscriber, so a route change repaints from memory and the
-// poll runs once regardless of how many components are listening.
+// is what the wallet reads as "loading again". Results live in the shared
+// vault-scan cache instead, so a route change repaints from memory, the poll
+// runs once regardless of how many components are listening, and a vault
+// switch hands this scan straight to the store as the active balance.
 // ---------------------------------------------------------------------------
 
-interface CacheEntry {
-  status: SiblingVaultStatus;
-  balancesByToken: Record<string, bigint>;
-  notes: InboxNote[];
-  fetchedAt: number;
-}
-
-const LOADING_ENTRY: CacheEntry = { status: "loading", balancesByToken: {}, notes: [], fetchedAt: 0 };
-
-const cache = new Map<string, CacheEntry>();
-const listeners = new Map<string, Set<() => void>>();
 const inflight = new Map<string, Promise<void>>();
 const timers = new Map<string, ReturnType<typeof setInterval>>();
-/** Identity the cache belongs to. A different login must not read these. */
-let cachedIdentity: string | null = null;
-
-function publish(key: string, entry: CacheEntry) {
-  cache.set(key, entry);
-  listeners.get(key)?.forEach((notify) => notify());
-}
 
 async function scanSibling(
   key: string,
@@ -129,7 +117,7 @@ async function scanSibling(
   sibling: VaultId,
   force: boolean,
 ): Promise<void> {
-  const cached = cache.get(key);
+  const cached = peekVaultScan(key);
   if (!force && cached && Date.now() - cached.fetchedAt < REFRESH_INTERVAL_MS) return;
   const running = inflight.get(key);
   if (running) return running;
@@ -138,9 +126,10 @@ async function scanSibling(
     try {
       const keys = await loadWarmVaultKeys(networkId, sibling);
       if (!keys) {
-        publish(key, { status: "locked", balancesByToken: {}, notes: [], fetchedAt: Date.now() });
+        publishVaultScan(key, { ...LOADING_SCAN, status: "locked", fetchedAt: Date.now() });
         return;
       }
+      const owner = encodeStealthMetaAddress(createStealthMetaAddress(keys));
 
       const base = getNetworkConfig(networkId);
       const env: ChainEnvironment = {
@@ -170,8 +159,9 @@ async function scanSibling(
         return { ...note, nullifierHash: hashHex, isSpent: spentPdas.has(nullifierHashToPDA(hashHex)) };
       });
 
-      publish(key, {
+      publishVaultScan(key, {
         status: "ready",
+        owner,
         balancesByToken: sumUnspentByToken(withSpent),
         notes: withSpent.map((note, index) => {
           const commitmentHex = Buffer.from(note.commitment)
@@ -190,8 +180,8 @@ async function scanSibling(
       });
     } catch {
       // Keep the last good numbers on screen; a failed poll is not new truth.
-      const prev = cache.get(key);
-      publish(key, prev?.status === "ready" ? prev : { ...LOADING_ENTRY, status: "error" });
+      const prev = peekVaultScan(key);
+      publishVaultScan(key, prev?.status === "ready" ? prev : { ...LOADING_SCAN, status: "error" });
     } finally {
       inflight.delete(key);
     }
@@ -205,22 +195,27 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
   const { networkId, vaultId } = useChainEnvironment();
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
   const isViewOnly = useUTXOpiaStore((s) => s.isViewOnly);
-  // Identifies the logged-in vault identity: it changes on logout and on any
-  // switch, and stale balances from a previous identity must never be shown.
-  const identity = useUTXOpiaStore((s) => s.stealthAddressEncoded) ?? "";
+  // Identifies the login the cache belongs to. The root seed where there is
+  // one: it survives a vault switch — which is what lets the two vaults hand
+  // their scans to each other — and only a real sign-out replaces it. Sessions
+  // without a root fall back to the active address, which does change on a
+  // switch: no hand-off there, but no stale numbers either.
+  const rootSeed = useUTXOpiaStore((s) => s.vaultSeed);
+  const address = useUTXOpiaStore((s) => s.stealthAddressEncoded) ?? "";
+  const login: unknown = rootSeed ?? address;
   const sibling = siblingVaultId(vaultId);
   const supported = vaultsSupported(networkId);
   const active = supported && !isViewOnly && hasKeys;
-  const key = `${networkId}:${sibling}`;
+  const key = vaultScanKey(networkId, sibling);
 
-  const [entry, setEntry] = useState<CacheEntry>(() =>
-    // cachedIdentity is checked here too: the effect clears a foreign identity's
-    // cache, but that is one paint later — long enough to flash its numbers.
+  const [entry, setEntry] = useState<VaultScanEntry>(() =>
+    // The login is checked here too: the effect clears a foreign one's cache,
+    // but that is one paint later — long enough to flash its numbers.
     !active
-      ? { ...LOADING_ENTRY, status: supported ? "locked" : "unsupported" }
-      : cachedIdentity === identity
-        ? cache.get(key) ?? LOADING_ENTRY
-        : LOADING_ENTRY,
+      ? { ...LOADING_SCAN, status: supported ? "locked" : "unsupported" }
+      : isScanLogin(login)
+        ? peekVaultScan(key) ?? LOADING_SCAN
+        : LOADING_SCAN,
   );
   const [refreshTick, setRefreshTick] = useState(0);
 
@@ -231,24 +226,15 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
 
   useEffect(() => {
     if (!active) {
-      setEntry({ ...LOADING_ENTRY, status: supported ? "locked" : "unsupported" });
+      setEntry({ ...LOADING_SCAN, status: supported ? "locked" : "unsupported" });
       return;
     }
 
-    if (cachedIdentity !== identity) {
-      cachedIdentity = identity;
-      cache.clear();
-    }
+    setScanLogin(login);
 
-    const read = () => setEntry(cache.get(key) ?? LOADING_ENTRY);
+    const read = () => setEntry(peekVaultScan(key) ?? LOADING_SCAN);
     read();
-
-    let set = listeners.get(key);
-    if (!set) {
-      set = new Set();
-      listeners.set(key, set);
-    }
-    set.add(read);
+    const unsubscribe = subscribeVaultScan(key, read);
 
     const forced = refreshTick !== handledTick.current;
     handledTick.current = refreshTick;
@@ -262,15 +248,13 @@ export function useSiblingVaultBalances(): SiblingVaultBalances {
     }
 
     return () => {
-      set!.delete(read);
-      if (set!.size === 0) {
-        listeners.delete(key);
-        const timer = timers.get(key);
-        if (timer) clearInterval(timer);
-        timers.delete(key);
-      }
+      unsubscribe();
+      if (hasVaultScanListeners(key)) return;
+      const timer = timers.get(key);
+      if (timer) clearInterval(timer);
+      timers.delete(key);
     };
-  }, [active, supported, identity, key, networkId, sibling, refreshTick]);
+  }, [active, supported, login, key, networkId, sibling, refreshTick]);
 
   return {
     status: entry.status,

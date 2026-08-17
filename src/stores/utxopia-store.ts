@@ -391,6 +391,13 @@ interface UTXOpiaState {
   rescopeVaultSeed: () => Promise<boolean>;
   /** Open a fast-poll window (default 2 minutes). */
   expectInboxSoon: (ms?: number) => void;
+  /** Adopt a cached scan of the current vault as the inbox, then revalidate.
+   *  Returns false when the entry belongs to another identity. */
+  adoptVaultScan: (entry: {
+    notes: InboxNote[];
+    balancesByToken: Record<string, bigint>;
+    owner: string;
+  }) => boolean;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
   startRealtimeInbox: () => () => void;
   refreshPublicBalance: (walletPubkey?: PublicKey) => Promise<void>;
@@ -817,6 +824,39 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   },
 
   expectInboxSoon: (ms = 120_000) => set({ fastRefreshUntil: Date.now() + ms }),
+
+  // Both vaults are scanned continuously — the active one here, the other by
+  // useSiblingVaultBalances — so at a switch the notes being asked for have
+  // usually just been decrypted. Adopting them paints the balance immediately
+  // and leaves the fetch below to confirm it, instead of blanking the vault for
+  // as long as a cold scan takes.
+  adoptVaultScan: (entry) => {
+    // Vault identities are separate keys. A cached scan under the wrong one is
+    // a wrong balance, not a stale one, so it is dropped rather than shown.
+    if (!entry.owner || entry.owner !== get().stealthAddressEncoded) return false;
+
+    const env = getChainEnvironment();
+    // Claim the identity so the refresh below repaints in place rather than
+    // taking the switch branch and wiping what was just seeded.
+    lastInboxIdentity = `${env.networkId}:${env.vaultId}`;
+    // Full re-scan, deliberately: the cached notes are a basis to show, not a
+    // scanned range to continue from. Carrying a high-water mark over from a
+    // window that started mid-tree would skip the leaves below it, and a
+    // skipped leaf reads as a note that vanished.
+    lastScannedLeafIndex = -1;
+
+    const notes = [...entry.notes].sort((a, b) => b.createdAt - a.createdAt);
+    const unspent = notes.filter((note) => !note.isSpent);
+    set({
+      inboxNotes: notes,
+      inboxBalancesByToken: entry.balancesByToken,
+      inboxTotalSats: unspent.reduce((sum, note) => sum + BigInt(note.amount ?? 0), 0n),
+      inboxDepositCount: unspent.length,
+      inboxHasLoaded: true,
+    });
+    void get().refreshInbox();
+    return true;
+  },
 
   refreshInbox: async (_connection, force) => {
     const { keys, viewOnlyKeys, isViewOnly } = get();
