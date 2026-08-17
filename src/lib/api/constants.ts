@@ -28,14 +28,32 @@ export const DEFAULT_API_URL = "http://localhost:3001";
 /** Default Solana RPC URL used when no env var or Helius key is configured */
 export const SOLANA_RPC_FALLBACK_URL = "https://api.devnet.solana.com";
 
+/** Same-origin JSON-RPC proxy the browser uses instead of a keyed RPC URL. */
+export const BROWSER_RPC_PATH = "/api/rpc";
+
 /**
- * Get the Solana RPC URL (server-side).
+ * Get the Solana RPC URL.
  *
- * Priority: SOLANA_RPC_URL (server-only, keyed) > NEXT_PUBLIC_SOLANA_RPC_URL > devnet fallback.
- * Server-only wins so a keyed backend RPC stays off the browser bundle.
+ * In the browser this is always the same-origin proxy: a keyed URL in
+ * `NEXT_PUBLIC_SOLANA_RPC_URL` would ship inside the client bundle, and the
+ * tokenless form of a keyed endpoint answers 403. Server-side, the keyed
+ * `SOLANA_RPC_URL` wins so the token stays off the client entirely.
  */
 export function getSolanaRpcUrl(): string {
+  if (typeof window !== "undefined") return `${window.location.origin}${BROWSER_RPC_PATH}`;
   return process.env.SOLANA_RPC_URL || process.env.NEXT_PUBLIC_SOLANA_RPC_URL || SOLANA_RPC_FALLBACK_URL;
+}
+
+/**
+ * Websocket endpoint for the browser. Subscriptions can't go through the HTTP
+ * proxy, so this needs a directly reachable host — set
+ * `NEXT_PUBLIC_SOLANA_WS_URL` to one that accepts browser origins. Falls back
+ * to the public cluster, which is rate-limited but works.
+ */
+export function getSolanaWsUrl(): string {
+  const explicit = process.env.NEXT_PUBLIC_SOLANA_WS_URL;
+  if (explicit) return explicit;
+  return SOLANA_RPC_FALLBACK_URL.replace(/^http/, "ws");
 }
 
 /**

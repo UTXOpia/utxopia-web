@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { initConfig, UTXOpiaClient, type NetworkConfig as SdkNetworkConfig } from "@utxopia/sdk";
 import { getChainAdapter, type ChainId } from "@/lib/chain-registry";
+import { getSolanaRpcUrl } from "@/lib/api/constants";
 import {
   detectNetwork,
   getNetworkConfig,
@@ -32,7 +33,10 @@ const SDK_INITIALIZERS: Record<ChainId, (env: ChainEnvironment) => Promise<void>
       configurePromise = initConfig({
         utxopiaProgramId: env.config.solana.utxopiaProgramId,
         zkbtcMint: env.config.tokens.zkbtcMint,
-        solanaRpcUrl: env.config.solana.rpcUrl,
+        // Browser-side, this resolves to the same-origin /api/rpc proxy: the
+        // configured RPC URL is either keyed (and must not reach the client) or
+        // tokenless (and answers 403).
+        solanaRpcUrl: getSolanaRpcUrl(),
         ikaDwalletXOnlyPubkey: env.config.ika?.dwalletXOnlyPubkey,
         depositMode: env.config.bitcoin.depositMode,
       });

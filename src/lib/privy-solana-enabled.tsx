@@ -12,7 +12,8 @@ import {
 } from "@privy-io/react-auth/solana";
 import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import { getSolanaRpcUrl } from "@/lib/api/constants";
+import { getSolanaRpcUrl, getSolanaWsUrl } from "@/lib/api/constants";
+import { detectNetwork } from "@/lib/network-config";
 import {
   PrivySolanaContext,
   type PrivySolanaAuthority,
@@ -20,15 +21,14 @@ import {
 
 type PrivySolanaChain = "solana:mainnet" | "solana:devnet" | "solana:testnet";
 
-function rpcWebsocketUrl(rpcUrl: string): string {
-  if (rpcUrl.startsWith("https://")) return rpcUrl.replace("https://", "wss://");
-  if (rpcUrl.startsWith("http://")) return rpcUrl.replace("http://", "ws://");
-  return rpcUrl;
-}
-
-function inferSolanaChain(rpcUrl: string): PrivySolanaChain {
-  if (rpcUrl.includes("mainnet")) return "solana:mainnet";
-  if (rpcUrl.includes("testnet")) return "solana:testnet";
+/**
+ * Read from the resolved network, not from the RPC URL: in the browser that URL
+ * is now the same-origin proxy, whose hostname says nothing about the cluster.
+ */
+function inferSolanaChain(): PrivySolanaChain {
+  const network = detectNetwork();
+  if (network === "mainnet") return "solana:mainnet";
+  if (network === "testnet") return "solana:testnet";
   return "solana:devnet";
 }
 
@@ -42,7 +42,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
-  const solanaChain = inferSolanaChain(getSolanaRpcUrl());
+  const solanaChain = inferSolanaChain();
 
   const wallet = useMemo(() => findEmbeddedWallet(wallets), [wallets]);
   const publicKey = useMemo(
@@ -107,7 +107,7 @@ export function EnabledPrivySolanaProvider({
   children: ReactNode;
 }) {
   const rpcUrl = getSolanaRpcUrl();
-  const solanaChain = inferSolanaChain(rpcUrl);
+  const solanaChain = inferSolanaChain();
 
   return (
     <PrivyProvider
@@ -125,7 +125,7 @@ export function EnabledPrivySolanaProvider({
           rpcs: {
             [solanaChain]: {
               rpc: createSolanaRpc(rpcUrl),
-              rpcSubscriptions: createSolanaRpcSubscriptions(rpcWebsocketUrl(rpcUrl)),
+              rpcSubscriptions: createSolanaRpcSubscriptions(getSolanaWsUrl()),
               blockExplorerUrl: "https://explorer.solana.com",
             },
           },

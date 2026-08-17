@@ -456,6 +456,17 @@ export function SendForm({
   const highFeeShare = feeShareBps(totalFee, BigInt(Math.max(0, amountSats)) + BigInt(effectiveRelayerFee)) >= 500;
 
   const totalAvailable = BigInt(noteSelector.totalAvailable);
+  // Only trust the balance once the inbox scan for *this* key/network has
+  // settled — otherwise the empty initial state reads as a shortfall and the
+  // button flickers disabled on every page load.
+  const balanceKnown =
+    ctx.hasKeys &&
+    !ctx.isLoading &&
+    !ctx.inboxError &&
+    !noteSelector.isLoading &&
+    (mode !== "cashout" || balanceReadyKey === balanceLoadKey);
+  const insufficientBalance =
+    balanceKnown && amountSats > 0 && BigInt(totalNeeded) > totalAvailable;
   const balanceLabel =
     ctx.isLoading || noteSelector.isLoading || (mode === "cashout" && ctx.hasKeys && balanceReadyKey !== balanceLoadKey)
       ? "Loading…"
@@ -706,6 +717,7 @@ export function SendForm({
   }, [submitter]);
 
   const openReview = useCallback(() => {
+    if (insufficientBalance) return;
     dispatch({ type: "open_review" });
 
     const dimensions = estimateJoinSplitDimensions(
@@ -729,6 +741,7 @@ export function SendForm({
     effectiveRelayerFee,
     noteSelector.selectedNotes,
     submitter,
+    insufficientBalance,
   ]);
 
   const onViewActivity = useCallback(() => {
@@ -910,6 +923,13 @@ export function SendForm({
               />
             }
           />
+          {insufficientBalance && (
+            <div className="text-xs text-red-500" data-testid="amount-insufficient-balance">
+              Not enough private balance. This needs {formatFee(totalNeeded)} including the{" "}
+              {PRODUCT_COPY.protocol.relayerFee.toLowerCase()}, and you have {formatFee(totalAvailable)}. Nothing was
+              submitted.
+            </div>
+          )}
           {btcAmountTooSmall && (
             <div className="text-xs text-red-500">
               BTC withdrawal amount must exceed the service fee ({btcServiceFee.toString()} sats).
@@ -941,7 +961,7 @@ export function SendForm({
         <button
           type="button"
           onClick={openReview}
-          disabled={!relayerReady}
+          disabled={!relayerReady || insufficientBalance}
           className={cn(
             "w-full px-4 py-3 rounded-lg bg-foreground text-background text-sm font-medium flex items-center justify-center gap-2",
             "disabled:cursor-not-allowed disabled:opacity-50",

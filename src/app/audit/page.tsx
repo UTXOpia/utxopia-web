@@ -15,7 +15,7 @@ import {
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { InfoTip } from "@/components/ui/info-tip";
-import { getBackendUrl } from "@/lib/api/constants";
+import { getBackendUrl, getSolanaRpcUrl } from "@/lib/api/constants";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
 const ZKBTC_TOKEN_ID = BigInt(0x7a627463);
@@ -55,7 +55,7 @@ export default function AuditPage() {
 
       const client = new AnnouncementClient({
         backendUrl: getBackendUrl(networkId),
-        solanaRpcUrl: networkConfig.solana.rpcUrl,
+        solanaRpcUrl: getSolanaRpcUrl(),
         programId: networkConfig.solana.utxopiaProgramId,
       });
       const raw = await client.fetchAll();

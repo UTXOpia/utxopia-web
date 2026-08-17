@@ -7,7 +7,7 @@ import { PhantomWalletAdapter } from "@solana/wallet-adapter-phantom";
 import { Toaster } from "sonner";
 import { StoreHydration } from "@/stores";
 import { ChainThemeSync } from "@/components/chain-theme-sync";
-import { getSolanaRpcUrl } from "@/lib/api/constants";
+import { getSolanaRpcUrl, getSolanaWsUrl } from "@/lib/api/constants";
 import { UiModeProvider } from "@/hooks/use-ui-mode";
 import { UtxopiaPrivyProvider } from "@/lib/privy-solana";
 import { DevSigner, devSolanaAdapters } from "@/lib/dev-signer";
@@ -21,18 +21,19 @@ import "@solana/wallet-adapter-react-ui/styles.css";
  * All other state (Bitcoin wallet, UTXOpia keys, notes) is managed by Zustand stores.
  */
 export function Providers({ children }: { children: React.ReactNode }) {
-  // Helius primary (supports getProgramAccounts), fallback to configured RPC
-  const endpoint = useMemo(
-    () => getSolanaRpcUrl(),
-    []
-  );
+  // Same-origin proxy in the browser; the keyed URL never leaves the server.
+  const endpoint = useMemo(() => getSolanaRpcUrl(), []);
+  // Connection would otherwise derive its websocket from `endpoint`, i.e.
+  // wss://<origin>/api/rpc — a path that serves no websocket, which makes every
+  // confirmation wait time out instead of failing.
+  const wsEndpoint = useMemo(() => getSolanaWsUrl(), []);
 
   // Configure supported wallets
   const wallets = useMemo(() => [new PhantomWalletAdapter(), ...devSolanaAdapters()], []);
 
   return (
     <UtxopiaPrivyProvider>
-      <ConnectionProvider endpoint={endpoint}>
+      <ConnectionProvider endpoint={endpoint} config={{ commitment: "confirmed", wsEndpoint }}>
         <WalletProvider wallets={wallets} autoConnect>
           <WalletModalProvider>
             <UiModeProvider>

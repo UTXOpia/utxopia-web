@@ -86,27 +86,33 @@ function addSecurityHeaders(response: NextResponse) {
   } catch {
     circuitOrigin = "";
   }
-  // The browser talks to whatever RPC the client config resolves to; if it
-  // isn't in connect-src every on-chain read (SNS resolve included) dies as a
-  // CSP violation, which the UI can only report as "name not found".
-  let rpcOrigin = "";
-  try {
-    const rpcUrl = process.env.NEXT_PUBLIC_SOLANA_RPC_URL || "";
-    rpcOrigin = rpcUrl ? new URL(rpcUrl).origin : "";
-  } catch {
-    rpcOrigin = "";
+  // Browser RPC reads go through /api/rpc, which 'self' already covers.
+  // Websockets can't be proxied, so that host does need naming — along with
+  // NEXT_PUBLIC_SOLANA_RPC_URL for deployments still pointing the browser
+  // straight at an RPC. Miss either and reads die as CSP violations, which the
+  // UI can only report as "name not found".
+  const wsOrigins: string[] = [];
+  for (const value of [process.env.NEXT_PUBLIC_SOLANA_WS_URL, process.env.NEXT_PUBLIC_SOLANA_RPC_URL]) {
+    if (!value) continue;
+    try {
+      const { origin } = new URL(value);
+      wsOrigins.push(origin, origin.replace(/^http/, "ws"));
+    } catch {
+      // Malformed env value — nothing to allow.
+    }
   }
   const connectSrc = [
     "'self'",
     "https://*.rpcpool.com",
     "wss://*.rpcpool.com",
-    rpcOrigin,
-    rpcOrigin.replace(/^https:/, "wss:"),
+    ...wsOrigins,
     "https://api.binance.com",
     "https://api.coingecko.com",
     "https://*.helius-rpc.com",
     "https://api.devnet.solana.com",
+    "wss://api.devnet.solana.com",
     "https://api.mainnet-beta.solana.com",
+    "wss://api.mainnet-beta.solana.com",
     "https://mempool.space",
     "wss://mempool.space",
     "https://*.amidoggy.xyz",
