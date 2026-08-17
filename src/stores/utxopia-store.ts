@@ -27,7 +27,7 @@ import {
   getChainEnvironment,
 } from "@/lib/chain-environment";
 import type { VaultId } from "@/lib/vault-config";
-import { fetchInboxSource, getEventClient, getTokenScanTargets, resetEventClient } from "@/lib/chain-inbox";
+import { fetchInboxSource, getEventClient, planTokenScan, resetEventClient, scanByTokenPlan } from "@/lib/chain-inbox";
 import { deriveNameOwnerKeypair } from "@/lib/names/passkey-solana-key";
 import { parseVaultBackupFile } from "@/lib/vault-backup";
 import { getAlphaDemoInboxNotes } from "@/lib/alpha-demo-ledger";
@@ -193,8 +193,12 @@ function removeKeys(walletPubkey: string): void {
 // Module-level deduplication for inbox fetch
 let inboxFetchPromise: Promise<void> | null = null;
 
-// Cache last announcement count to skip re-scan when nothing changed
-let lastAnnouncementCount = -1;
+// Highest announcement leafIndex already decrypted for the current inbox
+// identity. Announcements are append-only, so a poll only fetches and scans
+// what landed above this — previously scanned notes are carried forward.
+// ponytail: a leaf backfilled below the mark (indexer 429 gap) is only picked
+// up by a force refresh, which resets this to -1.
+let lastScannedLeafIndex = -1;
 let lastInboxIdentity = "";
 
 // ============================================================================
@@ -642,9 +646,9 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       return;
     }
 
-    // Force flag resets the announcement count cache so we re-scan everything
+    // Force flag drops the incremental mark so we re-fetch and re-scan everything
     if (force) {
-      lastAnnouncementCount = -1;
+      lastScannedLeafIndex = -1;
     }
 
     // Deduplicate: if already fetching, wait for that to complete
@@ -660,7 +664,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         const env = getChainEnvironment();
         const inboxIdentity = `${env.networkId}:${env.vaultId}`;
         if (lastInboxIdentity !== inboxIdentity) {
-          lastAnnouncementCount = -1;
+          lastScannedLeafIndex = -1;
           lastInboxIdentity = inboxIdentity;
           set({
             inboxNotes: [],
@@ -673,56 +677,55 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         if (viewOnlyKeys) {
           UTXOpiaClient.instance().loginViewOnly(viewOnlyKeys);
         }
-        const inboxSource = await fetchInboxSource(env);
+        // Only fetch announcements above the mark; the ones below are already
+        // decrypted and carried forward. Nullifiers are ALWAYS re-checked below.
+        const incremental = lastScannedLeafIndex >= 0;
+        const inboxSource = await fetchInboxSource(
+          env,
+          incremental ? lastScannedLeafIndex : undefined,
+        );
         const announcements = inboxSource.announcements;
 
-        // Skip only the expensive scan step if announcement count is unchanged,
-        // but ALWAYS re-check nullifiers (spent status may have changed)
-        const currentNotes = get().inboxNotes;
-        const announcementsUnchanged =
-          announcements.length === lastAnnouncementCount && currentNotes.length > 0;
-        lastAnnouncementCount = announcements.length;
-
-        // Build token list with computed tokenIds for multi-token scanning
         const utxopiaClient = UTXOpiaClient.instance();
-        const tokensToScan = getTokenScanTargets(env, announcements);
 
         // Scan locally for privacy (server doesn't know which are ours)
-        // Re-use previous scan results if announcements unchanged (skip expensive decrypt),
-        // but always re-check nullifier spent status below
         type ScannedWithToken = (ScannedNote | ViewOnlyScannedNote) & { tokenSymbol: string; isSpent?: boolean };
-        let scanned: ScannedWithToken[];
+        // Demo notes are re-appended from the ledger further down, so they must
+        // not enter the carried-forward basis or they'd double up.
+        const scanned: ScannedWithToken[] = incremental
+          ? get().inboxNotes
+              .filter((n) => !n.id.startsWith("alpha-demo-"))
+              .map(n => ({
+                commitment: hexToBytes(n.commitmentHex),
+                amount: n.amount,
+                leafIndex: n.leafIndex,
+                ephemeralPub: n.ephemeralPub ?? new Uint8Array(32),
+                // Preserve the spend-time stealth public key; without it the claim
+                // path can't prove ownership (Stealth key mismatch) on a re-scan.
+                stealthPub: n.stealthPub,
+                blockTime: n.createdAt > 1_000_000_000_000
+                  ? Math.floor(n.createdAt / 1000)
+                  : (n.createdAt > 0 ? n.createdAt : 0),
+                tokenSymbol: n.tokenSymbol,
+              }))
+          : [];
 
-        if (announcementsUnchanged) {
-          scanned = currentNotes.map(n => ({
-              commitment: hexToBytes(n.commitmentHex),
-              amount: n.amount,
-              leafIndex: n.leafIndex,
-              ephemeralPub: n.ephemeralPub ?? new Uint8Array(32),
-              // Preserve the spend-time stealth public key; without it the claim
-              // path can't prove ownership (Stealth key mismatch) on a re-scan.
-              stealthPub: n.stealthPub,
-              blockTime: n.createdAt > 1_000_000_000_000
-                ? Math.floor(n.createdAt / 1000)
-                : (n.createdAt > 0 ? n.createdAt : 0),
-              tokenSymbol: n.tokenSymbol,
-            }));
-        } else {
-          // Scan for each token in parallel — each announcement is tried against all token IDs
-          scanned = [];
-          const seenLeaves = new Set<number>(); // Deduplicate across tokens
-          for (const { symbol, tokenId } of tokensToScan) {
-            const results = isViewOnly && viewOnlyKeys
-              ? await scanAnnouncementsViewOnly(viewOnlyKeys, announcements, tokenId)
-              : await scanUnifiedNotes(keys!, announcements, tokenId);
-            for (const note of results) {
-              if (!seenLeaves.has(note.leafIndex)) {
-                seenLeaves.add(note.leafIndex);
-                scanned.push({ ...note, tokenSymbol: symbol } as ScannedWithToken);
-              }
-            }
-          }
+        if (announcements.length > 0) {
+          const fresh = await scanByTokenPlan(
+            planTokenScan(env, announcements),
+            (rows, tokenId) => isViewOnly && viewOnlyKeys
+              ? scanAnnouncementsViewOnly(viewOnlyKeys, rows, tokenId)
+              : scanUnifiedNotes(keys!, rows, tokenId),
+            new Set(scanned.map((n) => n.leafIndex)),
+          );
+          scanned.push(...(fresh as ScannedWithToken[]));
         }
+        // Advanced only once the scan results are in state (below) — an error in
+        // between would otherwise skip this range forever.
+        const nextScannedLeafIndex = announcements.reduce(
+          (max, ann) => Math.max(max, ann.leafIndex),
+          lastScannedLeafIndex,
+        );
 
         // Check which notes are spent via backend batch nullifier API (use proxy)
         const backendUrl = "";
@@ -807,6 +810,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
           inboxHasLoaded: true,
           ...(landed ? { fastRefreshUntil: 0 } : {}),
         });
+        lastScannedLeafIndex = nextScannedLeafIndex;
       } catch (err) {
         console.error("[UTXOpia] Inbox error:", err);
         set({

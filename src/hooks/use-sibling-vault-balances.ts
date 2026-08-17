@@ -11,8 +11,6 @@ import {
   computeNullifierHashForNote,
   createStealthMetaAddress,
   encodeStealthMetaAddress,
-  UTXOpiaClient,
-  type ScannedNote,
 } from "@utxopia/sdk";
 import { useChainEnvironment, type ChainEnvironment } from "@/lib/chain-environment";
 import { getNetworkConfig, type NetworkId } from "@/lib/network-config";
@@ -22,9 +20,8 @@ import {
   vaultsSupported,
   type VaultId,
 } from "@/lib/vault-config";
-import { fetchInboxSource } from "@/lib/chain-inbox";
+import { fetchInboxSource, planTokenScan, scanByTokenPlan } from "@/lib/chain-inbox";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
-import { VAULT_TOKENS } from "@/lib/supported-tokens";
 import { loadWarmVaultKeys, useUTXOpiaStore, type InboxNote } from "@/stores/utxopia-store";
 
 export type SiblingVaultStatus =
@@ -56,29 +53,6 @@ export function sumUnspentByToken(
       (balances[note.tokenSymbol] ?? 0n) + BigInt(note.amount ?? 0);
   }
   return balances;
-}
-
-/** Scan targets for the sibling vault. The shared helper reads the ACTIVE
- *  vault's zkBTC mint from the client config, which is wrong here — each
- *  vault has its own mint, so resolve zkBTC from the sibling env instead. */
-function siblingScanTargets(env: ChainEnvironment): Array<{ symbol: string; tokenId: bigint }> {
-  const client = UTXOpiaClient.instance();
-  const targets: Array<{ symbol: string; tokenId: bigint }> = [];
-  const seen = new Set<string>();
-  for (const token of VAULT_TOKENS) {
-    const mint = token.mint || (token.symbol === "zkBTC" ? env.config.tokens.zkbtcMint : "");
-    if (!mint) continue;
-    try {
-      const tokenId = client.getTokenId(mint);
-      const key = tokenId.toString(16);
-      if (seen.has(key)) continue;
-      seen.add(key);
-      targets.push({ symbol: token.shieldedSymbol, tokenId });
-    } catch {
-      // Malformed mint — skip.
-    }
-  }
-  return targets;
 }
 
 /** Encoded receive address of the sibling vault's identity, from the warm key
@@ -176,17 +150,13 @@ async function scanSibling(
       };
 
       const source = await fetchInboxSource(env);
-
-      const scanned: Array<ScannedNote & { tokenSymbol: string }> = [];
-      const seenLeaves = new Set<number>();
-      for (const { symbol, tokenId } of siblingScanTargets(env)) {
-        const results = await scanUnifiedNotes(keys, source.announcements, tokenId);
-        for (const note of results) {
-          if (seenLeaves.has(note.leafIndex)) continue;
-          seenLeaves.add(note.leafIndex);
-          scanned.push({ ...note, tokenSymbol: symbol });
-        }
-      }
+      // The plan resolves zkBTC from the env passed here, not the active SDK
+      // config — each vault mints its own, so the sibling would otherwise be
+      // scanned for the wrong one.
+      const scanned = await scanByTokenPlan(
+        planTokenScan(env, source.announcements),
+        (rows, tokenId) => scanUnifiedNotes(keys, rows, tokenId),
+      );
 
       // Both vaults share one program, so nullifier PDAs are program-global —
       // but the backend indexes them per pool, so this must ask for the

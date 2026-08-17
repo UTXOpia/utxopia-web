@@ -14,7 +14,8 @@ import { getBackendUrl } from "@/lib/api/constants";
 import type { NetworkId } from "@/lib/network-config";
 import {
   fetchInboxSource,
-  getTokenScanTargets,
+  planTokenScan,
+  scanByTokenPlan,
 } from "@/lib/chain-inbox";
 import {
   ensureChainEnvironment,
@@ -59,20 +60,12 @@ export async function scanSecretPhrase(
   const inboxSource = await fetchInboxSource(env);
   const announcements = inboxSource.announcements;
 
-  // Claim links can hold any supported shielded token. Scan every configured
-  // token id, then deduplicate by leaf because a note can only match one token.
-  const scannedNotes: Array<
-    Awaited<ReturnType<typeof scanUnifiedNotes>>[number] & { tokenSymbol: string }
-  > = [];
-  const seenLeaves = new Set<number>();
-  for (const { symbol, tokenId } of getTokenScanTargets(env, announcements)) {
-    const matches = await scanUnifiedNotes(keys, announcements, tokenId);
-    for (const note of matches) {
-      if (seenLeaves.has(note.leafIndex)) continue;
-      seenLeaves.add(note.leafIndex);
-      scannedNotes.push({ ...note, tokenSymbol: symbol });
-    }
-  }
+  // Claim links can hold any supported shielded token, so the scan is planned
+  // per token id and deduplicated by leaf — a note can only match one token.
+  const scannedNotes = await scanByTokenPlan(
+    planTokenScan(env, announcements),
+    (rows, tokenId) => scanUnifiedNotes(keys, rows, tokenId),
+  );
 
   if (scannedNotes.length === 0) {
     throw new Error(

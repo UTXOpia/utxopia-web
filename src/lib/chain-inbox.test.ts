@@ -92,4 +92,24 @@ describe("fetchInboxSource", () => {
     expect(source.announcements[0].blockTime).toBe(1_700_000_000);
     expect(source.announcements[0].slot).toBe(123);
   });
+
+  it("asks the backend only for announcements above the scanned mark", async () => {
+    mockFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({ success: true, announcements: [] }),
+    } as any);
+
+    await fetchInboxSource(
+      {
+        networkId: "devnet-regtest",
+        vaultId: "open",
+        config: getNetworkConfig("devnet-regtest", { applyEnvOverrides: false }),
+      },
+      41,
+    );
+
+    expect(mockFetch.mock.calls[0][0]).toBe(
+      "/api/announcements?network=devnet-regtest&vault=open&since=41",
+    );
+  });
 });
