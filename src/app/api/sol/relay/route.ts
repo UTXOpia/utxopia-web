@@ -57,6 +57,27 @@ import { isNativeSolMint } from "@/lib/solana/native-sol";
 import { resolvePolicyApproval } from "@/lib/server/policy-coordinator";
 import { resolveRegisteredExits } from "@/lib/server/exit-registry";
 import { describeProgramError } from "@/lib/program-error";
+
+export const runtime = "nodejs";
+/**
+ * Four sequential round trips to the chain — buffer create, proof upload, main
+ * transaction, buffer close — plus confirmation waits. Vercel's default cap is
+ * short enough that a slow RPC gets the function killed mid-submit, which the
+ * client can only report as a generic failure.
+ */
+export const maxDuration = 60;
+
+/**
+ * Errors from this route can carry the relayer pubkey and the keyed RPC URL.
+ * Strip those and keep the rest: the shape of the failure is what makes a
+ * report actionable, and hiding it entirely is why a 500 here was a dead end.
+ */
+function sanitizeErrorMessage(message: string): string {
+  return message
+    .replace(/https?:\/\/[^\s"')]+/g, "<rpc>")
+    .replace(/\b[1-9A-HJ-NP-Za-km-z]{32,44}\b/g, "<key>")
+    .slice(0, 300);
+}
 export const dynamic = "force-dynamic";
 
 // =============================================================================
@@ -551,7 +572,7 @@ export async function POST(request: NextRequest) {
         success: false,
         error: isDevEnv
           ? rawMessage
-          : describeProgramError(rawMessage) ?? "Transaction failed",
+          : describeProgramError(rawMessage) ?? sanitizeErrorMessage(rawMessage),
         logs: logs ?? undefined,
       },
       { status: 500 }
