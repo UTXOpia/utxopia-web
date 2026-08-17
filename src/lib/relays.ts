@@ -58,6 +58,50 @@ const BUILTIN_RELAYS: Record<string, SerializableRelay[]> = {
 };
 
 /**
+ * Ensure a relay URL carries both placeholders.
+ *
+ * `{vault}` is not cosmetic: a relay URL that omits it submits against the
+ * Open pool whatever vault the member is actually spending from, and the
+ * mismatch surfaces as a bogus rejection rather than as a wrong-pool error.
+ */
+export function normalizeRelayUrlTemplate(url: string): string {
+  let out = url.trim();
+  for (const [placeholder, param] of [["{network}", "network"], ["{vault}", "vault"]] as const) {
+    if (out.includes(placeholder)) continue;
+    out += `${out.includes("?") ? "&" : "?"}${param}=${placeholder}`;
+  }
+  return out;
+}
+
+/**
+ * Deployment-configured relays, highest priority first.
+ *
+ * `NEXT_PUBLIC_RELAY_URLS` is a comma-separated list of `Name|URL` (the name is
+ * optional). It exists so a deployment can point spends at its own relay — one
+ * running beside the backend, say — without every member adding it by hand. The
+ * same-origin built-in stays in the list behind these, so an unreachable
+ * configured relay fails over rather than taking spends down.
+ */
+function envRelays(chainKey: string): SerializableRelay[] {
+  if (chainKey !== "sol") return [];
+  const raw = process.env.NEXT_PUBLIC_RELAY_URLS;
+  if (!raw) return [];
+
+  return raw
+    .split(",")
+    .map((entry) => entry.trim())
+    .filter(Boolean)
+    .map((entry, index) => {
+      const separator = entry.indexOf("|");
+      const hasName = separator > 0;
+      const name = hasName ? entry.slice(0, separator).trim() : `Configured relay ${index + 1}`;
+      const url = hasName ? entry.slice(separator + 1).trim() : entry;
+      return { id: `env-${index}`, name, urlTemplate: normalizeRelayUrlTemplate(url) };
+    })
+    .filter((relay) => relay.urlTemplate.length > 0);
+}
+
+/**
  * Normalize the app's chain id ("solana", from `config.chain`) to the
  * registry/API key ("sol"). Accepts either form so callers using either
  * convention resolve correctly.
@@ -73,9 +117,10 @@ function relayChainKey(chainId: string): string {
  * Seam for future: replace body with a fetch from on-chain registry or remote API.
  */
 export function getBuiltinRelays(chainId: string): RelayConfig[] {
-  return (BUILTIN_RELAYS[relayChainKey(chainId)] ?? []).map(serializableToConfig);
+  return getBuiltinRelaysSerializable(chainId).map(serializableToConfig);
 }
 
 export function getBuiltinRelaysSerializable(chainId: string): SerializableRelay[] {
-  return BUILTIN_RELAYS[relayChainKey(chainId)] ?? [];
+  const key = relayChainKey(chainId);
+  return [...envRelays(key), ...(BUILTIN_RELAYS[key] ?? [])];
 }

@@ -15,7 +15,7 @@
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
 import type { RelayHealth } from "@/lib/relay-health";
-import type { SerializableRelay } from "@/lib/relays";
+import { normalizeRelayUrlTemplate, type SerializableRelay } from "@/lib/relays";
 
 interface RelayStoreState {
   /** "auto" = auto-select via resolveAutoRelay; any other string = pinned relay id. */
@@ -45,7 +45,9 @@ export const useRelayStore = create<RelayStoreState>()(
         const relay: SerializableRelay = {
           id,
           name,
-          urlTemplate: url.includes("{network}") ? url : `${url}?network={network}`,
+          // Shared with the env-configured relays: a template missing {vault}
+          // silently submits against the Open pool.
+          urlTemplate: normalizeRelayUrlTemplate(url),
           custom: true,
         };
         set((state) => ({ customRelays: [...state.customRelays, relay] }));
