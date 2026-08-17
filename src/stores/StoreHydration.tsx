@@ -60,6 +60,7 @@ export function StoreHydration(): JSX.Element {
   const envIdentity = `${networkId}:${vaultId}`;
   const lastEnvIdentityRef = useRef(envIdentity);
   const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
+  const rescopeVaultSeed = useUTXOpiaStore((s) => s.rescopeVaultSeed);
   const setIdentityRestoring = useUTXOpiaStore((s) => s.setIdentityRestoring);
   useEffect(() => {
     if (lastEnvIdentityRef.current !== envIdentity) {
@@ -71,8 +72,15 @@ export function StoreHydration(): JSX.Element {
       // otherwise swap the balance for the "Create private vault" hero mid-switch.
       setIdentityRestoring(true);
       clearKeys(undefined, { keepSession: true });
+      // An envelope member carries one root that covers every scope, so the new
+      // pool's identity is a derivation away rather than another Face ID. Falls
+      // through to the passkey hydration below when there is no root — a
+      // legacy identity, or a session that never unlocked one.
+      void rescopeVaultSeed().then((rescoped) => {
+        if (rescoped) setIdentityRestoring(false);
+      });
     }
-  }, [envIdentity, clearKeys, setIdentityRestoring]);
+  }, [envIdentity, clearKeys, rescopeVaultSeed, setIdentityRestoring]);
 
   useEffect(() => {
     if (hasAnyKeys) setIdentityRestoring(false);

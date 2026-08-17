@@ -10,6 +10,7 @@ import {
   unlockWithDevice,
   unlockWithRecoveryString,
   verifyRecoveryString,
+  workingSeedFor,
   type VaultScope,
 } from "@/lib/vault-identity";
 import {
@@ -385,6 +386,9 @@ interface UTXOpiaState {
   /** Drop this browser's wrapping. Distinct from logging out: after this the
    *  recovery string is the only way back in, on any device. */
   forgetVaultOnThisDevice: () => Promise<void>;
+  /** Re-derive the working identity for the active scope from the root already
+   *  in memory. Returns false when there is no root to work from. */
+  rescopeVaultSeed: () => Promise<boolean>;
   /** Open a fast-poll window (default 2 minutes). */
   expectInboxSoon: (ms?: number) => void;
   refreshInbox: (connection?: Connection, force?: boolean) => Promise<void>;
@@ -705,7 +709,11 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       error: null,
       hasKeys: false,
       isImportedSession: false,
-      vaultSeed: null,
+      // A vault switch is not a sign-out. One root seed serves every scope —
+      // each derives its own working identity — so keeping it across the switch
+      // is what lets the member move between pools without a second Face ID,
+      // the way the passkey path has always warmed both at once.
+      ...(opts?.keepSession ? {} : { vaultSeed: null }),
       inboxNotes: [],
       inboxTotalSats: 0n,
       inboxBalancesByToken: {},
@@ -791,6 +799,15 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     if (!metaAddress) throw new Error("Unlock your vault first.");
     const { scope } = await envelopeContext();
     await verifyRecoveryString({ scope, recoveryString, passphrase, metaAddress });
+  },
+
+  rescopeVaultSeed: async () => {
+    const root = get().vaultSeed;
+    if (!root) return false;
+    const { scope } = await envelopeContext();
+    await envelopeMetaAddressFor(await workingSeedFor(root, scope));
+    await adoptSeedIntoSession(set, root);
+    return true;
   },
 
   forgetVaultOnThisDevice: async () => {
