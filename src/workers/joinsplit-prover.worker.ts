@@ -1,5 +1,8 @@
 import type { JoinSplitProofInputs, ProofData } from "@utxopia/sdk";
-import { preloadJoinSplitArtifacts } from "@/lib/prover/circuit-artifacts";
+import {
+  assertJoinSplitArtifactsVerified,
+  preloadJoinSplitArtifacts,
+} from "@/lib/prover/circuit-artifacts";
 
 type WorkerRequest =
   | { id: number; type: "init"; circuitPath?: string }
@@ -66,6 +69,13 @@ self.onmessage = async (event: MessageEvent<WorkerRequest>) => {
       return;
     }
 
+    // Preloading is a separate message, so it cannot be assumed to have run: verify here too,
+    // before the witness generator ever sees a spending key. Already-checked bytes are cached.
+    await assertJoinSplitArtifactsVerified(
+      circuitPath || "/circuits/groth16",
+      event.data.inputs.nInputs,
+      event.data.inputs.nOutputs,
+    );
     const proof = await mod.generateJoinSplitProof(event.data.inputs);
     const proofBytes = mod.proofToBytes(proof);
     self.postMessage({

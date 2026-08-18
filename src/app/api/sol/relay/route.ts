@@ -196,6 +196,14 @@ export async function POST(request: NextRequest) {
   if (limited) return limited;
 
   const startTime = Date.now();
+  // Set once the ChadBuffer exists on-chain; cleared when it is closed. Read by the failure
+  // path so a rejected relay does not strand its rent.
+  let openBuffer: PublicKey | null = null;
+  let cleanup: {
+    connection: Connection;
+    relayer: Keypair;
+    chadbufferProgramId: PublicKey;
+  } | null = null;
 
   try {
     const requestedNetwork = request.nextUrl.searchParams.get("network") as NetworkId | null
@@ -260,6 +268,8 @@ export async function POST(request: NextRequest) {
     const connection = new Connection(cfg.solana.rpcUrl, "confirmed");
     const programId = new PublicKey(cfg.solana.utxopiaProgramId);
     const chadbufferProgramId = new PublicKey(cfg.solana.chadbufferId);
+    // Hoisted so the failure path can close a buffer this request opened.
+    cleanup = { connection, relayer, chadbufferProgramId };
     const zkbtcMint = new PublicKey(cfg.tokens.zkbtcMint);
 
     // ── Parse common hex fields ────────────────────────────────────────
@@ -299,7 +309,12 @@ export async function POST(request: NextRequest) {
     }
 
     // ── Upload proof to ChadBuffer ─────────────────────────────────────
+    // This is the first step that spends relayer SOL, and it happens before the proof has been
+    // checked by anything. Track the buffer so the failure path can reclaim its rent: without
+    // that, every rejected proof leaves a funded account behind for good, which turns "submit
+    // garbage" into a drain that rate limiting only slows down.
     const { bufferPubkey } = await uploadDataToBuffer(connection, relayer, proofBytes, chadbufferProgramId, "Relay");
+    openBuffer = bufferPubkey;
 
     // ── Build instruction data + accounts (per mode) ───────────────────
     let ixData: Uint8Array;
@@ -541,6 +556,7 @@ export async function POST(request: NextRequest) {
     // Close buffer and reclaim rent
     try {
       await closeBuffer(connection, relayer, bufferPubkey, chadbufferProgramId, "Relay");
+      openBuffer = null;
     } catch (closeErr) {
       console.warn("[Relay] Failed to close buffer (non-critical):", closeErr);
     }
@@ -557,6 +573,21 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("[Relay] Error:", error);
+    // Reclaim the proof buffer's rent on the failure path too. A rejected proof should cost the
+    // relayer transaction fees, not a permanently funded account per attempt.
+    if (openBuffer && cleanup) {
+      try {
+        await closeBuffer(
+          cleanup.connection,
+          cleanup.relayer,
+          openBuffer,
+          cleanup.chadbufferProgramId,
+          "Relay/cleanup",
+        );
+      } catch (closeErr) {
+        console.warn("[Relay] Failed to reclaim buffer after error:", closeErr);
+      }
+    }
     const errObj = error as Record<string, unknown> | null;
     const logs = (errObj && 'logs' in errObj ? errObj.logs : null)
       ?? (errObj && 'transactionError' in errObj ? (errObj.transactionError as Record<string, unknown>)?.logs : null)

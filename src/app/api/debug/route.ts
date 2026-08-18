@@ -28,7 +28,26 @@ function timeoutSignal(ms: number): AbortSignal {
   return controller.signal;
 }
 
+/**
+ * Off unless explicitly switched on. Unauthenticated, this hands any visitor the backend host,
+ * an env-var presence map, their raw cookie header, and — because it probes the backend and
+ * echoes the response — a server-side request forwarder that exposes internal responses. None
+ * of that is worth leaving reachable on a public deployment for the sake of a diagnostic.
+ *
+ * Set `DEBUG_ENDPOINT_TOKEN` and pass it as `x-debug-token` to use it against a live deploy.
+ */
+function debugAccessAllowed(request: Request): boolean {
+  const token = process.env.DEBUG_ENDPOINT_TOKEN;
+  if (token) return request.headers.get("x-debug-token") === token;
+  return process.env.NODE_ENV !== "production";
+}
+
 export async function GET(request: Request) {
+  if (!debugAccessAllowed(request)) {
+    // 404 rather than 403: do not confirm the route exists.
+    return new NextResponse("Not Found", { status: 404 });
+  }
+
   const cookieHeader = request.headers.get("cookie");
   const parsed = parseNetworkCookie(cookieHeader);
   const fromRequest = detectNetworkFromRequest(request);

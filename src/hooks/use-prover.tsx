@@ -10,7 +10,10 @@
 import { useRef, useState, useCallback } from "react";
 import type { JoinSplitProofInputs, ProofData } from "@utxopia/sdk";
 import { resolveCircuitPath } from "@/lib/prover/circuit-path";
-import { preloadJoinSplitArtifacts } from "@/lib/prover/circuit-artifacts";
+import {
+  assertJoinSplitArtifactsVerified,
+  preloadJoinSplitArtifacts,
+} from "@/lib/prover/circuit-artifacts";
 
 const circuitPath = resolveCircuitPath(process.env.NEXT_PUBLIC_CIRCUIT_CDN_URL);
 const PROVER_WORKER_TIMEOUT_MS = 120_000;
@@ -173,6 +176,9 @@ export function useProver(): ProverState {
           setProgress(null);
           return { proof: result.proof, proofBytes: result.proofBytes };
         }
+        // Same guard as the worker path: never hand a spending key to a witness generator
+        // whose bytes have not been matched against the digest committed in this build.
+        await assertJoinSplitArtifactsVerified(circuitPath, inputs.nInputs, inputs.nOutputs);
         const { generateJoinSplitProof, proofToBytes } = await loadBrowserProver();
         const proof = await generateJoinSplitProof(inputs);
         const bytes = proofToBytes(proof);

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { ArrowLeft, FileCheck, Upload, Check, X, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { resolveCircuitPath } from "@/lib/prover/circuit-path";
+import { assertArtifactDigest } from "@/lib/prover/circuit-artifacts";
 
 /**
  * In-browser Groth16 proof verifier.
@@ -77,7 +78,12 @@ export default function VerifyProofPage() {
           `or run \`bash circuits/scripts/build-aux.sh ${circuit}\` then copy the vkey to web/public/circuits/groth16/`,
       );
     }
-    return resp.json();
+    // This page exists to tell an auditor whether a proof is genuine, so the key it checks
+    // against cannot itself be whatever the CDN felt like serving — a swapped vkey turns a
+    // green "verified" into a lie. Match it to the digest committed in this build.
+    const bytes = await resp.arrayBuffer();
+    await assertArtifactDigest(`${circuit}/${circuit}.vkey.json`, bytes);
+    return JSON.parse(new TextDecoder().decode(bytes));
   }
 
   async function handleVerify() {

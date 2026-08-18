@@ -115,9 +115,13 @@ function addSecurityHeaders(response: NextResponse) {
     "wss://api.mainnet-beta.solana.com",
     "https://mempool.space",
     "wss://mempool.space",
-    "https://*.amidoggy.xyz",
-    // utxopia.com subdomains: api (prod), api-hybrid (devnet+regtest), btc (regtest esplora)
-    "https://*.utxopia.com",
+    // Named hosts, not `*.utxopia.com`. A wildcard here trusts every subdomain the org will
+    // ever have, including one lost to a dangling DNS record — and this is the page that holds
+    // spending keys, so an allowed origin is an exfiltration route. Add hosts deliberately.
+    "https://api.utxopia.com",          // prod backend
+    "https://api-hybrid.utxopia.com",   // devnet + regtest backend
+    "https://btc.utxopia.com",          // regtest esplora
+    "https://circuit.utxopia.com",      // circuit artifact CDN
     circuitOrigin,
   ]
     .filter(Boolean)
