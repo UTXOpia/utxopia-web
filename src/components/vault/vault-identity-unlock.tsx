@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { AlertCircle, KeyRound, Loader2 } from "lucide-react";
+import { KeyRound, Loader2 } from "lucide-react";
 import { AuthModal } from "@/components/auth-modal";
 import { useUTXOpia } from "@/hooks/use-utxopia";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { isDevSignerEnabled } from "@/lib/dev-signer/enabled";
 import { cn } from "@/lib/utils";
 
 /**
@@ -21,37 +20,17 @@ import { cn } from "@/lib/utils";
  * the account. An envelope vault derives every pool from one root, so there is
  * nothing to unlock per pool — there is only "do you have a vault yet", and the
  * sign-in modal is the one place that knows every way to answer it.
- *
- * ponytail: the wallet-signature path survives under DEV_SIGNER only. The e2e
- * runs mint their identity by clicking this, and moving them onto an envelope
- * would change which identity they land on and orphan the devnet notes already
- * sitting under the old one. Delete the branch once those runs create a vault
- * of their own.
  */
 export function VaultIdentityUnlock({ className }: { className?: string }) {
-  const { keys, deriveKeys, isLoading } = useUTXOpia();
+  const { keys, isLoading } = useUTXOpia();
   const { vaultId } = useChainEnvironment();
-  const [error, setError] = useState<string | null>(null);
   const [authOpen, setAuthOpen] = useState(false);
-  const devSigner = isDevSignerEnabled();
 
   // The wallet gate is the caller's business — this renders only when there is
   // a wallet but no identity for the pool in front of us.
   if (keys) return null;
 
   const label = vaultId === "verified" ? "Verified" : "Open";
-
-  const unlock = async () => {
-    if (!devSigner) return setAuthOpen(true);
-    setError(null);
-    try {
-      await deriveKeys();
-    } catch (caught) {
-      setError(
-        caught instanceof Error ? caught.message : "Could not unlock this vault — try again.",
-      );
-    }
-  };
 
   return (
     <div className={cn("rounded-[12px] border border-privacy/25 bg-privacy/5 p-4", className)}>
@@ -64,16 +43,9 @@ export function VaultIdentityUnlock({ className }: { className?: string }) {
         once covers both.
       </p>
 
-      {error && (
-        <div className="mt-3 flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
-          <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
-          <span className="text-caption text-red-400">{error}</span>
-        </div>
-      )}
-
       <button
         type="button"
-        onClick={unlock}
+        onClick={() => setAuthOpen(true)}
         disabled={isLoading}
         data-testid="vault-identity-unlock"
         className={cn(
@@ -83,12 +55,10 @@ export function VaultIdentityUnlock({ className }: { className?: string }) {
         )}
       >
         {isLoading ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <KeyRound className="h-4 w-4" aria-hidden />}
-        {isLoading ? "Waiting for your signature\u2026" : `Open ${label} vault`}
+        {isLoading ? "Opening\u2026" : `Open ${label} vault`}
       </button>
 
-      {!devSigner && (
-        <AuthModal open={authOpen} onOpenChange={setAuthOpen} auth={{ error: null }} />
-      )}
+      <AuthModal open={authOpen} onOpenChange={setAuthOpen} auth={{ error: null }} />
     </div>
   );
 }

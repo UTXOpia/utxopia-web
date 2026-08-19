@@ -397,26 +397,36 @@ function clickWhenEnabled(testid: string, totalMs = 30000): void {
   ab("find", "testid", testid, "click");
 }
 
-/** Unlock this pool's private identity, if the page is gating on it.
+/** Wait for the dev signer's identity to land, if the page is gating on it.
  *
- *  The identity is per-pool and is *derived at first unlock* from a wallet
- *  signature — hydration can only restore one that already exists, so a fresh
- *  browser profile always meets this wall. Until it clears, the amount field
- *  never mounts and the submit button stays disabled, which reads exactly like
- *  a hung proof: the run then waits out the success selector for nothing.
+ *  DevSigner derives both pools from the injected seed (`void
+ *  loginDevIdentity`, DevSigner.tsx) in a promise nobody awaits, so this gate
+ *  is a race to wait out, not a wall to click through. A cold start loses it
+ *  because the first WASM/SDK load widens the window.
  *
- *  The component unmounts once keys exist, so a miss here means "already
- *  unlocked" and is not an error. The dev adapter implements signMessage, so
- *  the signature is granted without a prompt.
+ *  This used to click the gate. That was worse than useless: the button then
+ *  derived an identity from a *wallet signature*, which is a different account
+ *  from the one the seed produces — a lost race silently switched which vault
+ *  the rest of the run deposited into. The button now opens the sign-in modal,
+ *  which a headless run cannot answer at all.
+ *
+ *  The gate unmounts once keys exist, so an immediate miss means "already
+ *  there" and is the normal case.
  */
-function unlockVaultIdentity(): void {
-  try {
-    ab("find", "testid", "vault-identity-unlock", "click");
-  } catch {
-    return; // No gate on screen — this pool's identity is already unlocked.
+function awaitVaultIdentity(totalMs = 60000): void {
+  const sel = '[data-testid="vault-identity-unlock"]';
+  const deadline = Date.now() + totalMs;
+  let waited = false;
+  while (ab("eval", `!!document.querySelector(${JSON.stringify(sel)})`).includes("true")) {
+    if (Date.now() > deadline) {
+      throw new Error(`the dev identity never landed within ${totalMs}ms — deposit is unreachable`);
+    }
+    if (!waited) {
+      console.log("  → Waiting for the pool's private identity…");
+      waited = true;
+    }
+    ab("wait", "2000");
   }
-  console.log("  → Unlocking the pool's private identity…");
-  ab("wait", "6000");
 }
 
 /** Pick a token in the ShieldFlow dropdown. The trigger and each option carry
@@ -489,7 +499,7 @@ async function stepShield(chain: ChainConfig, keys: DevKeys, amount: string): Pr
   // The dropdown defaults to BTC; the token loop runs on SOL.
   selectToken(SHIELD_TOKEN);
 
-  unlockVaultIdentity();
+  awaitVaultIdentity();
 
   // Amount + submit only render once the dev wallet is connected, which the
   // seeded `walletName` handles during injectDevKeysViaStorage.

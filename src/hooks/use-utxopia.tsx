@@ -20,17 +20,6 @@ export function useUTXOpia() {
   const store = useUTXOpiaStore();
   const refreshInboxAction = store.refreshInbox;
 
-  // Wrap deriveKeys to automatically use wallet
-  const deriveKeys = useCallback(async () => {
-    if (!wallet.connected || !wallet.signMessage || !wallet.publicKey) {
-      return;
-    }
-    await store.deriveKeys({
-      publicKey: wallet.publicKey,
-      signMessage: wallet.signMessage,
-    });
-  }, [wallet.connected, wallet.signMessage, wallet.publicKey, store]);
-
   // Wrap refreshInbox to automatically use connection
   const refreshInbox = useCallback(async (_conn?: unknown, force?: boolean) => {
     await refreshInboxAction(connection, force);
@@ -56,7 +45,6 @@ export function useUTXOpia() {
     stealthAddressEncoded: store.stealthAddressEncoded,
     isLoading: store.isLoading,
     error: store.error,
-    deriveKeys,
     clearKeys: store.clearKeys,
     hasKeys: store.hasKeys,
     isWalletConnected: wallet.connected,
@@ -88,7 +76,6 @@ export function useUTXOpiaKeys() {
     stealthAddressEncoded: ctx.stealthAddressEncoded,
     isLoading: ctx.isLoading,
     error: ctx.error,
-    deriveKeys: ctx.deriveKeys,
     clearKeys: ctx.clearKeys,
     hasKeys: ctx.hasKeys,
     isWalletConnected: ctx.isWalletConnected,

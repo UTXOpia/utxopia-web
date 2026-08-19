@@ -357,10 +357,6 @@ interface UTXOpiaState {
 
   // Actions
   initPoseidon: () => Promise<void>;
-  deriveKeys: (wallet: {
-    publicKey: PublicKey;
-    signMessage: (message: Uint8Array) => Promise<Uint8Array>;
-  }) => Promise<void>;
   hydrateKeys: (walletPubkey: PublicKey) => Promise<boolean>;
   deriveKeysFromPasskeySeed: (seed: Uint8Array, networkId?: NetworkId) => Promise<void>;
   hydratePasskeyKeys: (networkId?: NetworkId) => Promise<boolean>;
@@ -441,72 +437,6 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       set({ isPoseidonReady: true });
     } catch (err) {
       console.error("[UTXOpia] Failed to init:", err);
-    }
-  },
-
-  deriveKeys: async (wallet) => {
-    set({ isLoading: true, error: null });
-
-    try {
-      await ensureChainEnvironment();
-      const client = UTXOpiaClient.instance();
-      const vaultId = detectVault();
-      const walletPubkey = wallet.publicKey.toBase58();
-      const login = vaultId === "open"
-        ? await client.loginWithWallet({
-          publicKey: wallet.publicKey,
-          signMessage: wallet.signMessage,
-        })
-        : await (async () => {
-            const signature = await wallet.signMessage(
-              new TextEncoder().encode(
-                `utxopia:vault-identity:v1:${detectNetwork()}:${vaultId}`,
-              ),
-            );
-            const seed = new Uint8Array(
-              await crypto.subtle.digest("SHA-256", signature as BufferSource),
-            );
-            return client.loginWithSeed(seed);
-          })();
-      const {
-        keys: derivedKeys,
-        stealthAddress: meta,
-        stealthAddressEncoded: encoded,
-      } = login;
-
-      // Persist encrypted under a wallet-signature secret (unlocks the session).
-      const unlockSecret = await wallet.signMessage(
-        new TextEncoder().encode("utxopia:storage-unlock:v1"),
-      );
-      await persistKeys(walletStorageOwner(walletPubkey, vaultId), unlockSecret);
-
-      set({
-        keys: derivedKeys,
-        stealthAddress: meta,
-        stealthAddressEncoded: encoded,
-        hasKeys: true,
-        isLoading: false,
-      });
-    } catch (err) {
-      if (err instanceof Error) {
-        const isUserRejection =
-          err.name === "WalletSignMessageError" ||
-          err.message.includes("User rejected") ||
-          err.message.includes("user rejected");
-
-        if (isUserRejection) {
-          set({ isLoading: false });
-          return;
-        }
-
-        if (err.message.includes("Internal JSON-RPC")) {
-          set({ error: "Wallet error - please try reconnecting", isLoading: false });
-        } else {
-          set({ error: err.message, isLoading: false });
-        }
-      } else {
-        set({ error: "Failed to derive keys", isLoading: false });
-      }
     }
   },
 
@@ -1131,7 +1061,6 @@ export function useUTXOpiaKeys() {
     stealthAddressEncoded: store.stealthAddressEncoded,
     isLoading: store.isLoading,
     error: store.error,
-    deriveKeys: store.deriveKeys,
     clearKeys: store.clearKeys,
     hasKeys: store.hasKeys,
   };

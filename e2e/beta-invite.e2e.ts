@@ -422,21 +422,22 @@ function stepDeposit(devKeys: DevKeys): void {
   openWithKeys(appUrl("/vault/deposit"), devKeys);
   waitForText("Add funds", 30_000);
 
-  // A pool's private identity is derived at first unlock, not restored by
-  // hydration, so the wallet that just redeemed does not have one yet. Every
-  // real member meets this on exactly this screen; the run has to walk it too,
-  // or DEPOSIT fails as a mystery timeout on a greyed-out button.
-  const needsUnlock = () =>
+  // DevSigner derives both pools from the injected seed in a promise nobody
+  // awaits, so this gate is a race to wait out rather than a wall to click
+  // through. Clicking it now opens the sign-in modal, which a headless run
+  // cannot answer — and the old fallback was worse than useless: it derived
+  // from a wallet signature, a different account from the one the seed
+  // produces, so a lost race silently changed which vault this deposited into.
+  const needsIdentity = () =>
     evalJson<boolean>(`!!document.querySelector('[data-testid=vault-identity-unlock]')`);
-  if (needsUnlock()) {
-    console.log("  … unlocking the Verified identity (first time in this pool)");
-    clickTestId("vault-identity-unlock");
+  if (needsIdentity()) {
+    console.log("  … waiting for the Verified identity to land");
     for (let attempt = 0; ; attempt++) {
       sleep(3000);
-      if (!needsUnlock()) break;
-      if (attempt >= 20) throw new Error("the Verified identity never unlocked — deposit is unreachable");
+      if (!needsIdentity()) break;
+      if (attempt >= 20) throw new Error("the dev identity never landed — deposit is unreachable");
     }
-    console.log("  ✓ identity unlocked");
+    console.log("  ✓ identity ready");
   }
 
   clickTestId("token-selector-trigger");
