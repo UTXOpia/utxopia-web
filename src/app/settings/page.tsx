@@ -3,6 +3,7 @@
 import { Settings as SettingsIcon } from "lucide-react";
 import { FlowPageLayout } from "@/components/ui/flow-page-layout";
 import { PreferencesForm } from "@/components/settings/preferences-form";
+import { LoginSection } from "@/components/settings/login-section";
 import { RecoverySection } from "@/components/settings/recovery-section";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hrefWithChain } from "@/lib/network-config";
@@ -28,6 +29,7 @@ export default function SettingsPage() {
     >
       <div className="flex flex-col gap-8">
         <PreferencesForm />
+        <LoginSection />
         <RecoverySection />
       </div>
     </FlowPageLayout>

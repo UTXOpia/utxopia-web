@@ -2,7 +2,7 @@
 
 import { useCallback, useMemo } from "react";
 import type { ReactNode } from "react";
-import { PrivyProvider, useLogin, usePrivy } from "@privy-io/react-auth";
+import { PrivyProvider, useLogin, useLogout, usePrivy } from "@privy-io/react-auth";
 import {
   toSolanaWalletConnectors,
   useCreateWallet,
@@ -39,8 +39,9 @@ function findEmbeddedWallet(wallets: ConnectedStandardSolanaWallet[]) {
 }
 
 function PrivySolanaBridge({ children }: { children: ReactNode }) {
-  const { ready: privyReady, authenticated } = usePrivy();
+  const { ready: privyReady, authenticated, user } = usePrivy();
   const { login } = useLogin();
+  const { logout } = useLogout();
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
@@ -109,6 +110,19 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     [signMessage, wallets],
   );
 
+  // Whatever the member would recognise. Privy links several account types and
+  // any of them can be the one they remember signing in with.
+  const accountLabel = useMemo(() => {
+    if (!user) return null;
+    return (
+      user.email?.address ??
+      user.google?.email ??
+      user.farcaster?.username ??
+      user.wallet?.address ??
+      null
+    );
+  }, [user]);
+
   const value = useMemo<PrivySolanaAuthority>(
     () => ({
       enabled: true,
@@ -119,6 +133,8 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       ensureWallet,
       signTransaction: signPrivyTransaction,
       signMessage: signPrivyMessage,
+      accountLabel,
+      logout,
     }),
     [
       authenticated,
@@ -128,6 +144,8 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       publicKey,
       signPrivyTransaction,
       signPrivyMessage,
+      accountLabel,
+      logout,
       walletsReady,
     ],
   );

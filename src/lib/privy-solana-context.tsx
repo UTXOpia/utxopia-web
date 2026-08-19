@@ -26,6 +26,13 @@ export type PrivySolanaAuthority = {
    * one from a signature.
    */
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
+  /**
+   * Whichever identifier the member would recognise — the email or account they
+   * signed in with. Only for showing them which one they are on; nothing keys
+   * off it.
+   */
+  accountLabel: string | null;
+  logout: () => Promise<void>;
 };
 
 export const noopPrivySolanaAuthority: PrivySolanaAuthority = {
@@ -39,6 +46,8 @@ export const noopPrivySolanaAuthority: PrivySolanaAuthority = {
   signMessage: async () => {
     throw new Error("Privy is not configured");
   },
+  accountLabel: null,
+  logout: async () => {},
 };
 
 export const PrivySolanaContext = createContext<PrivySolanaAuthority>(noopPrivySolanaAuthority);
