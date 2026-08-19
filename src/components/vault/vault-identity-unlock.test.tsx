@@ -33,8 +33,8 @@ describe("VaultIdentityUnlock", () => {
     renderUnlock();
 
     expect(screen.getByTestId("vault-identity-unlock")).toBeDefined();
-    // The reason has to be on screen. Being asked to sign twice with no
-    // explanation is the moment a careful person closes the tab.
-    expect(screen.getByText(/signatures are not transactions and move/i)).toBeDefined();
+    // The reason has to be on screen. A wall with a button and no explanation
+    // is the moment a careful person closes the tab.
+    expect(screen.getByText(/there has to be a vault to land in/i)).toBeDefined();
   });
 });
