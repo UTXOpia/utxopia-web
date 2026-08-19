@@ -91,6 +91,16 @@ function addSecurityHeaders(response: NextResponse) {
   // NEXT_PUBLIC_SOLANA_RPC_URL for deployments still pointing the browser
   // straight at an RPC. Miss either and reads die as CSP violations, which the
   // UI can only report as "name not found".
+  // Social login talks to Privy from the browser, and its embedded wallet runs
+  // in an iframe served from the same origin — so this is one host in two
+  // directives, and missing either kills sign-in with a console error the UI
+  // never sees. Gated on the app id: a deployment with no Privy configured
+  // widens nothing, which is the only reason it is safe to name a host that,
+  // by design, is allowed to receive whatever the page will hand it.
+  const privyOrigins = process.env.NEXT_PUBLIC_PRIVY_APP_ID
+    ? ["https://auth.privy.io", "https://api.privy.io"]
+    : [];
+
   const wsOrigins: string[] = [];
   for (const value of [process.env.NEXT_PUBLIC_SOLANA_WS_URL, process.env.NEXT_PUBLIC_SOLANA_RPC_URL]) {
     if (!value) continue;
@@ -123,6 +133,7 @@ function addSecurityHeaders(response: NextResponse) {
     "https://btc.utxopia.com",          // regtest esplora
     "https://circuit.utxopia.com",      // circuit artifact CDN
     circuitOrigin,
+    ...privyOrigins,
   ]
     .filter(Boolean)
     .join(" ");
@@ -144,6 +155,9 @@ function addSecurityHeaders(response: NextResponse) {
       "img-src 'self' data: https:",
       "font-src 'self' data: https://fonts.gstatic.com",
       `connect-src ${connectSrc}`,
+      // default-src would otherwise hold this to 'self' and blank the embedded
+      // wallet's iframe.
+      `frame-src 'self'${privyOrigins.length ? " https://auth.privy.io" : ""}`,
       "frame-ancestors 'none'",
     ].join("; ")
   );

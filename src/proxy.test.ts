@@ -43,6 +43,41 @@ describe("Content-Security-Policy", () => {
     }
   });
 
+  function directive(name: string): string[] {
+    const res = proxy(new NextRequest("https://app.utxopia.com/"));
+    const csp = res.headers.get("Content-Security-Policy") ?? "";
+    const found = csp.split(";").map((d) => d.trim()).find((d) => d.startsWith(`${name} `));
+    return (found ?? "").replace(`${name} `, "").split(/\s+/).filter(Boolean);
+  }
+
+  it("lets social login reach Privy, in both directions it needs", () => {
+    const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+    process.env.NEXT_PUBLIC_PRIVY_APP_ID = "test-app-id";
+    try {
+      // The API call and the embedded wallet's iframe are the same host under
+      // two directives. Allowing only one of them fails as a console error the
+      // sign-in UI has no way to report.
+      expect(connectSrc()).toContain("https://auth.privy.io");
+      expect(directive("frame-src")).toContain("https://auth.privy.io");
+    } finally {
+      if (appId === undefined) delete process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+      else process.env.NEXT_PUBLIC_PRIVY_APP_ID = appId;
+    }
+  });
+
+  it("names no third party a deployment did not configure", () => {
+    const appId = process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+    delete process.env.NEXT_PUBLIC_PRIVY_APP_ID;
+    try {
+      // An allowed origin on the page that holds spending keys is a route out.
+      // Without Privy configured there is nothing to allow, so nothing is.
+      expect(connectSrc().some((s) => s.includes("privy.io"))).toBe(false);
+      expect(directive("frame-src")).toEqual(["'self'"]);
+    } finally {
+      if (appId !== undefined) process.env.NEXT_PUBLIC_PRIVY_APP_ID = appId;
+    }
+  });
+
   it("does not wildcard the org's own domain", () => {
     // This page holds spending keys, so every allowed origin is a possible exfiltration route.
     // A `*.utxopia.com` wildcard would extend that trust to any subdomain the org ever creates
