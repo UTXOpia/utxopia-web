@@ -91,7 +91,7 @@ function ObserverLine() {
           Public chain
         </span>
         <span className="truncate font-mono text-[12px] text-gray-light">
-          {s.from} <span className="text-gray">\u2192</span> {s.to}
+          {s.from} <span className="text-gray">→</span> {s.to}
         </span>
         <span className="flex-1" />
         <span className="shrink-0 font-mono text-[12.5px] tabular-nums text-foreground">
@@ -108,7 +108,7 @@ function ObserverLine() {
           Here
         </span>
         <span className="truncate font-mono text-[12px] text-gray/55">
-          {DOT.repeat(9)} <span className="text-gray/35">\u2192</span> {DOT.repeat(9)}
+          {DOT.repeat(9)} <span className="text-gray/35">→</span> {DOT.repeat(9)}
         </span>
         <span className="flex-1" />
         <span className="shrink-0 font-mono text-[12.5px] text-gray/55">{DOT.repeat(6)}</span>
