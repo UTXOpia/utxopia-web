@@ -3,6 +3,7 @@
 import { create } from "zustand";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
+  adoptExistingSeed,
   buildRecoveryString,
   clearDeviceEnvelope,
   createVault,
@@ -371,6 +372,13 @@ interface UTXOpiaState {
     opts?: { replaceExisting?: boolean },
   ) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array, factor?: "passkey" | "pin") => Promise<void>;
+  /** Adopt a root rebuilt from the login (see usePrivyVaultKey.deriveRoot). */
+  rebuildEnvelopeVault: (
+    root: Uint8Array,
+    passphrase: string,
+    deviceKeyMaterial?: Uint8Array,
+    opts?: { replaceExisting?: boolean },
+  ) => Promise<{ metaAddress: string; recoveryString: string }>;
   restoreEnvelopeVault: (
     recoveryString: string,
     passphrase: string,
@@ -674,6 +682,20 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     });
     await adoptSeedIntoSession(set, seed);
     return recoveryString;
+  },
+
+  rebuildEnvelopeVault: async (root, passphrase, deviceKeyMaterial, opts) => {
+    const { scope, metaAddressFor } = await envelopeContext();
+    const result = await adoptExistingSeed({
+      scope,
+      seed: root,
+      passphrase,
+      deviceKeyMaterial,
+      metaAddressFor,
+      replaceExisting: opts?.replaceExisting,
+    });
+    await adoptSeedIntoSession(set, root);
+    return result;
   },
 
   unlockEnvelopeVault: async (deviceKeyMaterial, factor) => {

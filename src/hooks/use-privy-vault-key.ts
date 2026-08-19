@@ -15,7 +15,17 @@
 import { useCallback, useEffect, useState } from "react";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
-import { assertPin, buildUnlockMessage, deriveFromPin } from "@/lib/vault-envelope";
+import {
+  ROOT_KDF,
+  assertPin,
+  buildRootMessage,
+  buildUnlockMessage,
+  deriveFromPassphrase,
+  deriveFromPin,
+  rootFromSignature,
+  rootSaltFor,
+  unlockCommit,
+} from "@/lib/vault-envelope";
 import { assertDeviceSigner, readDeviceSigner, writeDeviceSigner } from "@/lib/vault-identity";
 
 export class LoginRequiredError extends Error {
@@ -39,7 +49,8 @@ export function useLoginArmed(): boolean {
 }
 
 export function usePrivyVaultKey() {
-  const { enabled, authenticated, login, ensureWallet, signMessage } = usePrivySolanaAuthority();
+  const { enabled, authenticated, accountId, login, ensureWallet, signMessage } =
+    usePrivySolanaAuthority();
   const { networkId, vaultId } = useChainEnvironment();
 
   const keyMaterialFor = useCallback(
@@ -70,11 +81,38 @@ export function usePrivyVaultKey() {
     [authenticated, ensureWallet, networkId, signMessage, vaultId],
   );
 
+  /**
+   * Rebuild the root from the login and a passphrase, with nothing stored.
+   *
+   * The provider's account id salts the passphrase, the commit goes into a
+   * frozen message, and the signature over it becomes the root — so the same
+   * two inputs reproduce the same vault on a device that has never seen it.
+   *
+   * There is no ciphertext here and therefore no AEAD tag, which means a
+   * mistyped passphrase does not fail: it rebuilds a different, empty vault in
+   * silence. The caller has to show the member what came back before writing
+   * anything over what is already on this device.
+   */
+  const deriveRoot = useCallback(
+    async (passphrase: string): Promise<Uint8Array> => {
+      if (!authenticated) throw new LoginRequiredError();
+      const pubkey = await ensureWallet();
+      if (!pubkey) throw new LoginRequiredError();
+      if (!accountId) throw new LoginRequiredError();
+
+      const secret = deriveFromPassphrase(passphrase.trim(), rootSaltFor(accountId), ROOT_KDF);
+      const message = buildRootMessage(networkId, unlockCommit(secret));
+      const signature = await signMessage(new TextEncoder().encode(message));
+      return rootFromSignature(signature);
+    },
+    [accountId, authenticated, ensureWallet, networkId, signMessage],
+  );
+
   /** Only after the wrapping it describes has actually been written. */
   const remember = useCallback(
     (signer: string) => writeDeviceSigner({ networkId, vaultId }, signer),
     [networkId, vaultId],
   );
 
-  return { available: enabled, authenticated, login, keyMaterialFor, remember };
+  return { available: enabled, authenticated, login, keyMaterialFor, deriveRoot, remember };
 }

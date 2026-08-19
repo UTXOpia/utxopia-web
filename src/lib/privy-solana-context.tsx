@@ -32,6 +32,12 @@ export type PrivySolanaAuthority = {
    * off it.
    */
   accountLabel: string | null;
+  /**
+   * The provider's stable id for this member. Salts the root passphrase, so it
+   * has to be the same string on every device and outlive a linked email
+   * changing — never the label above.
+   */
+  accountId: string | null;
   logout: () => Promise<void>;
 };
 
@@ -47,6 +53,7 @@ export const noopPrivySolanaAuthority: PrivySolanaAuthority = {
     throw new Error("Privy is not configured");
   },
   accountLabel: null,
+  accountId: null,
   logout: async () => {},
 };
 

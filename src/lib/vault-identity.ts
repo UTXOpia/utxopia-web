@@ -399,10 +399,17 @@ export async function adoptExistingSeed(input: {
   scope: VaultScope;
   seed: Uint8Array;
   passphrase: string;
-  deviceKeyMaterial: Uint8Array;
+  deviceKeyMaterial?: Uint8Array;
   metaAddressFor: MetaAddressFor;
+  /** Caller has shown the member the identity they are about to write over. */
+  replaceExisting?: boolean;
 }): Promise<{ metaAddress: string; recoveryString: string }> {
   assertPassphrase(input.passphrase.trim());
+  // A derived root has no AEAD tag behind it, so a mistyped passphrase arrives
+  // here looking exactly like a correct one. Refusing to write over a wrapping
+  // this browser already holds is the only thing between that typo and the
+  // member's real vault.
+  if (!input.replaceExisting && readDeviceEnvelope(input.scope)) throw new VaultAlreadyHereError();
   const metaAddress = await metaAddressForScope(input.metaAddressFor, input.seed, input.scope);
   const recoveryString = await buildRecoveryString({
     scope: input.scope,
@@ -410,12 +417,14 @@ export async function adoptExistingSeed(input: {
     passphrase: input.passphrase,
     metaAddress,
   });
-  await armDevice({
-    scope: input.scope,
-    seed: input.seed,
-    metaAddress,
-    deviceKeyMaterial: input.deviceKeyMaterial,
-  });
+  if (input.deviceKeyMaterial) {
+    await armDevice({
+      scope: input.scope,
+      seed: input.seed,
+      metaAddress,
+      deviceKeyMaterial: input.deviceKeyMaterial,
+    });
+  }
   return { metaAddress, recoveryString };
 }
 

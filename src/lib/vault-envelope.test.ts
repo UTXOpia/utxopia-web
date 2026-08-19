@@ -1,4 +1,5 @@
 import { describe, expect, it } from "bun:test";
+import { bytesToHex } from "@utxopia/sdk";
 import {
   EnvelopeFormatError,
   EnvelopeIdentityError,
@@ -9,8 +10,13 @@ import {
   assertIdentity,
   buildUnlockMessage,
   decodeEnvelope,
+  ROOT_KDF,
+  buildRootMessage,
   deriveFromPassphrase,
   deriveFromPin,
+  rootFromSignature,
+  rootSaltFor,
+  unlockCommit,
   encodeEnvelope,
   envelopeFromHex,
   envelopeToHex,
@@ -259,5 +265,57 @@ describe("PIN stretching", () => {
       aad: AAD,
     });
     expect(unwrapSeed(envelope, material, OTHER_AAD)).rejects.toThrow(EnvelopeUnlockError);
+  });
+});
+
+describe("rebuilding a root from the login", () => {
+  const sig = (byte: number) => new Uint8Array(64).fill(byte);
+  const secretFor = (passphrase: string, account: string) =>
+    deriveFromPassphrase(passphrase, rootSaltFor(account), ROOT_KDF);
+
+  it("signs a message that says nothing about the passphrase", () => {
+    const commit = unlockCommit(new Uint8Array(32).fill(9));
+    expect(buildRootMessage("devnet", commit)).toBe(
+      `Sign this message to rebuild your UTXOpia vault.
+
+WARNING: Only sign this in a client you trust.
+Signing it anywhere else can cost you your funds.
+
+Network: solana:devnet
+Commit: ${bytesToHex(commit)}`,
+    );
+  });
+
+  // Two messages, two purposes. Sharing one would let a signature gathered for
+  // a device wrapping be replayed as the identity itself.
+  it("is not the message a device wrapping signs", () => {
+    const commit = unlockCommit(new Uint8Array(32).fill(1));
+    expect(buildRootMessage("devnet", commit)).not.toBe(buildUnlockMessage("devnet"));
+  });
+
+  it("salts two members who chose the same passphrase apart", () => {
+    expect(secretFor("correct horse battery staple", "did:privy:aaa")).not.toEqual(
+      secretFor("correct horse battery staple", "did:privy:bbb"),
+    );
+  });
+
+  it("rebuilds the same root from the same login and passphrase", async () => {
+    const a = await rootFromSignature(sig(3));
+    const b = await rootFromSignature(sig(3));
+    expect(a).toEqual(b);
+    expect(a.length).toBe(32);
+  });
+
+  // The hazard this path carries, stated as a test rather than left to be met.
+  // Nothing is being decrypted, so there is no tag to fail: a wrong passphrase
+  // produces a different commit, a different signature, and a different, valid,
+  // empty vault. The UI has to show the member what came back before it writes.
+  it("rebuilds a different root from a mistyped passphrase, silently", async () => {
+    const right = unlockCommit(secretFor("correct horse battery staple", "did:privy:aaa"));
+    const typo = unlockCommit(secretFor("correct horse battery stapl", "did:privy:aaa"));
+    expect(right).not.toEqual(typo);
+    // Different message, so a signer produces different bytes, so a different
+    // root. Modelled here with distinct signatures.
+    expect(await rootFromSignature(sig(1))).not.toEqual(await rootFromSignature(sig(2)));
   });
 });

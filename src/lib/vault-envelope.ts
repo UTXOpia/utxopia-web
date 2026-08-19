@@ -90,6 +90,96 @@ export function buildUnlockMessage(network: string): string {
 }
 
 /**
+ * FROZEN. What the provider signs when the root is derived instead of stored.
+ *
+ * Distinct from `buildUnlockMessage` on purpose and not a parameter of it. That
+ * one produces key material for a wrapping this device already holds; this one
+ * produces the identity itself, on a device that holds nothing. Sharing a
+ * message between the two would let either be replayed as the other.
+ *
+ * `commit` rather than the secret it commits to. The provider signs this, so it
+ * reads it: handed the secret it could derive the root alone, and the member's
+ * passphrase would be protecting nothing. Handed a hash it has to guess the
+ * passphrase first, which is what the generator's 55.8 bits are for. This is
+ * also why the path is passphrase-only — a six-digit PIN's commit falls to an
+ * offline sweep in about a week.
+ *
+ * The network is in it: a devnet signature must not produce a mainnet identity.
+ */
+const ROOT_MESSAGE = (network: string, commit: string) =>
+  `Sign this message to rebuild your UTXOpia vault.
+
+WARNING: Only sign this in a client you trust.
+Signing it anywhere else can cost you your funds.
+
+Network: solana:${network}
+Commit: ${commit}`;
+
+/** Exported so a test can pin it. Changing a byte rebuilds nobody's vault. */
+export function buildRootMessage(network: string, commit: Uint8Array): string {
+  return ROOT_MESSAGE(network, bytesToHex(commit));
+}
+
+/**
+ * Per-account salt for the root passphrase, derived rather than stored.
+ *
+ * There is nowhere to keep one — that is the point of this path — so it comes
+ * from the provider's stable account id. Two members who pick the same
+ * passphrase still land on different secrets, which a fixed salt would not give
+ * and which is the whole job of a salt here.
+ */
+export function rootSaltFor(accountId: string): Uint8Array {
+  return sha256(new TextEncoder().encode(`utxopia:root-salt:v1:${accountId}`));
+}
+
+/** FROZEN. What the provider is allowed to see of the passphrase. */
+export function unlockCommit(secret: Uint8Array): Uint8Array {
+  return sha256(
+    new Uint8Array([...secret, ...new TextEncoder().encode("utxopia:privy-unlock:v1")]),
+  );
+}
+
+/**
+ * Argon2id cost for the root passphrase. Heavier than KDF_V1 because its
+ * commit is handed to a third party, so brute-force resistance is the only
+ * thing standing between that party and the vault. Runs once per rebuild.
+ */
+export const ROOT_KDF = { m: 65536, t: 3, p: 1 } as const;
+
+/** FROZEN. HKDF domain separation for the derived root. */
+const ROOT_INFO = "utxopia:root:v1";
+
+/**
+ * The root, from the signature over `buildRootMessage`.
+ *
+ * Rests on ed25519 being deterministic (RFC 8032, and Solana signs that way):
+ * the same wallet over the same message must reproduce the same bytes, or the
+ * same member rebuilds as somebody else. Nothing here can check that, which is
+ * why this path still writes a recovery string — see `privy-signature-probe`
+ * for the watch, and the module header for why the string is not optional.
+ */
+export async function rootFromSignature(signature: Uint8Array): Promise<Uint8Array> {
+  const material = await crypto.subtle.importKey(
+    "raw",
+    signature as BufferSource,
+    "HKDF",
+    false,
+    ["deriveBits"],
+  );
+  const bits = await crypto.subtle.deriveBits(
+    {
+      name: "HKDF",
+      hash: "SHA-256",
+      salt: new Uint8Array(0) as BufferSource,
+      info: new TextEncoder().encode(ROOT_INFO) as BufferSource,
+    },
+    material,
+    SEED_BYTES * 8,
+  );
+  return new Uint8Array(bits);
+}
+
+/**
  * Argon2id cost. Not frozen — carried in the envelope so an existing wrapping
  * keeps opening at the cost it was written with while new ones get harder.
  * Pure-JS argon2 runs on the member's phone during a restore, so this is a

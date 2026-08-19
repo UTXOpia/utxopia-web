@@ -23,7 +23,7 @@ import { PassphraseField } from "@/components/vault/passphrase-field";
 import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
-type Mode = "choose" | "create" | "restore" | "saved" | "confirm-replace";
+type Mode = "choose" | "create" | "restore" | "login" | "rebuilt" | "saved" | "confirm-replace";
 
 export function VaultSetup({ onDone }: { onDone: () => void }) {
   const { register: registerPasskey, authenticate: authenticatePasskey, hasCredential: hasPasskeyCredential } = usePasskey();
@@ -34,6 +34,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   );
   const privy = usePrivyVaultKey();
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
+  const rebuildEnvelopeVault = useUTXOpiaStore((s) => s.rebuildEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
   const verifyRecoveryString = useUTXOpiaStore((s) => s.verifyRecoveryString);
 
@@ -43,6 +44,11 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   const [recoveryString, setRecoveryString] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [pin, setPin] = useState("");
+  const [rebuiltAddress, setRebuiltAddress] = useState("");
+  // A rebuild that landed on the wrong vault has already written a wrapping.
+  // The second attempt has to be allowed over it, and only the member saying
+  // "that is not mine" earns that.
+  const [replaceRebuilt, setReplaceRebuilt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -112,6 +118,28 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       setMode("saved");
     });
 
+  /**
+   * Rebuild the root from the login instead of a recovery string.
+   *
+   * Nothing is decrypted on this path, so nothing can report a wrong
+   * passphrase — it simply rebuilds a different, empty vault. The address it
+   * produces is shown before the member is asked to accept it, because that
+   * address is the only thing that distinguishes their vault from a typo.
+   */
+  const handleRebuild = () =>
+    run(async () => {
+      const root = await privy.deriveRoot(passphrase);
+      const { material, signer } = await armingMaterial(authenticatePasskey);
+      const { metaAddress } = await rebuildEnvelopeVault(root, passphrase, material, {
+        replaceExisting: replaceRebuilt || alreadyHere,
+      });
+      if (signer) privy.remember(signer);
+      setRebuiltAddress(metaAddress);
+      setPassphrase("");
+      setPin("");
+      setMode("rebuilt");
+    });
+
   const handleRestore = () =>
     run(async () => {
       // Arming this device is optional — a restore that cannot do it safely
@@ -136,6 +164,52 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       setConfirmPassphrase("");
       onDone();
     });
+
+  // What came back, before it is accepted. A wrong passphrase rebuilds a real,
+  // empty vault rather than failing, so the address is the check — it is the
+  // one thing a returning member recognises and a typo cannot reproduce.
+  if (mode === "rebuilt") {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <div className="flex flex-col gap-1.5 rounded-[12px] border border-privacy/25 bg-privacy/5 p-4">
+          <p className="text-caption font-semibold text-foreground">
+            Your passphrase rebuilt this vault
+          </p>
+          <p className="break-all font-mono text-[12px] leading-relaxed text-gray-light">
+            {rebuiltAddress}
+          </p>
+          <p className="mt-1 text-caption leading-relaxed text-gray">
+            Check it against the address you receive on. Nothing here can tell a wrong passphrase
+            from a right one — a wrong one rebuilds a different, empty vault rather than failing.
+          </p>
+        </div>
+
+        {recoveryString && <RecoveryStringCard value={recoveryString} />}
+
+        <button
+          type="button"
+          onClick={onDone}
+          className={cn(
+            "flex min-h-11 items-center justify-center rounded-[10px] px-4",
+            "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer hover:bg-white",
+          )}
+        >
+          That is my vault
+        </button>
+        <button
+          type="button"
+          onClick={() => {
+            setReplaceRebuilt(true);
+            setRebuiltAddress("");
+            setMode("login");
+          }}
+          className="text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+        >
+          Not my vault — try a different passphrase
+        </button>
+      </div>
+    );
+  }
 
   if (mode === "saved") {
     return (
@@ -219,6 +293,24 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
             <span className="block text-caption text-gray/60">I have a recovery string</span>
           </span>
         </button>
+        {privy.authenticated && (
+          <button
+            type="button"
+            onClick={() => setMode("login")}
+            className={cn(
+              "flex min-h-[52px] items-center gap-3 rounded-[12px] border border-gray/20 px-4",
+              "bg-muted/30 hover:bg-muted/60 transition-colors cursor-pointer text-left",
+            )}
+          >
+            <KeyRound className="h-4 w-4 shrink-0 text-privacy" aria-hidden />
+            <span>
+              <span className="block text-body2-semibold text-foreground">Rebuild from my login</span>
+              <span className="block text-caption text-gray/60">
+                No recovery string — your passphrase and this account
+              </span>
+            </span>
+          </button>
+        )}
       </div>
     );
   }
@@ -271,6 +363,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   }
 
   const creating = mode === "create";
+  const rebuilding = mode === "login";
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -286,7 +379,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         Back
       </button>
 
-      {!creating && (
+      {!creating && !rebuilding && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="recovery-string" className="px-1 text-[11px] uppercase tracking-wider text-gray/50 font-medium">
             Recovery string
@@ -323,6 +416,13 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         </p>
       )}
 
+      {rebuilding && (
+        <p className="px-1 text-caption leading-relaxed text-gray/60">
+          Your login and this passphrase rebuild the same vault on any device, with nothing stored
+          anywhere. We will show you the address they produce before you accept it.
+        </p>
+      )}
+
       {/* Only once signed in: an unauthenticated field would have to start a
           login from inside the ceremony, and the attempt that triggered it has
           already failed by the time the member finishes. */}
@@ -347,8 +447,8 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
 
       <button
         type="button"
-        onClick={creating ? handleCreate : handleRestore}
-        disabled={busy || !passphrase || (!creating && !recoveryInput.trim())}
+        onClick={creating ? handleCreate : rebuilding ? handleRebuild : handleRestore}
+        disabled={busy || !passphrase || (!creating && !rebuilding && !recoveryInput.trim())}
         className={cn(
           "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
           "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
@@ -359,10 +459,14 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         {busy
           ? creating
             ? "Creating…"
-            : "Unlocking…"
+            : rebuilding
+              ? "Rebuilding…"
+              : "Unlocking…"
           : creating
             ? "Create vault"
-            : "Restore vault"}
+            : rebuilding
+              ? "Rebuild vault"
+              : "Restore vault"}
       </button>
     </div>
   );

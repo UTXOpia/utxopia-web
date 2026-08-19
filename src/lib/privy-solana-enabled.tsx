@@ -134,6 +134,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       signTransaction: signPrivyTransaction,
       signMessage: signPrivyMessage,
       accountLabel,
+      accountId: user?.id ?? null,
       logout,
     }),
     [
@@ -145,6 +146,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       signPrivyTransaction,
       signPrivyMessage,
       accountLabel,
+      user,
       logout,
       walletsReady,
     ],
