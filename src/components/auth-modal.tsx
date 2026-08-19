@@ -30,6 +30,27 @@ interface AuthModalProps {
   auth: AuthState;
 }
 
+/**
+ * Monochrome provider marks. Privy's own window carries the branded versions;
+ * these only have to say "these are the ways in" at a glance, and a row of
+ * full-colour logos would outshout every other option in the list.
+ */
+function GoogleMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M12 10.9v3.4h4.8c-.2 1.3-1.6 3.7-4.8 3.7a5.6 5.6 0 0 1 0-11.2c1.7 0 2.9.8 3.5 1.4l2.4-2.3A8.6 8.6 0 0 0 12 3.4a8.6 8.6 0 1 0 0 17.2c5 0 8.3-3.5 8.3-8.4 0-.6-.1-1-.2-1.3H12z" />
+    </svg>
+  );
+}
+
+function FarcasterMark({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
+      <path d="M4.8 3h14.4v2.7h-2.1v12.6h2.1V21h-5.6v-2.7h1.3v-4.9a3 3 0 0 0-6 0v4.9h1.3V21H4.8v-2.7h2.1V5.7H4.8V3z" />
+    </svg>
+  );
+}
+
 export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   const {
     passkeySupported, hasPasskeyCredential, passkeyLoading,
@@ -149,30 +170,38 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   the same create-or-restore flow as the row below it, with the
                   login already done so this browser can be remembered. */}
               {privy.enabled && (
-                <button
-                  onClick={() => {
-                    if (privy.authenticated) return setShowEnvelopeSetup(true);
-                    setAwaitingLogin(true);
-                    void privy.login();
-                  }}
-                  disabled={isLoading || awaitingLogin}
-                  className={cn(
-                    "w-full flex items-center gap-4 p-4 rounded-[14px]",
-                    "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
-                    "hover:border-privacy/30 disabled:opacity-40",
-                    "transition-all duration-200 cursor-pointer text-left",
-                  )}
-                >
-                  <Mail className="w-5 h-5 text-privacy shrink-0" aria-hidden />
-                  <span>
-                    <span className="block text-body2-semibold text-foreground">
-                      {awaitingLogin ? "Waiting for sign in\u2026" : "Continue with email or Google"}
+                <div className="space-y-1.5">
+                  <button
+                    onClick={() => {
+                      if (privy.authenticated) return setShowEnvelopeSetup(true);
+                      setAwaitingLogin(true);
+                      void privy.login();
+                    }}
+                    disabled={isLoading || awaitingLogin}
+                    className={cn(
+                      "w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-[14px]",
+                      "bg-muted/40 hover:bg-muted/70 border border-gray/15 hover:border-gray/25",
+                      "disabled:opacity-40 transition-all duration-200 cursor-pointer",
+                    )}
+                  >
+                    <span className="text-body2-semibold text-foreground">
+                      {awaitingLogin ? "Waiting for sign in\u2026" : "Sign in with"}
                     </span>
-                    <span className="block text-caption text-gray/60">
-                      Then create or restore your vault
-                    </span>
-                  </span>
-                </button>
+                    {!awaitingLogin && (
+                      <span className="flex items-center gap-2 text-gray-light">
+                        <FarcasterMark className="w-4 h-4" />
+                        <GoogleMark className="w-4 h-4" />
+                        <Mail className="w-4 h-4" aria-hidden />
+                      </span>
+                    )}
+                  </button>
+                  {/* Under the row, not inside it: signing in does not find a
+                      vault, and a member who expects one has been misled by the
+                      time they are staring at a passphrase field. */}
+                  <p className="text-center text-caption text-gray/45">
+                    Then create or restore your vault
+                  </p>
+                </div>
               )}
 
               <button
