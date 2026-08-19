@@ -143,10 +143,15 @@ export function EnabledPrivySolanaProvider({
       appId={appId}
       clientId={clientId}
       config={{
-        // Privy's own passkey is deliberately absent: it would mint a second
-        // credential beside the one whose PRF wraps the vault, and re-pointing
-        // the stored credential id orphans every wrapping on the device.
-        loginMethods: ["email", "wallet", "google", "farcaster"],
+        // Privy's own passkey is deliberately absent, and the reason is the
+        // picker rather than our stored credential id, which Privy never
+        // touches. Its passkey would be a second discoverable credential on
+        // this same RP, and `authenticate` sends an empty allowCredentials
+        // whenever this browser has no stored id — the cross-device path, where
+        // a synced passkey is chosen from the OS list. A second entry there is
+        // one the member can pick, and picking it derives a different PRF seed:
+        // a different, empty vault, reported as no error at all.
+        loginMethods: ["email", "sms", "wallet", "google"],
         appearance: { theme: "dark", accentColor: "#14F195" },
         embeddedWallets: {
           solana: { createOnLogin: "users-without-wallets" },
