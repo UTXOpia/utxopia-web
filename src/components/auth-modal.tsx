@@ -2,22 +2,13 @@
 
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Fingerprint, Mail, Wallet, X, Eye, Upload, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogIn, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { VaultSetup } from "@/components/vault/vault-setup";
 
 export interface AuthState {
-  passkeySupported: boolean;
-  hasPasskeyCredential: boolean;
-  passkeyLoading: boolean;
-  walletLoading: boolean;
-  walletConnected: boolean;
   error: string | null;
-  onPasskeyRegister: () => void;
-  onPasskeyAuthenticate: () => void;
-  onWalletConnect: () => void;
-  onWalletDeriveKeys: () => void;
   onViewOnlyLogin?: (viewingKey: string) => void;
   /** Restore spending keys from a recovery file. Rejects with a user-facing
    *  message, which the modal shows next to the picker. */
@@ -52,16 +43,12 @@ function FarcasterMark({ className }: { className?: string }) {
 }
 
 export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
-  const {
-    passkeySupported, hasPasskeyCredential, passkeyLoading,
-    walletLoading, walletConnected, error,
-    onPasskeyRegister, onPasskeyAuthenticate,
-    onWalletConnect, onWalletDeriveKeys, onViewOnlyLogin, onImportBackup,
-  } = auth;
+  const { error, onViewOnlyLogin, onImportBackup } = auth;
   const [importing, setImporting] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
-  const isLoading = passkeyLoading || walletLoading || importing;
+  const isLoading = importing;
   const [showViewOnly, setShowViewOnly] = useState(false);
+  const [showMore, setShowMore] = useState(false);
   const [showEnvelopeSetup, setShowEnvelopeSetup] = useState(false);
 
   // Read straight from the context rather than through AuthState: the default
@@ -135,27 +122,14 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
           {error && (
             <div className="mx-6 mt-3 px-3 py-2 rounded-[8px] bg-red-500/10 border border-red-500/20">
               <p className="text-caption text-red-400 text-center">{error}</p>
-              {error.includes("No saved key found") && passkeySupported && (
-                <button
-                  onClick={onPasskeyRegister}
-                  disabled={isLoading}
-                  className={cn(
-                    "w-full mt-2 px-3 py-2 rounded-[8px]",
-                    "bg-privacy/20 hover:bg-privacy/30 text-privacy",
-                    "disabled:opacity-40 transition-colors text-caption font-semibold cursor-pointer",
-                  )}
-                >
-                  Create New Passkey on This Device
-                </button>
-              )}
             </div>
           )}
 
           {/* Options */}
           <div className="p-6 space-y-3">
-            {/* Envelope vault — create or restore. Offered above the legacy
-                paths because it is the only one where forgetting a passphrase
-                or losing a device is recoverable without us. */}
+            {/* Create or restore. The only way in where forgetting a
+                passphrase or losing a device is recoverable without us, which
+                is why it is the one the other rows now lead to. */}
             {showEnvelopeSetup ? (
               <VaultSetup
                 onDone={() => {
@@ -170,38 +144,44 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   the same create-or-restore flow as the row below it, with the
                   login already done so this browser can be remembered. */}
               {privy.enabled && (
-                <div className="space-y-1.5">
-                  <button
-                    onClick={() => {
-                      if (privy.authenticated) return setShowEnvelopeSetup(true);
-                      setAwaitingLogin(true);
-                      void privy.login();
-                    }}
-                    disabled={isLoading || awaitingLogin}
-                    className={cn(
-                      "w-full flex items-center justify-center gap-2.5 px-4 py-3 rounded-[14px]",
-                      "bg-muted/40 hover:bg-muted/70 border border-gray/15 hover:border-gray/25",
-                      "disabled:opacity-40 transition-all duration-200 cursor-pointer",
-                    )}
-                  >
-                    <span className="text-body2-semibold text-foreground">
+                <button
+                  onClick={() => {
+                    if (privy.authenticated) return setShowEnvelopeSetup(true);
+                    setAwaitingLogin(true);
+                    void privy.login();
+                  }}
+                  disabled={isLoading || awaitingLogin}
+                  className={cn(
+                    "w-full flex items-center gap-4 p-4 rounded-[14px]",
+                    "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
+                    "hover:border-privacy/30 disabled:opacity-40",
+                    "transition-all duration-200 cursor-pointer group",
+                    "hover:shadow-[0_0_24px_rgba(255,255,255,0.06)]",
+                  )}
+                >
+                  <div className="p-2.5 rounded-[10px] bg-privacy/12 group-hover:bg-privacy/20 transition-colors shrink-0">
+                    <LogIn className="w-5 h-5 text-privacy" />
+                  </div>
+                  <div className="text-left min-w-0 flex-1">
+                    <p className="text-body2-semibold text-privacy">
                       {awaitingLogin ? "Waiting for sign in\u2026" : "Sign in with"}
+                    </p>
+                    {/* Under the title, not floating below the row: signing in
+                        does not find a vault — nothing is kept on our side to
+                        look one up with — and a member expecting one has been
+                        misled by the time they are staring at a passphrase. */}
+                    <p className="text-caption text-gray mt-0.5">
+                      Then create or restore your vault
+                    </p>
+                  </div>
+                  {!awaitingLogin && (
+                    <span className="flex items-center gap-2 text-gray-light/70 shrink-0">
+                      <FarcasterMark className="w-4 h-4" />
+                      <GoogleMark className="w-4 h-4" />
+                      <Mail className="w-4 h-4" aria-hidden />
                     </span>
-                    {!awaitingLogin && (
-                      <span className="flex items-center gap-2 text-gray-light">
-                        <FarcasterMark className="w-4 h-4" />
-                        <GoogleMark className="w-4 h-4" />
-                        <Mail className="w-4 h-4" aria-hidden />
-                      </span>
-                    )}
-                  </button>
-                  {/* Under the row, not inside it: signing in does not find a
-                      vault, and a member who expects one has been misled by the
-                      time they are staring at a passphrase field. */}
-                  <p className="text-center text-caption text-gray/45">
-                    Then create or restore your vault
-                  </p>
-                </div>
+                  )}
+                </button>
               )}
 
               <button
@@ -211,93 +191,47 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   "w-full flex items-center gap-4 p-4 rounded-[14px]",
                   "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
                   "hover:border-privacy/30 disabled:opacity-40",
-                  "transition-all duration-200 cursor-pointer text-left",
-                )}
-              >
-                <ShieldCheck className="w-5 h-5 text-privacy shrink-0" aria-hidden />
-                <span>
-                  <span className="block text-body2-semibold text-foreground">
-                    Vault with recovery string
-                  </span>
-                  <span className="block text-caption text-gray/60">
-                    Works on any device you can reach
-                  </span>
-                </span>
-              </button>
-
-            {/* Passkey */}
-            {passkeySupported && (
-              <button
-                onClick={
-                  hasPasskeyCredential
-                    ? onPasskeyAuthenticate
-                    : onPasskeyRegister
-                }
-                disabled={isLoading}
-                className={cn(
-                  "w-full flex items-center gap-4 p-4 rounded-[14px]",
-                  "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
-                  "hover:border-privacy/30 disabled:opacity-40",
-                  "transition-all duration-200 cursor-pointer group",
-                  "hover:shadow-[0_0_24px_rgba(255,255,255,0.06)]",
+                  "transition-all duration-200 cursor-pointer text-left group",
                 )}
               >
                 <div className="p-2.5 rounded-[10px] bg-privacy/12 group-hover:bg-privacy/20 transition-colors shrink-0">
-                  <Fingerprint className="w-5 h-5 text-privacy" />
+                  <ShieldCheck className="w-5 h-5 text-privacy" />
                 </div>
                 <div className="text-left min-w-0">
-                  <p className="text-body2-semibold text-privacy">
-                    {passkeyLoading
-                      ? "Verifying..."
-                      : hasPasskeyCredential
-                        ? "Sign in with Passkey"
-                        : "Create Passkey"}
+                  <p className="text-body2-semibold text-foreground">
+                    Vault with recovery string
                   </p>
                   <p className="text-caption text-gray mt-0.5">
-                    Face ID, fingerprint, or device PIN
+                    Works on any device you can reach
                   </p>
                 </div>
               </button>
-            )}
 
-            {/* Wallet */}
+            {/* Folded rather than dropped.
+             *
+             * The passkey and wallet rows are the pre-envelope paths: they
+             * derive the identity from the factor, so the factor *is* the
+             * account and losing it loses the account. Nothing upgrades those
+             * identities yet — adoptExistingSeed exists and nothing calls it —
+             * so deleting the rows would strand whoever is still on one, with
+             * their funds visible to nobody including them.
+             *
+             * The other two open something real but are not how anybody
+             * arrives: one wants a viewing key already in hand, the other a
+             * file. Between them they cost every first-time reader four rows of
+             * choice they cannot act on.
+             */}
             <button
-              onClick={walletConnected ? onWalletDeriveKeys : onWalletConnect}
-              disabled={isLoading}
-              className={cn(
-                "w-full flex items-center gap-4 p-4 rounded-[14px]",
-                "bg-purple/8 hover:bg-purple/15 border border-purple/15",
-                "hover:border-purple/30 disabled:opacity-40",
-                "transition-all duration-200 cursor-pointer group",
-                "hover:shadow-[0_0_24px_rgba(153,69,255,0.08)]",
-              )}
+              type="button"
+              onClick={() => setShowMore((v) => !v)}
+              className="w-full flex items-center justify-center gap-1 py-1 text-caption text-gray/45 hover:text-gray-light transition-colors cursor-pointer"
             >
-              <div className="p-2.5 rounded-[10px] bg-purple/12 group-hover:bg-purple/20 transition-colors shrink-0">
-                <Wallet className="w-5 h-5 text-purple" />
-              </div>
-              <div className="text-left min-w-0">
-                <p className="text-body2-semibold text-purple">
-                  {walletLoading
-                    ? "Unlocking..."
-                    : walletConnected
-                      ? "Sign to Unlock"
-                      : "Connect Solana Wallet"}
-                </p>
-                <p className="text-caption text-gray mt-0.5">
-                  Connect and sign to derive your vault keys
-                </p>
-              </div>
+              Other ways in
+              <ChevronDown className={cn("w-3.5 h-3.5 transition-transform", showMore && "rotate-180")} />
             </button>
 
-            {/* Divider */}
-            <div className="flex items-center gap-3 py-1">
-              <div className="flex-1 h-px bg-gray/15" />
-              <span className="text-caption text-gray/40 uppercase tracking-widest text-[10px]">
-                or
-              </span>
-              <div className="flex-1 h-px bg-gray/15" />
-            </div>
-
+            {showMore && (
+              <>
             {/* View Only */}
             {!showViewOnly ? (
               <button
@@ -408,6 +342,8 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                 {importError && (
                   <p className="px-1 text-caption text-red-400">{importError}</p>
                 )}
+              </>
+            )}
               </>
             )}
               </>

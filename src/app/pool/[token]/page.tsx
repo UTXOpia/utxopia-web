@@ -12,8 +12,6 @@ import React, { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { notFound, useParams } from "next/navigation";
 import { AlertTriangle, ArrowLeft, Info, Key } from "lucide-react";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { AuthModal } from "@/components/auth-modal";
@@ -367,9 +365,7 @@ function YourPosition({
   depositsKnown: boolean;
   vaultHref: string;
 }) {
-  const { hasKeys, isLoading: keysLoading, error: keysError, deriveKeys } = useUTXOpiaKeys();
-  const wallet = useWallet();
-  const { setVisible: setWalletModalVisible } = useWalletModal();
+  const { hasKeys, isLoading: keysLoading, error: keysError } = useUTXOpiaKeys();
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
   // autoOpen off: this page is meant to be readable signed out, so the modal
   // opens only when the user asks for it.
@@ -403,22 +399,7 @@ function YourPosition({
           open={auth.authModalOpen}
           onOpenChange={auth.setAuthModalOpen}
           auth={{
-            passkeySupported: auth.passkeySupported,
-            hasPasskeyCredential: auth.hasPasskeyCredential,
-            passkeyLoading: auth.passkeyLoading,
-            walletLoading: keysLoading,
-            walletConnected: wallet.connected,
             error: keysError || auth.passkeyError,
-            onPasskeyRegister: () => void auth.handlePasskeyRegister(),
-            onPasskeyAuthenticate: () => void auth.handlePasskeyAuthenticate(),
-            onWalletConnect: () => {
-              auth.setAuthModalOpen(false);
-              setWalletModalVisible(true);
-            },
-            onWalletDeriveKeys: async () => {
-              await deriveKeys();
-              auth.setAuthModalOpen(false);
-            },
             onViewOnlyLogin: (viewingKey) => {
               void loadViewOnlyKeys(viewingKey);
               auth.setAuthModalOpen(false);

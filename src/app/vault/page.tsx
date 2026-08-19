@@ -38,7 +38,6 @@ import { cn } from "@/lib/utils";
 import { SiteHeader } from "@/components/site-header";
 import { SiteFooter } from "@/components/site-footer";
 import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { useUTXOpiaKeys } from "@/hooks/use-utxopia";
 import { usePasskey } from "@/hooks/use-passkey";
 import { useUTXOpiaStore } from "@/stores";
@@ -69,15 +68,12 @@ import { getSnsConfig } from "@/lib/names/sns";
 
 export default function VaultPage() {
   const wallet = useWallet();
-  const { setVisible } = useWalletModal();
   const {
     keys,
     isViewOnly,
     isImportedSession,
     stealthAddressEncoded,
-    isLoading,
     error,
-    deriveKeys,
     clearKeys,
   } = useUTXOpiaKeys();
   const { copied: snsCopied, copy: copySns } = useCopyToClipboard();
@@ -103,14 +99,7 @@ export default function VaultPage() {
     refresh: refreshInbox,
   } = useStealthInbox();
 
-  const {
-    isSupported: passkeySupported,
-    hasCredential: hasPasskeyCredential,
-    isLoading: passkeyLoading,
-    error: passkeyError,
-    register: registerPasskey,
-    authenticate: authenticatePasskey,
-  } = usePasskey();
+  const { error: passkeyError } = usePasskey();
 
   const tokenPrices = useTokenPrices();
   const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
@@ -135,25 +124,8 @@ export default function VaultPage() {
   const solanaNetworkLabel =
     networkId.charAt(0).toUpperCase() + networkId.slice(1);
 
-  const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
   const importBackupKeys = useUTXOpiaStore((s) => s.importBackupKeys);
-
-  const handlePasskeyRegister = async () => {
-    const seed = await registerPasskey();
-    if (seed) {
-      await deriveKeysFromPasskeySeed(seed);
-      setAuthModalOpen(false);
-    }
-  };
-
-  const handlePasskeyAuthenticate = async () => {
-    const seed = await authenticatePasskey();
-    if (seed) {
-      await deriveKeysFromPasskeySeed(seed);
-      setAuthModalOpen(false);
-    }
-  };
 
   const [authModalOpen, setAuthModalOpen] = useState(false);
   const [viewKeyModalOpen, setViewKeyModalOpen] = useState(false);
@@ -532,16 +504,7 @@ export default function VaultPage() {
         open={authModalOpen}
         onOpenChange={setAuthModalOpen}
         auth={{
-          passkeySupported,
-          hasPasskeyCredential,
-          passkeyLoading,
-          walletLoading: isLoading,
-          walletConnected: wallet.connected,
           error: error || passkeyError,
-          onPasskeyRegister: handlePasskeyRegister,
-          onPasskeyAuthenticate: handlePasskeyAuthenticate,
-          onWalletConnect: () => { setAuthModalOpen(false); setVisible(true); },
-          onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
           onViewOnlyLogin: (viewingKey) => { loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
           onImportBackup: async (contents) => { await importBackupKeys(contents); setAuthModalOpen(false); },
         }}

@@ -24,8 +24,6 @@ import { ErrorBoundary } from "@/components/error-boundary";
 import { useUTXOpiaKeys, useStealthInbox } from "@/hooks/use-utxopia";
 import { usePasskey } from "@/hooks/use-passkey";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import { AuthModal } from "@/components/auth-modal";
 import { EmptyInbox } from "@/components/stealth-inbox";
 
@@ -1278,37 +1276,12 @@ function ActivityFeedSkeleton() {
 }
 
 function ActivityContent() {
-  const { hasKeys, isLoading: keysLoading, deriveKeys } = useUTXOpiaKeys();
+  const { hasKeys, isLoading: keysLoading } = useUTXOpiaKeys();
 
   // Auth modal state
   const [authModalOpen, setAuthModalOpen] = useState(false);
-  const { connected } = useWallet();
-  const { setVisible: setWalletModalVisible } = useWalletModal();
-  const {
-    isSupported: passkeySupported,
-    hasCredential: hasPasskeyCredential,
-    isLoading: passkeyLoading,
-    error: passkeyError,
-    register: passkeyRegister,
-    authenticate: passkeyAuthenticate,
-  } = usePasskey();
-  const deriveKeysFromPasskeySeed = useUTXOpiaStore((s) => s.deriveKeysFromPasskeySeed);
+  const { error: passkeyError } = usePasskey();
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
-
-  const handlePasskeyRegister = async () => {
-    const seed = await passkeyRegister();
-    if (seed) {
-      await deriveKeysFromPasskeySeed(seed);
-      setAuthModalOpen(false);
-    }
-  };
-  const handlePasskeyAuthenticate = async () => {
-    const seed = await passkeyAuthenticate();
-    if (seed) {
-      await deriveKeysFromPasskeySeed(seed);
-      setAuthModalOpen(false);
-    }
-  };
 
   // Auto-open auth modal on mount when not logged in
   const autoOpenRef = useRef(false);
@@ -1329,16 +1302,7 @@ function ActivityContent() {
             open={authModalOpen}
             onOpenChange={setAuthModalOpen}
             auth={{
-              passkeySupported,
-              hasPasskeyCredential,
-              passkeyLoading,
-              walletLoading: keysLoading,
-              walletConnected: connected,
               error: passkeyError,
-              onPasskeyRegister: handlePasskeyRegister,
-              onPasskeyAuthenticate: handlePasskeyAuthenticate,
-              onWalletConnect: () => { setAuthModalOpen(false); setWalletModalVisible(true); },
-              onWalletDeriveKeys: async () => { await deriveKeys(); setAuthModalOpen(false); },
               onViewOnlyLogin: (viewingKey) => { void loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
             }}
           />

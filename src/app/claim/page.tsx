@@ -3,8 +3,6 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import Image from "next/image";
-import { useWallet } from "@solana/wallet-adapter-react";
-import { useWalletModal } from "@solana/wallet-adapter-react-ui";
 import {
   ArrowLeft,
   CheckCircle2,
@@ -44,8 +42,6 @@ import { useUTXOpiaStore } from "@/stores/utxopia-store";
 function ClaimContent() {
   const { networkId, vaultId } = useChainEnvironment();
   const ctx = useUTXOpia();
-  const wallet = useWallet();
-  const { setVisible: setWalletModalVisible } = useWalletModal();
   const submitter = useJoinSplitSubmit();
   const privacyDomain = getVaultPrivacyDomain(vaultId);
   const [phrase, setPhrase] = useState("");
@@ -55,15 +51,7 @@ function ClaimContent() {
   const [signature, setSignature] = useState<string | null>(null);
   const [authModalOpen, setAuthModalOpen] = useState(false);
 
-  const {
-    isSupported: passkeySupported,
-    hasCredential: hasPasskeyCredential,
-    isLoading: passkeyLoading,
-    error: passkeyError,
-    register: registerPasskey,
-    authenticate: authenticatePasskey,
-  } = usePasskey();
-  const deriveKeysFromPasskeySeed = useUTXOpiaStore((state) => state.deriveKeysFromPasskeySeed);
+  const { error: passkeyError } = usePasskey();
   const loadViewOnlyKeys = useUTXOpiaStore((state) => state.loadViewOnlyKeys);
 
   useEffect(() => {
@@ -116,20 +104,6 @@ function ClaimContent() {
   }, [note, relayerMetaLoaded, effectiveRelayerFee, receiveAmount, preloadCircuit]);
 
   useEffect(warmCircuit, [warmCircuit]);
-
-  const handlePasskeyRegister = async () => {
-    const seed = await registerPasskey();
-    if (!seed) return;
-    await deriveKeysFromPasskeySeed(seed, networkId);
-    setAuthModalOpen(false);
-  };
-
-  const handlePasskeyAuthenticate = async () => {
-    const seed = await authenticatePasskey();
-    if (!seed) return;
-    await deriveKeysFromPasskeySeed(seed, networkId);
-    setAuthModalOpen(false);
-  };
 
   const inspectClaim = async () => {
     const secret = phrase.trim();
@@ -346,16 +320,7 @@ function ClaimContent() {
         open={authModalOpen}
         onOpenChange={setAuthModalOpen}
         auth={{
-          passkeySupported,
-          hasPasskeyCredential,
-          passkeyLoading,
-          walletLoading: ctx.isLoading,
-          walletConnected: wallet.connected,
           error: ctx.error || passkeyError,
-          onPasskeyRegister: () => void handlePasskeyRegister(),
-          onPasskeyAuthenticate: () => void handlePasskeyAuthenticate(),
-          onWalletConnect: () => { setAuthModalOpen(false); setWalletModalVisible(true); },
-          onWalletDeriveKeys: async () => { await ctx.deriveKeys(); setAuthModalOpen(false); },
           onViewOnlyLogin: (viewingKey) => { void loadViewOnlyKeys(viewingKey); setAuthModalOpen(false); },
         }}
       />
