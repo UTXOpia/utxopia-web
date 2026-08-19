@@ -2,10 +2,11 @@
 
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, LogIn, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
+import { ChevronDown, LogIn, LogOut, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { VaultSetup } from "@/components/vault/vault-setup";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 export interface AuthState {
   error: string | null;
@@ -55,6 +56,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   // is a no-op authority, so every caller of this modal keeps working without
   // learning about a provider they may not have configured.
   const privy = usePrivySolanaAuthority();
+  const clearKeys = useUTXOpiaStore((s) => s.clearKeys);
   const [awaitingLogin, setAwaitingLogin] = useState(false);
 
   // login() only opens a window; there is no promise to await. So the click
@@ -131,12 +133,40 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                 passphrase or losing a device is recoverable without us, which
                 is why it is the one the other rows now lead to. */}
             {showEnvelopeSetup ? (
-              <VaultSetup
-                onDone={() => {
-                  setShowEnvelopeSetup(false);
-                  onOpenChange(false);
-                }}
-              />
+              <div className="flex flex-col gap-3">
+                <VaultSetup
+                  onDone={() => {
+                    setShowEnvelopeSetup(false);
+                    onOpenChange(false);
+                  }}
+                  onBack={() => setShowEnvelopeSetup(false)}
+                />
+
+                {/* Signing in and then landing here with no way back is how
+                    somebody on the wrong account gets stuck: the rows behind
+                    this are gone, and the only other exit was Settings, which
+                    means closing the modal to find it. */}
+                {privy.enabled && privy.authenticated && (
+                  <div className="flex items-center justify-between gap-3 border-t border-gray/10 pt-3">
+                    <span className="min-w-0 truncate text-caption text-gray/60">
+                      Signed in as{" "}
+                      <span className="text-gray-light">{privy.accountLabel ?? "your account"}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        clearKeys();
+                        setShowEnvelopeSetup(false);
+                        void privy.logout();
+                      }}
+                      className="flex shrink-0 items-center gap-1.5 text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      <LogOut className="h-3.5 w-3.5" aria-hidden />
+                      Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
             ) : (
               <>
               {/* Signing in proves nothing about a vault on its own — nothing

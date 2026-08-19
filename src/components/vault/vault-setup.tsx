@@ -25,7 +25,14 @@ import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
 type Mode = "choose" | "create" | "restore" | "login" | "rebuilt" | "saved" | "confirm-replace";
 
-export function VaultSetup({ onDone }: { onDone: () => void }) {
+export function VaultSetup({
+  onDone,
+  onBack,
+}: {
+  onDone: () => void;
+  /** Out of this flow entirely, back to whatever offered it. */
+  onBack?: () => void;
+}) {
   const { register: registerPasskey, authenticate: authenticatePasskey, hasCredential: hasPasskeyCredential } = usePasskey();
   const { networkId, vaultId } = useChainEnvironment();
   const alreadyHere = useMemo(
@@ -309,6 +316,15 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
                 No recovery string — your passphrase and this account
               </span>
             </span>
+          </button>
+        )}
+        {onBack && (
+          <button
+            type="button"
+            onClick={onBack}
+            className="mt-1 self-center text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+          >
+            Back
           </button>
         )}
       </div>
