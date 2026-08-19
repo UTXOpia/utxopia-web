@@ -151,7 +151,7 @@ export function EnabledPrivySolanaProvider({
         // a synced passkey is chosen from the OS list. A second entry there is
         // one the member can pick, and picking it derives a different PRF seed:
         // a different, empty vault, reported as no error at all.
-        loginMethods: ["email", "sms", "wallet", "google"],
+        loginMethods: ["email", "wallet", "google"],
         appearance: { theme: "dark", accentColor: "#14F195" },
         embeddedWallets: {
           solana: { createOnLogin: "users-without-wallets" },
