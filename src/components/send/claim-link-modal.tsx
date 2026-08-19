@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { Copy, Check, X, Loader2 } from "lucide-react";
+import { HoldButton } from "@/components/ui/hold-button";
 import { TokenSourcePicker } from "./token-source-picker";
 import { AmountField } from "./amount-field";
 
@@ -143,14 +144,17 @@ export function ClaimLinkModal({
                 </div>
               )}
               {err && <div role="alert" className="text-xs text-red-500">{err}</div>}
-              <button
-                type="button"
+              {/* Held, like confirming a send: this mints bearer spend
+                  authority that nothing can revoke once the link exists. */}
+              <HoldButton
+                onComplete={() => void handleGenerate()}
                 disabled={busy || !amount || amount === "0"}
-                onClick={handleGenerate}
-                className="w-full px-4 py-2.5 rounded-lg bg-foreground text-background text-sm font-medium disabled:opacity-50 flex items-center justify-center gap-2"
+                variant="primary"
+                className="w-full"
               >
-                {busy ? "Creating claim link..." : "Generate claim link"}
-              </button>
+                {busy && <Loader2 className="w-4 h-4 animate-spin" />}
+                {busy ? "Creating claim link\u2026" : "Hold to create link"}
+              </HoldButton>
             </div>
           ) : (
             <div className="space-y-3">
