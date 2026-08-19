@@ -55,7 +55,7 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
     try {
       if (loginArmed) {
         const { keyMaterial } = await privy.keyMaterialFor(pin);
-        await unlockEnvelopeVault(keyMaterial);
+        await unlockEnvelopeVault(keyMaterial, "pin");
         setPin("");
       } else {
         // A wrapping only exists here if PRF produced its key, so requiring PRF

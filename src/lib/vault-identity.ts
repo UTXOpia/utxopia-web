@@ -315,15 +315,28 @@ export async function unlockWithDevice(input: {
   scope: VaultScope;
   deviceKeyMaterial: Uint8Array;
   metaAddressFor: MetaAddressFor;
+  /**
+   * Which factor produced the key material. It changes nothing about the
+   * unlock and everything about what a failure is allowed to say.
+   */
+  factor?: "passkey" | "pin";
 }): Promise<{ seed: Uint8Array; metaAddress: string }> {
   const envelope = readDeviceEnvelope(input.scope);
   if (!envelope) throw new NoDeviceEnvelopeError();
-  // A passkey failure has no passphrase behind it, and this screen has no field
-  // to correct — pointing at one sends the member away from the recovery string,
-  // which is the thing that would actually get them back in.
+  // A wrong factor cannot open a different vault: the seed is unwrapped, never
+  // derived, so the AEAD tag fails and this throws. That is the whole reason
+  // the seed is wrapped rather than derived from whatever the member typed.
+  //
+  // What the failure says has to match the factor, though. A passkey failure
+  // has nothing on screen to correct, so it points at the recovery string. A
+  // PIN failure has a field right there, and sending that member to their
+  // recovery string instead is telling them to use the nuclear option over a
+  // typo.
   const seed = await unwrapSeed(envelope, input.deviceKeyMaterial, scopeTag(input.scope)).catch(() => {
     throw new EnvelopeUnlockError(
-      "This device's passkey no longer opens this vault. Restore from your recovery string.",
+      input.factor === "pin"
+        ? "That PIN does not open this vault. Try again."
+        : "This device's passkey no longer opens this vault. Restore from your recovery string.",
     );
   });
   const metaAddress = await metaAddressForScope(input.metaAddressFor, seed, input.scope);

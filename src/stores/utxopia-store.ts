@@ -370,7 +370,7 @@ interface UTXOpiaState {
     deviceKeyMaterial?: Uint8Array,
     opts?: { replaceExisting?: boolean },
   ) => Promise<string>;
-  unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array) => Promise<void>;
+  unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array, factor?: "passkey" | "pin") => Promise<void>;
   restoreEnvelopeVault: (
     recoveryString: string,
     passphrase: string,
@@ -676,10 +676,10 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     return recoveryString;
   },
 
-  unlockEnvelopeVault: async (deviceKeyMaterial) => {
+  unlockEnvelopeVault: async (deviceKeyMaterial, factor) => {
     const { scope, metaAddressFor } = await envelopeContext();
     try {
-      const { seed } = await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor });
+      const { seed } = await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor, factor });
       await adoptSeedIntoSession(set, seed);
     } catch (err) {
       // Same reason as the restore path: checking the guard means deriving the

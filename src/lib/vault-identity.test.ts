@@ -395,3 +395,52 @@ describe("the login that armed this device", () => {
     expect(readDeviceSigner(SCOPE)).toBeNull();
   });
 });
+
+describe("a wrong factor cannot open a different vault", () => {
+  beforeEach(freshBrowser);
+
+  // The property the whole envelope design exists for. A derived identity would
+  // hand a wrong PIN a valid, empty vault and report nothing; an unwrapped one
+  // fails the AEAD tag, which is an error somebody can act on.
+  it("fails loudly instead of producing a second identity", async () => {
+    await createVault({
+      scope: SCOPE,
+      passphrase: PASSPHRASE,
+      deviceKeyMaterial: device(1),
+      metaAddressFor,
+    });
+
+    expect(
+      unlockWithDevice({ scope: SCOPE, deviceKeyMaterial: device(2), metaAddressFor }),
+    ).rejects.toThrow(EnvelopeUnlockError);
+  });
+
+  // Same failure, two factors, and only one of them has a field on screen to
+  // correct. Sending a mistyped PIN to the recovery string is telling somebody
+  // to use the nuclear option over a typo.
+  it("names the factor the member actually used", async () => {
+    await createVault({
+      scope: SCOPE,
+      passphrase: PASSPHRASE,
+      deviceKeyMaterial: device(1),
+      metaAddressFor,
+    });
+
+    const pin = await unlockWithDevice({
+      scope: SCOPE,
+      deviceKeyMaterial: device(2),
+      metaAddressFor,
+      factor: "pin",
+    }).catch((caught: Error) => caught.message);
+    expect(pin).toContain("PIN");
+    expect(pin).not.toContain("recovery string");
+
+    const passkey = await unlockWithDevice({
+      scope: SCOPE,
+      deviceKeyMaterial: device(2),
+      metaAddressFor,
+    }).catch((caught: Error) => caught.message);
+    expect(passkey).toContain("passkey");
+    expect(passkey).toContain("recovery string");
+  });
+});
