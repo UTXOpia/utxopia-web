@@ -90,6 +90,7 @@ mock.module("./claim-link-modal", () => ({
 }));
 
 import { SendForm } from "./send-form";
+import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 describe("SendForm", () => {
   it("renders the recipient input first; amount and review hidden until valid", () => {
@@ -107,6 +108,21 @@ describe("SendForm", () => {
       target: { value: "bc1q9d4ywgfnd8h70q4thlsclpw0ymmqfumzgxlhpe" },
     });
     expect(screen.getByLabelText(/^amount$/i)).toBeDefined();
+  });
+
+  // Switching Open <-> Verified drops the old keys before the new ones derive.
+  // The form used to read that gap as signed out and say so, to somebody who
+  // had just clicked a control only a signed-in member can see — three labels
+  // for one click, the first of them untrue.
+  it("does not tell a member to sign in while their vault is being switched", () => {
+    useUTXOpiaStore.setState({ identityRestoring: true });
+    try {
+      render(<SendForm mode="cashout" />);
+      expect(screen.queryByText("Sign in to view")).toBeNull();
+      expect(screen.getAllByText("Loading…").length).toBeGreaterThan(0);
+    } finally {
+      useUTXOpiaStore.setState({ identityRestoring: false });
+    }
   });
 
   it("lets cash-out users choose Bitcoin or Solana and validates the selected network", () => {

@@ -273,6 +273,12 @@ export function SendForm({
   const privacyDomain = getVaultPrivacyDomain(chainEnv.vaultId);
   const activeChainLabel = "Solana";
   const hasVaultKeys = ctx.hasKeys;
+  // A vault switch drops the old keys before the new ones derive, so for those
+  // frames hasKeys is false while the member is very much signed in. Without
+  // this the one click costs three different labels — "Sign in to view", then
+  // "Loading…", then the number — and the first of them is not a flicker, it is
+  // wrong. /vault reads the same flag for the same reason.
+  const identityRestoring = useUTXOpiaStore((s) => s.identityRestoring);
   const refreshPrivateBalance = ctx.refreshInbox;
   const balanceLoadKey = `${chainEnv.networkId}:${ctx.stealthAddressEncoded ?? "locked"}`;
   const balanceLoadRequested = useRef<string | null>(null);
@@ -468,7 +474,7 @@ export function SendForm({
   const insufficientBalance =
     balanceKnown && amountSats > 0 && BigInt(totalNeeded) > totalAvailable;
   const balanceLabel =
-    ctx.isLoading || noteSelector.isLoading || (mode === "cashout" && ctx.hasKeys && balanceReadyKey !== balanceLoadKey)
+    ctx.isLoading || noteSelector.isLoading || identityRestoring || (mode === "cashout" && ctx.hasKeys && balanceReadyKey !== balanceLoadKey)
       ? "Loading…"
       : !ctx.hasKeys
         ? "Sign in to view"
@@ -1066,7 +1072,7 @@ export function SendForm({
         onSourceTokenChange={setLinkToken}
         availableBaseUnits={linkAvailable}
         availableLabel={
-          ctx.isLoading || linkNotes.isLoading
+          ctx.isLoading || linkNotes.isLoading || identityRestoring
             ? "Loading…"
             : !ctx.hasKeys
               ? "Sign in to view"
