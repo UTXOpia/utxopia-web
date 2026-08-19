@@ -130,3 +130,26 @@
     box-shadow: none;
   }
 }
+
+/* ── Shielded-pool observer line ──────────────────────────────────────────
+ *
+ * The card's one argument, in motion: the total above it is public and stays
+ * legible, and the transfer that made it move does not. Two layers share a
+ * cell and trade places — a public chain's version of the same line, then
+ * ours. Blur rather than a fade, because the claim is that the data is there
+ * and unreadable, not that it is absent.
+ *
+ * One shared duration; the two are complements, so any gap between them reads
+ * as a flicker rather than a hand-off.
+ */
+@keyframes utx-observed {
+  0%, 4%     { opacity: 0; filter: blur(7px); transform: translateY(3px); }
+  10%, 40%   { opacity: 1; filter: blur(0);   transform: translateY(0); }
+  48%, 100%  { opacity: 0; filter: blur(7px); transform: translateY(0); }
+}
+
+@keyframes utx-redacted {
+  0%, 40%    { opacity: 0; filter: blur(7px); }
+  50%, 92%   { opacity: 1; filter: blur(0); }
+  100%       { opacity: 0; filter: blur(7px); }
+}

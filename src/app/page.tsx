@@ -43,6 +43,80 @@ function fmtInt(n: number) {
   return Math.round(n).toLocaleString();
 }
 
+/* ── Observer line ───────────────────────────────────────────────────────── */
+
+/**
+ * The card's one argument, in motion.
+ *
+ * The total above it is public and stays legible — that is deliberate, and the
+ * reason this sits under it rather than replacing it. A pool anyone can audit
+ * is worth more than a pool that hides its own size. What a pool must hide is
+ * everything else, and that is what this line trades between: the version of a
+ * transfer a transparent chain publishes, and the version this one does.
+ *
+ * The samples illustrate a public chain's view, which is why they are labelled
+ * as one. There is no feed of ours to show; that is the whole point.
+ *
+ * Blur rather than a fade, because the claim is that the data is there and
+ * unreadable. A fade would say nothing happened.
+ */
+const OBSERVED = [
+  { from: "7xKX\u20269fD2", to: "4mNp\u2026kR8w", amount: "412.50", unit: "USDC" },
+  { from: "Gk2v\u2026Lq7T", to: "9bWc\u2026Hs3E", amount: "1.284", unit: "SOL" },
+  { from: "Dm8p\u2026Rt5N", to: "2fQz\u2026Yv6J", amount: "0.0417", unit: "zkBTC" },
+];
+
+const CYCLE = "5.6s";
+const DOT = "\u2022";
+
+function ObserverLine() {
+  const [i, setI] = React.useState(0);
+  const s = OBSERVED[i];
+
+  return (
+    <div
+      className="relative mb-3.5 h-[52px] overflow-hidden rounded-[14px] border border-gray/15 bg-background"
+      // The clear half is an illustration of a public chain; a screen reader
+      // reading it aloud in sequence would hear a claim about this pool.
+      aria-hidden="true"
+    >
+      {/* Public chain — enters clear, then goes under. Opacity 0 by default so
+          the reduced-motion and no-animation paths land on the truthful half. */}
+      <div
+        onAnimationIteration={() => setI((n) => (n + 1) % OBSERVED.length)}
+        style={{ animationDuration: CYCLE }}
+        className="absolute inset-0 flex items-center gap-2 px-4 opacity-0 motion-safe:animate-[utx-observed_linear_infinite]"
+      >
+        <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-wider text-gray/70">
+          Public chain
+        </span>
+        <span className="truncate font-mono text-[12px] text-gray-light">
+          {s.from} <span className="text-gray">\u2192</span> {s.to}
+        </span>
+        <span className="flex-1" />
+        <span className="shrink-0 font-mono text-[12.5px] tabular-nums text-foreground">
+          {s.amount} <span className="text-gray">{s.unit}</span>
+        </span>
+      </div>
+
+      {/* Here. The resting state, and the only one that describes this pool. */}
+      <div
+        style={{ animationDuration: CYCLE }}
+        className="absolute inset-0 flex items-center gap-2 px-4 motion-safe:animate-[utx-redacted_linear_infinite]"
+      >
+        <span className="shrink-0 text-[10.5px] font-medium uppercase tracking-wider text-privacy/80">
+          Here
+        </span>
+        <span className="truncate font-mono text-[12px] text-gray/55">
+          {DOT.repeat(9)} <span className="text-gray/35">\u2192</span> {DOT.repeat(9)}
+        </span>
+        <span className="flex-1" />
+        <span className="shrink-0 font-mono text-[12.5px] text-gray/55">{DOT.repeat(6)}</span>
+      </div>
+    </div>
+  );
+}
+
 function PoolCard({
   holdings,
   tvlUsd,
@@ -88,6 +162,8 @@ function PoolCard({
           />
         )}
       </div>
+
+      <ObserverLine />
 
       {/* Exactly three rows visible, however many assets land. Rows are pinned to
           --row-h so the cap is arithmetic rather than a guessed pixel height. */}
