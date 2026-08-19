@@ -20,7 +20,7 @@ import type { DepositRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, FlowIcon, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, StatusDot, FlowCell, FlowIcon, LoadingState, ErrorState, EmptyState, RefreshButton, usePagination } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { getTokenBySymbol, type SupportedToken } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -478,7 +478,9 @@ export function DepositRow({
 
 export function DepositsTab() {
   const { transactions, isLoading, error, refresh } = useExplorer();
+  const { networkId } = useChainEnvironment();
   const deposits = transactions.filter(t => t.type === "shield").map(toDepositRecord);
+  const { rows, offset, control: pagination } = usePagination(deposits, networkId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = useCallback((sig: string) => {
@@ -516,8 +518,10 @@ export function DepositsTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray/10">
-            {deposits.map((d, i) => {
-              const depositKey = `${d.btcMeta?.depositTxid || d.txSignature || d.btcMeta?.taprootAddress || d.commitment}-${i}`;
+            {rows.map((d, i) => {
+              // Offset, not the page index: the key has to mean the same thing
+              // on page 3 as on page 1 or the expanded panel follows the wrong row.
+              const depositKey = `${d.btcMeta?.depositTxid || d.txSignature || d.btcMeta?.taprootAddress || d.commitment}-${offset + i}`;
               return (
                 <DepositRow
                   key={depositKey}
@@ -530,6 +534,7 @@ export function DepositsTab() {
           </tbody>
         </table>
       </div>
+      {pagination}
     </div>
   );
 }

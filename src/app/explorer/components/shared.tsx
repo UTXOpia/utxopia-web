@@ -9,6 +9,8 @@
 import { useState, useRef, useEffect } from "react";
 import {
   ArrowDownToLine,
+  ChevronLeft,
+  ChevronRight,
   ArrowUpDown,
   ArrowUpFromLine,
   Check,
@@ -437,6 +439,125 @@ export function StatCard({ label, value, icon, color }: { label: string; value: 
       <div>
         <p className="text-heading6 text-foreground font-mono">{value}</p>
         <p className="text-caption text-gray">{label}</p>
+      </div>
+    </div>
+  );
+}
+
+// --- Pagination ---
+
+export const PAGE_SIZES = [10, 20, 50] as const;
+const PAGE_SIZE_KEY = "utxopia:explorer-page-size";
+const DEFAULT_PAGE_SIZE = 20;
+
+/** Clamp the page to what `total` rows actually support, then slice. */
+export function pageSlice<T>(items: T[], page: number, size: number): { page: number; pageCount: number; rows: T[] } {
+  const pageCount = Math.max(1, Math.ceil(items.length / size));
+  const current = Math.min(Math.max(1, page), pageCount);
+  return { page: current, pageCount, rows: items.slice((current - 1) * size, current * size) };
+}
+
+/**
+ * Client-side paging for an already-fetched list. `resetKey` is any string that
+ * changes when the view changes (filters, pool, network) — not on data refresh,
+ * which would yank the reader back to page 1 every poll.
+ */
+export function usePagination<T>(items: T[], resetKey: string) {
+  const [size, setSize] = useState<number>(DEFAULT_PAGE_SIZE);
+  const [page, setPage] = useState(1);
+
+  // localStorage only after mount, else SSR and client disagree on first paint.
+  useEffect(() => {
+    const saved = Number(localStorage.getItem(PAGE_SIZE_KEY));
+    if ((PAGE_SIZES as readonly number[]).includes(saved)) setSize(saved);
+  }, []);
+
+  useEffect(() => setPage(1), [resetKey]);
+
+  const { page: current, pageCount, rows } = pageSlice(items, page, size);
+
+  const changeSize = (next: number) => {
+    setSize(next);
+    setPage(1);
+    localStorage.setItem(PAGE_SIZE_KEY, String(next));
+  };
+
+  return {
+    rows,
+    /**
+     * Index of the first row on this page, within the whole list. Callers that
+     * build a row key from the map index need it: paged indices restart at 0,
+     * so without the offset two rows on different pages collide, and whatever
+     * the key drives — an expanded detail panel, a selection — follows the
+     * wrong row.
+     */
+    offset: (current - 1) * size,
+    control:
+      items.length <= PAGE_SIZES[0] ? null : (
+        <PaginationBar
+          page={current}
+          pageCount={pageCount}
+          size={size}
+          total={items.length}
+          onPage={setPage}
+          onSize={changeSize}
+        />
+      ),
+  };
+}
+
+function PaginationBar({
+  page,
+  pageCount,
+  size,
+  total,
+  onPage,
+  onSize,
+}: {
+  page: number;
+  pageCount: number;
+  size: number;
+  total: number;
+  onPage: (p: number) => void;
+  onSize: (s: number) => void;
+}) {
+  const first = (page - 1) * size + 1;
+  const last = Math.min(page * size, total);
+
+  return (
+    <div className="flex items-center justify-between gap-3 px-1 pt-3 flex-wrap">
+      <label className="flex items-center gap-2 text-caption text-gray">
+        Rows
+        <select
+          value={size}
+          onChange={(e) => onSize(Number(e.target.value))}
+          className="rounded-[8px] border border-gray/15 bg-muted/40 px-2 py-1 text-[12px] text-gray-light cursor-pointer"
+        >
+          {PAGE_SIZES.map((s) => (
+            <option key={s} value={s}>{s}</option>
+          ))}
+        </select>
+      </label>
+
+      <div className="flex items-center gap-2">
+        <span className="text-caption text-gray font-mono">{first}&ndash;{last} of {total}</span>
+        <button
+          onClick={() => onPage(page - 1)}
+          disabled={page <= 1}
+          aria-label="Previous page"
+          className="p-1 rounded-[8px] border border-gray/15 text-gray hover:text-foreground disabled:opacity-30 disabled:hover:text-gray cursor-pointer disabled:cursor-default"
+        >
+          <ChevronLeft className="w-3.5 h-3.5" />
+        </button>
+        <span className="text-caption text-gray font-mono">{page} / {pageCount}</span>
+        <button
+          onClick={() => onPage(page + 1)}
+          disabled={page >= pageCount}
+          aria-label="Next page"
+          className="p-1 rounded-[8px] border border-gray/15 text-gray hover:text-foreground disabled:opacity-30 disabled:hover:text-gray cursor-pointer disabled:cursor-default"
+        >
+          <ChevronRight className="w-3.5 h-3.5" />
+        </button>
       </div>
     </div>
   );

@@ -24,7 +24,7 @@ import { formatAmount } from "@/lib/utils/formatting";
 import useSWR from "swr";
 import { getEsploraApiUrl, getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo, scriptToAddress } from "./helpers";
-import { Th, Td, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, TypeBadge, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton, usePagination } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import type { NetworkId } from "@/lib/network-config";
@@ -503,6 +503,7 @@ export function WithdrawalsTab() {
   const redemptions = data ?? [];
   const error = swrError ? (swrError instanceof Error ? swrError.message : "Failed to fetch redemptions") : null;
   const refresh = () => mutate();
+  const { rows, control: pagination } = usePagination(redemptions, networkId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = useCallback((key: string) => {
@@ -538,7 +539,7 @@ export function WithdrawalsTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray/10">
-            {redemptions.map((r) => {
+            {rows.map((r) => {
               const rowKey = r.requestId || r.pubkey;
               return (
                 <WithdrawalRow
@@ -553,6 +554,7 @@ export function WithdrawalsTab() {
           </tbody>
         </table>
       </div>
+      {pagination}
     </div>
   );
 }

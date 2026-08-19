@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import { detectNetwork, NETWORK_META, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 
-import { TypeFilterBar, VaultFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState, type VaultFilter } from "./components/shared";
+import { TypeFilterBar, VaultFilterBar, LoadingState, StatCard, Th, RefreshButton, EmptyState, usePagination, type VaultFilter } from "./components/shared";
 import { vaultsSupported } from "@/lib/vault-config";
 import type { FilterType, TokenFilter } from "./components/shared";
 import { TransferRow } from "./components/transfers-tab";
@@ -176,6 +176,13 @@ function ExplorerContent({ network }: { network: NetworkId }) {
     return items;
   }, [vaultScoped, activeFilter, selectedTokens]);
 
+  // Paging is client-side over the already-fetched feed. The reset key is the
+  // view, not the data — a 30s refresh must not throw the reader back to page 1.
+  const { rows, control: pagination } = usePagination(
+    filtered,
+    `${network}|${activeVault}|${activeFilter}|${[...selectedTokens].sort().join(",")}`,
+  );
+
   // TVL from on-chain pool state (same as main page)
   // TVL follows the pool filter: "All pools" sums both, a scoped view shows
   // only that pool's value.
@@ -250,7 +257,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray/10">
-                {filtered.map((tx) => {
+                {rows.map((tx) => {
                   const rowKey = tx.txSignature || tx.btcMeta?.depositTxid || `${tx.type}-${tx.timestamp}`;
                   return (
                     <TransferRow
@@ -268,6 +275,7 @@ function ExplorerContent({ network }: { network: NetworkId }) {
             </table>
           </div>
         )}
+        {pagination}
       </div>
     </>
   );

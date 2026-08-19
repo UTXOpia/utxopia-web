@@ -15,7 +15,7 @@ import { CopyButton } from "@/components/ui/copy-button";
 import { useExplorer, type ExplorerTransaction, type RedemptionRecord } from "@/hooks/use-explorer";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { truncate, timeAgo } from "./helpers";
-import { Th, Td, ChainTxLink, TypeBadge, VaultTag, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton } from "./shared";
+import { Th, Td, ChainTxLink, TypeBadge, VaultTag, StatusDot, FlowCell, LoadingState, ErrorState, EmptyState, RefreshButton, usePagination } from "./shared";
 import type { StatusDotVariant } from "./shared";
 import { SUPPORTED_TOKENS, getTokenBySymbol } from "@/lib/supported-tokens";
 import { resolveTokenSymbolSync } from "@/lib/token-map";
@@ -255,6 +255,8 @@ export function TransfersTab() {
   const { transactions, isLoading, error, refresh } = useExplorer();
   const { networkId } = useChainEnvironment();
   const transfers = transactions.filter(t => t.type !== "shield");
+  // Before the early returns: hooks cannot sit behind a loading branch.
+  const { rows, control: pagination } = usePagination(transfers, networkId);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
 
   const toggle = useCallback((sig: string) => {
@@ -290,7 +292,7 @@ export function TransfersTab() {
             </tr>
           </thead>
           <tbody className="divide-y divide-gray/10">
-            {transfers.map((tx) => (
+            {rows.map((tx) => (
               <TransferRow
                 key={tx.txSignature}
                 tx={tx}
@@ -303,6 +305,7 @@ export function TransfersTab() {
           </tbody>
         </table>
       </div>
+      {pagination}
     </div>
   );
 }
