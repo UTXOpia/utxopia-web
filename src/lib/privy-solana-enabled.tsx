@@ -6,6 +6,7 @@ import { PrivyProvider, useLogin, usePrivy } from "@privy-io/react-auth";
 import {
   toSolanaWalletConnectors,
   useCreateWallet,
+  useSignMessage,
   useSignTransaction,
   useWallets,
   type ConnectedStandardSolanaWallet,
@@ -42,6 +43,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
+  const { signMessage } = useSignMessage();
   const solanaChain = inferSolanaChain();
 
   const wallet = useMemo(() => findEmbeddedWallet(wallets), [wallets]);
@@ -81,6 +83,23 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     [signTransaction, solanaChain, wallets],
   );
 
+  const signPrivyMessage = useCallback(
+    async (message: Uint8Array) => {
+      const signingWallet = findEmbeddedWallet(wallets);
+      if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
+
+      const { signature } = await signMessage({ message, wallet: signingWallet });
+      // The wrapping key is argon2id(PIN, sha256(signature)), so a short or
+      // re-encoded signature silently produces a key nobody can reproduce and
+      // the member is told their PIN is wrong. Fail here, where it is legible.
+      if (signature.length !== 64) {
+        throw new Error(`Unexpected Privy signature length: ${signature.length}`);
+      }
+      return signature;
+    },
+    [signMessage, wallets],
+  );
+
   const value = useMemo<PrivySolanaAuthority>(
     () => ({
       enabled: true,
@@ -90,8 +109,18 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       login: openLogin,
       ensureWallet,
       signTransaction: signPrivyTransaction,
+      signMessage: signPrivyMessage,
     }),
-    [authenticated, ensureWallet, openLogin, privyReady, publicKey, signPrivyTransaction, walletsReady],
+    [
+      authenticated,
+      ensureWallet,
+      openLogin,
+      privyReady,
+      publicKey,
+      signPrivyTransaction,
+      signPrivyMessage,
+      walletsReady,
+    ],
   );
 
   return <PrivySolanaContext.Provider value={value}>{children}</PrivySolanaContext.Provider>;
@@ -114,7 +143,10 @@ export function EnabledPrivySolanaProvider({
       appId={appId}
       clientId={clientId}
       config={{
-        loginMethods: ["passkey", "email", "wallet"],
+        // Privy's own passkey is deliberately absent: it would mint a second
+        // credential beside the one whose PRF wraps the vault, and re-pointing
+        // the stored credential id orphans every wrapping on the device.
+        loginMethods: ["email", "wallet", "google", "farcaster"],
         appearance: { theme: "dark", accentColor: "#14F195" },
         embeddedWallets: {
           solana: { createOnLogin: "users-without-wallets" },

@@ -4,9 +4,13 @@ import {
   EnvelopeIdentityError,
   EnvelopeUnlockError,
   KDF_V1,
+  MIN_PIN_LENGTH,
+  WeakPinError,
   assertIdentity,
+  buildUnlockMessage,
   decodeEnvelope,
   deriveFromPassphrase,
+  deriveFromPin,
   encodeEnvelope,
   envelopeFromHex,
   envelopeToHex,
@@ -178,5 +182,82 @@ describe("passphrase stretching", () => {
     // what it must not cost. Both bounds are load-bearing.
     expect(elapsed).toBeGreaterThan(20);
     expect(elapsed).toBeLessThan(4000);
+  });
+});
+
+describe("the message the login provider signs", () => {
+  // FROZEN. Every wrapping written under the old text stops opening if this
+  // changes, so this test failing is the alarm, not a chore.
+  it("is exactly this", () => {
+    expect(buildUnlockMessage("devnet")).toBe(
+      `Sign this message to unlock your UTXOpia vault.
+
+WARNING: Only sign this in a client you trust.
+Signing it anywhere else can cost you your funds.
+
+Network: solana:devnet
+Vault: root`,
+    );
+  });
+
+  // The provider sees this string and nothing else. If it ever varies per
+  // member, it becomes an offline oracle linking a social account to an
+  // on-chain identity — the one thing the pools exist to prevent.
+  it("says nothing about who is signing it", () => {
+    expect(buildUnlockMessage("devnet")).toBe(buildUnlockMessage("devnet"));
+    expect(buildUnlockMessage("devnet")).not.toContain("utxo:");
+  });
+
+  it("does not let a devnet signature open a mainnet wrapping", () => {
+    expect(buildUnlockMessage("devnet")).not.toBe(buildUnlockMessage("mainnet"));
+  });
+});
+
+describe("PIN stretching", () => {
+  const sig = (byte: number) => new Uint8Array(64).fill(byte);
+
+  // The load-bearing assumption of the whole login path: ed25519 is
+  // deterministic (RFC 8032) and Solana signs that way, so the same wallet over
+  // the same message reproduces the same salt. A signer that adds randomness
+  // costs this wrapping — not the identity, which the recovery string still
+  // opens, but the failure would otherwise look like a wrong PIN.
+  it("is deterministic for the same PIN and signature", () => {
+    expect(deriveFromPin("123456", sig(7))).toEqual(deriveFromPin("123456", sig(7)));
+  });
+
+  it("changes completely when the signature does", () => {
+    expect(deriveFromPin("123456", sig(7))).not.toEqual(deriveFromPin("123456", sig(8)));
+  });
+
+  it("refuses a PIN too short to be worth wrapping under", () => {
+    expect(() => deriveFromPin("1".repeat(MIN_PIN_LENGTH - 1), sig(7))).toThrow(WeakPinError);
+  });
+
+  it("wraps and unwraps a seed like any other factor", async () => {
+    const seed = newSeed();
+    const material = deriveFromPin("123456", sig(7));
+    const envelope = await wrapSeed({
+      seed,
+      keyMaterial: material,
+      salt: newSalt(),
+      guard: guardFor(META),
+      aad: AAD,
+    });
+    expect(await unwrapSeed(envelope, deriveFromPin("123456", sig(7)), AAD)).toEqual(seed);
+    expect(unwrapSeed(envelope, deriveFromPin("654321", sig(7)), AAD)).rejects.toThrow(
+      EnvelopeUnlockError,
+    );
+  });
+
+  it("is bound to its pool like every other wrapping", async () => {
+    const material = deriveFromPin("123456", sig(7));
+    const envelope = await wrapSeed({
+      seed: newSeed(),
+      keyMaterial: material,
+      salt: newSalt(),
+      guard: guardFor(META),
+      aad: AAD,
+    });
+    expect(unwrapSeed(envelope, material, OTHER_AAD)).rejects.toThrow(EnvelopeUnlockError);
   });
 });

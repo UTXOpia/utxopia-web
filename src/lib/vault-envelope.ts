@@ -16,16 +16,24 @@
  * instead of opening an empty stranger — and unlike a stored verifier, that tag
  * is only useful to someone already holding the ciphertext.
  *
- * Nothing here reaches a server, ours or anyone's. Two wrappings exist:
+ * Nothing here reaches a server, ours or anyone's. Three wrappings exist:
  *
- *   E_device  passkey PRF          on this device, every day
- *   E_string  argon2id(passphrase) the member keeps it, the only way to a new device
+ *   E_device  passkey PRF              on this device, every day
+ *   E_login   argon2id(PIN, signature) same job, where PRF is unavailable
+ *   E_string  argon2id(passphrase)     the member keeps it, the only way to a new device
  *
- * Deliberately no provider-signed wrapping. It could only live on a device that
- * already has E_device, so it would never be the one that saves anybody — and
- * leaving it out keeps the login provider out of the vault's security model
- * entirely: taking over the member's email wins the attacker an app session and
- * nothing else.
+ * E_login exists because a browser without PRF got no daily wrapping at all and
+ * had to be handed the recovery string every visit — which is how a string that
+ * should be written down once ends up pasted out of a notes app twice a day.
+ *
+ * It is a real trade and not a free one. An earlier version of this comment
+ * argued for keeping the login provider out of the model entirely, on the
+ * grounds that taking over the member's email would then win an attacker an app
+ * session and nothing else. Where E_login is armed that is no longer true: a
+ * stolen session yields one signature, and a signature beside this ciphertext
+ * puts a six-digit PIN within offline reach. So the PIN is not what makes
+ * E_login safe — E_string is still the only factor carrying real entropy, and
+ * E_login is deliberately never the only wrapping a member has.
  */
 
 import { argon2id } from "@noble/hashes/argon2";
@@ -43,6 +51,43 @@ const HKDF_INFO = "utxopia:envelope:v1";
 
 /** Recovery strings are prefixed so a member can tell what they are pasting. */
 const STRING_PREFIX = "utxovault1";
+
+/**
+ * FROZEN. What the login provider signs, and the whole of what it learns.
+ *
+ * Every member on a network signs this exact string. It carries no address, no
+ * salt and nothing derived from the PIN, so the provider cannot tell two
+ * members apart by it and cannot link a social account to an on-chain identity
+ * — which for a pool whose entire purpose is unlinkability is the property that
+ * matters most here. That is why the PIN is mixed in afterwards (see
+ * `deriveFromPin`) rather than committed to inside the message: a per-member
+ * string here would be an offline oracle for exactly the pair the pools exist
+ * to keep apart.
+ *
+ * `Vault: root` rather than a pool id, because there is one root and both
+ * pools' wrappings hold it. Scoping the message per pool would cost a second
+ * signature prompt and separate nothing — `wrapSeed` already folds the scope
+ * into the HKDF info and the AEAD's additional data, so one signature produces
+ * a different key in each pool by construction.
+ *
+ * The network is in it: a devnet signature must not open a mainnet wrapping.
+ *
+ * Change a byte and every wrapping written under the old text stops opening.
+ * Treat that the way Umbra had to treat eth_sign -> personal_sign.
+ */
+const MESSAGE_TEMPLATE = (network: string) =>
+  `Sign this message to unlock your UTXOpia vault.
+
+WARNING: Only sign this in a client you trust.
+Signing it anywhere else can cost you your funds.
+
+Network: solana:${network}
+Vault: root`;
+
+/** The message the login provider signs. Exported so a test can pin it. */
+export function buildUnlockMessage(network: string): string {
+  return MESSAGE_TEMPLATE(network);
+}
 
 /**
  * Argon2id cost. Not frozen — carried in the envelope so an existing wrapping
@@ -122,6 +167,53 @@ export function deriveFromPassphrase(
     m: kdf.m,
     t: kdf.t,
     p: kdf.p,
+    dkLen: 32,
+  });
+}
+
+/**
+ * Argon2id cost for the PIN. Heavier than KDF_V1 on purpose.
+ *
+ * KDF_V1 has to stay usable during a restore on a member's phone, in a panic,
+ * possibly on the worst hardware they own. This one runs once, on a device the
+ * member already uses daily, behind a login they have just completed — so it
+ * can afford four times the memory, and a six-digit secret needs every bit of
+ * it. ~600ms on an M-series laptop.
+ */
+const PIN_KDF = { m: 65536, t: 3, p: 1 } as const;
+
+export const MIN_PIN_LENGTH = 6;
+
+export class WeakPinError extends Error {
+  constructor() {
+    super(`Use at least ${MIN_PIN_LENGTH} characters.`);
+    this.name = "WeakPinError";
+  }
+}
+
+/**
+ * Key material for E_login: the PIN stretched under the provider's signature.
+ *
+ * The signature is the salt. That is what lets the second factor be six digits
+ * — it is high-entropy, stable for a member, and unlike a stored salt it is not
+ * sitting on the device beside the ciphertext, so there is nothing to attack
+ * until the signature itself leaks. It also means nothing new has to be stored:
+ * `armDevice` keeps its own salt for HKDF and needs no field for this one.
+ *
+ * Separate from `deriveFromPassphrase` on purpose, and deliberately not a thin
+ * wrapper over it. A PIN must never end up wrapping a recovery string, and the
+ * way to guarantee that is for the two to share no code path at all.
+ */
+export function assertPin(pin: string): void {
+  if (pin.trim().length < MIN_PIN_LENGTH) throw new WeakPinError();
+}
+
+export function deriveFromPin(pin: string, signature: Uint8Array): Uint8Array {
+  assertPin(pin);
+  return argon2id(new TextEncoder().encode(pin.trim()), sha256(signature), {
+    m: PIN_KDF.m,
+    t: PIN_KDF.t,
+    p: PIN_KDF.p,
     dkLen: 32,
   });
 }

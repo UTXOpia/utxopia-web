@@ -15,10 +15,12 @@ import { useMemo, useState } from "react";
 import { AlertCircle, ArrowLeft, KeyRound, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
+import { usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { PassphraseField } from "@/components/vault/passphrase-field";
+import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
 type Mode = "choose" | "create" | "restore" | "saved" | "confirm-replace";
@@ -30,6 +32,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
     () => hasDeviceEnvelope({ networkId, vaultId }),
     [networkId, vaultId],
   );
+  const privy = usePrivyVaultKey();
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
   const verifyRecoveryString = useUTXOpiaStore((s) => s.verifyRecoveryString);
@@ -39,6 +42,7 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryString, setRecoveryString] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
+  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -55,6 +59,35 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
     }
   };
 
+  /**
+   * Key material for this device's wrapping, preferring the passkey.
+   *
+   * PRF's absence is only discoverable by asking, so the fallback lives here
+   * rather than in a branch chosen up front. Where the browser cannot do PRF, a
+   * login signature and a PIN wrap the same seed — the alternative is what this
+   * used to do: leave the device with no wrapping at all and send the member
+   * back to their recovery string on every visit, which is how a string that
+   * should be written down once ends up in a notes app.
+   *
+   * Still optional. A member who gives no PIN gets the old behaviour and an
+   * honest notice, not a wrapping under something they did not choose.
+   */
+  const armingMaterial = async (
+    ask: (opts: { requirePrf: true }) => Promise<Uint8Array | null>,
+  ): Promise<{ material?: Uint8Array; signer?: string }> => {
+    try {
+      const material = await ask({ requirePrf: true });
+      if (material) return { material };
+    } catch (caught) {
+      if (!(caught instanceof PrfUnavailableError)) throw caught;
+      setNotice(caught.message);
+    }
+    if (!privy.available || !pin.trim()) return {};
+    const { keyMaterial, signer } = await privy.keyMaterialFor(pin);
+    setNotice(null);
+    return { material: keyMaterial, signer };
+  };
+
   const handleCreate = () =>
     run(async () => {
       // The passkey both gates this device and supplies the key material its
@@ -68,17 +101,14 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       // already on this device — the other vault, other networks, any legacy
       // identity — was sealed under the first credential's PRF output.
       const askDevice = hasPasskeyCredential ? authenticatePasskey : registerPasskey;
-      const deviceKeyMaterial = await askDevice({ requirePrf: true }).catch((caught) => {
-        if (caught instanceof PrfUnavailableError) {
-          setNotice(caught.message);
-          return null;
-        }
-        throw caught;
-      });
+      const { material, signer } = await armingMaterial(askDevice);
       setRecoveryString(
-        await createEnvelopeVault(passphrase, deviceKeyMaterial ?? undefined, { replaceExisting: alreadyHere }),
+        await createEnvelopeVault(passphrase, material, { replaceExisting: alreadyHere }),
       );
+      // Only once the wrapping it describes exists.
+      if (signer) privy.remember(signer);
       setPassphrase("");
+      setPin("");
       setMode("saved");
     });
 
@@ -87,12 +117,11 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
       // Arming this device is optional — a restore that cannot do it safely
       // should still open the vault for this session rather than fail, and
       // should say why the next visit will ask again.
-      const deviceKeyMaterial = await authenticatePasskey({ requirePrf: true }).catch((caught) => {
-        if (caught instanceof PrfUnavailableError) setNotice(caught.message);
-        return null;
-      });
-      await restoreEnvelopeVault(recoveryInput, passphrase, deviceKeyMaterial ?? undefined);
+      const { material, signer } = await armingMaterial(authenticatePasskey);
+      await restoreEnvelopeVault(recoveryInput, passphrase, material);
+      if (signer) privy.remember(signer);
       setPassphrase("");
+      setPin("");
       setRecoveryInput("");
       onDone();
     });
@@ -292,6 +321,16 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
           This passphrase is the only lock on your recovery string, and it is not stored anywhere.
           If you forget it, the string alone will not get you back in.
         </p>
+      )}
+
+      {privy.available && (
+        <PinField
+          value={pin}
+          onChange={setPin}
+          disabled={busy}
+          label="PIN (optional)"
+          hint="Only used if this device cannot do passkeys. It lets your login reopen this vault here — it is not a second lock on your recovery string."
+        />
       )}
 
       {notice && <Notice text={notice} />}

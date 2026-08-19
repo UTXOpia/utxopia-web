@@ -3,6 +3,7 @@ import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@utxopia/sdk";
 import {
   EnvelopeIdentityError,
+  SignerChangedError,
   workingSeedFor,
   NoDeviceEnvelopeError,
   VaultAlreadyHereError,
@@ -14,11 +15,15 @@ import {
   clearDeviceEnvelope,
   createVault,
   hasDeviceEnvelope,
+  assertDeviceSigner,
   readDeviceEnvelope,
+  readDeviceSigner,
   unlockWithDevice,
+  writeDeviceSigner,
   unlockWithRecoveryString,
   verifyRecoveryString,
 } from "./vault-identity";
+import { MIN_PIN_LENGTH, WeakPinError, deriveFromPin } from "./vault-envelope";
 import { EnvelopeUnlockError } from "./vault-envelope";
 
 // A stand-in for the SDK's seed → meta-address derivation: deterministic, and
@@ -334,5 +339,59 @@ describe("armDevice", () => {
     const second = readDeviceEnvelope(SCOPE)!;
     expect(second.kdf.salt).not.toEqual(first.kdf.salt);
     expect(second.nonce).not.toEqual(first.nonce);
+  });
+});
+
+describe("a PIN is not a passphrase", () => {
+  beforeEach(freshBrowser);
+
+  // The two share no code path by construction, and the length floors make the
+  // separation impossible to cross by accident: a PIN short enough to be worth
+  // typing daily cannot reach a recovery string, which is the only factor here
+  // carrying real entropy.
+  it("is too short to lock a recovery string", async () => {
+    const pin = "1".repeat(MIN_PIN_LENGTH);
+    expect(
+      createVault({ scope: SCOPE, passphrase: pin, metaAddressFor }),
+    ).rejects.toThrow(WeakPassphraseError);
+  });
+
+  it("refuses to stretch something shorter than a PIN either", () => {
+    expect(() => deriveFromPin("12345", new Uint8Array(64).fill(1))).toThrow(WeakPinError);
+  });
+});
+
+describe("the login that armed this device", () => {
+  beforeEach(freshBrowser);
+
+  it("passes when it is the one that armed, or when nothing armed yet", () => {
+    expect(() => assertDeviceSigner(SCOPE, "wallet-a")).not.toThrow();
+    writeDeviceSigner(SCOPE, "wallet-a");
+    expect(() => assertDeviceSigner(SCOPE, "wallet-a")).not.toThrow();
+  });
+
+  // Without this the member is told their passkey stopped working, on a screen
+  // with no passkey involved and nothing to act on.
+  it("names itself when the provider hands back a different wallet", () => {
+    writeDeviceSigner(SCOPE, "wallet-a");
+    expect(() => assertDeviceSigner(SCOPE, "wallet-b")).toThrow(SignerChangedError);
+  });
+
+  it("is scoped per pool, like the wrapping it describes", () => {
+    writeDeviceSigner(SCOPE, "wallet-a");
+    expect(readDeviceSigner(OTHER_SCOPE)).toBeNull();
+    expect(() => assertDeviceSigner(OTHER_SCOPE, "wallet-b")).not.toThrow();
+  });
+
+  it("is forgotten with the vault, not left behind to mislead the next one", async () => {
+    await createVault({
+      scope: SCOPE,
+      passphrase: PASSPHRASE,
+      deviceKeyMaterial: device(1),
+      metaAddressFor,
+    });
+    writeDeviceSigner(SCOPE, "wallet-a");
+    clearDeviceEnvelope(SCOPE);
+    expect(readDeviceSigner(SCOPE)).toBeNull();
   });
 });

@@ -132,6 +132,53 @@ export function writeDeviceEnvelope(scope: VaultScope, envelope: VaultEnvelope):
 
 export function clearDeviceEnvelope(scope: VaultScope): void {
   localStorage.removeItem(deviceKey(scope));
+  localStorage.removeItem(signerKey(scope));
+}
+
+// ---------------------------------------------------------------------------
+// Which login armed this device
+//
+// A device-local note, not part of the envelope: the packed format is what
+// recovery strings are made of, and it does not grow a field for something only
+// this browser cares about.
+//
+// It does two jobs. It is the tell for which unlock this browser should offer,
+// since a wrapping alone cannot say whether PRF or a signature produced it. And
+// it is the error message: a member whose provider hands them a different
+// embedded wallet would otherwise be told "this device's passkey no longer
+// opens this vault", which names the wrong factor on a screen with nothing to
+// act on — the empty-vault-instead-of-an-error failure this whole module was
+// written to avoid.
+// ---------------------------------------------------------------------------
+
+const DEVICE_SIGNER_PREFIX = "utxo:signer:v1:";
+
+function signerKey(scope: VaultScope): string {
+  return `${DEVICE_SIGNER_PREFIX}${scope.networkId}:${scope.vaultId}`;
+}
+
+export class SignerChangedError extends Error {
+  constructor() {
+    super(
+      "This vault was set up under a different login. Sign in with that account, or restore from your recovery string.",
+    );
+    this.name = "SignerChangedError";
+  }
+}
+
+export function readDeviceSigner(scope: VaultScope): string | null {
+  if (typeof window === "undefined") return null;
+  return localStorage.getItem(signerKey(scope));
+}
+
+export function writeDeviceSigner(scope: VaultScope, signer: string): void {
+  localStorage.setItem(signerKey(scope), signer);
+}
+
+/** Call before signing, so a swapped wallet fails naming the real cause. */
+export function assertDeviceSigner(scope: VaultScope, signer: string): void {
+  const known = readDeviceSigner(scope);
+  if (known && known !== signer) throw new SignerChangedError();
 }
 
 /** Has this browser ever held a vault for this scope? Drives "restore or create". */

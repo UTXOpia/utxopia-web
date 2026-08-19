@@ -9,17 +9,20 @@
  * invitation to start over. The wrapping in localStorage is the tell: it exists
  * only if a vault was set up in this browser.
  *
- * Reopening it needs the passkey, and WebAuthn needs a gesture, so this is a
- * button rather than something that happens on load.
+ * Reopening it needs whichever factor armed this browser — the passkey, or a
+ * login signature and a PIN where PRF was unavailable. Both need a gesture, so
+ * this is a button rather than something that happens on load.
  */
 
 import { useEffect, useState } from "react";
-import { AlertCircle, Fingerprint, Loader2 } from "lucide-react";
+import { AlertCircle, Fingerprint, KeyRound, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePasskey } from "@/hooks/use-passkey";
+import { useLoginArmed, usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { hasDeviceEnvelope } from "@/lib/vault-identity";
+import { PinField } from "@/components/vault/pin-field";
 
 export function useHasLocalVault(): boolean {
   const { networkId, vaultId } = useChainEnvironment();
@@ -37,7 +40,12 @@ export function useHasLocalVault(): boolean {
 
 export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => void }) {
   const { authenticate } = usePasskey();
+  const privy = usePrivyVaultKey();
+  // The wrapping alone cannot say what made it, so the signer note is the tell.
+  // Offering the wrong one would ask for a factor that was never used here.
+  const loginArmed = useLoginArmed();
   const unlockEnvelopeVault = useUTXOpiaStore((s) => s.unlockEnvelopeVault);
+  const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -45,12 +53,18 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
     setError(null);
     setBusy(true);
     try {
-      // A wrapping only exists here if PRF produced its key, so requiring PRF
-      // now turns a browser that quietly lost it into a clear failure rather
-      // than an unlock attempt with the wrong key material.
-      const deviceKeyMaterial = await authenticate({ requirePrf: true });
-      if (!deviceKeyMaterial) throw new Error("That passkey did not unlock this vault.");
-      await unlockEnvelopeVault(deviceKeyMaterial);
+      if (loginArmed) {
+        const { keyMaterial } = await privy.keyMaterialFor(pin);
+        await unlockEnvelopeVault(keyMaterial);
+        setPin("");
+      } else {
+        // A wrapping only exists here if PRF produced its key, so requiring PRF
+        // now turns a browser that quietly lost it into a clear failure rather
+        // than an unlock attempt with the wrong key material.
+        const deviceKeyMaterial = await authenticate({ requirePrf: true });
+        if (!deviceKeyMaterial) throw new Error("That passkey did not unlock this vault.");
+        await unlockEnvelopeVault(deviceKeyMaterial);
+      }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not unlock this vault.");
     } finally {
@@ -58,10 +72,12 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
     }
   };
 
+  const Icon = loginArmed ? KeyRound : Fingerprint;
+
   return (
     <div className="flex flex-col items-center py-10">
       <div className="mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-full border border-privacy/20 bg-privacy/10">
-        <Fingerprint className="h-8 w-8 text-privacy" aria-hidden />
+        <Icon className="h-8 w-8 text-privacy" aria-hidden />
       </div>
       <h1 className="mb-1.5 text-[22px] font-bold text-foreground">Welcome back</h1>
       <p className="mb-6 max-w-[34ch] text-balance text-center text-caption text-gray-light/70">
@@ -75,6 +91,18 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
         </div>
       )}
 
+      {loginArmed && (
+        <form
+          className="mb-4 w-full max-w-[34ch]"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!busy) void unlock();
+          }}
+        >
+          <PinField value={pin} onChange={setPin} disabled={busy} autoFocus />
+        </form>
+      )}
+
       <button
         onClick={unlock}
         disabled={busy}
@@ -85,8 +113,8 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
           "disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
         )}
       >
-        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Fingerprint className="h-4 w-4" />}
-        {busy ? "Unlocking…" : "Unlock vault"}
+        {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icon className="h-4 w-4" />}
+        {busy ? "Unlocking\u2026" : "Unlock vault"}
       </button>
 
       <button
