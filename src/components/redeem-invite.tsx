@@ -6,6 +6,7 @@ import { useWallet } from "@solana/wallet-adapter-react";
 import bs58 from "bs58";
 import { AlertCircle, Check, Loader2 } from "lucide-react";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
+import { HoldButton } from "@/components/ui/hold-button";
 import { cn } from "@/lib/utils";
 import { SolanaAddressField } from "@/components/ui/solana-address-field";
 
@@ -252,21 +253,21 @@ export function RedeemInvite({
         </div>
       )}
 
-      <button
-        type="button"
-        onClick={redeem}
+      {/* Held, like confirming a send. This page spends a one-time code and
+          writes a membership on chain; the four permanent facts are stated
+          above it precisely because nobody can take any of them back, and a
+          control that fires on a stray click disagrees with all of that. */}
+      <HoldButton
+        onComplete={() => void redeem()}
         disabled={!ready}
-        className={cn(
-          "flex min-h-10 w-full items-center justify-center gap-2 rounded-[10px] border border-gray/20",
-          "px-3 py-2.5 text-caption font-semibold text-foreground transition-colors",
-          "hover:border-gray/40 disabled:cursor-not-allowed disabled:opacity-60",
-        )}
+        variant="primary"
+        className="w-full"
       >
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-        {status === "signing" ? "Waiting for your signature…"
-          : status === "redeeming" ? "Registering on chain…"
-          : "Redeem invite code"}
-      </button>
+        {status === "signing" ? "Waiting for your signature\u2026"
+          : status === "redeeming" ? "Registering on chain\u2026"
+          : "Hold to redeem invite"}
+      </HoldButton>
 
       {showApplyLink && (
         <p className="text-caption text-gray">

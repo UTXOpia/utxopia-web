@@ -22,7 +22,7 @@ describe("RedeemInvite", () => {
 
     // A code alone is not enough: the address that becomes the membership is
     // still blank, and redeeming binds it permanently.
-    const button = screen.getByRole("button", { name: "Redeem invite code" }) as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Hold to redeem invite" }) as HTMLButtonElement;
     expect(button.disabled).toBe(true);
   });
 
@@ -31,7 +31,7 @@ describe("RedeemInvite", () => {
     const address = screen.getByPlaceholderText(
       "Paste the address that will be your membership",
     );
-    const button = screen.getByRole("button", { name: "Redeem invite code" }) as HTMLButtonElement;
+    const button = screen.getByRole("button", { name: "Hold to redeem invite" }) as HTMLButtonElement;
 
     // Base58 with no checksum means length is the only cheap signal there is.
     fireEvent.change(address, { target: { value: "9MFnVxiXKtb" } });

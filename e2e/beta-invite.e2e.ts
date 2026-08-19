@@ -401,18 +401,23 @@ function stepRedeem(devKeys: DevKeys, code: string, wallet: PublicKey): void {
 
   setInput('input[placeholder="XXXXX-XXXXX-XXXXX-XXXXX"]', code);
   const state = evalJson<{ found: boolean; disabled: boolean }>(`(()=>{
-    const b = Array.from(document.querySelectorAll('button')).find(x => x.innerText.trim() === 'Redeem invite code');
+    const b = Array.from(document.querySelectorAll('button')).find(x => x.innerText.trim() === 'Hold to redeem invite');
     return JSON.stringify({ found: !!b, disabled: b?.disabled });
   })()`);
 
   // A disabled button here almost always means signMessage is missing from the
   // wallet adapter, not that the code is bad — the form reports nothing either
   // way, so name the likely cause rather than timing out on the success text.
+  //
+  // It is a HoldButton now, like every other irreversible control. Holding is
+  // not something this driver can do, but DEV_SIGNER makes them fire on a
+  // plain click (hold-button.tsx, `fastConfirm`), which is the same escape the
+  // "Hold to confirm" steps below already rely on.
   if (!state.found || state.disabled) {
     throw new Error("the redeem button is disabled with a code filled in — check that the wallet adapter implements signMessage (lib/dev-signer/solana-adapter.ts)");
   }
 
-  clickByText("Redeem invite code");
+  clickByText("Hold to redeem invite");
   waitForText("You're in.", 90_000);
   console.log(`  ✓ ${wallet.toBase58()} is a member`);
 }
