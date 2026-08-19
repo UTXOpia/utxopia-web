@@ -15,6 +15,7 @@ import { createSolanaRpc, createSolanaRpcSubscriptions } from "@solana/kit";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { getSolanaRpcUrl, getSolanaWsUrl } from "@/lib/api/constants";
 import { detectNetwork } from "@/lib/network-config";
+import { checkSignatureStability } from "@/lib/privy-signature-probe";
 import {
   PrivySolanaContext,
   type PrivySolanaAuthority,
@@ -95,6 +96,14 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       if (signature.length !== 64) {
         throw new Error(`Unexpected Privy signature length: ${signature.length}`);
       }
+      // Development only, and free: it compares against signatures this browser
+      // already made rather than asking for another one.
+      const drift = checkSignatureStability({
+        signer: signingWallet.address,
+        message,
+        signature,
+      });
+      if (drift) console.error(drift);
       return signature;
     },
     [signMessage, wallets],
