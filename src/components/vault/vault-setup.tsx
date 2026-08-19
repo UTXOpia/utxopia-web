@@ -323,13 +323,16 @@ export function VaultSetup({ onDone }: { onDone: () => void }) {
         </p>
       )}
 
-      {privy.available && (
+      {/* Only once signed in: an unauthenticated field would have to start a
+          login from inside the ceremony, and the attempt that triggered it has
+          already failed by the time the member finishes. */}
+      {privy.authenticated && (
         <PinField
           value={pin}
           onChange={setPin}
           disabled={busy}
           label="PIN (optional)"
-          hint="Only used if this device cannot do passkeys. It lets your login reopen this vault here — it is not a second lock on your recovery string."
+          hint="Only used if this device cannot do passkeys. Your login plus this PIN reopens the vault here — it is not a second lock on your recovery string."
         />
       )}
 

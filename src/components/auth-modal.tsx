@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { Fingerprint, Wallet, X, Eye, Upload, ShieldCheck } from "lucide-react";
+import { Fingerprint, Mail, Wallet, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { VaultSetup } from "@/components/vault/vault-setup";
 
 export interface AuthState {
@@ -41,6 +42,22 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   const isLoading = passkeyLoading || walletLoading || importing;
   const [showViewOnly, setShowViewOnly] = useState(false);
   const [showEnvelopeSetup, setShowEnvelopeSetup] = useState(false);
+
+  // Read straight from the context rather than through AuthState: the default
+  // is a no-op authority, so every caller of this modal keeps working without
+  // learning about a provider they may not have configured.
+  const privy = usePrivySolanaAuthority();
+  const [awaitingLogin, setAwaitingLogin] = useState(false);
+
+  // login() only opens a window; there is no promise to await. So the click
+  // records that we are waiting, and the session turning authenticated is what
+  // carries the member onward — otherwise they log in and land back here.
+  useEffect(() => {
+    if (awaitingLogin && privy.authenticated) {
+      setAwaitingLogin(false);
+      setShowEnvelopeSetup(true);
+    }
+  }, [awaitingLogin, privy.authenticated]);
   const [viewingKeyInput, setViewingKeyInput] = useState("");
 
   const handleImport = async (file: File | undefined) => {
@@ -127,6 +144,37 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
               />
             ) : (
               <>
+              {/* Signing in proves nothing about a vault on its own — nothing
+                  is stored on our side to look one up with — so this leads to
+                  the same create-or-restore flow as the row below it, with the
+                  login already done so this browser can be remembered. */}
+              {privy.enabled && (
+                <button
+                  onClick={() => {
+                    if (privy.authenticated) return setShowEnvelopeSetup(true);
+                    setAwaitingLogin(true);
+                    void privy.login();
+                  }}
+                  disabled={isLoading || awaitingLogin}
+                  className={cn(
+                    "w-full flex items-center gap-4 p-4 rounded-[14px]",
+                    "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
+                    "hover:border-privacy/30 disabled:opacity-40",
+                    "transition-all duration-200 cursor-pointer text-left",
+                  )}
+                >
+                  <Mail className="w-5 h-5 text-privacy shrink-0" aria-hidden />
+                  <span>
+                    <span className="block text-body2-semibold text-foreground">
+                      {awaitingLogin ? "Waiting for sign in\u2026" : "Continue with email or Google"}
+                    </span>
+                    <span className="block text-caption text-gray/60">
+                      Then create or restore your vault
+                    </span>
+                  </span>
+                </button>
+              )}
+
               <button
                 onClick={() => setShowEnvelopeSetup(true)}
                 disabled={isLoading}
