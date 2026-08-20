@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { sha256 } from "@noble/hashes/sha2.js";
 import { bytesToHex, hexToBytes } from "@utxopia/sdk";
+import { detectNetwork } from "@/lib/network-config";
 import {
   startRegistration,
   startAuthentication,
@@ -28,6 +29,34 @@ function getPrfSalt(credentialId?: string | null): Uint8Array {
 }
 
 const RP_NAME = "UTXOpia";
+
+/**
+ * What this credential is called in the member's passkey list.
+ *
+ * Cosmetic to WebAuthn and load-bearing to a person: it is the only thing
+ * distinguishing our entry from every other site's, and — because `user.id` is
+ * random per registration — the only thing distinguishing a working credential
+ * from an orphan left behind by a second `register()` call. Every entry used to
+ * read "utxopia-user", so a member with an orphan could not tell which of two
+ * identical rows was the one holding their vault, and would not dare delete
+ * either.
+ *
+ * The network is in it because that is the coarsest thing a member might
+ * genuinely have two of, and the finest thing that is safe to put here: this
+ * string is stored by the authenticator and syncs to their keychain, so it must
+ * never carry the login's email or the vault's meta-address. Naming a social
+ * account or an on-chain identity in a synced keychain is exactly the link this
+ * pool exists to prevent.
+ *
+ * Only affects credentials made from now on — the label is written at
+ * registration and nothing can rewrite an existing one.
+ */
+function credentialLabel(): { name: string; displayName: string } {
+  const network = detectNetwork();
+  return network === "mainnet"
+    ? { name: "utxopia", displayName: "UTXOpia vault" }
+    : { name: `utxopia-${network}`, displayName: `UTXOpia vault (${network})` };
+}
 
 function getRpId(): string {
   if (typeof window === "undefined") return "localhost";
@@ -197,9 +226,11 @@ export function usePasskey(): UsePasskeyReturn {
       const creationOptions: PublicKeyCredentialCreationOptionsJSON = {
         rp: { name: RP_NAME, id: rpId },
         user: {
+          // Random, so this never silently replaces a credential already
+          // holding a wrapping. `vault-setup` is what keeps a second one from
+          // being minted in the first place — see the reuse note there.
           id: randomBase64URL(32),
-          name: "utxopia-user",
-          displayName: "UTXOpia User",
+          ...credentialLabel(),
         },
         challenge: randomBase64URL(32),
         pubKeyCredParams: [
