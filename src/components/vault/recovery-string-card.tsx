@@ -109,7 +109,7 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
             onClick={onConfirmed}
             disabled={!acknowledged}
             className={cn(
-              "inline-flex min-h-9 flex-1 items-center justify-center rounded-[9px] px-4",
+              "inline-flex min-h-11 flex-1 items-center justify-center rounded-[9px] px-4",
               "bg-foreground text-caption font-semibold text-background transition-colors cursor-pointer",
               "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
             )}
@@ -165,7 +165,7 @@ function SaveAction({
       type="button"
       onClick={onClick}
       className={cn(
-        "inline-flex min-h-9 items-center gap-1.5 rounded-[9px] px-3",
+        "inline-flex min-h-11 items-center gap-1.5 rounded-[9px] px-3",
         "border border-gray/20 bg-muted/40 text-caption text-foreground",
         "hover:bg-muted/70 transition-colors cursor-pointer",
       )}

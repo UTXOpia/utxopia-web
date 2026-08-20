@@ -81,6 +81,18 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   // — for the rest of the session, with no way to try again. Its modal closing
   // without an authenticated session is the member changing their mind, and the
   // only honest response is to put the button back.
+  // modal={false} gave up Radix's scroll lock along with the focus trap and the
+  // pointer shield. The first two had to go; this one did not, and without it
+  // the page slides around under a dialog that is covering it.
+  useEffect(() => {
+    if (!open) return;
+    const previous = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.body.style.overflow = previous;
+    };
+  }, [open]);
+
   const modalWasOpen = useRef(false);
   useEffect(() => {
     if (privy.isModalOpen) modalWasOpen.current = true;
@@ -141,6 +153,13 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
           className={cn(
             "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50",
             "w-[90vw] max-w-[400px] rounded-[20px]",
+            // Centred and fixed with no ceiling, this had no way to be read
+            // once it grew past the viewport: the overflow sat off-screen and
+            // nothing scrolled to it. The recovery screen is the tallest thing
+            // here and the one where missing the bottom costs the most.
+            // dvh rather than vh — on iOS Safari, vh is the height with the
+            // toolbars hidden, so the last control stays under them.
+            "max-h-[90dvh] overflow-y-auto overscroll-contain",
             "bg-card/95 backdrop-blur-xl border border-gray/20",
             "shadow-[0_0_80px_rgba(255,255,255,0.04),0_0_160px_rgba(153,69,255,0.04)]",
             "animate-in fade-in-0 zoom-in-95 duration-200",
