@@ -2,10 +2,12 @@
 
 import { useEffect, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, LogIn, LogOut, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
+import { ChevronDown, Fingerprint, LogIn, LogOut, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { VaultSetup } from "@/components/vault/vault-setup";
+import { VaultUnlockPrompt, useHasLocalVault } from "@/components/vault/vault-unlock-prompt";
+import { useLoginArmed } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 
 export interface AuthState {
@@ -51,6 +53,11 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   const [showViewOnly, setShowViewOnly] = useState(false);
   const [showMore, setShowMore] = useState(false);
   const [showEnvelopeSetup, setShowEnvelopeSetup] = useState(false);
+  const [showUnlock, setShowUnlock] = useState(false);
+  // Only /vault knew how to offer this. Every other page that opens this modal
+  // was telling a member holding a vault to create or restore one.
+  const hasLocalVault = useHasLocalVault();
+  const loginArmed = useLoginArmed();
 
   // Read straight from the context rather than through AuthState: the default
   // is a no-op authority, so every caller of this modal keeps working without
@@ -132,7 +139,15 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
             {/* Create or restore. The only way in where forgetting a
                 passphrase or losing a device is recoverable without us, which
                 is why it is the one the other rows now lead to. */}
-            {showEnvelopeSetup ? (
+            {showUnlock ? (
+              <VaultUnlockPrompt
+                onSignInInstead={() => setShowUnlock(false)}
+                onUnlocked={() => {
+                  setShowUnlock(false);
+                  onOpenChange(false);
+                }}
+              />
+            ) : showEnvelopeSetup ? (
               <div className="flex flex-col gap-3">
                 <VaultSetup
                   onDone={() => {
@@ -173,6 +188,30 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   is stored on our side to look one up with — so this leads to
                   the same create-or-restore flow as the row below it, with the
                   login already done so this browser can be remembered. */}
+              {hasLocalVault && (
+                <button
+                  onClick={() => setShowUnlock(true)}
+                  disabled={isLoading}
+                  className={cn(
+                    "w-full flex items-center gap-4 p-4 rounded-[14px]",
+                    "bg-privacy/8 hover:bg-privacy/15 border border-privacy/15",
+                    "hover:border-privacy/30 disabled:opacity-40",
+                    "transition-all duration-200 cursor-pointer group",
+                    "hover:shadow-[0_0_24px_rgba(255,255,255,0.06)]",
+                  )}
+                >
+                  <div className="p-2.5 rounded-[10px] bg-privacy/12 group-hover:bg-privacy/20 transition-colors shrink-0">
+                    <Fingerprint className="w-5 h-5 text-privacy" />
+                  </div>
+                  <div className="text-left min-w-0">
+                    <p className="text-body2-semibold text-privacy">Unlock this vault</p>
+                    <p className="text-caption text-gray mt-0.5">
+                      {loginArmed ? "Your login and PIN" : "Already set up in this browser"}
+                    </p>
+                  </div>
+                </button>
+              )}
+
               {privy.enabled && (
                 <button
                   onClick={() => {

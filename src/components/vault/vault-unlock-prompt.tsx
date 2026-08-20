@@ -38,7 +38,14 @@ export function useHasLocalVault(): boolean {
   return present;
 }
 
-export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => void }) {
+export function VaultUnlockPrompt({
+  onSignInInstead,
+  onUnlocked,
+}: {
+  onSignInInstead: () => void;
+  /** Rendered inside a dialog, the caller has to dismiss it. */
+  onUnlocked?: () => void;
+}) {
   const { authenticate } = usePasskey();
   const privy = usePrivyVaultKey();
   // The wrapping alone cannot say what made it, so the signer note is the tell.
@@ -57,6 +64,7 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
         const { keyMaterial } = await privy.keyMaterialFor(pin);
         await unlockEnvelopeVault(keyMaterial, "pin");
         setPin("");
+        onUnlocked?.();
       } else {
         // A wrapping only exists here if PRF produced its key, so requiring PRF
         // now turns a browser that quietly lost it into a clear failure rather
@@ -64,6 +72,7 @@ export function VaultUnlockPrompt({ onSignInInstead }: { onSignInInstead: () => 
         const deviceKeyMaterial = await authenticate({ requirePrf: true });
         if (!deviceKeyMaterial) throw new Error("That passkey did not unlock this vault.");
         await unlockEnvelopeVault(deviceKeyMaterial);
+        onUnlocked?.();
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not unlock this vault.");
