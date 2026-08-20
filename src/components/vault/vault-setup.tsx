@@ -130,8 +130,14 @@ export function VaultSetup({
       envelope,
     });
     if (!saved) {
+      // Almost always one cause, and it deserves naming: a copy is already
+      // saved for this login under a different PIN, which happens to everyone
+      // who replaces a vault. The row is only released against a proof of the
+      // PIN it was written under, so the way past it is to delete that copy —
+      // and a member told only "could not save" goes looking at their network
+      // instead, or gives up on a path that is two steps away.
       setNotice(
-        "We could not save your PIN backup, so a new device will need your recovery string. Keep it somewhere you will find it.",
+        "We could not save your PIN backup. If this login already has one under a different PIN, delete it under PIN backup in Settings, then restore from the recovery string below to save a new one. Until then a new device will need that string.",
       );
     }
   };
