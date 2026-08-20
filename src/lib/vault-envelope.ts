@@ -20,7 +20,8 @@
  *
  *   E_device  passkey PRF              on this device, every day
  *   E_login   argon2id(PIN, signature) a new device, and where PRF is missing
- *   E_string  argon2id(passphrase)     the member keeps it, and it outlives us
+ *   E_string  a random key, in the string itself — the member keeps it, and it
+ *                                      outlives us
  *
  * E_login's ciphertext is the one thing that does leave: `lib/vault-remote`
  * publishes it so a device that has never seen this vault has something to
@@ -57,8 +58,25 @@ const CT_BYTES = SEED_BYTES + 16; // AES-GCM tag
 /** FROZEN. HKDF domain separation. */
 const HKDF_INFO = "utxopia:envelope:v1";
 
-/** Recovery strings are prefixed so a member can tell what they are pasting. */
-const STRING_PREFIX = "utxovault1";
+/**
+ * Recovery strings are prefixed so a member can tell what they are pasting.
+ *
+ * v2 carries its own key. v1 was a ciphertext locked under a passphrase the
+ * member also had to keep, and two secrets that both end up in the same
+ * password manager entry are one secret with a second thing to lose — while
+ * losing only the passphrase, with the string in hand, was permanent and had
+ * nothing anywhere to tell them they had mistyped it.
+ *
+ * The trade is stated rather than hidden: a v2 string is bearer authority.
+ * Whoever reads it owns the vault, the way a seed phrase always has.
+ */
+const STRING_PREFIX = "utxovault2";
+const LEGACY_STRING_PREFIX = "utxovault1";
+
+/** The key rides after the packed envelope. Full-length, because it is the only
+ *  thing between a leaked string and the seed — there is no KDF to slow anyone
+ *  down and nothing else to combine it with. */
+const STRING_KEY_BYTES = 32;
 
 /**
  * FROZEN. What the login provider signs, and the whole of what it learns.
@@ -162,21 +180,16 @@ export function guardFor(metaAddress: string): Uint8Array {
 }
 
 /**
- * Stretch the passphrase into key material. The salt is per-envelope rather
- * than derived from the account: two members who pick the same passphrase must
- * not share work, and a rewrap must not reuse the old salt.
+ * The key a recovery string carries.
+ *
+ * Random rather than stretched from anything, because there is nothing left to
+ * stretch: no passphrase, and the value goes into the string beside the
+ * ciphertext. That makes the KDF header on a v2 envelope carried rather than
+ * used — the same as it has always been for the passkey and PIN wrappings,
+ * which supply key material from elsewhere too.
  */
-export function deriveFromPassphrase(
-  passphrase: string,
-  salt: Uint8Array,
-  kdf: { m: number; t: number; p: number } = KDF_V1,
-): Uint8Array {
-  return argon2id(new TextEncoder().encode(passphrase), salt, {
-    m: kdf.m,
-    t: kdf.t,
-    p: kdf.p,
-    dkLen: 32,
-  });
+export function newStringKey(): Uint8Array {
+  return crypto.getRandomValues(new Uint8Array(STRING_KEY_BYTES));
 }
 
 /**
@@ -373,20 +386,51 @@ function unpack(bytes: Uint8Array): VaultEnvelope {
   };
 }
 
-/** What the member keeps. Prefixed so they can tell what they are looking at. */
-export function encodeEnvelope(envelope: VaultEnvelope): string {
-  return `${STRING_PREFIX}${base64url(pack(envelope))}`;
+/**
+ * What the member keeps: the wrapping and the key that opens it, in one string.
+ *
+ * `pack` is deliberately untouched and the key is appended after it. The same
+ * packed bytes are what localStorage and the blob store hold, and neither of
+ * those carries a key — changing the shared format to serve the one form that
+ * does would have rewritten every wrapping already written.
+ */
+export function encodeRecoveryString(envelope: VaultEnvelope, key: Uint8Array): string {
+  if (key.length !== STRING_KEY_BYTES) {
+    throw new EnvelopeFormatError(`key must be ${STRING_KEY_BYTES} bytes`);
+  }
+  const packed = pack(envelope);
+  const out = new Uint8Array(packed.length + key.length);
+  out.set(packed);
+  out.set(key, packed.length);
+  return `${STRING_PREFIX}${base64url(out)}`;
 }
 
-export function decodeEnvelope(text: string): VaultEnvelope {
+export function decodeRecoveryString(text: string): { envelope: VaultEnvelope; key: Uint8Array } {
   const trimmed = text.trim().replace(/\s+/g, "");
+  // Named rather than left to fail as a length mismatch. A v1 string is not a
+  // corrupt v2 string, and the member holding one needs to be told which of
+  // their two secrets is now useless, not shown a byte count.
+  if (trimmed.startsWith(LEGACY_STRING_PREFIX)) {
+    throw new EnvelopeFormatError(
+      "This is an older recovery string and no longer opens a vault. Unlock on a device you still have, then issue a new one.",
+    );
+  }
   if (!trimmed.startsWith(STRING_PREFIX)) throw new EnvelopeFormatError("wrong prefix");
+  let bytes: Uint8Array;
   try {
-    return unpack(unBase64url(trimmed.slice(STRING_PREFIX.length)));
-  } catch (caught) {
-    if (caught instanceof EnvelopeFormatError) throw caught;
+    bytes = unBase64url(trimmed.slice(STRING_PREFIX.length));
+  } catch {
     throw new EnvelopeFormatError("not valid base64");
   }
+  if (bytes.length !== PACKED_BYTES + STRING_KEY_BYTES) {
+    throw new EnvelopeFormatError(
+      `expected ${PACKED_BYTES + STRING_KEY_BYTES} bytes, got ${bytes.length}`,
+    );
+  }
+  return {
+    envelope: unpack(bytes.slice(0, PACKED_BYTES)),
+    key: bytes.slice(PACKED_BYTES),
+  };
 }
 
 /** Device-wrapping storage form — same bytes, hex so devtools stays readable. */

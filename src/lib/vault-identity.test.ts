@@ -7,11 +7,9 @@ import {
   workingSeedFor,
   NoDeviceEnvelopeError,
   VaultAlreadyHereError,
-  WeakPassphraseError,
   adoptExistingSeed,
   armDevice,
   buildRecoveryString,
-  changePassphrase,
   clearDeviceEnvelope,
   createVault,
   hasDeviceEnvelope,
@@ -21,7 +19,6 @@ import {
   unlockWithDevice,
   writeDeviceSigner,
   unlockWithRecoveryString,
-  verifyRecoveryString,
 } from "./vault-identity";
 import { MIN_PIN_LENGTH, WeakPinError, deriveFromPin } from "./vault-envelope";
 import { EnvelopeUnlockError } from "./vault-envelope";
@@ -32,7 +29,18 @@ const metaAddressFor = async (seed: Uint8Array) => `utxo:${bytesToHex(sha256(see
 
 const SCOPE = { networkId: "solana:devnet", vaultId: "verified" };
 const OTHER_SCOPE = { networkId: "solana:devnet", vaultId: "open" };
-const PASSPHRASE = "brief candle dusk arch";
+/**
+ * One flipped character inside the key the string carries.
+ *
+ * Not the last character: the packed length leaves its low bits unused, so
+ * flipping it decodes to the same bytes and the test passes for the wrong
+ * reason. Twenty back is comfortably inside the key.
+ */
+const tamper = (text: string) => {
+  const at = text.length - 20;
+  return text.slice(0, at) + (text[at] === "A" ? "B" : "A") + text.slice(at + 1);
+};
+
 const device = (byte: number) => new Uint8Array(32).fill(byte);
 
 /** A browser that has never seen this vault. */
@@ -44,11 +52,10 @@ describe("creating a vault", () => {
   it("arms the device and hands back a recovery string the member must keep", async () => {
     const created = await createVault({
       scope: SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });
-    expect(created.recoveryString.startsWith("utxovault1")).toBe(true);
+    expect(created.recoveryString.startsWith("utxovault2")).toBe(true);
     expect(hasDeviceEnvelope(SCOPE)).toBe(true);
     // The address comes from the scope's working seed, not the root the member
     // keeps — that is what gives the guard something of its own to check.
@@ -59,7 +66,6 @@ describe("creating a vault", () => {
   it("never stores the recovery string", async () => {
     const created = await createVault({
       scope: SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });
@@ -70,29 +76,24 @@ describe("creating a vault", () => {
   });
 
   it("gives every vault its own identity from one root", async () => {
-    const a = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    const b = await createVault({ scope: OTHER_SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const a = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    const b = await createVault({ scope: OTHER_SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     expect(a.metaAddress).not.toBe(b.metaAddress);
     expect(readDeviceEnvelope(SCOPE)).not.toEqual(readDeviceEnvelope(OTHER_SCOPE)!);
   });
 
-  it("refuses a passphrase too short to be the only lock on the string", async () => {
-    await expect(
-      createVault({ scope: SCOPE, passphrase: "hunter2", deviceKeyMaterial: device(1), metaAddressFor }),
-    ).rejects.toBeInstanceOf(WeakPassphraseError);
-  });
 });
 
 describe("daily unlock", () => {
   it("returns the same identity it was created with", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     const unlocked = await unlockWithDevice({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     expect(unlocked.seed).toEqual(created.seed);
     expect(unlocked.metaAddress).toBe(created.metaAddress);
   });
 
   it("refuses a different passkey rather than inventing an identity", async () => {
-    await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     await expect(
       unlockWithDevice({ scope: SCOPE, deviceKeyMaterial: device(2), metaAddressFor }),
     ).rejects.toBeInstanceOf(EnvelopeUnlockError);
@@ -105,7 +106,7 @@ describe("daily unlock", () => {
   });
 
   it("does not leak one vault's wrapping into the other", async () => {
-    await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     await expect(
       unlockWithDevice({ scope: OTHER_SCOPE, deviceKeyMaterial: device(1), metaAddressFor }),
     ).rejects.toBeInstanceOf(NoDeviceEnvelopeError);
@@ -113,14 +114,13 @@ describe("daily unlock", () => {
 });
 
 describe("restoring on a new device", () => {
-  it("recovers the identity from string plus passphrase alone", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+  it("recovers the identity from the string alone", async () => {
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     freshBrowser();
 
     const restored = await unlockWithRecoveryString({
       scope: SCOPE,
       recoveryString: created.recoveryString,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(7),
       metaAddressFor,
     });
@@ -129,12 +129,11 @@ describe("restoring on a new device", () => {
   });
 
   it("arms the new device so the passphrase is typed once, not every session", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     freshBrowser();
     await unlockWithRecoveryString({
       scope: SCOPE,
       recoveryString: created.recoveryString,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(7),
       metaAddressFor,
     });
@@ -142,26 +141,27 @@ describe("restoring on a new device", () => {
     expect(daily.seed).toEqual(created.seed);
   });
 
-  it("rejects the wrong passphrase instead of opening an empty stranger", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+  // The key rides in the string now, so the way to get this wrong is a string
+  // that arrived damaged — a truncated paste, a line wrapped by a mail client.
+  // It must fail at the tag rather than open an empty stranger.
+  it("rejects a damaged string instead of opening an empty stranger", async () => {
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     await expect(
       unlockWithRecoveryString({
         scope: SCOPE,
-        recoveryString: created.recoveryString,
-        passphrase: "brief candle dusk arch!",
+        recoveryString: tamper(created.recoveryString),
         metaAddressFor,
       }),
     ).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
   it("leaves the device unarmed when the restore fails", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     freshBrowser();
     await expect(
       unlockWithRecoveryString({
         scope: SCOPE,
-        recoveryString: created.recoveryString,
-        passphrase: "wrong wrong wrong",
+        recoveryString: tamper(created.recoveryString),
         deviceKeyMaterial: device(7),
         metaAddressFor,
       }),
@@ -175,7 +175,6 @@ describe("restoring on a new device", () => {
   it("refuses a genuine string from the member's other vault", async () => {
     const other = await createVault({
       scope: OTHER_SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });
@@ -183,7 +182,6 @@ describe("restoring on a new device", () => {
       unlockWithRecoveryString({
         scope: SCOPE,
         recoveryString: other.recoveryString,
-        passphrase: PASSPHRASE,
         deviceKeyMaterial: device(1),
         metaAddressFor,
       }),
@@ -193,11 +191,10 @@ describe("restoring on a new device", () => {
   });
 
   it("still stops a fabricated envelope whose guard names another vault", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     const misleading = await buildRecoveryString({
       scope: SCOPE,
       seed: created.seed,
-      passphrase: PASSPHRASE,
       metaAddress: "utxo:somebodyelse",
     });
     freshBrowser();
@@ -205,73 +202,30 @@ describe("restoring on a new device", () => {
       unlockWithRecoveryString({
         scope: SCOPE,
         recoveryString: misleading,
-        passphrase: PASSPHRASE,
         metaAddressFor,
       }),
     ).rejects.toBeInstanceOf(EnvelopeIdentityError);
   });
 
   it("refuses to create over a vault this browser already holds", async () => {
-    await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     await expect(
-      createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor }),
+      createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor }),
     ).rejects.toBeInstanceOf(VaultAlreadyHereError);
   });
 });
 
-describe("proving a new string opens", () => {
-  it("passes for the passphrase it was built with", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    await expect(
-      verifyRecoveryString({
-        scope: SCOPE,
-        recoveryString: created.recoveryString,
-        passphrase: PASSPHRASE,
-        metaAddress: created.metaAddress,
-      }),
-    ).resolves.toBeUndefined();
-  });
-
-  // The whole point: a typo at creation is otherwise invisible until a restore
-  // months later, with no old device left.
-  it("catches a typo the member would not discover for months", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    await expect(
-      verifyRecoveryString({
-        scope: SCOPE,
-        recoveryString: created.recoveryString,
-        passphrase: `${PASSPHRASE} `.replace("arch ", "arcg "),
-        metaAddress: created.metaAddress,
-      }),
-    ).rejects.toBeInstanceOf(EnvelopeUnlockError);
-  });
-
-  it("leaves nothing behind — it is a check, not an unlock", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    const before = readDeviceEnvelope(SCOPE);
-    await verifyRecoveryString({
-      scope: SCOPE,
-      recoveryString: created.recoveryString,
-      passphrase: PASSPHRASE,
-      metaAddress: created.metaAddress,
-    });
-    expect(readDeviceEnvelope(SCOPE)).toEqual(before!);
-  });
-});
-
-describe("changing the passphrase", () => {
+describe("issuing another string", () => {
   it("keeps the identity", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    const next = await changePassphrase({
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    const next = await buildRecoveryString({
       scope: SCOPE,
       seed: created.seed,
       metaAddress: created.metaAddress,
-      nextPassphrase: "another long passphrase",
     });
     const restored = await unlockWithRecoveryString({
       scope: SCOPE,
       recoveryString: next,
-      passphrase: "another long passphrase",
       metaAddressFor,
     });
     expect(restored.metaAddress).toBe(created.metaAddress);
@@ -280,27 +234,31 @@ describe("changing the passphrase", () => {
   // The member has to be told this: a string already written down cannot be
   // revoked, and only rotating the seed actually retires it.
   it("does not invalidate a string that is already out there", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    await changePassphrase({
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    await buildRecoveryString({
       scope: SCOPE,
       seed: created.seed,
       metaAddress: created.metaAddress,
-      nextPassphrase: "another long passphrase",
     });
     const stillWorks = await unlockWithRecoveryString({
       scope: SCOPE,
       recoveryString: created.recoveryString,
-      passphrase: PASSPHRASE,
       metaAddressFor,
     });
     expect(stillWorks.seed).toEqual(created.seed);
   });
 
-  it("refuses a weak replacement", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    await expect(
-      changePassphrase({ scope: SCOPE, seed: created.seed, metaAddress: created.metaAddress, nextPassphrase: "short" }),
-    ).rejects.toBeInstanceOf(WeakPassphraseError);
+  // Each issue mints its own key, so two strings for one vault must not be the
+  // same bytes — otherwise reissuing after a suspected leak would hand back the
+  // string that leaked.
+  it("mints a different key every time", async () => {
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    const next = await buildRecoveryString({
+      scope: SCOPE,
+      seed: created.seed,
+      metaAddress: created.metaAddress,
+    });
+    expect(next).not.toBe(created.recoveryString);
   });
 });
 
@@ -310,7 +268,6 @@ describe("adopting an identity that predates envelopes", () => {
     const adopted = await adoptExistingSeed({
       scope: SCOPE,
       seed: existing,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(3),
       metaAddressFor,
     });
@@ -323,8 +280,8 @@ describe("adopting an identity that predates envelopes", () => {
 
 describe("logging out", () => {
   it("removes this device's wrapping and only this vault's", async () => {
-    await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
-    await createVault({ scope: OTHER_SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    await createVault({ scope: OTHER_SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     clearDeviceEnvelope(SCOPE);
     expect(hasDeviceEnvelope(SCOPE)).toBe(false);
     expect(hasDeviceEnvelope(OTHER_SCOPE)).toBe(true);
@@ -333,7 +290,7 @@ describe("logging out", () => {
 
 describe("armDevice", () => {
   it("rewraps with a fresh salt each time", async () => {
-    const created = await createVault({ scope: SCOPE, passphrase: PASSPHRASE, deviceKeyMaterial: device(1), metaAddressFor });
+    const created = await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
     const first = readDeviceEnvelope(SCOPE)!;
     await armDevice({ scope: SCOPE, seed: created.seed, metaAddress: created.metaAddress, deviceKeyMaterial: device(1) });
     const second = readDeviceEnvelope(SCOPE)!;
@@ -342,21 +299,10 @@ describe("armDevice", () => {
   });
 });
 
-describe("a PIN is not a passphrase", () => {
+describe("the PIN floor", () => {
   beforeEach(freshBrowser);
 
-  // The two share no code path by construction, and the length floors make the
-  // separation impossible to cross by accident: a PIN short enough to be worth
-  // typing daily cannot reach a recovery string, which is the only factor here
-  // carrying real entropy.
-  it("is too short to lock a recovery string", async () => {
-    const pin = "1".repeat(MIN_PIN_LENGTH);
-    expect(
-      createVault({ scope: SCOPE, passphrase: pin, metaAddressFor }),
-    ).rejects.toThrow(WeakPassphraseError);
-  });
-
-  it("refuses to stretch something shorter than a PIN either", () => {
+  it("refuses to stretch something shorter than a PIN", () => {
     expect(() => deriveFromPin("12345", new Uint8Array(64).fill(1))).toThrow(WeakPinError);
   });
 });
@@ -386,7 +332,6 @@ describe("the login that armed this device", () => {
   it("is forgotten with the vault, not left behind to mislead the next one", async () => {
     await createVault({
       scope: SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });
@@ -405,7 +350,6 @@ describe("a wrong factor cannot open a different vault", () => {
   it("fails loudly instead of producing a second identity", async () => {
     await createVault({
       scope: SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });
@@ -421,7 +365,6 @@ describe("a wrong factor cannot open a different vault", () => {
   it("names the factor the member actually used", async () => {
     await createVault({
       scope: SCOPE,
-      passphrase: PASSPHRASE,
       deviceKeyMaterial: device(1),
       metaAddressFor,
     });

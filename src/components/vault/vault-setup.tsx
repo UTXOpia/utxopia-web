@@ -20,7 +20,6 @@ import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
-import { PassphraseField } from "@/components/vault/passphrase-field";
 import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
@@ -43,16 +42,14 @@ export function VaultSetup({
   const privy = usePrivyVaultKey();
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
-  const verifyRecoveryString = useUTXOpiaStore((s) => s.verifyRecoveryString);
   const sealLoginEnvelope = useUTXOpiaStore((s) => s.sealLoginEnvelope);
   const restoreFromLoginEnvelope = useUTXOpiaStore((s) => s.restoreFromLoginEnvelope);
   const scope = useMemo(() => ({ networkId, vaultId }), [networkId, vaultId]);
 
   const [mode, setMode] = useState<Mode>("choose");
-  const [passphrase, setPassphrase] = useState("");
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryString, setRecoveryString] = useState("");
-  const [confirmPassphrase, setConfirmPassphrase] = useState("");
+  const [confirmString, setConfirmString] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -156,9 +153,7 @@ export function VaultSetup({
       const device = await deviceMaterial(askDevice);
       const login = await loginMaterial();
       setRecoveryString(
-        await createEnvelopeVault(passphrase, device ?? login?.keyMaterial, {
-          replaceExisting: alreadyHere,
-        }),
+        await createEnvelopeVault(device ?? login?.keyMaterial, { replaceExisting: alreadyHere }),
       );
       // Only once the wrapping it describes exists, and only when the login is
       // what armed *this* device: the note is what decides whether the unlock
@@ -166,7 +161,6 @@ export function VaultSetup({
       // holds the wrapping names the wrong factor.
       if (!device && login) privy.remember(login.signer);
       await publishLogin(login, device);
-      setPassphrase("");
       setPin("");
       setMode("saved");
     });
@@ -178,12 +172,11 @@ export function VaultSetup({
       // should say why the next visit will ask again.
       const device = await deviceMaterial(authenticatePasskey);
       const login = await loginMaterial();
-      await restoreEnvelopeVault(recoveryInput, passphrase, device ?? login?.keyMaterial);
+      await restoreEnvelopeVault(recoveryInput, device ?? login?.keyMaterial);
       if (!device && login) privy.remember(login.signer);
       // A restore is the moment the string was needed. Publishing here is what
       // stops it being needed again on the next device.
       await publishLogin(login, device);
-      setPassphrase("");
       setPin("");
       setRecoveryInput("");
       onDone();
@@ -209,14 +202,17 @@ export function VaultSetup({
       onDone();
     });
 
-  // Nothing anywhere stores a verifier, so a typo in the passphrase would stay
-  // invisible until a restore months later, with no old device left to fall
-  // back on. Typing it back here proves the pair opens, at the one moment it
-  // still costs nothing to find out.
+  // The string carries its own key, so there is no second secret whose typo
+  // could stay invisible until a restore months later — which is what typing a
+  // passphrase back used to catch. What is left to check is the only thing that
+  // can still go wrong here: that the member actually put the string somewhere
+  // they can read it back from.
   const handleConfirm = () =>
     run(async () => {
-      await verifyRecoveryString(recoveryString, confirmPassphrase);
-      setConfirmPassphrase("");
+      if (confirmString.trim() !== recoveryString) {
+        throw new Error("That is not the string above. Paste the one you saved.");
+      }
+      setConfirmString("");
       onDone();
     });
 
@@ -228,18 +224,25 @@ export function VaultSetup({
 
         <div className="flex flex-col gap-2.5 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
           <p className="text-caption leading-relaxed text-gray">
-            <span className="font-semibold text-foreground">Now prove it opens.</span> Type your
-            passphrase once more. Nobody stores it, so this is the only chance to find out you saved
-            the right one.
+            <span className="font-semibold text-foreground">Now paste it back.</span> This string is
+            the whole key and nobody keeps a copy — read it back from wherever you just saved it,
+            not from the box above.
           </p>
 
-          <PassphraseField
-            value={confirmPassphrase}
-            onChange={setConfirmPassphrase}
-            label="Passphrase"
-            verifyOnly
+          <textarea
+            value={confirmString}
+            onChange={(e) => setConfirmString(e.target.value)}
+            rows={3}
+            spellCheck={false}
+            autoComplete="off"
             autoFocus
             disabled={busy}
+            placeholder="utxovault2…"
+            className={cn(
+              "w-full resize-none rounded-[10px] border border-gray/20 bg-muted/40 px-3 py-2.5",
+              "font-mono text-[12px] leading-relaxed text-foreground placeholder:text-gray/35",
+              "focus:border-privacy/50 focus:outline-none focus:ring-1 focus:ring-privacy/30",
+            )}
           />
 
           {error && (
@@ -252,7 +255,7 @@ export function VaultSetup({
           <button
             type="button"
             onClick={handleConfirm}
-            disabled={busy || !confirmPassphrase}
+            disabled={busy || !confirmString.trim()}
             className={cn(
               "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
               "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
@@ -382,8 +385,8 @@ export function VaultSetup({
     );
   }
 
-  // A new device, with nothing on it. Only the PIN is asked for: the passphrase
-  // is the other path off this screen, not a second field on this one.
+  // A new device, with nothing on it. Only the PIN is asked for: the recovery
+  // string is the other path off this screen, not a second field on this one.
   if (mode === "unlock-login") {
     return (
       <div className="flex flex-col gap-3.5">
@@ -472,7 +475,7 @@ export function VaultSetup({
             rows={3}
             spellCheck={false}
             autoComplete="off"
-            placeholder="utxovault1…"
+            placeholder="utxovault2…"
             className={cn(
               "w-full resize-none rounded-[10px] border border-gray/20 bg-muted/40 px-3 py-2.5",
               "font-mono text-[12px] leading-relaxed text-foreground placeholder:text-gray/35",
@@ -482,18 +485,11 @@ export function VaultSetup({
         </div>
       )}
 
-      <PassphraseField
-        value={passphrase}
-        onChange={setPassphrase}
-        verifyOnly={!creating}
-        autoFocus={creating}
-        disabled={busy}
-      />
-
       {creating && (
         <p className="px-1 text-caption leading-relaxed text-gray/60">
-          This passphrase is the only lock on your recovery string, and it is not stored anywhere.
-          If you forget it, the string alone will not get you back in.
+          We will give you one recovery string. It carries its own key, so it is the only thing you
+          have to keep — and anyone who reads it can open this vault, the way a seed phrase always
+          has been.
         </p>
       )}
 
@@ -522,7 +518,7 @@ export function VaultSetup({
       <button
         type="button"
         onClick={creating ? handleCreate : handleRestore}
-        disabled={busy || !passphrase || (!creating && !recoveryInput.trim())}
+        disabled={busy || (!creating && !recoveryInput.trim())}
         className={cn(
           "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
           "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",

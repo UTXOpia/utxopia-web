@@ -136,9 +136,9 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
 
           {/* Options */}
           <div className="p-6 space-y-3">
-            {/* Create or restore. The only way in where forgetting a
-                passphrase or losing a device is recoverable without us, which
-                is why it is the one the other rows now lead to. */}
+            {/* Create or restore. The only way in that survives us — losing a
+                device is recoverable without anyone's help, which is why it is
+                the one the other rows now lead to. */}
             {showUnlock ? (
               <VaultUnlockPrompt
                 onSignInInstead={() => setShowUnlock(false)}
@@ -236,9 +236,9 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                       {awaitingLogin ? "Waiting for sign in\u2026" : "Sign in with"}
                     </p>
                     {/* Under the title, not floating below the row: signing in
-                        does not find a vault — nothing is kept on our side to
-                        look one up with — and a member expecting one has been
-                        misled by the time they are staring at a passphrase. */}
+                        alone does not open a vault — that still takes a PIN or
+                        a recovery string — and a member expecting otherwise has
+                        been misled by the time the next screen asks. */}
                     <p className="text-caption text-gray mt-0.5">
                       Then create or restore your vault
                     </p>

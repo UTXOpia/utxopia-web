@@ -9,10 +9,10 @@ import {
   WeakPinError,
   assertIdentity,
   buildUnlockMessage,
-  decodeEnvelope,
-  deriveFromPassphrase,
+  decodeRecoveryString,
   deriveFromPin,
-  encodeEnvelope,
+  encodeRecoveryString,
+  newStringKey,
   envelopeFromHex,
   envelopeToHex,
   guardFor,
@@ -54,7 +54,7 @@ describe("wrapping", () => {
     await expect(unwrapSeed(envelope, key(1), AAD)).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
-  it("re-wraps the same seed under a new key — changing a passphrase keeps the identity", async () => {
+  it("re-wraps the same seed under a new key — reissuing a string keeps the identity", async () => {
     const seed = newSeed();
     const first = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META), aad: AAD });
     const second = await wrapSeed({
@@ -80,9 +80,9 @@ describe("identity guard", () => {
     expect(() => assertIdentity(envelope, META)).not.toThrow();
   });
 
-  // The AEAD tag cannot catch this one: the passphrase is right, the string is
+  // The AEAD tag cannot catch this one: the key is right, the string is
   // simply from the member's other vault.
-  it("stops a correct passphrase against the wrong vault", async () => {
+  it("stops a correct key against the wrong vault", async () => {
     const envelope = await anEnvelope({ guard: guardFor("utxo:other") });
     expect(() => assertIdentity(envelope, META)).toThrow(EnvelopeIdentityError);
   });
@@ -91,15 +91,15 @@ describe("identity guard", () => {
 describe("recovery string", () => {
   it("survives a round trip", async () => {
     const envelope = await anEnvelope();
-    const decoded = decodeEnvelope(encodeEnvelope(envelope));
+    const decoded = decodeRecoveryString(encodeRecoveryString(envelope, key(9))).envelope;
     expect(decoded).toEqual(envelope);
   });
 
   it("still opens after being written down and typed back in", async () => {
     const seed = newSeed();
     const envelope = await wrapSeed({ seed, keyMaterial: key(1), salt: newSalt(), guard: guardFor(META), aad: AAD });
-    const written = `  ${encodeEnvelope(envelope).replace(/(.{40})/g, "$1\n")}  `;
-    expect(await unwrapSeed(decodeEnvelope(written), key(1), AAD)).toEqual(seed);
+    const written = `  ${encodeRecoveryString(envelope, key(1)).replace(/(.{40})/g, "$1\n")}  `;
+    expect(await unwrapSeed(decodeRecoveryString(written).envelope, key(1), AAD)).toEqual(seed);
   });
 
   // The finding this exists for: with scope carried only by the storage key
@@ -110,16 +110,21 @@ describe("recovery string", () => {
     await expect(unwrapSeed(envelope, key(1), OTHER_AAD)).rejects.toBeInstanceOf(EnvelopeUnlockError);
   });
 
+  // Longer than v1 by the 32 bytes of key it now carries, and worth it: v1 was
+  // shorter only because half of it was a second thing the member had to keep.
+  // Still inside what a 24-word seed phrase costs to write down.
   it("stays short enough that a member will actually save it", async () => {
-    const text = encodeEnvelope(await anEnvelope());
-    expect(text.length).toBeLessThan(140);
+    const text = encodeRecoveryString(await anEnvelope(), key(1));
+    expect(text.length).toBeLessThan(200);
   });
 
   it("says what is wrong rather than failing silently", async () => {
-    expect(() => decodeEnvelope("hello")).toThrow(EnvelopeFormatError);
-    expect(() => decodeEnvelope("utxovault1AAAA")).toThrow(EnvelopeFormatError);
-    const truncated = encodeEnvelope(await anEnvelope()).slice(0, 40);
-    expect(() => decodeEnvelope(truncated)).toThrow(EnvelopeFormatError);
+    expect(() => decodeRecoveryString("hello")).toThrow(EnvelopeFormatError);
+    expect(() => decodeRecoveryString("utxovault2AAAA")).toThrow(EnvelopeFormatError);
+    const truncated = encodeRecoveryString(await anEnvelope(), key(1)).slice(0, 40);
+    expect(() => decodeRecoveryString(truncated)).toThrow(EnvelopeFormatError);
+    // A v1 string is named, not left to fail as a byte count.
+    expect(() => decodeRecoveryString("utxovault1AAAA")).toThrow(/older recovery string/);
   });
 
   // The header travels with the string, so anyone who can hand a member a
@@ -127,7 +132,7 @@ describe("recovery string", () => {
   it("refuses cost parameters outside the supported range", async () => {
     const envelope = await anEnvelope();
     const bytes = Array.from(
-      Uint8Array.from(atob(encodeEnvelope(envelope).slice(10).replace(/-/g, "+").replace(/_/g, "/") + "="), (c) =>
+      Uint8Array.from(atob(encodeRecoveryString(envelope, key(1)).slice(10).replace(/-/g, "+").replace(/_/g, "/") + "="), (c) =>
         c.charCodeAt(0),
       ),
     );
@@ -141,18 +146,18 @@ describe("recovery string", () => {
     absurdMemory[3] = 0xff;
     absurdMemory[4] = 0xff;
     absurdMemory[5] = 0xff;
-    expect(() => decodeEnvelope(reencode(absurdMemory))).toThrow(EnvelopeFormatError);
+    expect(() => decodeRecoveryString(reencode(absurdMemory))).toThrow(EnvelopeFormatError);
 
     const noWork = [...bytes];
     noWork[2] = 1;
     noWork[3] = 0;
     noWork[4] = 0;
     noWork[5] = 0;
-    expect(() => decodeEnvelope(reencode(noWork))).toThrow(EnvelopeFormatError);
+    expect(() => decodeRecoveryString(reencode(noWork))).toThrow(EnvelopeFormatError);
 
     const unknownKdf = [...bytes];
     unknownKdf[1] = 9;
-    expect(() => decodeEnvelope(reencode(unknownKdf))).toThrow(EnvelopeFormatError);
+    expect(() => decodeRecoveryString(reencode(unknownKdf))).toThrow(EnvelopeFormatError);
   });
 
   it("round-trips through the device storage form too", async () => {
@@ -161,28 +166,33 @@ describe("recovery string", () => {
   });
 });
 
-describe("passphrase stretching", () => {
-  it("is deterministic for the same passphrase and salt", () => {
-    const salt = newSalt();
-    expect(deriveFromPassphrase("correct horse battery staple", salt)).toEqual(
-      deriveFromPassphrase("correct horse battery staple", salt),
-    );
+describe("the key a recovery string carries", () => {
+  it("is a fresh 32 bytes every time", () => {
+    const a = newStringKey();
+    expect(a.length).toBe(32);
+    expect(a).not.toEqual(newStringKey());
   });
 
-  it("separates members who picked the same passphrase", () => {
-    expect(deriveFromPassphrase("hunter2", newSalt())).not.toEqual(
-      deriveFromPassphrase("hunter2", newSalt()),
-    );
+  // The whole point of v2: what is in the string opens the string. If these
+  // ever come apart, a member holding a valid-looking string has nothing.
+  it("round-trips as the key that opens its own envelope", async () => {
+    const k = newStringKey();
+    const seed = newSeed();
+    const envelope = await wrapSeed({
+      seed,
+      keyMaterial: k,
+      salt: newSalt(),
+      guard: guardFor(META),
+      aad: AAD,
+    });
+    const decoded = decodeRecoveryString(encodeRecoveryString(envelope, k));
+    expect(decoded.key).toEqual(k);
+    expect(await unwrapSeed(decoded.envelope, decoded.key, AAD)).toEqual(seed);
   });
 
-  it("costs enough to be worth having but stays usable on a phone", () => {
-    const started = performance.now();
-    deriveFromPassphrase("correct horse battery staple", newSalt());
-    const elapsed = performance.now() - started;
-    // Brute-force resistance is what this buys; a restore that feels broken is
-    // what it must not cost. Both bounds are load-bearing.
-    expect(elapsed).toBeGreaterThan(20);
-    expect(elapsed).toBeLessThan(4000);
+  it("refuses a key that is not the right length", async () => {
+    const envelope = await anEnvelope();
+    expect(() => encodeRecoveryString(envelope, new Uint8Array(16))).toThrow(EnvelopeFormatError);
   });
 });
 

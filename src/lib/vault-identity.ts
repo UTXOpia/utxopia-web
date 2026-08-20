@@ -23,13 +23,13 @@ import {
   EnvelopeIdentityError,
   EnvelopeUnlockError,
   assertIdentity,
-  decodeEnvelope,
-  deriveFromPassphrase,
-  encodeEnvelope,
+  decodeRecoveryString,
+  encodeRecoveryString,
   envelopeFromHex,
   envelopeToHex,
   guardFor,
   newSalt,
+  newStringKey,
   newSeed,
   unwrapSeed,
   wrapSeed,
@@ -68,16 +68,6 @@ export async function workingSeedFor(root: Uint8Array, scope: VaultScope): Promi
   material.set(root);
   material.set(tag, root.length);
   return new Uint8Array(await crypto.subtle.digest("SHA-256", material));
-}
-
-/** Minimum a member may choose. Below this the string is the weaker half. */
-export const MIN_PASSPHRASE_LENGTH = 12;
-
-export class WeakPassphraseError extends Error {
-  constructor() {
-    super(`Use at least ${MIN_PASSPHRASE_LENGTH} characters — this is the only lock on your recovery string.`);
-    this.name = "WeakPassphraseError";
-  }
 }
 
 export interface VaultScope {
@@ -186,28 +176,30 @@ export function hasDeviceEnvelope(scope: VaultScope): boolean {
   return readDeviceEnvelope(scope) !== null;
 }
 
-export function assertPassphrase(passphrase: string): void {
-  if (passphrase.trim().length < MIN_PASSPHRASE_LENGTH) throw new WeakPassphraseError();
-}
-
-/** Wrap a seed under a passphrase. Every call mints a fresh salt. */
+/**
+ * Wrap a seed under a fresh random key and put both in one string.
+ *
+ * Every call mints a new key as well as a new salt, so an old string keeps
+ * opening under its own key and a new one is not a re-encoding of it. That is
+ * the same property the passphrase version had, and the same caveat: a string
+ * already written down cannot be revoked. Rotating the seed is the only thing
+ * that retires one.
+ */
 export async function buildRecoveryString(input: {
   scope: VaultScope;
   seed: Uint8Array;
-  passphrase: string;
   metaAddress: string;
 }): Promise<string> {
-  const passphrase = input.passphrase.trim();
-  assertPassphrase(passphrase);
-  const salt = newSalt();
-  return encodeEnvelope(
+  const key = newStringKey();
+  return encodeRecoveryString(
     await wrapSeed({
       seed: input.seed,
-      keyMaterial: deriveFromPassphrase(passphrase, salt),
-      salt,
+      keyMaterial: key,
+      salt: newSalt(),
       guard: guardFor(input.metaAddress),
       aad: scopeTag(input.scope),
     }),
+    key,
   );
 }
 
@@ -220,7 +212,6 @@ export async function buildRecoveryString(input: {
  */
 export async function createVault(input: {
   scope: VaultScope;
-  passphrase: string;
   /**
    * Omitted when this browser cannot supply key material worth wrapping under
    * (see PrfUnavailableError). The vault is still created and still has a
@@ -232,17 +223,11 @@ export async function createVault(input: {
   /** Caller has shown the member what they are about to lose. */
   replaceExisting?: boolean;
 }): Promise<{ seed: Uint8Array; metaAddress: string; recoveryString: string }> {
-  assertPassphrase(input.passphrase.trim());
   if (!input.replaceExisting && readDeviceEnvelope(input.scope)) throw new VaultAlreadyHereError();
   const seed = newSeed();
   const metaAddress = await metaAddressForScope(input.metaAddressFor, seed, input.scope);
 
-  const recoveryString = await buildRecoveryString({
-    scope: input.scope,
-    seed,
-    passphrase: input.passphrase,
-    metaAddress,
-  });
+  const recoveryString = await buildRecoveryString({ scope: input.scope, seed, metaAddress });
   if (input.deviceKeyMaterial) {
     await armDevice({
       scope: input.scope,
@@ -293,34 +278,6 @@ export async function armDevice(input: {
   );
 }
 
-/**
- * Prove a string and a passphrase actually open together, without side effects.
- *
- * Nothing stores a verifier, by design — which means a typo at creation is
- * invisible until the member restores on a new device, possibly months later,
- * with no old device left to fall back on. Checking here costs one argon2 run
- * at the only moment it is cheap.
- *
- * The guard comparison needs no derivation: the envelope was written for a
- * known address, so comparing against that address's guard is enough, and
- * skipping the SDK keeps this free of the login side effects the unlock paths
- * necessarily have.
- */
-export async function verifyRecoveryString(input: {
-  scope: VaultScope;
-  recoveryString: string;
-  passphrase: string;
-  metaAddress: string;
-}): Promise<void> {
-  const envelope = decodeEnvelope(input.recoveryString);
-  await unwrapSeed(
-    envelope,
-    deriveFromPassphrase(input.passphrase.trim(), envelope.kdf.salt, envelope.kdf),
-    scopeTag(input.scope),
-  );
-  assertIdentity(envelope, input.metaAddress);
-}
-
 export class NoDeviceEnvelopeError extends Error {
   constructor() {
     super("This browser has no vault yet. Restore from your recovery string.");
@@ -363,22 +320,17 @@ export async function unlockWithDevice(input: {
 }
 
 /**
- * New device. Arms this browser on success so the member types the passphrase
+ * New device. Arms this browser on success so the member pastes the string
  * once rather than every session.
  */
 export async function unlockWithRecoveryString(input: {
   scope: VaultScope;
   recoveryString: string;
-  passphrase: string;
   deviceKeyMaterial?: Uint8Array;
   metaAddressFor: MetaAddressFor;
 }): Promise<{ seed: Uint8Array; metaAddress: string }> {
-  const envelope = decodeEnvelope(input.recoveryString);
-  return unlockWithEnvelope({
-    ...input,
-    envelope,
-    keyMaterial: deriveFromPassphrase(input.passphrase.trim(), envelope.kdf.salt, envelope.kdf),
-  });
+  const { envelope, key } = decodeRecoveryString(input.recoveryString);
+  return unlockWithEnvelope({ ...input, envelope, keyMaterial: key });
 }
 
 /**
@@ -408,26 +360,6 @@ export async function unlockWithEnvelope(input: {
 }
 
 /**
- * Re-wrap under a new passphrase. Returns the new string; the caller must tell
- * the member the old one still opens the vault with the old passphrase, because
- * a string already written down cannot be revoked. Rotating the seed is the
- * only thing that actually retires it.
- */
-export async function changePassphrase(input: {
-  scope: VaultScope;
-  seed: Uint8Array;
-  metaAddress: string;
-  nextPassphrase: string;
-}): Promise<string> {
-  return buildRecoveryString({
-    scope: input.scope,
-    seed: input.seed,
-    passphrase: input.nextPassphrase,
-    metaAddress: input.metaAddress,
-  });
-}
-
-/**
  * Bring an identity that predates envelopes under one, keeping the identity.
  * The seed is whatever already produced this member's notes — wrapping it does
  * not move anything, which is the point.
@@ -435,23 +367,19 @@ export async function changePassphrase(input: {
 export async function adoptExistingSeed(input: {
   scope: VaultScope;
   seed: Uint8Array;
-  passphrase: string;
   deviceKeyMaterial?: Uint8Array;
   metaAddressFor: MetaAddressFor;
   /** Caller has shown the member the identity they are about to write over. */
   replaceExisting?: boolean;
 }): Promise<{ metaAddress: string; recoveryString: string }> {
-  assertPassphrase(input.passphrase.trim());
-  // A derived root has no AEAD tag behind it, so a mistyped passphrase arrives
-  // here looking exactly like a correct one. Refusing to write over a wrapping
-  // this browser already holds is the only thing between that typo and the
-  // member's real vault.
+  // The seed arrives from somewhere with no tag to check it against, so
+  // refusing to write over a wrapping this browser already holds is the only
+  // thing between a wrong one and the member's real vault.
   if (!input.replaceExisting && readDeviceEnvelope(input.scope)) throw new VaultAlreadyHereError();
   const metaAddress = await metaAddressForScope(input.metaAddressFor, input.seed, input.scope);
   const recoveryString = await buildRecoveryString({
     scope: input.scope,
     seed: input.seed,
-    passphrase: input.passphrase,
     metaAddress,
   });
   if (input.deviceKeyMaterial) {

@@ -1,9 +1,9 @@
 "use client";
 
 // Shown once, at the only moment the member can still act on it. The copy says
-// the three things that decide whether they will ever get back in: it is the
-// only route to a new device, it needs the passphrase to be worth anything, and
-// nobody can reissue it.
+// the three things that decide whether they ever get back in — and whether
+// somebody else does: it is the last route in when a device and a PIN are both
+// gone, it is the whole key on its own, and nobody can reissue this one.
 
 import { useState } from "react";
 import { QRCodeSVG } from "qrcode.react";
@@ -26,8 +26,8 @@ function downloadRecoveryString(value: string) {
       "UTXOpia vault recovery string\n",
       `Saved ${stamp}\n\n`,
       `${value}\n\n`,
-      "This alone cannot open your vault — it needs the passphrase you chose.\n",
-      "Keep the passphrase somewhere else.\n",
+      "This string is the whole key. Anyone who reads it can open your vault.\n",
+      "Keep it where only you can read it. We have no copy and cannot reissue this one.\n",
     ],
     { type: "text/plain" },
   );
@@ -62,9 +62,9 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
         <div>
           <p className="text-caption font-semibold text-foreground">Your recovery string</p>
           <p className="mt-1 text-caption leading-relaxed text-gray">
-            The only way into this vault from a new device or a cleared browser. Save it in your
-            password manager. It is useless to anyone without your passphrase — and useless to you
-            without it too. We keep no copy and cannot reissue it.
+            The last way into this vault when a device and your PIN are both gone. Save it in your
+            password manager. It carries its own key, so there is nothing else to keep — and
+            nothing stopping anyone who reads it. We keep no copy of this one.
           </p>
         </div>
       </div>
@@ -128,10 +128,11 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
             onChange={(e) => setAcknowledged(e.target.checked)}
             className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-privacy"
           />
-          {/* Storing both halves in one place quietly turns two-of-two back into
-              one-of-one, and no code can prevent it. Saying so is the mitigation. */}
-          I have saved this somewhere I will still have it if I lose this device — and my passphrase
-          is not stored next to it.
+          {/* There is no second half to keep apart any more, so the only thing
+              left to ask about is the two ways this actually goes wrong: saved
+              nowhere, or saved somewhere other people can read. */}
+          I have saved this somewhere I will still have it if I lose this device, and where nobody
+          else can read it.
         </label>
       )}
     </div>

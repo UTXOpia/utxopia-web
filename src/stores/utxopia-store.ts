@@ -12,7 +12,6 @@ import {
   unlockWithDevice,
   unlockWithEnvelope,
   unlockWithRecoveryString,
-  verifyRecoveryString,
   workingSeedFor,
   type VaultScope,
 } from "@/lib/vault-identity";
@@ -370,14 +369,12 @@ interface UTXOpiaState {
   setIdentityRestoring: (restoring: boolean) => void;
   /** Envelope-backed identity (see lib/vault-identity). Memory only. */
   createEnvelopeVault: (
-    passphrase: string,
     deviceKeyMaterial?: Uint8Array,
     opts?: { replaceExisting?: boolean },
   ) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array, factor?: "passkey" | "pin") => Promise<void>;
   restoreEnvelopeVault: (
     recoveryString: string,
-    passphrase: string,
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<void>;
   /** The login wrapping, sealed but not stored — the caller publishes it (see
@@ -393,9 +390,7 @@ interface UTXOpiaState {
     keyMaterial: Uint8Array,
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<void>;
-  exportRecoveryString: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
-  /** Prove a freshly issued string opens with the passphrase the member typed. */
-  verifyRecoveryString: (recoveryString: string, passphrase: string) => Promise<void>;
+  exportRecoveryString: (deviceKeyMaterial?: Uint8Array) => Promise<string>;
   /** Drop this browser's wrapping. Distinct from logging out: after this the
    *  recovery string is the only way back in, on any device. */
   forgetVaultOnThisDevice: () => Promise<void>;
@@ -680,11 +675,10 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
 
   setIdentityRestoring: (restoring) => set({ identityRestoring: restoring }),
 
-  createEnvelopeVault: async (passphrase, deviceKeyMaterial, opts) => {
+  createEnvelopeVault: async (deviceKeyMaterial, opts) => {
     const { scope, metaAddressFor } = await envelopeContext();
     const { seed, recoveryString } = await createVault({
       scope,
-      passphrase,
       deviceKeyMaterial,
       metaAddressFor,
       replaceExisting: opts?.replaceExisting,
@@ -706,13 +700,12 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  restoreEnvelopeVault: async (recoveryString, passphrase, deviceKeyMaterial) => {
+  restoreEnvelopeVault: async (recoveryString, deviceKeyMaterial) => {
     const { scope, metaAddressFor } = await envelopeContext();
     try {
       const { seed } = await unlockWithRecoveryString({
         scope,
         recoveryString,
-        passphrase,
         deviceKeyMaterial,
         metaAddressFor,
       });
@@ -771,7 +764,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  exportRecoveryString: async (passphrase, deviceKeyMaterial) => {
+  exportRecoveryString: async (deviceKeyMaterial) => {
     const seed = get().vaultSeed;
     const metaAddress = get().stealthAddressEncoded;
     if (!seed || !metaAddress) {
@@ -788,14 +781,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor: envelopeMetaAddressFor });
     }
 
-    return buildRecoveryString({ scope, seed, passphrase, metaAddress });
-  },
-
-  verifyRecoveryString: async (recoveryString, passphrase) => {
-    const metaAddress = get().stealthAddressEncoded;
-    if (!metaAddress) throw new Error("Unlock your vault first.");
-    const { scope } = await envelopeContext();
-    await verifyRecoveryString({ scope, recoveryString, passphrase, metaAddress });
+    return buildRecoveryString({ scope, seed, metaAddress });
   },
 
   rescopeVaultSeed: async () => {

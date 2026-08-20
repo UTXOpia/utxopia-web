@@ -1,26 +1,24 @@
 "use client";
 
 /**
- * Re-export the recovery string, and change the passphrase that locks it.
+ * Issue a fresh recovery string, and forget this vault on this device.
  *
- * Both need the member's passphrase, and neither is reachable without an
- * unlocked vault — the seed lives in memory for exactly this, so nobody has to
- * run an unlock ceremony twice to write their string down again.
+ * There used to be two export tasks — one under the passphrase already in use,
+ * one under a new one — because the string was a ciphertext and the passphrase
+ * was its lock. A string now carries its own key, so every issue is a new key
+ * and the distinction has nothing left to describe.
  *
- * Re-exporting is the real safety net in this design: as long as one device
- * still opens, a lost string is an inconvenience rather than a loss. It has to
- * stay findable.
+ * Issuing is the real safety net in this design: as long as one device still
+ * opens, a lost string is an inconvenience rather than a loss. It has to stay
+ * findable.
  */
 
 import { useState } from "react";
-import { AlertCircle, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
+import { AlertCircle, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
-import { PassphraseField } from "@/components/vault/passphrase-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
-
-type Task = "idle" | "export" | "change";
 
 export function RecoverySection() {
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
@@ -29,8 +27,6 @@ export function RecoverySection() {
   const forgetVaultOnThisDevice = useUTXOpiaStore((s) => s.forgetVaultOnThisDevice);
   const { authenticate } = usePasskey();
 
-  const [task, setTask] = useState<Task>("idle");
-  const [passphrase, setPassphrase] = useState("");
   const [result, setResult] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -53,8 +49,6 @@ export function RecoverySection() {
   }
 
   const reset = () => {
-    setTask("idle");
-    setPassphrase("");
     setResult("");
     setError(null);
   };
@@ -71,8 +65,7 @@ export function RecoverySection() {
         if (caught instanceof PrfUnavailableError) return undefined;
         throw caught;
       });
-      setResult(await exportRecoveryString(passphrase, deviceKeyMaterial ?? undefined));
-      setPassphrase("");
+      setResult(await exportRecoveryString(deviceKeyMaterial ?? undefined));
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not build a recovery string.");
     } finally {
@@ -100,17 +93,15 @@ export function RecoverySection() {
       {result ? (
         <div className="flex flex-col gap-3">
           <RecoveryStringCard value={result} />
-          {task === "change" && (
-            <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3">
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-              <p className="text-caption leading-relaxed text-gray">
-                <span className="font-semibold text-foreground">Your old string still works.</span>{" "}
-                Anyone holding it, with the old passphrase, can still open this vault — a string
-                already written down cannot be revoked. If you think the old one leaked, move your
-                funds to a new vault instead.
-              </p>
-            </div>
-          )}
+          <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3">
+            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
+            <p className="text-caption leading-relaxed text-gray">
+              <span className="font-semibold text-foreground">Every string you have issued still
+              works.</span>{" "}
+              Each carries its own key and a string already written down cannot be revoked. If you
+              think an old one leaked, move your funds to a new vault — nothing else retires it.
+            </p>
+          </div>
           <button
             type="button"
             onClick={reset}
@@ -119,17 +110,18 @@ export function RecoverySection() {
             Done
           </button>
         </div>
-      ) : task === "idle" ? (
+      ) : (
         <div className="flex flex-col gap-2">
+          {error && (
+            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+              <span className="text-caption text-red-400">{error}</span>
+            </div>
+          )}
           <SettingsAction
-            title="Show my recovery string"
-            detail="Write it down again, or move it to a new password manager."
-            onClick={() => setTask("export")}
-          />
-          <SettingsAction
-            title="Issue a new recovery string"
-            detail="Under a new passphrase. The old string keeps working — only moving your funds retires it."
-            onClick={() => setTask("change")}
+            title={busy ? "Working…" : "Issue a recovery string"}
+            detail="A fresh one, with its own key. Keep it somewhere only you can read."
+            onClick={() => void run()}
           />
           <SettingsAction
             title="Forget this vault on this device"
@@ -137,57 +129,6 @@ export function RecoverySection() {
             onClick={forget}
             danger
           />
-        </div>
-      ) : (
-        <div className="flex flex-col gap-3 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
-          <p className="text-caption leading-relaxed text-gray">
-            {task === "export"
-              ? "Choose the passphrase that will lock this string. It can be the one you already use, or a new one — whatever you pick here is what unlocks this copy."
-              : "Choose a new passphrase. It will lock the new string — your vault, address and balance do not change."}
-          </p>
-
-          {/* Both tasks choose the lock on a string that is about to exist, so
-              both get the generator and the strength read-out. Nothing is being
-              verified against — there is no stored copy to check a passphrase
-              against, by design. */}
-          <PassphraseField
-            value={passphrase}
-            onChange={setPassphrase}
-            label={task === "export" ? "Passphrase for this string" : "New passphrase"}
-            disabled={busy}
-            autoFocus
-          />
-
-          {error && (
-            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
-              <span className="text-caption text-red-400">{error}</span>
-            </div>
-          )}
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={run}
-              disabled={busy || !passphrase}
-              className={cn(
-                "inline-flex min-h-10 flex-1 items-center justify-center gap-2 rounded-[10px] px-4",
-                "bg-foreground text-caption font-semibold text-background transition-colors cursor-pointer",
-                "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
-              )}
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <RotateCcw className="h-4 w-4" aria-hidden />}
-              {task === "export" ? "Show string" : "Issue new string"}
-            </button>
-            <button
-              type="button"
-              onClick={reset}
-              disabled={busy}
-              className="min-h-10 rounded-[10px] px-3 text-caption text-gray/60 hover:text-foreground transition-colors cursor-pointer"
-            >
-              Cancel
-            </button>
-          </div>
         </div>
       )}
     </section>
