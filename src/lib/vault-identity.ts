@@ -222,6 +222,8 @@ export async function createVault(input: {
   metaAddressFor: MetaAddressFor;
   /** Caller has shown the member what they are about to lose. */
   replaceExisting?: boolean;
+  /** The salt the login signature was bound to, when a login armed this device. */
+  salt?: Uint8Array;
 }): Promise<{ seed: Uint8Array; metaAddress: string; recoveryString: string }> {
   if (!input.replaceExisting && readDeviceEnvelope(input.scope)) throw new VaultAlreadyHereError();
   const seed = newSeed();
@@ -234,6 +236,7 @@ export async function createVault(input: {
       seed,
       metaAddress,
       deviceKeyMaterial: input.deviceKeyMaterial,
+      salt: input.salt,
     });
   }
 
@@ -254,12 +257,18 @@ export async function sealEnvelope(input: {
   seed: Uint8Array;
   metaAddress: string;
   keyMaterial: Uint8Array;
+  /**
+   * The salt this wrapping is written under, minted by the caller rather than
+   * here. The login path signs a message carrying it, so the key material
+   * arriving above was already derived from this exact value — generating a
+   * fresh one now would seal the envelope under a salt nothing can reproduce.
+   */
+  salt: Uint8Array;
 }): Promise<VaultEnvelope> {
-  const salt = newSalt();
   return wrapSeed({
     seed: input.seed,
     keyMaterial: input.keyMaterial,
-    salt,
+    salt: input.salt,
     guard: guardFor(input.metaAddress),
     aad: scopeTag(input.scope),
   });
@@ -271,10 +280,16 @@ export async function armDevice(input: {
   seed: Uint8Array;
   metaAddress: string;
   deviceKeyMaterial: Uint8Array;
+  /** Omitted by the passkey path, whose key material does not depend on one. */
+  salt?: Uint8Array;
 }): Promise<void> {
   writeDeviceEnvelope(
     input.scope,
-    await sealEnvelope({ ...input, keyMaterial: input.deviceKeyMaterial }),
+    await sealEnvelope({
+      ...input,
+      keyMaterial: input.deviceKeyMaterial,
+      salt: input.salt ?? newSalt(),
+    }),
   );
 }
 
@@ -327,6 +342,7 @@ export async function unlockWithRecoveryString(input: {
   scope: VaultScope;
   recoveryString: string;
   deviceKeyMaterial?: Uint8Array;
+  salt?: Uint8Array;
   metaAddressFor: MetaAddressFor;
 }): Promise<{ seed: Uint8Array; metaAddress: string }> {
   const { envelope, key } = decodeRecoveryString(input.recoveryString);
@@ -347,6 +363,8 @@ export async function unlockWithEnvelope(input: {
   envelope: VaultEnvelope;
   keyMaterial: Uint8Array;
   deviceKeyMaterial?: Uint8Array;
+  /** Present when a login is what will arm this device. */
+  salt?: Uint8Array;
   metaAddressFor: MetaAddressFor;
 }): Promise<{ seed: Uint8Array; metaAddress: string }> {
   const seed = await unwrapSeed(input.envelope, input.keyMaterial, scopeTag(input.scope));
@@ -354,7 +372,13 @@ export async function unlockWithEnvelope(input: {
   assertIdentity(input.envelope, metaAddress);
 
   if (input.deviceKeyMaterial) {
-    await armDevice({ scope: input.scope, seed, metaAddress, deviceKeyMaterial: input.deviceKeyMaterial });
+    await armDevice({
+      scope: input.scope,
+      seed,
+      metaAddress,
+      deviceKeyMaterial: input.deviceKeyMaterial,
+      salt: input.salt,
+    });
   }
   return { seed, metaAddress };
 }

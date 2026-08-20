@@ -61,8 +61,11 @@ export function PinBackupSection() {
     setError(null);
     setBusy(true);
     try {
-      const { signature } = await privy.keyMaterialFor(pin);
-      await deleteRemoteEnvelope({ scope: { networkId, vaultId }, pin, signature });
+      // No signature needed any more: the row is addressed by the account and
+      // released against the PIN proof. One fewer prompt for the one action a
+      // member takes when they have decided they want us out of it.
+      if (!privy.accountId) throw new Error("Sign in first.");
+      await deleteRemoteEnvelope({ scope: { networkId, vaultId }, pin, accountId: privy.accountId });
       setConfirming(false);
       setPin("");
       setDone(true);

@@ -370,18 +370,20 @@ interface UTXOpiaState {
   /** Envelope-backed identity (see lib/vault-identity). Memory only. */
   createEnvelopeVault: (
     deviceKeyMaterial?: Uint8Array,
-    opts?: { replaceExisting?: boolean },
+    opts?: { replaceExisting?: boolean; salt?: Uint8Array },
   ) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array, factor?: "passkey" | "pin") => Promise<void>;
   restoreEnvelopeVault: (
     recoveryString: string,
     deviceKeyMaterial?: Uint8Array,
+    salt?: Uint8Array,
   ) => Promise<void>;
   /** The login wrapping, sealed but not stored — the caller publishes it (see
    *  lib/vault-remote). Needs a vault already open in this session, and on a
    *  passkey-armed device the passkey answering again. */
   sealLoginEnvelope: (
     keyMaterial: Uint8Array,
+    salt: Uint8Array,
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<VaultEnvelope>;
   /** Open a wrapping fetched from the blob store, and arm this device with it. */
@@ -389,6 +391,7 @@ interface UTXOpiaState {
     envelope: VaultEnvelope,
     keyMaterial: Uint8Array,
     deviceKeyMaterial?: Uint8Array,
+    salt?: Uint8Array,
   ) => Promise<void>;
   exportRecoveryString: (deviceKeyMaterial?: Uint8Array) => Promise<string>;
   /** Drop this browser's wrapping. Distinct from logging out: after this the
@@ -682,6 +685,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       deviceKeyMaterial,
       metaAddressFor,
       replaceExisting: opts?.replaceExisting,
+      salt: opts?.salt,
     });
     await adoptSeedIntoSession(set, seed);
     return recoveryString;
@@ -700,13 +704,14 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  restoreEnvelopeVault: async (recoveryString, deviceKeyMaterial) => {
+  restoreEnvelopeVault: async (recoveryString, deviceKeyMaterial, salt) => {
     const { scope, metaAddressFor } = await envelopeContext();
     try {
       const { seed } = await unlockWithRecoveryString({
         scope,
         recoveryString,
         deviceKeyMaterial,
+        salt,
         metaAddressFor,
       });
       await adoptSeedIntoSession(set, seed);
@@ -721,7 +726,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     }
   },
 
-  sealLoginEnvelope: async (keyMaterial, deviceKeyMaterial) => {
+  sealLoginEnvelope: async (keyMaterial, salt, deviceKeyMaterial) => {
     const seed = get().vaultSeed;
     const metaAddress = get().stealthAddressEncoded;
     if (!seed || !metaAddress) throw new Error("Unlock your vault before saving a backup.");
@@ -741,10 +746,10 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor: envelopeMetaAddressFor });
     }
 
-    return sealEnvelope({ scope, seed, metaAddress, keyMaterial });
+    return sealEnvelope({ scope, seed, metaAddress, keyMaterial, salt });
   },
 
-  restoreFromLoginEnvelope: async (envelope, keyMaterial, deviceKeyMaterial) => {
+  restoreFromLoginEnvelope: async (envelope, keyMaterial, deviceKeyMaterial, salt) => {
     const { scope, metaAddressFor } = await envelopeContext();
     try {
       const { seed } = await unlockWithEnvelope({
@@ -752,6 +757,7 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
         envelope,
         keyMaterial,
         deviceKeyMaterial,
+        salt,
         metaAddressFor,
       });
       await adoptSeedIntoSession(set, seed);

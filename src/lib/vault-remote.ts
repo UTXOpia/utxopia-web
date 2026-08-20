@@ -13,7 +13,8 @@
  *
  *   we have            the envelope, and a proof of the PIN
  *   we never have      the signature, and therefore not the key
- *   Privy has          the signature
+ *   Privy has          the signature, over a salt it cannot decrypt anything
+ *                      with
  *   Privy never has    the envelope
  *
  * `deriveFromPin` salts the PIN with the signature, so our copy of the
@@ -21,10 +22,9 @@
  * both parties, which is the property the member is told they are trusting.
  *
  * WHY THE PROOF EXISTS AT ALL. Gating release on the blob id alone would make
- * this theatre: the id comes from the signature, so anyone who took over the
- * member's email logs into Privy, signs, computes the id, and downloads the
- * ciphertext — at which point six digits fall to an offline sweep in under an
- * hour. The proof moves that sweep onto a server that counts, which is the only
+ * this theatre: the id is derivable by anyone who can reach the member's
+ * account, so a stolen email would otherwise download the ciphertext outright —
+ * at which point six digits fall to an offline sweep in under an hour. The proof moves that sweep onto a server that counts, which is the only
  * place a six-digit secret has ever been safe. The lockout is not a nicety
  * around this design; it *is* this design.
  */
@@ -38,20 +38,27 @@ import { scopeTag, type VaultScope } from "@/lib/vault-identity";
 /**
  * FROZEN. Which row this member's wrapping is.
  *
- * Domain-separated from the signature's bare digest ON PURPOSE, and this is not
- * cosmetic: `deriveFromPin` salts the PIN with exactly `sha256(signature)`.
- * Publishing that value as the row key would hand us the argon2 salt for every
- * member, and the two-party property above would be gone — a PIN swept out of
- * our own table would finish the job without Privy. Never collapse these.
+ * From the provider's account id, not from a signature, and the ordering is
+ * what forces it: the message a signature is bound to now carries the
+ * wrapping's salt, and that salt lives inside the wrapping this id is used to
+ * fetch. Deriving the id from a signature would mean signing twice on a new
+ * device — once over a constant to find the row, once over the salt to open it
+ * — and the second prompt buys nothing.
+ *
+ * What it costs is narrow: anyone who learns the account id can address the
+ * row, where before they needed to be able to sign. Both require knowing the
+ * member; neither yields the ciphertext, which still takes the PIN and its
+ * counter. The id is opaque either way — a hash, carrying no address and
+ * nothing derived from the PIN.
  *
  * The scope is in it so Open and Verified do not share a row.
  */
-function blobId(scope: VaultScope, signature: Uint8Array): string {
+function blobId(scope: VaultScope, accountId: string): string {
   return bytesToHex(
     sha256(new Uint8Array([
-      ...new TextEncoder().encode("utxopia:blob-id:v1|"),
+      ...new TextEncoder().encode("utxopia:blob-id:v2|"),
       ...scopeTag(scope),
-      ...signature,
+      ...new TextEncoder().encode(accountId),
     ])),
   );
 }
@@ -59,9 +66,8 @@ function blobId(scope: VaultScope, signature: Uint8Array): string {
 /**
  * FROZEN. What we are allowed to check the PIN against.
  *
- * Salted from the blob id rather than the signature, for the same reason the id
- * is domain-separated: a proof whose salt we already hold must not be the same
- * computation as the key we must not hold.
+ * Salted from the blob id rather than the signature: a proof whose salt we
+ * already hold must not be the same computation as the key we must not hold.
  *
  * KDF_V1 rather than the heavier PIN cost. This one is not what stands between
  * a leaked table and the vault — the missing signature is — so its only job is
@@ -86,10 +92,11 @@ export interface RemoteCredentials {
 export function remoteCredentials(input: {
   scope: VaultScope;
   pin: string;
-  signature: Uint8Array;
+  accountId: string;
 }): RemoteCredentials {
   assertPin(input.pin);
-  const id = blobId(input.scope, input.signature);
+  if (!input.accountId) throw new Error("Sign in before saving or opening a backup.");
+  const id = blobId(input.scope, input.accountId);
   return { id, proof: pinProof(id, input.pin) };
 }
 
@@ -133,7 +140,7 @@ const ENDPOINT = "/api/vault-blob";
 export async function putRemoteEnvelope(input: {
   scope: VaultScope;
   pin: string;
-  signature: Uint8Array;
+  accountId: string;
   envelope: VaultEnvelope;
 }): Promise<boolean> {
   const { id, proof } = remoteCredentials(input);
@@ -159,7 +166,7 @@ export async function putRemoteEnvelope(input: {
 export async function deleteRemoteEnvelope(input: {
   scope: VaultScope;
   pin: string;
-  signature: Uint8Array;
+  accountId: string;
 }): Promise<void> {
   await send(ENDPOINT, "DELETE", remoteCredentials(input));
 }
@@ -188,7 +195,7 @@ async function send(url: string, method: string, body: unknown): Promise<Respons
 export async function getRemoteEnvelope(input: {
   scope: VaultScope;
   pin: string;
-  signature: Uint8Array;
+  accountId: string;
 }): Promise<VaultEnvelope> {
   const response = await send(ENDPOINT, "POST", remoteCredentials(input));
   const body = (await response.json()) as { envelope?: string };

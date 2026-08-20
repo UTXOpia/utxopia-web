@@ -20,6 +20,7 @@ import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
+import { newSalt } from "@/lib/vault-envelope";
 import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
@@ -100,11 +101,11 @@ export function VaultSetup({
    * Still optional. No login or no PIN and the member keeps exactly the old
    * behaviour, with the string as their only portable key.
    */
-  const loginMaterial = async () => {
+  const loginMaterial = async (salt: Uint8Array) => {
     if (!privy.available || !pin.trim()) return null;
-    const material = await privy.keyMaterialFor(pin);
+    const material = await privy.keyMaterialFor(pin, salt);
     setNotice(null);
-    return material;
+    return { ...material, salt };
   };
 
   /**
@@ -115,18 +116,18 @@ export function VaultSetup({
    * string down.
    */
   const publishLogin = async (
-    login: { keyMaterial: Uint8Array; signature: Uint8Array } | null,
+    login: { keyMaterial: Uint8Array; salt: Uint8Array } | null,
     device?: Uint8Array,
   ): Promise<void> => {
-    if (!login) return;
+    if (!login || !privy.accountId) return;
     // `sealLoginEnvelope` refuses to mint portable authority on a
     // passkey-armed device without the passkey answering. Here it just did,
     // moments ago, so hand that answer along rather than asking twice.
-    const envelope = await sealLoginEnvelope(login.keyMaterial, device);
+    const envelope = await sealLoginEnvelope(login.keyMaterial, login.salt, device);
     const saved = await putRemoteEnvelope({
       scope,
       pin,
-      signature: login.signature,
+      accountId: privy.accountId,
       envelope,
     });
     if (!saved) {
@@ -156,9 +157,17 @@ export function VaultSetup({
       // identity — was sealed under the first credential's PRF output.
       const askDevice = hasPasskeyCredential ? authenticatePasskey : registerPasskey;
       const device = await deviceMaterial(askDevice);
-      const login = await loginMaterial();
+      // Minted before the signature, because the signature is over it. Every
+      // wrapping written in this ceremony — the device one and the published
+      // one — is sealed under this exact salt, or the key the login just
+      // produced opens neither.
+      const salt = newSalt();
+      const login = await loginMaterial(salt);
       setRecoveryString(
-        await createEnvelopeVault(device ?? login?.keyMaterial, { replaceExisting: alreadyHere }),
+        await createEnvelopeVault(device ?? login?.keyMaterial, {
+          replaceExisting: alreadyHere,
+          salt: login && !device ? salt : undefined,
+        }),
       );
       // Only once the wrapping it describes exists, and only when the login is
       // what armed *this* device: the note is what decides whether the unlock
@@ -176,8 +185,13 @@ export function VaultSetup({
       // should still open the vault for this session rather than fail, and
       // should say why the next visit will ask again.
       const device = await deviceMaterial(authenticatePasskey);
-      const login = await loginMaterial();
-      await restoreEnvelopeVault(recoveryInput, device ?? login?.keyMaterial);
+      const salt = newSalt();
+      const login = await loginMaterial(salt);
+      await restoreEnvelopeVault(
+        recoveryInput,
+        device ?? login?.keyMaterial,
+        login && !device ? salt : undefined,
+      );
       if (!device && login) privy.remember(login.signer);
       // A restore is the moment the string was needed. Publishing here is what
       // stops it being needed again on the next device.
@@ -198,10 +212,20 @@ export function VaultSetup({
    */
   const handleLoginUnlock = () =>
     run(async () => {
-      const { keyMaterial, signer, signature } = await privy.keyMaterialFor(pin);
-      const envelope = await getRemoteEnvelope({ scope, pin, signature });
+      if (!privy.accountId) throw new Error("Sign in first, then unlock with your PIN.");
+      // Fetch before signing, and in that order for a reason: the message the
+      // signature is bound to carries this wrapping's salt, and the salt is
+      // inside the wrapping. The PIN gate is passed before the provider is
+      // asked for anything.
+      const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
+      const { keyMaterial, signer } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
       const device = await deviceMaterial(authenticatePasskey);
-      await restoreFromLoginEnvelope(envelope, keyMaterial, device ?? keyMaterial);
+      await restoreFromLoginEnvelope(
+        envelope,
+        keyMaterial,
+        device ?? keyMaterial,
+        device ? undefined : envelope.kdf.salt,
+      );
       if (!device) privy.remember(signer);
       setPin("");
       onDone();

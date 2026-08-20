@@ -90,29 +90,50 @@ const STRING_KEY_BYTES = 32;
  * string here would be an offline oracle for exactly the pair the pools exist
  * to keep apart.
  *
- * `Vault: root` rather than a pool id, because there is one root and both
- * pools' wrappings hold it. Scoping the message per pool would cost a second
- * signature prompt and separate nothing — `wrapSeed` already folds the scope
+ * `Vault:` carries the wrapping's salt rather than a pool id. Scoping the
+ * message per pool would separate nothing — `wrapSeed` already folds the scope
  * into the HKDF info and the AEAD's additional data, so one signature produces
- * a different key in each pool by construction.
+ * a different key in each pool by construction. The salt is there for a
+ * different reason; see `buildUnlockMessage`.
  *
  * The network is in it: a devnet signature must not open a mainnet wrapping.
  *
- * Change a byte and every wrapping written under the old text stops opening.
- * Treat that the way Umbra had to treat eth_sign -> personal_sign.
+ * Change a byte of the surrounding text and every wrapping written under the
+ * old version stops opening. Treat that the way Umbra had to treat
+ * eth_sign -> personal_sign. The salt is the one part meant to vary, and it
+ * varies with the wrapping it belongs to, never on its own.
  */
-const MESSAGE_TEMPLATE = (network: string) =>
+const MESSAGE_TEMPLATE = (network: string, salt: string) =>
   `Sign this message to unlock your UTXOpia vault.
 
 WARNING: Only sign this in a client you trust.
 Signing it anywhere else can cost you your funds.
 
 Network: solana:${network}
-Vault: root`;
+Vault: ${salt}`;
 
-/** The message the login provider signs. Exported so a test can pin it. */
-export function buildUnlockMessage(network: string): string {
-  return MESSAGE_TEMPLATE(network);
+/**
+ * The message the login provider signs. Exported so a test can pin it.
+ *
+ * The salt is the wrapping's own, and putting it here is what makes the
+ * signature rotatable. Re-wrapping mints a fresh salt, so the message changes,
+ * so the signature changes, so the key changes — and a signature captured under
+ * the old wrapping opens nothing. Without it the message was a constant and the
+ * signature was a permanent secret with no way to retire it.
+ *
+ * It has to be the salt and not the ciphertext, and that is a proof rather than
+ * a preference: at unlock the client has not decrypted anything yet, and at
+ * creation the ciphertext does not exist until the key it needs has been
+ * derived. The only values available at both moments are the envelope's header
+ * — and of those, only the salt and nonce are fresh per wrapping.
+ *
+ * It must not be the PIN, or anything committing to one. The provider reads
+ * what it signs, and six digits fall to an offline sweep in under an hour —
+ * which would leave the party holding the signature holding the whole vault.
+ * The PIN is mixed in afterwards, in `deriveFromPin`, where nobody sees it.
+ */
+export function buildUnlockMessage(network: string, salt: Uint8Array): string {
+  return MESSAGE_TEMPLATE(network, bytesToHex(salt));
 }
 
 /**

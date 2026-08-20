@@ -21,7 +21,7 @@ import { usePasskey } from "@/hooks/use-passkey";
 import { useLoginArmed, usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
-import { hasDeviceEnvelope } from "@/lib/vault-identity";
+import { NoDeviceEnvelopeError, hasDeviceEnvelope, readDeviceEnvelope } from "@/lib/vault-identity";
 import { PinField } from "@/components/vault/pin-field";
 
 export function useHasLocalVault(): boolean {
@@ -47,6 +47,7 @@ export function VaultUnlockPrompt({
   onUnlocked?: () => void;
 }) {
   const { authenticate } = usePasskey();
+  const { networkId, vaultId } = useChainEnvironment();
   const privy = usePrivyVaultKey();
   // The wrapping alone cannot say what made it, so the signer note is the tell.
   // Offering the wrong one would ask for a factor that was never used here.
@@ -61,7 +62,11 @@ export function VaultUnlockPrompt({
     setBusy(true);
     try {
       if (loginArmed) {
-        const { keyMaterial } = await privy.keyMaterialFor(pin);
+        // The salt this browser's wrapping was written under is what the
+        // signature is bound to, so it has to be read before asking for one.
+        const envelope = readDeviceEnvelope({ networkId, vaultId });
+        if (!envelope) throw new NoDeviceEnvelopeError();
+        const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
         await unlockEnvelopeVault(keyMaterial, "pin");
         setPin("");
         onUnlocked?.();

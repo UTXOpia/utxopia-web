@@ -197,30 +197,42 @@ describe("the key a recovery string carries", () => {
 });
 
 describe("the message the login provider signs", () => {
-  // FROZEN. Every wrapping written under the old text stops opening if this
-  // changes, so this test failing is the alarm, not a chore.
+  const SALT = new Uint8Array(16).fill(0xab);
+
+  // FROZEN apart from the salt. Every wrapping written under different
+  // surrounding text stops opening, so this test failing is the alarm.
   it("is exactly this", () => {
-    expect(buildUnlockMessage("devnet")).toBe(
+    expect(buildUnlockMessage("devnet", SALT)).toBe(
       `Sign this message to unlock your UTXOpia vault.
 
 WARNING: Only sign this in a client you trust.
 Signing it anywhere else can cost you your funds.
 
 Network: solana:devnet
-Vault: root`,
+Vault: ${bytesToHex(SALT)}`,
     );
   });
 
-  // The provider sees this string and nothing else. If it ever varies per
-  // member, it becomes an offline oracle linking a social account to an
-  // on-chain identity — the one thing the pools exist to prevent.
-  it("says nothing about who is signing it", () => {
-    expect(buildUnlockMessage("devnet")).toBe(buildUnlockMessage("devnet"));
-    expect(buildUnlockMessage("devnet")).not.toContain("utxo:");
+  // The salt is random per wrapping, so it says nothing about the member. What
+  // must never appear here is an address or anything derived from the PIN: the
+  // provider reads what it signs, and either would hand it the vault.
+  it("carries a random salt and nothing about who is signing", () => {
+    const message = buildUnlockMessage("devnet", SALT);
+    expect(message).not.toContain("utxo:");
+    expect(message).toContain(bytesToHex(SALT));
+  });
+
+  // The point of putting it there: a new wrapping is a new message, so the
+  // signature that opened the old one opens nothing. Without this, a leaked
+  // signature could never be retired.
+  it("changes with the wrapping, so a signature can be retired", () => {
+    expect(buildUnlockMessage("devnet", newSalt())).not.toBe(
+      buildUnlockMessage("devnet", newSalt()),
+    );
   });
 
   it("does not let a devnet signature open a mainnet wrapping", () => {
-    expect(buildUnlockMessage("devnet")).not.toBe(buildUnlockMessage("mainnet"));
+    expect(buildUnlockMessage("devnet", SALT)).not.toBe(buildUnlockMessage("mainnet", SALT));
   });
 });
 

@@ -39,12 +39,17 @@ export function useLoginArmed(): boolean {
 }
 
 export function usePrivyVaultKey() {
-  const { enabled, authenticated, login, ensureWallet, signMessage } =
+  const { enabled, authenticated, accountId, login, ensureWallet, signMessage } =
     usePrivySolanaAuthority();
   const { networkId, vaultId } = useChainEnvironment();
 
   const keyMaterialFor = useCallback(
-    async (pin: string): Promise<{ keyMaterial: Uint8Array; signer: string; signature: Uint8Array }> => {
+    async (
+      pin: string,
+      /** The wrapping's salt, which the message is bound to. New wrapping,
+       *  new salt, new key — see buildUnlockMessage. */
+      salt: Uint8Array,
+    ): Promise<{ keyMaterial: Uint8Array; signer: string; signature: Uint8Array }> => {
       // Ahead of the signature prompt: making somebody approve a signature and
       // then telling them their PIN was too short is a wasted ceremony.
       assertPin(pin);
@@ -64,12 +69,8 @@ export function usePrivyVaultKey() {
       assertDeviceSigner({ networkId, vaultId }, signer);
 
       const signature = await signMessage(
-        new TextEncoder().encode(buildUnlockMessage(networkId)),
+        new TextEncoder().encode(buildUnlockMessage(networkId, salt)),
       );
-      // The raw signature comes back too. `vault-remote` needs it to address
-      // the row this member's wrapping lives in — never to derive anything, and
-      // never in a form that leaves this browser: see the domain separation in
-      // that module for why the id must not be its bare digest.
       return { keyMaterial: deriveFromPin(pin, signature), signer, signature };
     },
     [authenticated, ensureWallet, networkId, signMessage, vaultId],
@@ -81,5 +82,5 @@ export function usePrivyVaultKey() {
     [networkId, vaultId],
   );
 
-  return { available: enabled, authenticated, login, keyMaterialFor, remember };
+  return { available: enabled, authenticated, accountId, login, keyMaterialFor, remember };
 }
