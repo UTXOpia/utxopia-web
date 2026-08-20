@@ -49,7 +49,6 @@ export function VaultSetup({
   const [mode, setMode] = useState<Mode>("choose");
   const [recoveryInput, setRecoveryInput] = useState("");
   const [recoveryString, setRecoveryString] = useState("");
-  const [confirmString, setConfirmString] = useState("");
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -202,70 +201,24 @@ export function VaultSetup({
       onDone();
     });
 
-  // The string carries its own key, so there is no second secret whose typo
-  // could stay invisible until a restore months later — which is what typing a
-  // passphrase back used to catch. What is left to check is the only thing that
-  // can still go wrong here: that the member actually put the string somewhere
-  // they can read it back from.
-  const handleConfirm = () =>
-    run(async () => {
-      if (confirmString.trim() !== recoveryString) {
-        throw new Error("That is not the string above. Paste the one you saved.");
-      }
-      setConfirmString("");
-      onDone();
-    });
-
   if (mode === "saved") {
     return (
       <div className="flex flex-col gap-3">
         {notice && <Notice text={notice} />}
-        <RecoveryStringCard value={recoveryString} />
-
-        <div className="flex flex-col gap-2.5 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
-          <p className="text-caption leading-relaxed text-gray">
-            <span className="font-semibold text-foreground">Now paste it back.</span> This string is
-            the whole key and nobody keeps a copy — read it back from wherever you just saved it,
-            not from the box above.
-          </p>
-
-          <textarea
-            value={confirmString}
-            onChange={(e) => setConfirmString(e.target.value)}
-            rows={3}
-            spellCheck={false}
-            autoComplete="off"
-            autoFocus
-            disabled={busy}
-            placeholder="utxovault2…"
-            className={cn(
-              "w-full resize-none rounded-[10px] border border-gray/20 bg-muted/40 px-3 py-2.5",
-              "font-mono text-[12px] leading-relaxed text-foreground placeholder:text-gray/35",
-              "focus:border-privacy/50 focus:outline-none focus:ring-1 focus:ring-privacy/30",
-            )}
-          />
-
-          {error && (
-            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
-              <span className="text-caption text-red-400">{error}</span>
-            </div>
-          )}
-
-          <button
-            type="button"
-            onClick={handleConfirm}
-            disabled={busy || !confirmString.trim()}
-            className={cn(
-              "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
-              "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
-              "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
-            )}
-          >
-            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {busy ? "Checking…" : "Open my vault"}
-          </button>
-        </div>
+        {/*
+          A reminder, not a test. Typing a passphrase back used to prove
+          something real — argon2 either reproduced the key or it did not — and
+          there is nothing like that left to prove: the string carries its own
+          key, so it is either saved or it is not. Asking somebody to paste back
+          what is still on screen above measures only whether they can copy from
+          a box we are showing them, and buys the appearance of a check.
+          The card's own acknowledgement is honest about being one.
+        */}
+        <RecoveryStringCard
+          value={recoveryString}
+          onConfirmed={onDone}
+          confirmLabel="Open my vault"
+        />
       </div>
     );
   }

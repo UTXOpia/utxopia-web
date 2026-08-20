@@ -26,8 +26,8 @@ function downloadRecoveryString(value: string) {
       "UTXOpia vault recovery string\n",
       `Saved ${stamp}\n\n`,
       `${value}\n\n`,
-      "This string is the whole key. Anyone who reads it can open your vault.\n",
-      "Keep it where only you can read it. We have no copy and cannot reissue this one.\n",
+      "This string is the only way back in if you lose your PIN and every device.\n",
+      "Anyone who reads it can open the vault. We keep no copy.\n",
     ],
     { type: "text/plain" },
   );
@@ -61,10 +61,14 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
         <KeyRound className="mt-0.5 h-4 w-4 shrink-0 text-privacy" aria-hidden />
         <div>
           <p className="text-caption font-semibold text-foreground">Your recovery string</p>
+          {/* Three facts, one sentence each, in the order they matter on a
+              phone: what it is for, who else it works for, and that nobody can
+              send it again. The paragraph this replaced said the same things in
+              four clauses and read as boilerplate at exactly the moment it had
+              to be read. */}
           <p className="mt-1 text-caption leading-relaxed text-gray">
-            The last way into this vault when a device and your PIN are both gone. Save it in your
-            password manager. It carries its own key, so there is nothing else to keep — and
-            nothing stopping anyone who reads it. We keep no copy of this one.
+            Save this in your password manager. It is the only way back in if you lose your PIN and
+            every device you own. Anyone who reads it can open this vault, and we keep no copy.
           </p>
         </div>
       </div>
@@ -94,11 +98,6 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
           label={copied ? "Copied" : "Copy"}
         />
         <SaveAction
-          onClick={() => setShowQr((shown) => !shown)}
-          icon={<QrCode className="h-3.5 w-3.5" />}
-          label={showQr ? "Show text" : "QR"}
-        />
-        <SaveAction
           onClick={() => downloadRecoveryString(value)}
           icon={<Download className="h-3.5 w-3.5" />}
           label="File"
@@ -119,6 +118,19 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
           </button>
         )}
       </div>
+
+      {/* QR sat beside Copy as if it were a third way to save this, which it is
+          not — a photo of a screen is a worse password manager than a password
+          manager. It does one job, and naming that job is what keeps it out of
+          the way of the two that everybody needs. */}
+      <button
+        type="button"
+        onClick={() => setShowQr((shown) => !shown)}
+        className="flex items-center gap-1.5 self-start px-0.5 text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+      >
+        <QrCode className="h-3.5 w-3.5" aria-hidden />
+        {showQr ? "Show the text instead" : "Moving to another device? Show a QR code"}
+      </button>
 
       {onConfirmed && (
         <label className="flex cursor-pointer items-start gap-2 px-0.5 text-caption text-gray">
