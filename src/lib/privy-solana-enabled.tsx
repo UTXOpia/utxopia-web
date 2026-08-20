@@ -39,7 +39,7 @@ function findEmbeddedWallet(wallets: ConnectedStandardSolanaWallet[]) {
 }
 
 function PrivySolanaBridge({ children }: { children: ReactNode }) {
-  const { ready: privyReady, authenticated, user } = usePrivy();
+  const { ready: privyReady, authenticated, user, isModalOpen } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
   const { ready: walletsReady, wallets } = useWallets();
@@ -128,6 +128,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       enabled: true,
       ready: privyReady && walletsReady,
       authenticated,
+      isModalOpen,
       publicKey,
       login: openLogin,
       ensureWallet,
@@ -139,6 +140,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     }),
     [
       authenticated,
+      isModalOpen,
       ensureWallet,
       openLogin,
       privyReady,

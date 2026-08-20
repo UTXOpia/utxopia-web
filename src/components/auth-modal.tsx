@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, Fingerprint, LogIn, LogOut, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -75,6 +75,20 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
       setShowEnvelopeSetup(true);
     }
   }, [awaitingLogin, privy.authenticated]);
+
+  // Signing in was the only thing that ever cleared the wait, so dismissing the
+  // provider's modal left this row reading "Waiting for sign in…" and disabled
+  // — for the rest of the session, with no way to try again. Its modal closing
+  // without an authenticated session is the member changing their mind, and the
+  // only honest response is to put the button back.
+  const modalWasOpen = useRef(false);
+  useEffect(() => {
+    if (privy.isModalOpen) modalWasOpen.current = true;
+    else if (modalWasOpen.current) {
+      modalWasOpen.current = false;
+      if (!privy.authenticated) setAwaitingLogin(false);
+    }
+  }, [privy.isModalOpen, privy.authenticated]);
   const [viewingKeyInput, setViewingKeyInput] = useState("");
 
   const handleImport = async (file: File | undefined) => {
@@ -91,10 +105,39 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
+    // modal={false}, and it is load-bearing rather than a preference.
+    //
+    // Radix's modal content does three things to everything outside it:
+    // `trapFocus` installs a document-level focusin handler that pulls focus
+    // back, `disableOutsidePointerEvents` sets pointer-events:none on the body,
+    // and `hideOthers` marks the rest aria-hidden. The provider's login sheet
+    // portals to the body, so on a phone it arrived fully outside all three —
+    // visible, and completely dead. Taps did nothing and the email field could
+    // not be typed into at all.
+    //
+    // What modal={false} costs is the scroll lock and the pointer shield, and
+    // the overlay below is a fixed inset-0 element that already covers the page
+    // either way. Toggling this only while the provider's modal is up would be
+    // narrower and is not an option: modal and non-modal are different
+    // components, so React would remount the content — wiping a half-typed PIN
+    // in the middle of the one ceremony that also opens a provider modal.
+    <Dialog.Root open={open} onOpenChange={onOpenChange} modal={false}>
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/70 backdrop-blur-md z-50 animate-in fade-in-0 duration-200" />
         <Dialog.Content
+          // Non-modal layers still dismiss on outside interaction, and every
+          // tap inside the provider's sheet is outside this one. Without these
+          // the first tap on their email field closes the vault dialog behind
+          // it, and finishing the login lands the member nowhere.
+          onPointerDownOutside={(event) => {
+            if (privy.isModalOpen) event.preventDefault();
+          }}
+          onInteractOutside={(event) => {
+            if (privy.isModalOpen) event.preventDefault();
+          }}
+          onOpenAutoFocus={(event) => {
+            if (privy.isModalOpen) event.preventDefault();
+          }}
           className={cn(
             "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50",
             "w-[90vw] max-w-[400px] rounded-[20px]",

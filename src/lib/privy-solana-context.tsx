@@ -7,6 +7,16 @@ export type PrivySolanaAuthority = {
   enabled: boolean;
   ready: boolean;
   authenticated: boolean;
+  /**
+   * Whether the provider's own modal is on screen.
+   *
+   * Two things need it and neither is cosmetic. That modal is portalled outside
+   * our dialog, so a focus trap around ours will pull focus back out of its
+   * email field and the member simply cannot type. And `login()` returns before
+   * anything happens, so a member who dismisses the modal without signing in
+   * leaves us waiting for an event that is never coming.
+   */
+  isModalOpen: boolean;
   publicKey: PublicKey | null;
   login: () => Promise<void>;
   ensureWallet: () => Promise<PublicKey | null>;
@@ -45,6 +55,7 @@ export const noopPrivySolanaAuthority: PrivySolanaAuthority = {
   enabled: false,
   ready: true,
   authenticated: false,
+  isModalOpen: false,
   publicKey: null,
   login: async () => {},
   ensureWallet: async () => null,
