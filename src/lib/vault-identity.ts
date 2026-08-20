@@ -255,6 +255,31 @@ export async function createVault(input: {
   return { seed, metaAddress, recoveryString };
 }
 
+/**
+ * One wrapping of a seed under whatever factor produced the key material.
+ *
+ * Separate from `armDevice` because not every wrapping is written here any
+ * more: the login wrapping is published to a server so a device that has never
+ * seen this vault has something to open (`lib/vault-remote`). Same seal, same
+ * scope binding, different destination — and the destination is the caller's
+ * business, not this function's.
+ */
+export async function sealEnvelope(input: {
+  scope: VaultScope;
+  seed: Uint8Array;
+  metaAddress: string;
+  keyMaterial: Uint8Array;
+}): Promise<VaultEnvelope> {
+  const salt = newSalt();
+  return wrapSeed({
+    seed: input.seed,
+    keyMaterial: input.keyMaterial,
+    salt,
+    guard: guardFor(input.metaAddress),
+    aad: scopeTag(input.scope),
+  });
+}
+
 /** Add (or replace) this device's daily wrapping for a seed already in hand. */
 export async function armDevice(input: {
   scope: VaultScope;
@@ -262,16 +287,9 @@ export async function armDevice(input: {
   metaAddress: string;
   deviceKeyMaterial: Uint8Array;
 }): Promise<void> {
-  const salt = newSalt();
   writeDeviceEnvelope(
     input.scope,
-    await wrapSeed({
-      seed: input.seed,
-      keyMaterial: input.deviceKeyMaterial,
-      salt,
-      guard: guardFor(input.metaAddress),
-      aad: scopeTag(input.scope),
-    }),
+    await sealEnvelope({ ...input, keyMaterial: input.deviceKeyMaterial }),
   );
 }
 
@@ -356,13 +374,32 @@ export async function unlockWithRecoveryString(input: {
   metaAddressFor: MetaAddressFor;
 }): Promise<{ seed: Uint8Array; metaAddress: string }> {
   const envelope = decodeEnvelope(input.recoveryString);
-  const seed = await unwrapSeed(
+  return unlockWithEnvelope({
+    ...input,
     envelope,
-    deriveFromPassphrase(input.passphrase.trim(), envelope.kdf.salt, envelope.kdf),
-    scopeTag(input.scope),
-  );
+    keyMaterial: deriveFromPassphrase(input.passphrase.trim(), envelope.kdf.salt, envelope.kdf),
+  });
+}
+
+/**
+ * Open a wrapping this device did not write, from wherever it came.
+ *
+ * The recovery string is one such wrapping; the one fetched from the blob
+ * store is another. Both need the same three things afterwards and none of them
+ * are optional: the guard has to be checked against a derived address, the
+ * device has to be armed so this happens once rather than every visit, and a
+ * failure must not leave a stranger's identity half-loaded.
+ */
+export async function unlockWithEnvelope(input: {
+  scope: VaultScope;
+  envelope: VaultEnvelope;
+  keyMaterial: Uint8Array;
+  deviceKeyMaterial?: Uint8Array;
+  metaAddressFor: MetaAddressFor;
+}): Promise<{ seed: Uint8Array; metaAddress: string }> {
+  const seed = await unwrapSeed(input.envelope, input.keyMaterial, scopeTag(input.scope));
   const metaAddress = await metaAddressForScope(input.metaAddressFor, seed, input.scope);
-  assertIdentity(envelope, metaAddress);
+  assertIdentity(input.envelope, metaAddress);
 
   if (input.deviceKeyMaterial) {
     await armDevice({ scope: input.scope, seed, metaAddress, deviceKeyMaterial: input.deviceKeyMaterial });

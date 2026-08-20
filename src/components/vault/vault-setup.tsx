@@ -12,18 +12,19 @@
  */
 
 import { useMemo, useState } from "react";
-import { AlertCircle, ArrowLeft, KeyRound, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
+import { AlertCircle, ArrowLeft, Fingerprint, KeyRound, Loader2, RotateCcw, ShieldAlert } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { hasDeviceEnvelope } from "@/lib/vault-identity";
+import { getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
 import { PassphraseField } from "@/components/vault/passphrase-field";
 import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
 
-type Mode = "choose" | "create" | "restore" | "login" | "rebuilt" | "saved" | "confirm-replace";
+type Mode = "choose" | "create" | "restore" | "unlock-login" | "saved" | "confirm-replace";
 
 export function VaultSetup({
   onDone,
@@ -41,9 +42,11 @@ export function VaultSetup({
   );
   const privy = usePrivyVaultKey();
   const createEnvelopeVault = useUTXOpiaStore((s) => s.createEnvelopeVault);
-  const rebuildEnvelopeVault = useUTXOpiaStore((s) => s.rebuildEnvelopeVault);
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
   const verifyRecoveryString = useUTXOpiaStore((s) => s.verifyRecoveryString);
+  const sealLoginEnvelope = useUTXOpiaStore((s) => s.sealLoginEnvelope);
+  const restoreFromLoginEnvelope = useUTXOpiaStore((s) => s.restoreFromLoginEnvelope);
+  const scope = useMemo(() => ({ networkId, vaultId }), [networkId, vaultId]);
 
   const [mode, setMode] = useState<Mode>("choose");
   const [passphrase, setPassphrase] = useState("");
@@ -51,11 +54,6 @@ export function VaultSetup({
   const [recoveryString, setRecoveryString] = useState("");
   const [confirmPassphrase, setConfirmPassphrase] = useState("");
   const [pin, setPin] = useState("");
-  const [rebuiltAddress, setRebuiltAddress] = useState("");
-  // A rebuild that landed on the wrong vault has already written a wrapping.
-  // The second attempt has to be allowed over it, and only the member saying
-  // "that is not mine" earns that.
-  const [replaceRebuilt, setReplaceRebuilt] = useState(false);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -73,32 +71,73 @@ export function VaultSetup({
   };
 
   /**
-   * Key material for this device's wrapping, preferring the passkey.
+   * This device's daily wrapping. PRF or nothing.
    *
-   * PRF's absence is only discoverable by asking, so the fallback lives here
-   * rather than in a branch chosen up front. Where the browser cannot do PRF, a
-   * login signature and a PIN wrap the same seed — the alternative is what this
-   * used to do: leave the device with no wrapping at all and send the member
-   * back to their recovery string on every visit, which is how a string that
-   * should be written down once ends up in a notes app.
-   *
-   * Still optional. A member who gives no PIN gets the old behaviour and an
-   * honest notice, not a wrapping under something they did not choose.
+   * PRF's absence is only discoverable by asking, so this reports it rather
+   * than branching up front. Returning nothing is a real outcome: a browser
+   * that cannot do PRF gets its wrapping from the login instead, and the caller
+   * decides that, because the login now has a second job this function has no
+   * business knowing about.
    */
-  const armingMaterial = async (
+  const deviceMaterial = async (
     ask: (opts: { requirePrf: true }) => Promise<Uint8Array | null>,
-  ): Promise<{ material?: Uint8Array; signer?: string }> => {
+  ): Promise<Uint8Array | undefined> => {
     try {
-      const material = await ask({ requirePrf: true });
-      if (material) return { material };
+      return (await ask({ requirePrf: true })) ?? undefined;
     } catch (caught) {
       if (!(caught instanceof PrfUnavailableError)) throw caught;
       setNotice(caught.message);
+      return undefined;
     }
-    if (!privy.available || !pin.trim()) return {};
-    const { keyMaterial, signer } = await privy.keyMaterialFor(pin);
+  };
+
+  /**
+   * The login wrapping — one signature, one PIN.
+   *
+   * This used to run only where PRF was missing, as this browser's fallback.
+   * It is no longer about this browser: its ciphertext is what a device that
+   * has never seen this vault downloads and opens, so it has to be built on
+   * every device including the ones whose passkey works. Skipping it on a
+   * PRF-capable browser is what left the recovery string as the only way onto
+   * a second device.
+   *
+   * Still optional. No login or no PIN and the member keeps exactly the old
+   * behaviour, with the string as their only portable key.
+   */
+  const loginMaterial = async () => {
+    if (!privy.available || !pin.trim()) return null;
+    const material = await privy.keyMaterialFor(pin);
     setNotice(null);
-    return { material: keyMaterial, signer };
+    return material;
+  };
+
+  /**
+   * Publish it. Best-effort on purpose: the vault exists, the recovery string
+   * is already in the member's hands, and failing the whole ceremony over a
+   * backup would trade a working vault for a convenience. What it must not do
+   * is fail quietly — a member who believes this landed will not write the
+   * string down.
+   */
+  const publishLogin = async (
+    login: { keyMaterial: Uint8Array; signature: Uint8Array } | null,
+    device?: Uint8Array,
+  ): Promise<void> => {
+    if (!login) return;
+    // `sealLoginEnvelope` refuses to mint portable authority on a
+    // passkey-armed device without the passkey answering. Here it just did,
+    // moments ago, so hand that answer along rather than asking twice.
+    const envelope = await sealLoginEnvelope(login.keyMaterial, device);
+    const saved = await putRemoteEnvelope({
+      scope,
+      pin,
+      signature: login.signature,
+      envelope,
+    });
+    if (!saved) {
+      setNotice(
+        "We could not save your PIN backup, so a new device will need your recovery string. Keep it somewhere you will find it.",
+      );
+    }
   };
 
   const handleCreate = () =>
@@ -114,37 +153,22 @@ export function VaultSetup({
       // already on this device — the other vault, other networks, any legacy
       // identity — was sealed under the first credential's PRF output.
       const askDevice = hasPasskeyCredential ? authenticatePasskey : registerPasskey;
-      const { material, signer } = await armingMaterial(askDevice);
+      const device = await deviceMaterial(askDevice);
+      const login = await loginMaterial();
       setRecoveryString(
-        await createEnvelopeVault(passphrase, material, { replaceExisting: alreadyHere }),
+        await createEnvelopeVault(passphrase, device ?? login?.keyMaterial, {
+          replaceExisting: alreadyHere,
+        }),
       );
-      // Only once the wrapping it describes exists.
-      if (signer) privy.remember(signer);
+      // Only once the wrapping it describes exists, and only when the login is
+      // what armed *this* device: the note is what decides whether the unlock
+      // screen asks for a PIN, and asking for one on a browser whose passkey
+      // holds the wrapping names the wrong factor.
+      if (!device && login) privy.remember(login.signer);
+      await publishLogin(login, device);
       setPassphrase("");
       setPin("");
       setMode("saved");
-    });
-
-  /**
-   * Rebuild the root from the login instead of a recovery string.
-   *
-   * Nothing is decrypted on this path, so nothing can report a wrong
-   * passphrase — it simply rebuilds a different, empty vault. The address it
-   * produces is shown before the member is asked to accept it, because that
-   * address is the only thing that distinguishes their vault from a typo.
-   */
-  const handleRebuild = () =>
-    run(async () => {
-      const root = await privy.deriveRoot(passphrase);
-      const { material, signer } = await armingMaterial(authenticatePasskey);
-      const { metaAddress } = await rebuildEnvelopeVault(root, passphrase, material, {
-        replaceExisting: replaceRebuilt || alreadyHere,
-      });
-      if (signer) privy.remember(signer);
-      setRebuiltAddress(metaAddress);
-      setPassphrase("");
-      setPin("");
-      setMode("rebuilt");
     });
 
   const handleRestore = () =>
@@ -152,12 +176,36 @@ export function VaultSetup({
       // Arming this device is optional — a restore that cannot do it safely
       // should still open the vault for this session rather than fail, and
       // should say why the next visit will ask again.
-      const { material, signer } = await armingMaterial(authenticatePasskey);
-      await restoreEnvelopeVault(recoveryInput, passphrase, material);
-      if (signer) privy.remember(signer);
+      const device = await deviceMaterial(authenticatePasskey);
+      const login = await loginMaterial();
+      await restoreEnvelopeVault(recoveryInput, passphrase, device ?? login?.keyMaterial);
+      if (!device && login) privy.remember(login.signer);
+      // A restore is the moment the string was needed. Publishing here is what
+      // stops it being needed again on the next device.
+      await publishLogin(login, device);
       setPassphrase("");
       setPin("");
       setRecoveryInput("");
+      onDone();
+    });
+
+  /**
+   * A device that has never seen this vault, without the recovery string.
+   *
+   * The PIN does two separate things here and the order matters. It proves out
+   * against the blob store first, which is the only counted check a six-digit
+   * secret ever gets; only then does it derive the key that opens what came
+   * back, which nothing on our side can do. A wrong PIN therefore spends one of
+   * ten tries rather than one of a million.
+   */
+  const handleLoginUnlock = () =>
+    run(async () => {
+      const { keyMaterial, signer, signature } = await privy.keyMaterialFor(pin);
+      const envelope = await getRemoteEnvelope({ scope, pin, signature });
+      const device = await deviceMaterial(authenticatePasskey);
+      await restoreFromLoginEnvelope(envelope, keyMaterial, device ?? keyMaterial);
+      if (!device) privy.remember(signer);
+      setPin("");
       onDone();
     });
 
@@ -171,52 +219,6 @@ export function VaultSetup({
       setConfirmPassphrase("");
       onDone();
     });
-
-  // What came back, before it is accepted. A wrong passphrase rebuilds a real,
-  // empty vault rather than failing, so the address is the check — it is the
-  // one thing a returning member recognises and a typo cannot reproduce.
-  if (mode === "rebuilt") {
-    return (
-      <div className="flex flex-col gap-3.5">
-        <div className="flex flex-col gap-1.5 rounded-[12px] border border-privacy/25 bg-privacy/5 p-4">
-          <p className="text-caption font-semibold text-foreground">
-            Your passphrase rebuilt this vault
-          </p>
-          <p className="break-all font-mono text-[12px] leading-relaxed text-gray-light">
-            {rebuiltAddress}
-          </p>
-          <p className="mt-1 text-caption leading-relaxed text-gray">
-            Check it against the address you receive on. Nothing here can tell a wrong passphrase
-            from a right one — a wrong one rebuilds a different, empty vault rather than failing.
-          </p>
-        </div>
-
-        {recoveryString && <RecoveryStringCard value={recoveryString} />}
-
-        <button
-          type="button"
-          onClick={onDone}
-          className={cn(
-            "flex min-h-11 items-center justify-center rounded-[10px] px-4",
-            "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer hover:bg-white",
-          )}
-        >
-          That is my vault
-        </button>
-        <button
-          type="button"
-          onClick={() => {
-            setReplaceRebuilt(true);
-            setRebuiltAddress("");
-            setMode("login");
-          }}
-          className="text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
-        >
-          Not my vault — try a different passphrase
-        </button>
-      </div>
-    );
-  }
 
   if (mode === "saved") {
     return (
@@ -269,8 +271,10 @@ export function VaultSetup({
     return (
       <div className="flex flex-col gap-2.5">
         <p className="px-1 text-caption leading-relaxed text-gray">
-          Your vault lives on this device and in a recovery string you keep. Nothing about it is
-          stored on our servers, so we cannot tell whether you already have one.
+          Your vault lives on this device and in a recovery string you keep. Set a PIN and we also
+          hold a locked copy — we keep a check of the PIN, never the PIN itself, and opening the
+          copy still takes a signature from your login that we never see. We still cannot tell
+          whether you already have a vault.
         </p>
         <button
           type="button"
@@ -303,17 +307,17 @@ export function VaultSetup({
         {privy.authenticated && (
           <button
             type="button"
-            onClick={() => setMode("login")}
+            onClick={() => setMode("unlock-login")}
             className={cn(
               "flex min-h-[52px] items-center gap-3 rounded-[12px] border border-gray/20 px-4",
               "bg-muted/30 hover:bg-muted/60 transition-colors cursor-pointer text-left",
             )}
           >
-            <KeyRound className="h-4 w-4 shrink-0 text-privacy" aria-hidden />
+            <Fingerprint className="h-4 w-4 shrink-0 text-privacy" aria-hidden />
             <span>
-              <span className="block text-body2-semibold text-foreground">Rebuild from my login</span>
+              <span className="block text-body2-semibold text-foreground">Unlock with my PIN</span>
               <span className="block text-caption text-gray/60">
-                No recovery string — your passphrase and this account
+                New device — this login and the PIN you chose
               </span>
             </span>
           </button>
@@ -378,8 +382,69 @@ export function VaultSetup({
     );
   }
 
+  // A new device, with nothing on it. Only the PIN is asked for: the passphrase
+  // is the other path off this screen, not a second field on this one.
+  if (mode === "unlock-login") {
+    return (
+      <div className="flex flex-col gap-3.5">
+        <button
+          type="button"
+          onClick={() => {
+            setMode("choose");
+            setError(null);
+          }}
+          className="flex items-center gap-1 self-start text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+        >
+          <ArrowLeft className="h-3.5 w-3.5" />
+          Back
+        </button>
+
+        <p className="px-1 text-caption leading-relaxed text-gray">
+          We hold a locked copy of your vault for this login. Your PIN is what we check before
+          handing it over; the signature that actually opens it never reaches us. It takes both,
+          which is why neither of us can do this alone.
+        </p>
+
+        <form
+          className="flex flex-col gap-3.5"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (!busy && pin.trim()) void handleLoginUnlock();
+          }}
+        >
+          <PinField value={pin} onChange={setPin} disabled={busy} autoFocus />
+
+          {notice && <Notice text={notice} />}
+
+          {error && (
+            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
+              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
+              <span className="text-caption text-red-400">{error}</span>
+            </div>
+          )}
+
+          <button
+            type="submit"
+            disabled={busy || !pin.trim()}
+            className={cn(
+              "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
+              "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
+              "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
+            )}
+          >
+            {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
+            {busy ? "Unlocking…" : "Unlock vault"}
+          </button>
+        </form>
+
+        <p className="px-1 text-caption leading-relaxed text-gray/60">
+          Ten wrong PINs lock this login out for a day. Your recovery string still works.
+        </p>
+      </div>
+    );
+  }
+
   const creating = mode === "create";
-  const rebuilding = mode === "login";
 
   return (
     <div className="flex flex-col gap-3.5">
@@ -395,7 +460,7 @@ export function VaultSetup({
         Back
       </button>
 
-      {!creating && !rebuilding && (
+      {!creating && (
         <div className="flex flex-col gap-1.5">
           <label htmlFor="recovery-string" className="px-1 text-[11px] uppercase tracking-wider text-gray/50 font-medium">
             Recovery string
@@ -432,13 +497,6 @@ export function VaultSetup({
         </p>
       )}
 
-      {rebuilding && (
-        <p className="px-1 text-caption leading-relaxed text-gray/60">
-          Your login and this passphrase rebuild the same vault on any device, with nothing stored
-          anywhere. We will show you the address they produce before you accept it.
-        </p>
-      )}
-
       {/* Only once signed in: an unauthenticated field would have to start a
           login from inside the ceremony, and the attempt that triggered it has
           already failed by the time the member finishes. */}
@@ -448,7 +506,7 @@ export function VaultSetup({
           onChange={setPin}
           disabled={busy}
           label="PIN (optional)"
-          hint="Only used if this device cannot do passkeys. Your login plus this PIN reopens the vault here — it is not a second lock on your recovery string."
+          hint="How you open this vault on a new device. We hold a locked copy and a check of this PIN — never the PIN, and never the signature that opens the copy."
         />
       )}
 
@@ -463,8 +521,8 @@ export function VaultSetup({
 
       <button
         type="button"
-        onClick={creating ? handleCreate : rebuilding ? handleRebuild : handleRestore}
-        disabled={busy || !passphrase || (!creating && !rebuilding && !recoveryInput.trim())}
+        onClick={creating ? handleCreate : handleRestore}
+        disabled={busy || !passphrase || (!creating && !recoveryInput.trim())}
         className={cn(
           "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
           "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
@@ -472,17 +530,7 @@ export function VaultSetup({
         )}
       >
         {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-        {busy
-          ? creating
-            ? "Creating…"
-            : rebuilding
-              ? "Rebuilding…"
-              : "Unlocking…"
-          : creating
-            ? "Create vault"
-            : rebuilding
-              ? "Rebuild vault"
-              : "Restore vault"}
+        {busy ? (creating ? "Creating…" : "Unlocking…") : creating ? "Create vault" : "Restore vault"}
       </button>
     </div>
   );

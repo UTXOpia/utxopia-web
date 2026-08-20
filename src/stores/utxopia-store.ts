@@ -3,17 +3,20 @@
 import { create } from "zustand";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
-  adoptExistingSeed,
   buildRecoveryString,
   clearDeviceEnvelope,
   createVault,
   readDeviceEnvelope,
+  readDeviceSigner,
+  sealEnvelope,
   unlockWithDevice,
+  unlockWithEnvelope,
   unlockWithRecoveryString,
   verifyRecoveryString,
   workingSeedFor,
   type VaultScope,
 } from "@/lib/vault-identity";
+import type { VaultEnvelope } from "@/lib/vault-envelope";
 import {
   UTXOpiaClient,
   hexToBytes,
@@ -372,16 +375,22 @@ interface UTXOpiaState {
     opts?: { replaceExisting?: boolean },
   ) => Promise<string>;
   unlockEnvelopeVault: (deviceKeyMaterial: Uint8Array, factor?: "passkey" | "pin") => Promise<void>;
-  /** Adopt a root rebuilt from the login (see usePrivyVaultKey.deriveRoot). */
-  rebuildEnvelopeVault: (
-    root: Uint8Array,
-    passphrase: string,
-    deviceKeyMaterial?: Uint8Array,
-    opts?: { replaceExisting?: boolean },
-  ) => Promise<{ metaAddress: string; recoveryString: string }>;
   restoreEnvelopeVault: (
     recoveryString: string,
     passphrase: string,
+    deviceKeyMaterial?: Uint8Array,
+  ) => Promise<void>;
+  /** The login wrapping, sealed but not stored — the caller publishes it (see
+   *  lib/vault-remote). Needs a vault already open in this session, and on a
+   *  passkey-armed device the passkey answering again. */
+  sealLoginEnvelope: (
+    keyMaterial: Uint8Array,
+    deviceKeyMaterial?: Uint8Array,
+  ) => Promise<VaultEnvelope>;
+  /** Open a wrapping fetched from the blob store, and arm this device with it. */
+  restoreFromLoginEnvelope: (
+    envelope: VaultEnvelope,
+    keyMaterial: Uint8Array,
     deviceKeyMaterial?: Uint8Array,
   ) => Promise<void>;
   exportRecoveryString: (passphrase: string, deviceKeyMaterial?: Uint8Array) => Promise<string>;
@@ -684,20 +693,6 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
     return recoveryString;
   },
 
-  rebuildEnvelopeVault: async (root, passphrase, deviceKeyMaterial, opts) => {
-    const { scope, metaAddressFor } = await envelopeContext();
-    const result = await adoptExistingSeed({
-      scope,
-      seed: root,
-      passphrase,
-      deviceKeyMaterial,
-      metaAddressFor,
-      replaceExisting: opts?.replaceExisting,
-    });
-    await adoptSeedIntoSession(set, root);
-    return result;
-  },
-
   unlockEnvelopeVault: async (deviceKeyMaterial, factor) => {
     const { scope, metaAddressFor } = await envelopeContext();
     try {
@@ -728,6 +723,49 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       // client.logout(): the SDK zeroes its key object in place, and the store
       // holds that same reference — logging out alone would blank the keys
       // while leaving hasKeys, the address and the balance on screen.
+      get().clearKeys();
+      throw err;
+    }
+  },
+
+  sealLoginEnvelope: async (keyMaterial, deviceKeyMaterial) => {
+    const seed = get().vaultSeed;
+    const metaAddress = get().stealthAddressEncoded;
+    if (!seed || !metaAddress) throw new Error("Unlock your vault before saving a backup.");
+    const { scope } = await envelopeContext();
+
+    // Same reason exportRecoveryString re-asks: what comes back is portable,
+    // permanent spend authority, and minting one off a tab somebody left
+    // unlocked turns thirty seconds of physical access into forever. Choosing
+    // the PIN is not the check — the attacker chooses it too.
+    //
+    // Only where a passkey armed this device. A login-armed one has no second
+    // factor to demand, and demanding the passkey it does not have would take
+    // this feature away from exactly the browsers it exists for. The signer
+    // note is the tell; see readDeviceSigner.
+    if (readDeviceEnvelope(scope) && !readDeviceSigner(scope)) {
+      if (!deviceKeyMaterial) throw new Error("Confirm with your passkey to save a PIN backup.");
+      await unlockWithDevice({ scope, deviceKeyMaterial, metaAddressFor: envelopeMetaAddressFor });
+    }
+
+    return sealEnvelope({ scope, seed, metaAddress, keyMaterial });
+  },
+
+  restoreFromLoginEnvelope: async (envelope, keyMaterial, deviceKeyMaterial) => {
+    const { scope, metaAddressFor } = await envelopeContext();
+    try {
+      const { seed } = await unlockWithEnvelope({
+        scope,
+        envelope,
+        keyMaterial,
+        deviceKeyMaterial,
+        metaAddressFor,
+      });
+      await adoptSeedIntoSession(set, seed);
+    } catch (err) {
+      // Same reason as restoreEnvelopeVault: the guard check derives an
+      // address, so by the time it fails this client is already logged in as
+      // whoever that seed was.
       get().clearKeys();
       throw err;
     }

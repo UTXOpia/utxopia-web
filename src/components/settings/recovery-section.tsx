@@ -194,7 +194,7 @@ export function RecoverySection() {
   );
 }
 
-function SettingsAction({
+export function SettingsAction({
   title,
   detail,
   onClick,
