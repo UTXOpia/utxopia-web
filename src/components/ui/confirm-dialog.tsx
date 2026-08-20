@@ -62,6 +62,7 @@ export function ConfirmDialog({
           className={cn(
             "fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50",
             "w-[90vw] max-w-md p-6 rounded-[20px]",
+            "max-h-[90dvh] overflow-y-auto overscroll-contain",
             "bg-card border border-gray/30",
             "animate-in fade-in-0 zoom-in-95 slide-in-from-left-1/2 slide-in-from-top-[48%]",
             "focus:outline-none"

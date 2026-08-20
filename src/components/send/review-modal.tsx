@@ -82,7 +82,7 @@ export function ReviewModal({
       <Dialog.Portal>
         <Dialog.Overlay className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50" />
         <Dialog.Content
-          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[420px] max-w-[calc(100vw-32px)] bg-background border border-gray/20 rounded-2xl p-5 shadow-xl"
+          className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 z-50 w-[420px] max-w-[calc(100vw-32px)] max-h-[90dvh] overflow-y-auto overscroll-contain bg-background border border-gray/20 rounded-2xl p-5 shadow-xl"
           // Block Esc / outside-click dismissal while a transaction is in flight —
           // the user can't cancel a proof mid-generation, and losing the modal
           // would hide the only live status.

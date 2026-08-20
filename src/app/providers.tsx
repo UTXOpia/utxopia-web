@@ -46,6 +46,13 @@ export function Providers({ children }: { children: React.ReactNode }) {
               <FeedbackWidget />
               <Toaster
                 position="top-right"
+                // On a phone sonner spans the full width at the top, which put
+                // every toast straight across the header of whatever dialog was
+                // open — "Recovery string copied" sitting on top of the title
+                // telling somebody what they were looking at. Desktop has room
+                // beside the content and keeps its corner; mobile drops below
+                // the browser chrome and the first line of a centred dialog.
+                mobileOffset={{ top: "5.5rem", left: "0.75rem", right: "0.75rem" }}
                 toastOptions={{
                   style: {
                     background: "var(--muted)",
