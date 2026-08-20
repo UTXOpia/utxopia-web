@@ -455,7 +455,13 @@ export function VaultSetup({
           onChange={setPin}
           disabled={busy}
           label="PIN (optional)"
-          hint="How you open this vault on a new device. We hold a locked copy and a check of this PIN — never the PIN, and never the signature that opens the copy."
+          // Permanence belongs on the screen where it is chosen, not on the one
+          // where somebody goes looking for a control that is not there. It is
+          // not enforced by a missing button — it falls out of the design: the
+          // wrapping is sealed under this PIN and the row is released against a
+          // proof of it, so replacing it takes the old one, and there is
+          // deliberately nothing that lets a stolen session skip that.
+          hint="Choose carefully — there is no way to change it later. This is how you open the vault on a new device. We hold a locked copy and a check of this PIN, never the PIN itself and never the signature that opens the copy."
         />
       )}
 

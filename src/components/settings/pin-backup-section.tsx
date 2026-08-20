@@ -3,7 +3,19 @@
 /**
  * Taking back the copy we hold.
  *
- * The only control here, and deliberately so. Everything about the PIN backup
+ * The only control here, and deliberately so — there is no way to change a PIN.
+ *
+ * Not an omission. Releasing the row takes a proof of the PIN it was written
+ * under, and the alternative — letting a signature alone replace it — hands
+ * anyone holding a stolen session the ability to destroy the backup. For most
+ * members that is an inconvenience against a device and a recovery string they
+ * still have. For the ones who ticked the acknowledgement without saving the
+ * string, this copy is the last key to their funds, and losing it is not
+ * recoverable by anyone. A twenty-four hour lockout is; this would not be.
+ *
+ * So a member who forgets their PIN keeps their vault and loses only this path.
+ * A member who wants a different PIN deletes and saves a new copy on their next
+ * restore. Both are said on screen, where the choice is made. Everything about the PIN backup
  * asks the member to accept that we keep half of their vault; this is what
  * makes that a trade rather than a claim, and what means we cannot be made to
  * hand over something we no longer have.
@@ -86,7 +98,8 @@ export function PinBackupSection() {
           <p className="px-1 text-caption leading-relaxed text-gray/60">
             A locked copy of your vault, so a new device does not need your recovery string. We
             hold the copy and a check of your PIN; opening it takes a signature from your login
-            that never reaches us.
+            that never reaches us. The PIN cannot be changed — deleting the copy and saving a new
+            one when you next restore is the only way to a different one.
           </p>
           <SettingsAction
             title="Delete the copy we hold"
