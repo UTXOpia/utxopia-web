@@ -28,17 +28,20 @@ describe("network-config query routing", () => {
     expect(detectNetworkFromRequest(req)).toBe("devnet-regtest");
   });
 
-  it("does not expose testnet4-backed networks as supported", () => {
+  it("exposes both deployed environments", () => {
     const enabled = NETWORK_META.filter((item) => item.enabled).map((item) => item.id);
     const devnet = NETWORK_META.find((item) => item.id === "devnet");
 
     expect(enabled).toContain("devnet-regtest");
-    expect(enabled).not.toContain("devnet");
-    expect(devnet?.comingSoon).toBe(true);
+    expect(enabled).toContain("devnet");
+    expect(devnet?.comingSoon).toBeFalsy();
   });
 
-  it("falls back from unsupported testnet4 networks to supported hybrids", () => {
+  it("honours an explicit network in the query, and still falls back for one that is not deployed", () => {
     expect(detectNetworkFromRequest(new Request("https://app.utxopia.test/?chain=sol&network=devnet"))).toBe(
+      "devnet",
+    );
+    expect(detectNetworkFromRequest(new Request("https://app.utxopia.test/?chain=sol&network=testnet"))).toBe(
       "devnet-regtest",
     );
   });

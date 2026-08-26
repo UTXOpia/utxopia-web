@@ -28,7 +28,7 @@ export interface VaultRuntimeConfig {
  *  are derived rather than written down twice. */
 type VaultSeed = Omit<VaultRuntimeConfig, "poolState" | "commitmentTree">;
 
-const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
+const DEVNET_REGTEST_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
   open: {
     id: "open",
     name: "Open Privacy",
@@ -59,13 +59,56 @@ const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
   },
 };
 
-const derived = new Map<VaultId, VaultRuntimeConfig>();
+/** Solana devnet + Bitcoin testnet4, deployed 2026-08-26. A separate program
+ *  and separate pools from devnet-regtest — nothing here may be reused there. */
+const DEVNET_VAULT_SEEDS: Record<VaultId, VaultSeed> = {
+  open: {
+    id: "open",
+    name: "Open Privacy",
+    description: "Anyone can use it. No invite, no approval.",
+    permissioned: false,
+    policyMode: "disabled",
+    programId: "28z2AtKA6aFGrGCh4ns1rmp7vGpWuh6x3H7gXKBcfxur",
+    mint: "87zWstDnNgMig2vk8q8jTrK6YTcyugeRTanfT3LfyU3T",
+    backendPath: "/open",
+    btcAddress: "tb1p8f4tszapf0q9puzgaclqka7cjddd7n79ut6eguc37fkv9j6m6x2qtcnqsg",
+    btcGroupPubkey: "3a6ab80ba14bc050f048ee3e0b77d8935adf4fc5e2f5947311f26cc2cb5bd194",
+    ikaDwallet: "GmRpTRLuSFK6axmMyeUuGRzHD92NiGx48qDw49kT2sko",
+  },
+  verified: {
+    id: "verified",
+    name: "Verified Privacy",
+    description: "Invite only. Your wallet must be on the operator's allowlist.",
+    permissioned: true,
+    policyMode: "per",
+    programId: "28z2AtKA6aFGrGCh4ns1rmp7vGpWuh6x3H7gXKBcfxur",
+    policyProgramId: "9asWYKVriWGpExW5xM44ChHjZtispkLCiWKkM8SQi8Rs",
+    mint: "G78CTddWGDaNaSKQayAt7m3pzcMyaUNxgR8y3R34YvEv",
+    backendPath: "/verified",
+    btcAddress: "tb1pzmzk8w4pr07gl6f6etlglctfh92t86knand8w4xxzh0vn6zqkkjskx9ll6",
+    btcGroupPubkey: "16c563baa11bfc8fe93acafe8fe169b954b3ead3ecda7754c615dec9e840b5a5",
+    ikaDwallet: "5pWCLBcusnUVdfamJWtW3UtpySRQagvKxestVqwR4tzj",
+  },
+};
+
+/** Every deployment that runs dual vaults. `vaultsSupported` is membership in
+ *  this table, not a hardcoded network id — a second environment was exactly
+ *  the case the old single-table shape could not express. */
+const VAULT_SEEDS: Partial<Record<NetworkId, Record<VaultId, VaultSeed>>> = {
+  "devnet-regtest": DEVNET_REGTEST_VAULT_SEEDS,
+  devnet: DEVNET_VAULT_SEEDS,
+};
+
+// Keyed by network too: both deployments have an "open" vault, and caching on
+// the vault id alone would serve whichever network resolved first to both.
+const derived = new Map<string, VaultRuntimeConfig>();
 
 /** Resolve a vault's PDAs once. Deriving beats storing: a stored address can
  *  drift from the program and mint it is supposed to belong to, and nothing
  *  fails loudly when it does. */
-function resolveVault(seed: VaultSeed): VaultRuntimeConfig {
-  const cached = derived.get(seed.id);
+function resolveVault(networkId: NetworkId, seed: VaultSeed): VaultRuntimeConfig {
+  const key = `${networkId}:${seed.id}`;
+  const cached = derived.get(key);
   if (cached) return cached;
 
   const programId = new PublicKey(seed.programId);
@@ -78,7 +121,7 @@ function resolveVault(seed: VaultSeed): VaultRuntimeConfig {
     poolState: poolState.toBase58(),
     commitmentTree: commitmentTree.toBase58(),
   };
-  derived.set(seed.id, resolved);
+  derived.set(key, resolved);
   return resolved;
 }
 
@@ -89,14 +132,18 @@ export function parseVaultId(value: string | null | undefined): VaultId {
 /** Every pool's zkBTC mint. Each vault mints its own, so anything resolving
  *  token ids across pools (explorer TVL, merged feeds) needs all of them. */
 export function allVaultZkbtcMints(): string[] {
-  return Object.values(DEVNET_VAULT_SEEDS).map((vault) => vault.mint);
+  // Every network's mints, not just the active one: a mint is globally unique,
+  // and this feeds a lookup table that is cheaper to over-fill than to miss.
+  return Object.values(VAULT_SEEDS).flatMap((vaults) =>
+    Object.values(vaults).map((vault) => vault.mint),
+  );
 }
 
-/** Dual vaults exist on one deployment only. Plain devnet runs a different
- *  program and mint, so claiming vault support there would hand out this
- *  deployment's pool addresses for someone else's pool. */
+/** Dual vaults exist only on deployments listed in VAULT_SEEDS. Claiming
+ *  support for a network with no entry would hand out another deployment's
+ *  pool addresses. */
 export function vaultsSupported(networkId: NetworkId): boolean {
-  return networkId === "devnet-regtest";
+  return networkId in VAULT_SEEDS;
 }
 
 export function siblingVaultId(vaultId: VaultId): VaultId {
@@ -113,10 +160,13 @@ export function getVaultRuntimeConfig(
   networkId: NetworkId,
   vaultId: VaultId,
 ): VaultRuntimeConfig {
-  if (!vaultsSupported(networkId)) {
-    throw new Error("Dual privacy vaults are available on UTXOpia Devnet (regtest) only");
+  const vaults = VAULT_SEEDS[networkId];
+  if (!vaults) {
+    throw new Error(
+      `Dual privacy vaults are not configured on "${networkId}" — have: ${Object.keys(VAULT_SEEDS).join(", ")}`,
+    );
   }
-  return resolveVault(DEVNET_VAULT_SEEDS[vaultId]);
+  return resolveVault(networkId, vaults[vaultId]);
 }
 
 export function getVaultNetworkConfig(

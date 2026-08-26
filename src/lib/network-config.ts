@@ -92,12 +92,12 @@ export const NETWORK_META: NetworkMeta[] = [
     id: "devnet",
     label: "Devnet",
     tagline: "Solana devnet + Bitcoin testnet4",
-    description: "Legacy testnet4 stack. Not supported for alpha while BTC header relay is disabled.",
+    description: "Real Bitcoin testnet4. Same on-chain model as Hybrid, but blocks arrive on Bitcoin's schedule.",
     caveats: [
-      "Unsupported: use Hybrid for Solana devnet + local regtest BTC.",
+      "Testnet4 blocks take ~10 minutes; a deposit needs 6 confirmations, so about an hour.",
+      "You fund deposits from your own testnet4 wallet — there is no faucet here.",
     ],
-    enabled: false,
-    comingSoon: true,
+    enabled: true,
   },
   {
     id: "devnet-regtest",
