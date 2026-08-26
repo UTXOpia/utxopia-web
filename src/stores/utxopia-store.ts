@@ -32,6 +32,7 @@ import {
   type ScannedNote,
   type ViewOnlyScannedNote,
 } from "@utxopia/sdk";
+import { accountScopedSeed } from "@/lib/account-seed";
 import { fetchSpentNullifierPDAs, nullifierHashToPDA } from "@/lib/nullifier-utils";
 import { API_ENDPOINTS } from "@/lib/api/constants";
 import { detectNetwork, networkChain, type NetworkId } from "@/lib/network-config";
@@ -166,17 +167,21 @@ async function chainScopedPasskeySeed(
   seed: Uint8Array,
   networkId: NetworkId,
   vaultId: VaultId,
+  accountIndex = 0,
 ): Promise<Uint8Array> {
   const chainSeed = deriveChainScopedPasskeySeed(seed, {
     chain: networkChain(networkId),
     network: networkId,
   });
-  if (vaultId === "open") return chainSeed;
-  const domain = new TextEncoder().encode(`utxopia:vault-identity:v1:${vaultId}`);
-  const material = new Uint8Array(chainSeed.length + domain.length);
-  material.set(chainSeed);
-  material.set(domain, chainSeed.length);
-  return new Uint8Array(await crypto.subtle.digest("SHA-256", material));
+  let scoped = chainSeed;
+  if (vaultId !== "open") {
+    const domain = new TextEncoder().encode(`utxopia:vault-identity:v1:${vaultId}`);
+    const material = new Uint8Array(scoped.length + domain.length);
+    material.set(scoped);
+    material.set(domain, scoped.length);
+    scoped = new Uint8Array(await crypto.subtle.digest("SHA-256", material));
+  }
+  return accountScopedSeed(scoped, accountIndex);
 }
 
 /** Scope + address deriver for the envelope layer, bound to the active chain. */
