@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import * as Dialog from "@radix-ui/react-dialog";
-import { ChevronDown, Fingerprint, LogIn, LogOut, Mail, X, Eye, Upload, ShieldCheck } from "lucide-react";
+import { ChevronDown, Fingerprint, LogIn, LogOut, Mail, Wallet, X, Eye, Upload, ShieldCheck } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { VaultSetup } from "@/components/vault/vault-setup";
@@ -287,6 +287,7 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   {!awaitingLogin && (
                     <span className="flex items-center gap-2 text-gray-light/70 shrink-0">
                       <Mail className="w-4 h-4" aria-hidden />
+                      <Wallet className="w-4 h-4" aria-hidden />
                     </span>
                   )}
                 </button>
