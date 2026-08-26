@@ -24,19 +24,6 @@ interface AuthModalProps {
   auth: AuthState;
 }
 
-/**
- * Monochrome provider marks. Privy's own window carries the branded versions;
- * these only have to say "these are the ways in" at a glance, and a row of
- * full-colour logos would outshout every other option in the list.
- */
-function FarcasterMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path d="M4.8 3h14.4v2.7h-2.1v12.6h2.1V21h-5.6v-2.7h1.3v-4.9a3 3 0 0 0-6 0v4.9h1.3V21H4.8v-2.7h2.1V5.7H4.8V3z" />
-    </svg>
-  );
-}
-
 export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
   const { error, onViewOnlyLogin, onImportBackup } = auth;
   const [importing, setImporting] = useState(false);
@@ -299,7 +286,6 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   </div>
                   {!awaitingLogin && (
                     <span className="flex items-center gap-2 text-gray-light/70 shrink-0">
-                      <FarcasterMark className="w-4 h-4" />
                       <Mail className="w-4 h-4" aria-hidden />
                     </span>
                   )}
