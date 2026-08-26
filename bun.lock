@@ -27,7 +27,7 @@
         "@solana/wallet-adapter-react": "^0.15.39",
         "@solana/wallet-adapter-react-ui": "^0.9.39",
         "@solana/web3.js": "^1.98.0",
-        "@utxopia/sdk": "0.1.0-alpha.1",
+        "@utxopia/sdk": "0.1.0-alpha.2",
         "bs58": "^5.0.0",
         "canvas-confetti": "^1.9.4",
         "circomlibjs": "^0.1.7",
@@ -901,7 +901,7 @@
 
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.12.2", "", { "os": "win32", "cpu": "x64" }, "sha512-nAB74NfSNKknqQ1RrYj6uz8FcXEomu/MATJZxh/x+BArzN2U3JbOYC0APYzUIGhVY3m5hRxA8VPNdPBoG8txlA=="],
 
-    "@utxopia/sdk": ["@utxopia/sdk@0.1.0-alpha.1", "", { "dependencies": { "@magicblock-labs/ephemeral-rollups-kit": "0.16.2", "@noble/ciphers": "^2.2.0", "@noble/curves": "2.0.1", "@noble/hashes": "1.8.0", "@scure/base": "2.0.0", "@scure/btc-signer": "2.0.1", "@solana-program/system": "^0.10.0", "@solana/kit": "^5.5.0", "bech32": "^2.0.0", "circomlibjs": "^0.1.7", "poseidon-lite": "0.3.0" }, "peerDependencies": { "react": ">=17.0.0", "snarkjs": "^0.7.5" }, "optionalPeers": ["react", "snarkjs"] }, "sha512-6Z7tHF8zqmt28haR5j4uMihd9JepPRN7B6Q56sD9HOlshbqInlo3iMh3oT3BXCdwGvgakcoRn4jX71UGHAhWfQ=="],
+    "@utxopia/sdk": ["@utxopia/sdk@0.1.0-alpha.2", "", { "dependencies": { "@magicblock-labs/ephemeral-rollups-kit": "0.16.2", "@noble/ciphers": "^2.2.0", "@noble/curves": "2.0.1", "@noble/hashes": "1.8.0", "@scure/base": "2.0.0", "@scure/btc-signer": "2.0.1", "@solana-program/system": "^0.10.0", "@solana/kit": "^5.5.0", "bech32": "^2.0.0", "circomlibjs": "^0.1.7", "poseidon-lite": "0.3.0" }, "peerDependencies": { "react": ">=17.0.0", "snarkjs": "^0.7.5" }, "optionalPeers": ["react", "snarkjs"] }, "sha512-NLWdHVFqg+yF4bTYBb87+JEjKEv240ZefSP/Jv8jSy4+VeKDC2PBAmYlprnTy53xQYiTzQFatGSk2mZ3q+IujA=="],
 
     "@wagmi/connectors": ["@wagmi/connectors@6.2.0", "", { "dependencies": { "@base-org/account": "2.4.0", "@coinbase/wallet-sdk": "4.3.6", "@gemini-wallet/core": "0.3.2", "@metamask/sdk": "0.33.1", "@safe-global/safe-apps-provider": "0.18.6", "@safe-global/safe-apps-sdk": "9.1.0", "@walletconnect/ethereum-provider": "2.21.1", "cbw-sdk": "npm:@coinbase/wallet-sdk@3.9.3", "porto": "0.2.35" }, "peerDependencies": { "@wagmi/core": "2.22.1", "typescript": ">=5.0.4", "viem": "2.x" }, "optionalPeers": ["typescript"] }, "sha512-2NfkbqhNWdjfibb4abRMrn7u6rPjEGolMfApXss6HCDVt9AW2oVC6k8Q5FouzpJezElxLJSagWz9FW1zaRlanA=="],
 
