@@ -32,6 +32,8 @@ export interface WalletDepositResult {
   txid: string;
   depositAddress: string;
   opReturnHex: string;
+  /** Local notes-store id for this deposit — how the status tracker finds it. */
+  noteId: string;
 }
 
 interface UseBtcDepositParams {
@@ -145,7 +147,7 @@ export function useBtcDeposit({
       const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
 
       const opReturnHex = depositPreview.opReturnHex;
-      useNotesStore.getState().saveNote({
+      const noteId = useNotesStore.getState().saveNote({
         commitment: opReturnHex,
         noteExport: txid,
         amountSats: depositPreview.depositAmountSats,
@@ -165,7 +167,7 @@ export function useBtcDeposit({
               ephemeralPubkeyHex,
               networkId,
             );
-            if (res.deposit_id) useNotesStore.getState().updateNote(opReturnHex, { depositId: res.deposit_id });
+            if (res.deposit_id) useNotesStore.getState().updateNote(noteId, { depositId: res.deposit_id });
             return;
           } catch {
             if (attempt < 2) await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt));
@@ -174,7 +176,7 @@ export function useBtcDeposit({
         }
       })();
 
-      setWalletDepositResult({ txid, depositAddress: depositPreview.depositAddress, opReturnHex });
+      setWalletDepositResult({ txid, depositAddress: depositPreview.depositAddress, opReturnHex, noteId });
       setDepositPreview(null);
       btcWallet.refreshBalance(networkId);
       onStatusChange("done");

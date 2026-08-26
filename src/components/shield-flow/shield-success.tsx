@@ -43,7 +43,7 @@ export function ShieldSuccess({
           : `Your ${selectedToken.symbol} is now in your private balance.`}
       </p>
       {isBtc && walletDepositResult?.opReturnHex && (
-        <DepositStatusTracker opReturnHex={walletDepositResult.opReturnHex} className="pt-1" />
+        <DepositStatusTracker noteId={walletDepositResult.noteId} className="pt-1" />
       )}
       {txSig && (
         <a

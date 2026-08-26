@@ -10,19 +10,19 @@ import { cn } from "@/lib/utils";
  * Live "pending → confirming → swept → minted" tracker for a BTC deposit.
  *
  * The deposit's backend `depositId` is registered asynchronously after broadcast
- * and lands on the note (keyed by its OP_RETURN). We read it reactively from the
- * notes store and drive the existing useDepositStatus hook (WS + poll fallback),
- * so the user sees real confirmation progress instead of a static "submitted".
+ * and lands on the note. We read it reactively from the notes store by the note's
+ * local id and drive the existing useDepositStatus hook (WS + poll fallback), so
+ * the user sees real confirmation progress instead of a static "submitted".
  */
 export function DepositStatusTracker({
-  opReturnHex,
+  noteId,
   className,
 }: {
-  opReturnHex: string;
+  noteId: string;
   className?: string;
 }) {
   const depositId = useNotesStore(
-    (s) => s.notes.find((n) => n.commitment === opReturnHex)?.depositId ?? null,
+    (s) => s.notes.find((n) => n.id === noteId)?.depositId ?? null,
   );
   const { status, confirmations, sweepConfirmations } = useDepositStatus(depositId);
 

@@ -151,7 +151,7 @@ export function useDepositFlow() {
 
       // Save to local notes store
       const opReturnHex = depositPreview.opReturnHex;
-      useNotesStore.getState().saveNote({
+      const noteId = useNotesStore.getState().saveNote({
         commitment: opReturnHex,
         noteExport: txid,
         amountSats: depositPreview.depositAmountSats,
@@ -172,7 +172,7 @@ export function useDepositFlow() {
               networkId,
             );
             if (res.deposit_id) {
-              useNotesStore.getState().updateNote(opReturnHex, { depositId: res.deposit_id });
+              useNotesStore.getState().updateNote(noteId, { depositId: res.deposit_id });
             }
             return;
           } catch (err) {
