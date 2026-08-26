@@ -182,13 +182,31 @@ export function EnabledPrivySolanaProvider({
         // a synced passkey is chosen from the OS list. A second entry there is
         // one the member can pick, and picking it derives a different PRF seed:
         // a different, empty vault, reported as no error at all.
-        loginMethods: ["email", "wallet", "google"],
-        appearance: { theme: "dark", accentColor: "#14F195" },
+        loginMethods: ["email", "wallet"],
+        appearance: {
+          theme: "dark",
+          accentColor: "#14F195",
+          // Both lines are load-bearing. Privy's default walletList is the Ethereum
+          // set (metamask, rainbow, wallet_connect), and any of those names makes the
+          // SDK fetch the WalletConnect registry from explorer-api.walletconnect.com —
+          // blocked by our CSP, and `externalWallets.walletConnect.enabled` does not
+          // gate that fetch. Naming only detected Solana wallets keeps the request
+          // from ever being made, and matches what this app can actually sign with.
+          walletChainType: "solana-only",
+          walletList: ["detected_solana_wallets"],
+        },
         embeddedWallets: {
           solana: { createOnLogin: "users-without-wallets" },
           showWalletUIs: true,
         },
-        externalWallets: { solana: { connectors: toSolanaWalletConnectors() } },
+        externalWallets: {
+          // WalletConnect is off: nothing here uses it (Solana externals arrive via
+          // wallet-standard), and leaving it on makes the SDK fetch its registry from
+          // explorer-api.walletconnect.com — a CSP violation on the page that holds
+          // spending keys, and an origin not worth allowing for an unused path.
+          walletConnect: { enabled: false },
+          solana: { connectors: toSolanaWalletConnectors() },
+        },
         solana: {
           rpcs: {
             [solanaChain]: {

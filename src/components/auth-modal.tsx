@@ -29,14 +29,6 @@ interface AuthModalProps {
  * these only have to say "these are the ways in" at a glance, and a row of
  * full-colour logos would outshout every other option in the list.
  */
-function GoogleMark({ className }: { className?: string }) {
-  return (
-    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
-      <path d="M12 10.9v3.4h4.8c-.2 1.3-1.6 3.7-4.8 3.7a5.6 5.6 0 0 1 0-11.2c1.7 0 2.9.8 3.5 1.4l2.4-2.3A8.6 8.6 0 0 0 12 3.4a8.6 8.6 0 1 0 0 17.2c5 0 8.3-3.5 8.3-8.4 0-.6-.1-1-.2-1.3H12z" />
-    </svg>
-  );
-}
-
 function FarcasterMark({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden>
@@ -308,7 +300,6 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
                   {!awaitingLogin && (
                     <span className="flex items-center gap-2 text-gray-light/70 shrink-0">
                       <FarcasterMark className="w-4 h-4" />
-                      <GoogleMark className="w-4 h-4" />
                       <Mail className="w-4 h-4" aria-hidden />
                     </span>
                   )}
