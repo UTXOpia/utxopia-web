@@ -1,7 +1,9 @@
 "use client";
 
 import * as Dialog from "@radix-ui/react-dialog";
-import { AlertCircle, Check, CheckCircle2, ExternalLink, Loader2, LockKeyhole, X } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, ChevronDown, ExternalLink, Loader2, LockKeyhole, X } from "lucide-react";
+import { useState } from "react";
+import { formatSpendDoc, type SpendDoc } from "@utxopia/sdk";
 import { cn } from "@/lib/utils";
 import { HoldButton } from "@/components/ui/hold-button";
 import { RelayControl } from "@/components/relay/relay-control";
@@ -27,6 +29,11 @@ export interface ReviewModalProps {
   privacyNote?: string;
   /** Optional warning row (e.g. BTC privacy notice). */
   warning?: string;
+  /**
+   * Exactly what the proof will be checked against. Null while the form is
+   * incomplete; the confirm button is not reachable in that state anyway.
+   */
+  spendDoc?: SpendDoc | null;
   /** Relay registry chain id ("sol") for the per-tx relay line. */
   chainId: string;
   /** Full network id for relay health probing. */
@@ -61,6 +68,7 @@ export function ReviewModal({
   privacyNote,
   onConfirm,
   warning,
+  spendDoc,
   chainId,
   networkId,
   status,
@@ -74,6 +82,7 @@ export function ReviewModal({
   onViewActivity,
 }: ReviewModalProps) {
   const view = selectReviewView(status, busy, errorMessage);
+  const [docOpen, setDocOpen] = useState(false);
   const chainEnv = useChainEnvironment();
   const { permissioned: poolPermissioned } = usePoolPermissioned();
 
@@ -130,6 +139,25 @@ export function ReviewModal({
               {warning && (
                 <div className="mt-3 px-2 py-1.5 rounded bg-yellow-500/10 text-yellow-600 text-xs">
                   {warning}
+                </div>
+              )}
+
+              {spendDoc && (
+                <div className="mt-3 border-t border-gray/10 pt-3">
+                  <button
+                    type="button"
+                    onClick={() => setDocOpen((v) => !v)}
+                    aria-expanded={docOpen}
+                    className="flex w-full items-center justify-between text-xs text-muted-foreground hover:text-foreground"
+                  >
+                    <span>What this proof proves</span>
+                    <ChevronDown className={cn("h-3.5 w-3.5 transition-transform", docOpen && "rotate-180")} />
+                  </button>
+                  {docOpen && (
+                    <pre className="mt-2 max-h-64 overflow-auto whitespace-pre-wrap break-all rounded bg-muted/40 p-2 font-mono text-[11px] leading-relaxed text-muted-foreground">
+                      {formatSpendDoc(spendDoc)}
+                    </pre>
+                  )}
                 </div>
               )}
 

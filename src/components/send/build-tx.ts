@@ -1,4 +1,5 @@
 import type { RecipientType } from "./recipient-detect";
+import type { SpendDoc } from "@utxopia/sdk";
 
 export type SendIntentKind = "redeem" | "transact" | "unshield" | "claim_link";
 
@@ -69,5 +70,51 @@ export function buildSendIntent(input: BuildSendIntentInput): SendIntent {
     recipientValue: input.recipientValue,
     sourceToken,
     amount: input.amount,
+  };
+}
+
+
+export interface BuildSpendDocInput {
+  recipientType: RecipientType;
+  /** The destination exactly as typed. */
+  recipient: string;
+  network: string;
+  asset: string;
+  decimals: number;
+  amountBaseUnits: bigint;
+  relayerFee: bigint;
+  /** Sum of the notes this spend will consume. */
+  selectedTotal: bigint;
+  /** Resolved destination bytes: scriptPubKey for BTC, owner pubkey for a wallet. */
+  recipientBytes?: Uint8Array;
+}
+
+/**
+ * The statement the user approves in the review modal.
+ *
+ * Returns null when the form cannot yet describe a spend truthfully — an
+ * unresolved destination or notes that do not cover the amount. A doc is either
+ * complete or absent; a half-filled one would be a caption, and the whole point
+ * is that this is not a caption.
+ */
+export function buildSpendDoc(input: BuildSpendDocInput): SpendDoc | null {
+  const mode: SpendDoc["mode"] =
+    input.recipientType === "btc" ? "redeem"
+    : input.recipientType === "spl_wallet" ? "unshield"
+    : "transfer";
+  if (input.amountBaseUnits <= 0n) return null;
+  if (mode !== "transfer" && !input.recipientBytes) return null;
+  const change = input.selectedTotal - input.amountBaseUnits - input.relayerFee;
+  if (change < 0n) return null;
+  return {
+    mode,
+    network: input.network,
+    asset: input.asset,
+    decimals: input.decimals,
+    recipient: input.recipient,
+    recipientBytes: input.recipientBytes,
+    amount: input.amountBaseUnits,
+    relayerFee: input.relayerFee,
+    change,
   };
 }

@@ -8,7 +8,7 @@ import { Bitcoin, Check, Link as LinkIcon, Loader2, LockKeyhole, Send, Wallet } 
 import { cn } from "@/lib/utils";
 import { type RecipientType } from "./recipient-detect";
 import { useRecipientResolution } from "@/hooks/use-recipient-resolution";
-import { buildSendIntent, computeBtcServiceFee } from "./build-tx";
+import { buildSendIntent, buildSpendDoc, computeBtcServiceFee } from "./build-tx";
 import { RecipientInput } from "./recipient-input";
 import { SolanaAddressField } from "@/components/ui/solana-address-field";
 import { TokenSourcePicker } from "./token-source-picker";
@@ -29,6 +29,7 @@ import { buildTransferParams } from "@/hooks/use-build-transfer-params";
 import { autoSelectNotes } from "@/components/send/_lifted/helpers";
 import { PAY_TOKENS } from "@/lib/supported-tokens";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
+import type { SpendDoc } from "@utxopia/sdk";
 import { humanizeSpendError } from "@/lib/indexer-lag-error";
 import { parseDecimalToBaseUnits } from "@/lib/utils/validation";
 import { formatAmount } from "@/lib/utils/formatting";
@@ -434,6 +435,36 @@ export function SendForm({
   // recipientValid is true (the JSX gates on that before reading it).
   const recipientType = detection.type as RecipientType;
 
+  // The statement the user actually approves. The same object is handed to
+  // buildTransferParams, which re-derives boundParamsHash from it and matches
+  // every printed amount against the proof's outputs — so this string is not a
+  // caption, it is what the proof is checked against.
+  const spendDoc = useMemo<SpendDoc | null>(() => {
+    if (!recipientValid) return null;
+    const addr = state.recipient.trim();
+    let recipientBytes: Uint8Array | undefined;
+    try {
+      if (recipientType === "btc") recipientBytes = validateBtcAddress(addr).scriptPubKey ?? undefined;
+      else if (recipientType === "spl_wallet") recipientBytes = new PublicKey(addr).toBytes();
+    } catch {
+      return null; // an unparseable destination is not a doc we can stand behind
+    }
+    return buildSpendDoc({
+      recipientType,
+      recipient: addr,
+      network: `Solana ${chainEnv.networkId}`,
+      asset: displayToken,
+      decimals: selectedPayToken.decimals,
+      amountBaseUnits: BigInt(Math.max(0, amountSats)),
+      relayerFee: BigInt(effectiveRelayerFee),
+      selectedTotal: noteSelector.selectedNotes.reduce((sum, n) => sum + BigInt(n.amount), 0n),
+      recipientBytes,
+    });
+  }, [
+    recipientValid, recipientType, state.recipient, amountSats, effectiveRelayerFee,
+    noteSelector.selectedNotes, chainEnv.networkId, displayToken, selectedPayToken.decimals,
+  ]);
+
   const amountNum = parseFloat(state.amount || "0");
   const btcServiceFee = computeBtcServiceFee(
     BigInt(Math.max(0, amountSats)),
@@ -620,6 +651,7 @@ export function SendForm({
         tokenMint: selectedPayToken.mint || undefined,
         recipient: recipientArg,
         requesterPubkey,
+        spendDoc: spendDoc ?? undefined,
         serviceFeeBase: effectiveServiceFee,
         serviceFeeBps: effectiveServiceFeeBps,
       });
@@ -1012,6 +1044,7 @@ export function SendForm({
         }}
         recipientLabel={state.recipient.trim()}
         amountLabel={`${state.amount} ${displayToken}`}
+        spendDoc={spendDoc}
         feeLabel={formatFee(totalFee)}
         details={
           recipientType === "spl_wallet"

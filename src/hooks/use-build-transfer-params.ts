@@ -9,6 +9,7 @@
 
 import { toHex64 } from "@/lib/utils/hex";
 import { computeSolanaDomainBoundParamsHash } from "@/lib/solana-domain-binding";
+import { renderSpendDoc, type SpendDoc } from "@utxopia/sdk";
 import { PublicKey } from "@solana/web3.js";
 import type { InboxNote } from "@/hooks/use-utxopia";
 import type { JoinSplitProofInputs, UTXOpiaKeys, StealthMetaAddress, ScannedNote } from "@utxopia/sdk";
@@ -57,6 +58,14 @@ export interface TransferUserInputs {
    * which the indexer records only after a rotation occurs.
    */
   sourceTree?: string;
+  /**
+   * The statement shown to the user at confirm time. `recipientBytes` is filled
+   * in here from the resolved destination, then the whole doc is checked against
+   * the proof's public signals — a mismatch aborts before anything is signed.
+   * Omitted only by flows with no confirm step (claim links), which fall back to
+   * a doc built from these same values.
+   */
+  spendDoc?: SpendDoc;
 }
 
 export interface TransferParams {
@@ -81,6 +90,12 @@ export interface TransferParams {
    * new outputs into the active tree. Undefined for the common single/active-tree case.
    */
   sourceTree?: string;
+  /**
+   * Canonical statement of what this proof proves. Cross-checked against the
+   * public signals — it cannot be built if the numbers diverge. Show it before
+   * proving.
+   */
+  spendDoc: string;
 }
 
 export async function buildTransferParams(inputs: TransferUserInputs): Promise<TransferParams> {
@@ -292,6 +307,40 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     boundParamsHash = computeSolanaDomainBoundParamsHash(transferParams, domainContext);
   }
 
+  const relayMode = mode === "btc" ? "redeem" as const : mode === "public" ? "unshield" as const : "transfer" as const;
+
+  // 6b. Verify the statement the user was shown against the signals about to be
+  //     proven. renderSpendDoc re-derives boundParamsHash from the destination it
+  //     prints and matches every printed amount against the proof's outputs, so a
+  //     divergence throws here instead of becoming a proof nobody agreed to.
+  const doc: SpendDoc = inputs.spendDoc ?? {
+    mode: relayMode,
+    network: "Solana",
+    asset: "zkBTC",
+    decimals: 8,
+    recipient: recipient.solanaAddress ?? "shielded recipient",
+    amount: amountSats,
+    relayerFee: BigInt(relayerFee),
+    change: BigInt(changeSats),
+  };
+  const spendDoc = renderSpendDoc(
+    {
+      ...doc,
+      recipientBytes:
+        mode === "public" ? unshieldRecipientAddress
+        : mode === "btc" ? recipient.btcScriptPubKey
+        : undefined,
+    },
+    {
+      outputValues: sendAmounts,
+      boundParamsHash,
+      stealthDataHash,
+      chainId: boundChainId,
+      domain: domainContext,
+      requester: inputs.requesterPubkey,
+    },
+  );
+
   // 7. Sign
   const allNullifiers = inputsData.map((d) => d.claimInputs.nullifier);
   const msgHashInputs = [merkleRoot, boundParamsHash, ...allNullifiers, ...outCommitments];
@@ -333,7 +382,6 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     return sd;
   });
 
-  const relayMode = mode === "btc" ? "redeem" as const : mode === "public" ? "unshield" as const : "transfer" as const;
 
   return {
     proofInputs,
@@ -345,5 +393,6 @@ export async function buildTransferParams(inputs: TransferUserInputs): Promise<T
     relayerFeeOutputIndex,
     changeSats,
     sourceTree: inputs.sourceTree,
+    spendDoc,
   };
 }
