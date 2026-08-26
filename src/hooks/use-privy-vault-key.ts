@@ -39,7 +39,7 @@ export function useLoginArmed(): boolean {
 }
 
 export function usePrivyVaultKey() {
-  const { enabled, authenticated, accountId, login, ensureWallet, signMessage } =
+  const { enabled, ready, authenticated, accountId, login, ensureWallet, signMessage } =
     usePrivySolanaAuthority();
   const { networkId, vaultId } = useChainEnvironment();
 
@@ -82,5 +82,5 @@ export function usePrivyVaultKey() {
     [networkId, vaultId],
   );
 
-  return { available: enabled, authenticated, accountId, login, keyMaterialFor, remember };
+  return { available: enabled, ready, authenticated, accountId, login, keyMaterialFor, remember };
 }

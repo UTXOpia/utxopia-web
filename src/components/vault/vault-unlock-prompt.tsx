@@ -86,6 +86,11 @@ export function VaultUnlockPrompt({
     }
   };
 
+  // A login-armed browser whose provider session has lapsed had a PIN field, a
+  // signature it could not ask for, and no way back to a sign-in — the unlock
+  // just errored. Sign in first, then the same button unlocks.
+  const needsLogin = loginArmed && privy.available && privy.ready && !privy.authenticated;
+
   const Icon = loginArmed ? KeyRound : Fingerprint;
 
   return (
@@ -105,7 +110,7 @@ export function VaultUnlockPrompt({
         </div>
       )}
 
-      {loginArmed && (
+      {loginArmed && !needsLogin && (
         <form
           className="mb-4 w-full max-w-[34ch]"
           onSubmit={(e) => {
@@ -118,7 +123,7 @@ export function VaultUnlockPrompt({
       )}
 
       <button
-        onClick={unlock}
+        onClick={needsLogin ? () => void privy.login() : unlock}
         disabled={busy}
         className={cn(
           "inline-flex items-center gap-2 rounded-full px-7 py-3",
@@ -128,7 +133,7 @@ export function VaultUnlockPrompt({
         )}
       >
         {busy ? <Loader2 className="h-4 w-4 animate-spin" aria-hidden /> : <Icon className="h-4 w-4" />}
-        {busy ? "Unlocking\u2026" : "Unlock vault"}
+        {busy ? "Unlocking\u2026" : needsLogin ? "Sign in to unlock" : "Unlock vault"}
       </button>
 
       <button

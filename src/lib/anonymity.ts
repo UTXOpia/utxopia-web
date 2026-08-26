@@ -206,3 +206,14 @@ export function bucketIndexOf(buckets: HistogramBucket[], amount: number): numbe
   }
   return -1;
 }
+
+/**
+ * One sentence naming the crowd a spend of `amount` hides in — the same line
+ * on the send form and in its review modal, so the two cannot drift.
+ */
+export function crowdNote(deposits: DepositPoint[], amount: number, unit: string): string | null {
+  if (amount <= 0) return null;
+  const n = countDepositsAtLeast(deposits, amount);
+  const many = `${n} ${unit} deposit${n === 1 ? " is" : "s are"} large enough to be this note.`;
+  return n < THIN_CROWD ? `Thin crowd: only ${many}` : many;
+}

@@ -42,7 +42,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated, user, isModalOpen } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
-  const { ready: walletsReady, wallets } = useWallets();
+  const { wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
   const { signMessage } = useSignMessage();
@@ -126,7 +126,10 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const value = useMemo<PrivySolanaAuthority>(
     () => ({
       enabled: true,
-      ready: privyReady && walletsReady,
+      // privyReady alone: walletsReady stays false for the whole of a logged-out
+      // session, and `ready` is read to decide whether `authenticated` can be
+      // trusted yet. Wallet availability is ensureWallet's problem.
+      ready: privyReady,
       authenticated,
       isModalOpen,
       publicKey,
@@ -150,7 +153,6 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       accountLabel,
       user,
       logout,
-      walletsReady,
     ],
   );
 

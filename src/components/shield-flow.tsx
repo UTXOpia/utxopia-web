@@ -778,12 +778,15 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         {showSolTestFunds && <SolTestFundsHelper />}
         {amountRaw > 0n && poolFees.fees && (
           <div className="space-y-2 border-t border-gray/10 pt-3 text-xs">
-            <PreviewRow label="You shield" value={`${formatBaseUnits(amountRaw)} ${displayUnit}`} />
-            <PreviewRow label="Shield fee" value={`${formatBaseUnits(depositFee)} ${displayUnit}`} />
-            <PreviewRow label="Private balance receives" value={`${formatBaseUnits(privateReceives)} ${privateUnit}`} strong />
-            <p className="flex items-start gap-1.5 text-[11px] text-gray/60">
-              <Info className="mt-0.5 h-3 w-3 shrink-0" />
-              This shield transaction is public. Your later private transfers are not publicly linked by the app.
+            {/* The amount is in the field right above; repeating it as "You
+                shield" was a row that told nobody anything. */}
+            <PreviewRow label="Fee" value={`${formatBaseUnits(depositFee)} ${displayUnit}`} />
+            <PreviewRow label="You receive" value={`${formatBaseUnits(privateReceives)} ${privateUnit}`} strong />
+            <p className="flex items-center gap-1.5 text-[11px] text-gray/60">
+              <span title="Your later private transfers are not publicly linked by the app.">
+                <Info className="h-3 w-3 shrink-0 cursor-help" />
+              </span>
+              This shield transaction is public.
             </p>
             {highDepositFee && <p className="text-[11px] text-warning">The fee is high relative to this shield amount.</p>}
           </div>

@@ -28,6 +28,8 @@ import { useRelayerConfig, resolveRelayerFee } from "@/hooks/use-relayer-config"
 import { buildTransferParams } from "@/hooks/use-build-transfer-params";
 import { autoSelectNotes } from "@/components/send/_lifted/helpers";
 import { PAY_TOKENS } from "@/lib/supported-tokens";
+import { useSingleTokenActivity } from "@/hooks/use-token-activity";
+import { crowdNote as buildCrowdNote } from "@/lib/anonymity";
 import { validateBtcAddress } from "@/components/ui/btc-address-input";
 import type { SpendDoc } from "@utxopia/sdk";
 import { humanizeSpendError } from "@/lib/indexer-lag-error";
@@ -415,6 +417,18 @@ export function SendForm({
   const linkAvailable = BigInt(linkNotes.totalAvailable);
 
   const amountSats = parseDecimalToBaseUnits(state.amount, selectedPayToken.decimals) ?? 0;
+
+  // The crowd this spend hides in: deposits big enough to have funded the note
+  // on their own. Scoped to this vault — the other pool's deposits are not a
+  // crowd you are standing in. Counted on whatever window the indexer returned,
+  // so a truncated list understates it.
+  // ponytail: amount-only. Timing and merged notes narrow it further; the pool
+  // page does that math if anyone needs it.
+  const { activity: poolActivity } = useSingleTokenActivity(selectedPayToken.symbol, chainEnv.vaultId);
+  const crowdNote = useMemo(
+    () => (poolActivity ? buildCrowdNote(poolActivity.deposits, amountSats, selectedPayToken.unit) : null),
+    [poolActivity, amountSats, selectedPayToken.unit],
+  );
   const relayerReady = relayerMetaLoaded && Boolean(relayerMeta?.stealthMeta);
   const totalNeeded = amountSats + effectiveRelayerFee;
   const noteSelector = useNoteAutoSelector(
@@ -973,6 +987,7 @@ export function SendForm({
               BTC withdrawal amount must exceed the service fee ({btcServiceFee.toString()} sats).
             </div>
           )}
+          {crowdNote && <div className="text-xs text-muted-foreground">{crowdNote}</div>}
         </>
       )}
 
@@ -1070,11 +1085,16 @@ export function SendForm({
                 ]
         }
         privacyNote={
-          recipientType === "spl_wallet"
-            ? `${selectedPayToken.unit} destination and received amount are public on Solana.${effectiveToken === "zkSOL" ? " You receive native SOL." : ""}`
-            : recipientType === "btc"
-              ? "Bitcoin destination and payout are public."
-              : "Sender, recipient, and amount remain private."
+          [
+            recipientType === "spl_wallet"
+              ? `${selectedPayToken.unit} destination and received amount are public on Solana.${effectiveToken === "zkSOL" ? " You receive native SOL." : ""}`
+              : recipientType === "btc"
+                ? "Bitcoin destination and payout are public."
+                : "Sender, recipient, and amount remain private.",
+            crowdNote,
+          ]
+            .filter(Boolean)
+            .join(" ")
         }
         warning={
           highFeeShare

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import {
   assessNote,
+  crowdNote,
   bucketIndexOf,
   buildHistogram,
   countDepositsAtLeast,
@@ -188,5 +189,23 @@ describe("histogram", () => {
     expect(bucketIndexOf(buckets, 100)).toBe(0);
     expect(bucketIndexOf(buckets, 10_000)).toBe(buckets.length - 1);
     expect(bucketIndexOf(buckets, 1)).toBe(-1);
+  });
+});
+
+describe("crowdNote", () => {
+  const deposits = [10, 20, 50, 100, 200, 500, 1000, 2000].map((amount) => ({ amount, blockTime: 0 }));
+
+  it("counts only deposits big enough to have funded the note", () => {
+    expect(crowdNote(deposits, 60, "USDC")).toBe("5 USDC deposits are large enough to be this note.");
+  });
+
+  it("calls out a thin crowd, in the singular when it is one", () => {
+    expect(crowdNote(deposits, 1500, "USDC")).toBe(
+      "Thin crowd: only 1 USDC deposit is large enough to be this note.",
+    );
+  });
+
+  it("no note without an amount", () => {
+    expect(crowdNote(deposits, 0, "USDC")).toBeNull();
   });
 });
