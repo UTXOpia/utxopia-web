@@ -16,7 +16,7 @@ describe("backend proxy", () => {
 
   it("forwards requests to the selected network backend", async () => {
     const fetchMock = mock(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe("https://api-hybrid.utxopia.com/api/tree/status?network=devnet-regtest");
+      expect(String(input)).toBe("https://api-regtest.utxopia.com/api/tree/status?network=devnet-regtest");
       return Response.json({ synced: true });
     });
     global.fetch = fetchMock as any;
@@ -34,7 +34,7 @@ describe("backend proxy", () => {
   it("routes an explicit verified vault to its fixed backend path", async () => {
     const fetchMock = mock(async (input: RequestInfo | URL) => {
       expect(String(input)).toBe(
-        "https://api-hybrid.utxopia.com/verified/api/announcements?network=devnet-regtest&vault=verified",
+        "https://api-regtest.utxopia.com/verified/api/announcements?network=devnet-regtest&vault=verified",
       );
       return Response.json({ announcements: [] });
     });
@@ -72,7 +72,7 @@ describe("backend proxy", () => {
       success: false,
       code: "BACKEND_TIMEOUT",
       network: "devnet-regtest",
-      backendHost: "api-hybrid.utxopia.com",
+      backendHost: "api-regtest.utxopia.com",
     });
   });
 });

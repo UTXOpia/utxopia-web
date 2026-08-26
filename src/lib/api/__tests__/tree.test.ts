@@ -10,7 +10,7 @@ describe("tree API helpers", () => {
 
   it("uses the explicit network backend for tree status", async () => {
     const fetchMock = mock(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe("https://api-hybrid.utxopia.com/api/tree/status");
+      expect(String(input)).toBe("https://api-regtest.utxopia.com/api/tree/status");
       return Response.json({
         root: "abc",
         next_index: 2,

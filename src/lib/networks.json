@@ -67,7 +67,7 @@
       "dwalletXOnlyPubkey": "243a6c47504f82d168754da9392a9dbcbab9b9f9c515a609227fac4642b2a26f"
     },
     "backend": {
-      "url": "https://api-hybrid.utxopia.com"
+      "url": "https://api-regtest.utxopia.com"
     },
     "sns": {
       "nameServiceProgramId": "namesLPneVptA9Z5rqUDD9tMTWEJwofgaYwp8cawRkX",

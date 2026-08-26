@@ -89,7 +89,7 @@ const BTC_DEPOSIT_TIMEOUT_MS = parseInt(process.env.BTC_DEPOSIT_TIMEOUT_MS ?? "6
 const BTC_REDEEM_TIMEOUT_MS = parseInt(process.env.BTC_REDEEM_TIMEOUT_MS ?? "600000", 10);
 
 /** Which network the run drives, via `?network=`. Both `devnet` and
- *  `devnet-regtest` sit on Solana devnet and are served by api-hybrid; they
+ *  `devnet-regtest` sit on Solana devnet and are served by api-regtest; they
  *  differ in program id and in whether BTC is testnet4 or regtest. The BTC legs
  *  here mine regtest blocks, so they only make sense on `devnet-regtest`. */
 const E2E_NETWORK = process.env.E2E_NETWORK ?? "devnet";

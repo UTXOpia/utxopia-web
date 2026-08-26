@@ -6,7 +6,7 @@ describe("/api/tree/status", () => {
   it("proxies Solana network status to the selected backend", async () => {
     const originalFetch = global.fetch;
     const fetchMock = mock(async (input: RequestInfo | URL) => {
-      expect(String(input)).toBe("https://api-hybrid.utxopia.com/api/tree/status?network=devnet-regtest");
+      expect(String(input)).toBe("https://api-regtest.utxopia.com/api/tree/status?network=devnet-regtest");
       return Response.json({ synced: true, root: "abc", next_index: 1, size: 1 });
     });
     global.fetch = fetchMock as any;

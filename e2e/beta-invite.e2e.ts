@@ -62,7 +62,7 @@ const VAULT = "verified";
 
 /** Verified pool backend. Minting is deliberately not proxied through the web
  *  origin, so this talks to the backend directly. */
-const BACKEND = process.env.BACKEND ?? "https://api-hybrid.utxopia.com/verified";
+const BACKEND = process.env.BACKEND ?? "https://api-regtest.utxopia.com/verified";
 const RPC_URL = process.env.UTXOPIA_E2E_RPC_URL ?? process.env.TRITON_SOLANA_RPC_URL
   ?? "https://api.devnet.solana.com";
 

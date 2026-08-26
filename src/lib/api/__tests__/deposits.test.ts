@@ -114,6 +114,6 @@ describe("deposit network routing", () => {
       global.WebSocket = originalWebSocket;
     }
 
-    expect(sockets[0]).toBe("wss://api-hybrid.utxopia.com/ws/deposits/deposit_1");
+    expect(sockets[0]).toBe("wss://api-regtest.utxopia.com/ws/deposits/deposit_1");
   });
 });

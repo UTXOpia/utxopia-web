@@ -36,7 +36,7 @@ describe("Content-Security-Policy", () => {
     for (const host of [
       "'self'",
       "https://api.utxopia.com",
-      "https://api-hybrid.utxopia.com",
+      "https://api-regtest.utxopia.com",
       "https://btc.utxopia.com",
       "https://circuit.utxopia.com",
     ]) {

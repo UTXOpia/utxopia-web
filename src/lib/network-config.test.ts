@@ -81,8 +81,8 @@ describe("network-config query routing", () => {
     // would mean one indistinguishable UTXO set across both vaults.
     expect(open.bitcoin.poolAddress).not.toBe(verified.bitcoin.poolAddress);
     expect(open.ika?.dwallet).not.toBe(verified.ika?.dwallet);
-    expect(open.backend.url).toBe("https://api-hybrid.utxopia.com/open");
-    expect(verified.backend.url).toBe("https://api-hybrid.utxopia.com/verified");
+    expect(open.backend.url).toBe("https://api-regtest.utxopia.com/open");
+    expect(verified.backend.url).toBe("https://api-regtest.utxopia.com/verified");
     expect(getVaultRuntimeConfig("devnet-regtest", "verified").policyMode).toBe("per");
     expect(getVaultPrivacyDomain("open")).toBe("public");
     expect(getVaultPrivacyDomain("verified")).toBe("institution");
