@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useMemo } from "react";
+import { useCallback, useEffect, useMemo, useRef } from "react";
 import type { ReactNode } from "react";
 import { PrivyProvider, useLogin, useLogout, usePrivy } from "@privy-io/react-auth";
 import {
@@ -42,7 +42,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { ready: privyReady, authenticated, user, isModalOpen } = usePrivy();
   const { login } = useLogin();
   const { logout } = useLogout();
-  const { wallets } = useWallets();
+  const { ready: walletsReady, wallets } = useWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
   const { signMessage } = useSignMessage();
@@ -57,22 +57,59 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     login();
   }, [login]);
 
+  // useWallets fills in asynchronously, and on a phone it can take seconds
+  // after the session is already authenticated. Read through a ref rather than
+  // the callback's captured value: every wallet decision below runs inside a
+  // ceremony that started before the list arrived.
+  const walletsRef = useRef({ ready: walletsReady, wallets });
+  useEffect(() => {
+    walletsRef.current = { ready: walletsReady, wallets };
+  }, [walletsReady, wallets]);
+
+  /**
+   * The wallet list once it means something.
+   *
+   * Before it is ready an account that owns an embedded wallet looks like an
+   * account with none — which is how a member ended up being told "User
+   * already has an embedded wallet" (createWallet, refused) and, worse, how a
+   * signature could be taken from whatever other wallet happened to be listed
+   * first. The vault key is derived from that signature, so the wrong signer
+   * is not an error, it is a PIN that no longer works.
+   */
+  const settledWallets = useCallback(async (timeoutMs = 15_000) => {
+    const deadline = Date.now() + timeoutMs;
+    while (!walletsRef.current.ready && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+    return walletsRef.current.wallets;
+  }, []);
+
   const ensureWallet = useCallback(async () => {
     if (!authenticated) {
       login();
       return null;
     }
 
-    const currentWallet = findEmbeddedWallet(wallets);
+    const currentWallet = findEmbeddedWallet(await settledWallets());
     if (currentWallet?.address) return new PublicKey(currentWallet.address);
 
-    const created = await createWallet({ createAdditional: false });
-    return created.wallet.address ? new PublicKey(created.wallet.address) : null;
-  }, [authenticated, createWallet, login, wallets]);
+    try {
+      const created = await createWallet({ createAdditional: false });
+      return created.wallet.address ? new PublicKey(created.wallet.address) : null;
+    } catch (cause) {
+      // Privy refuses a second embedded wallet. Reaching here means the list
+      // was still empty when the timeout ran out, not that anything is wrong —
+      // so wait for the one it says exists rather than surfacing its message.
+      if (!/already has an embedded wallet/i.test(String(cause))) throw cause;
+      const late = findEmbeddedWallet(await settledWallets(15_000));
+      if (late?.address) return new PublicKey(late.address);
+      throw new Error("Your wallet is still loading. Try again in a moment.");
+    }
+  }, [authenticated, createWallet, login, settledWallets]);
 
   const signPrivyTransaction = useCallback(
     async (transaction: Transaction) => {
-      const signingWallet = findEmbeddedWallet(wallets);
+      const signingWallet = findEmbeddedWallet(await settledWallets());
       if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
 
       const { signedTransaction } = await signTransaction({
@@ -82,12 +119,12 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       });
       return Transaction.from(signedTransaction);
     },
-    [signTransaction, solanaChain, wallets],
+    [settledWallets, signTransaction, solanaChain],
   );
 
   const signPrivyMessage = useCallback(
     async (message: Uint8Array) => {
-      const signingWallet = findEmbeddedWallet(wallets);
+      const signingWallet = findEmbeddedWallet(await settledWallets());
       if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
 
       const { signature } = await signMessage({ message, wallet: signingWallet });
@@ -107,7 +144,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       if (drift) console.error(drift);
       return signature;
     },
-    [signMessage, wallets],
+    [settledWallets, signMessage],
   );
 
   // Whatever the member would recognise. Privy links several account types and
