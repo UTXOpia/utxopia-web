@@ -1,6 +1,7 @@
 import { describe, expect, it } from "bun:test";
 import { NextRequest } from "next/server";
 import { isSameOrigin, proxy, requestOrigin } from "./proxy";
+import { NETWORK_META, getNetworkConfig } from "@/lib/network-config";
 
 describe("API origin checks", () => {
   it("accepts a browser Origin header matching the served application", () => {
@@ -40,6 +41,21 @@ describe("Content-Security-Policy", () => {
       "https://circuit.utxopia.com",
     ]) {
       expect(sources).toContain(host);
+    }
+  });
+
+  it("covers the backend of every network the picker offers", () => {
+    // Enabling testnet4 added a network whose backend origin was not listed, so
+    // the browser could reach the app and not its own API. Derive the
+    // expectation from NETWORK_META rather than restating hostnames, or the
+    // next environment repeats it.
+    const sources = connectSrc();
+    for (const meta of NETWORK_META.filter((m) => m.enabled && !m.comingSoon)) {
+      const url = getNetworkConfig(meta.id, { applyEnvOverrides: false }).backend.url;
+      if (!url) continue;
+      expect(sources, `${meta.id} backend origin missing from connect-src`).toContain(
+        new URL(url).origin,
+      );
     }
   });
 

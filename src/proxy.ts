@@ -129,7 +129,9 @@ function addSecurityHeaders(response: NextResponse) {
     // ever have, including one lost to a dangling DNS record — and this is the page that holds
     // spending keys, so an allowed origin is an exfiltration route. Add hosts deliberately.
     "https://api.utxopia.com",          // prod backend
-    "https://api-hybrid.utxopia.com",   // devnet + regtest backend
+    "https://api-regtest.utxopia.com",  // Solana devnet + regtest BTC backend
+    "https://api-hybrid.utxopia.com",   // the same backend's retired name; drop with the route
+    "https://api-testnet4.utxopia.com", // Solana devnet + testnet4 BTC backend
     "https://btc.utxopia.com",          // regtest esplora
     "https://circuit.utxopia.com",      // circuit artifact CDN
     circuitOrigin,
