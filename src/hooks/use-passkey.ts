@@ -58,9 +58,25 @@ function credentialLabel(): { name: string; displayName: string } {
     : { name: `utxopia-${network}`, displayName: `UTXOpia vault (${network})` };
 }
 
+/**
+ * The registrable domain rather than the exact host.
+ *
+ * A credential belongs to one RP id and nothing else, and the hostname made
+ * `app.` and `www.` two different relying parties — so a passkey registered on
+ * one was not merely PRF-less on the other, it did not exist there. WebAuthn
+ * allows any registrable suffix of the origin, and the parent domain is the
+ * one that covers every subdomain this app will ever be served from.
+ *
+ * Anything not under utxopia.com — localhost, preview deployments — keeps its
+ * own host: they are separate relying parties on purpose.
+ */
+export function registrableRpId(hostname: string): string {
+  return hostname === "utxopia.com" || hostname.endsWith(".utxopia.com") ? "utxopia.com" : hostname;
+}
+
 function getRpId(): string {
   if (typeof window === "undefined") return "localhost";
-  return window.location.hostname;
+  return registrableRpId(window.location.hostname);
 }
 
 export interface SeedRequest {
