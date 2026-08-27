@@ -116,7 +116,7 @@ export function VaultUnlockPrompt({
   const Icon = loginArmed ? KeyRound : Fingerprint;
 
   return (
-    <div className="flex flex-col items-center py-10">
+    <div className="flex flex-col items-center py-6">
       <div className="mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-full border border-privacy/20 bg-privacy/10">
         <Icon className="h-8 w-8 text-privacy" aria-hidden />
       </div>

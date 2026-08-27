@@ -155,8 +155,11 @@ export function AuthModal({ open, onOpenChange, auth }: AuthModalProps) {
             </button>
           </Dialog.Close>
 
-          {/* Header */}
-          <div className="pt-8 pb-2 px-6 text-center">
+          {/* Header. Hidden — not removed — behind the unlock prompt: that
+              screen brings its own icon, heading and line, and two stacked
+              headers is most of a phone viewport spent saying the same thing
+              twice. Radix still needs the title in the tree. */}
+          <div className={cn("pt-8 pb-2 px-6 text-center", showUnlock && "sr-only")}>
             <div className="inline-flex mb-4">
               <img src="/brand/logo-transparent-96.png" alt="UTXOpia" className="w-20 h-20 object-contain" />
             </div>
