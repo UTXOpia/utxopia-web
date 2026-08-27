@@ -15,6 +15,7 @@ import {
   hasDeviceEnvelope,
   assertDeviceSigner,
   readDeviceEnvelope,
+  clearDeviceSigner,
   readDeviceSigner,
   unlockWithDevice,
   writeDeviceSigner,
@@ -321,6 +322,20 @@ describe("the login that armed this device", () => {
   it("names itself when the provider hands back a different wallet", () => {
     writeDeviceSigner(SCOPE, "wallet-a");
     expect(() => assertDeviceSigner(SCOPE, "wallet-b")).toThrow(SignerChangedError);
+  });
+
+  // The handover to a passkey: the wrapping this browser holds gets replaced,
+  // and only the note saying a login armed it goes.
+  it("can be dropped without taking the wrapping with it", async () => {
+    await createVault({
+      scope: SCOPE,
+      deviceKeyMaterial: device(1),
+      metaAddressFor,
+    });
+    writeDeviceSigner(SCOPE, "wallet-a");
+    clearDeviceSigner(SCOPE);
+    expect(readDeviceSigner(SCOPE)).toBeNull();
+    expect(hasDeviceEnvelope(SCOPE)).toBe(true);
   });
 
   it("is scoped per pool, like the wrapping it describes", () => {

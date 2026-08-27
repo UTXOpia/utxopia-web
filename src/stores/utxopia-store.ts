@@ -3,8 +3,10 @@
 import { create } from "zustand";
 import { PublicKey, type Connection } from "@solana/web3.js";
 import {
+  armDevice,
   buildRecoveryString,
   clearDeviceEnvelope,
+  clearDeviceSigner,
   createVault,
   readDeviceEnvelope,
   readDeviceSigner,
@@ -398,6 +400,9 @@ interface UTXOpiaState {
     deviceKeyMaterial?: Uint8Array,
     salt?: Uint8Array,
   ) => Promise<void>;
+  /** Hand the daily unlock to this device's passkey, on a browser a login and
+   *  a PIN had been arming. Needs the vault open in this session. */
+  armThisDeviceWithPasskey: (deviceKeyMaterial: Uint8Array) => Promise<void>;
   exportRecoveryString: (deviceKeyMaterial?: Uint8Array) => Promise<string>;
   /** Drop this browser's wrapping. Distinct from logging out: after this the
    *  recovery string is the only way back in, on any device. */
@@ -773,6 +778,17 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
       get().clearKeys();
       throw err;
     }
+  },
+
+  armThisDeviceWithPasskey: async (deviceKeyMaterial) => {
+    const seed = get().vaultSeed;
+    const metaAddress = get().stealthAddressEncoded;
+    if (!seed || !metaAddress) throw new Error("Unlock your vault first.");
+    const { scope } = await envelopeContext();
+    // Order matters: the note is what makes the unlock screen ask for a PIN, so
+    // it only goes once the wrapping the passkey can open is actually written.
+    await armDevice({ scope, seed, metaAddress, deviceKeyMaterial });
+    clearDeviceSigner(scope);
   },
 
   exportRecoveryString: async (deviceKeyMaterial) => {

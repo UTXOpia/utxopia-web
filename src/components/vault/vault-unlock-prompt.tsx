@@ -46,16 +46,37 @@ export function VaultUnlockPrompt({
   /** Rendered inside a dialog, the caller has to dismiss it. */
   onUnlocked?: () => void;
 }) {
-  const { authenticate } = usePasskey();
+  const { authenticate, hasCredential: hasPasskey } = usePasskey();
   const { networkId, vaultId } = useChainEnvironment();
   const privy = usePrivyVaultKey();
   // The wrapping alone cannot say what made it, so the signer note is the tell.
   // Offering the wrong one would ask for a factor that was never used here.
   const loginArmed = useLoginArmed();
   const unlockEnvelopeVault = useUTXOpiaStore((s) => s.unlockEnvelopeVault);
+  const armThisDeviceWithPasskey = useUTXOpiaStore((s) => s.armThisDeviceWithPasskey);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  /**
+   * The PIN is for a new device. Once one is in hand, the daily unlock belongs
+   * to this device's passkey — so hand it over the first time PRF answers here,
+   * and this screen stops asking.
+   *
+   * Best-effort by design: the vault is already open by the time this runs, and
+   * a browser that cannot do PRF should keep the PIN rather than see an error
+   * for something it did not ask for. Only re-uses a credential this browser
+   * already has; minting one is a decision, not a side effect of unlocking.
+   */
+  const handOverToPasskey = async () => {
+    if (!hasPasskey) return;
+    try {
+      const material = await authenticate({ requirePrf: true });
+      if (material) await armThisDeviceWithPasskey(material);
+    } catch {
+      // Stay on the PIN. Nothing was lost — the wrapping it opens is untouched.
+    }
+  };
 
   const unlock = async () => {
     setError(null);
@@ -69,6 +90,7 @@ export function VaultUnlockPrompt({
         const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
         await unlockEnvelopeVault(keyMaterial, "pin");
         setPin("");
+        await handOverToPasskey();
         onUnlocked?.();
       } else {
         // A wrapping only exists here if PRF produced its key, so requiring PRF

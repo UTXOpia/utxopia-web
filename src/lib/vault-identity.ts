@@ -165,6 +165,12 @@ export function writeDeviceSigner(scope: VaultScope, signer: string): void {
   localStorage.setItem(signerKey(scope), signer);
 }
 
+/** Drop the note, without touching the wrapping it described. What a browser
+ *  does when a passkey takes over the daily unlock from a login and a PIN. */
+export function clearDeviceSigner(scope: VaultScope): void {
+  localStorage.removeItem(signerKey(scope));
+}
+
 /** Call before signing, so a swapped wallet fails naming the real cause. */
 export function assertDeviceSigner(scope: VaultScope, signer: string): void {
   const known = readDeviceSigner(scope);
