@@ -82,45 +82,33 @@ function bareAmount(raw: number, token: SupportedToken) {
 
 /* ── shared shells ───────────────────────────────────────────────────────── */
 
-/** Open section on the page ground. Public data gets no container. */
+/**
+ * A page section. `yours` boxes and tints it — the page's one rule, that
+ * exactly one section holds your own data and everything else is public, so
+ * the two cannot drift apart in separate components.
+ */
 function Section({
   title,
   subtitle,
+  yours,
   children,
 }: {
   title: string;
   subtitle?: string;
+  yours?: boolean;
   children: React.ReactNode;
 }) {
   return (
-    <section>
-      <h2 className="section-title m-0 text-xl">{title}</h2>
-      {subtitle && (
-        <p className="m-0 mt-1.5 max-w-[74ch] text-[13.5px] leading-relaxed text-gray">{subtitle}</p>
-      )}
-      <div className="mt-5">{children}</div>
-    </section>
-  );
-}
-
-/** The one boxed thing on the page, tinted because it is the one thing here
- *  that is yours. */
-function PrivatePanel({
-  title,
-  subtitle,
-  children,
-}: {
-  title: string;
-  subtitle?: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section className="rounded-[18px] border border-privacy/25 bg-muted/50 p-6 sm:p-7">
+    <section
+      className={yours ? "rounded-[18px] border border-privacy/25 bg-muted/50 p-6 sm:p-7" : ""}
+    >
       <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
         <h2 className="section-title m-0 text-xl">{title}</h2>
-        <span className="font-mono text-[11px] tracking-[0.08em] text-privacy">
-          IN YOUR BROWSER
-        </span>
+        {yours && (
+          <span className="font-mono text-[11px] tracking-[0.08em] text-privacy">
+            IN YOUR BROWSER
+          </span>
+        )}
       </div>
       {subtitle && (
         <p className="m-0 mt-1.5 max-w-[74ch] text-[13.5px] leading-relaxed text-gray">{subtitle}</p>
@@ -132,7 +120,7 @@ function PrivatePanel({
 
 /** One cell of a ruled strip. The strip's gap draws the dividers, so cells
  *  carry no borders of their own and re-flow at any column count. */
-function Metric({ label, value, hint }: { label: string; value: React.ReactNode; hint?: string }) {
+function Metric({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="min-w-0 bg-muted px-5 py-4">
       <div className="font-display text-[22px] font-semibold leading-tight tracking-tight tabular-nums break-words sm:text-[26px]">
@@ -219,19 +207,14 @@ function Distribution({
               </span>
             )}
             <div
-              className={`rounded-t transition-colors ${
+              className={`mx-auto w-full max-w-[120px] rounded-t transition-colors ${
                 b.count === 0
                   ? "bg-gray/15"
                   : i === marked
                     ? "bg-privacy"
                     : "bg-gray/30 group-hover:bg-gray/45"
               }`}
-              style={{
-                height: b.count === 0 ? "2px" : `${Math.max(4, (b.count / peak) * 100)}%`,
-                maxWidth: 120,
-                margin: "0 auto",
-                width: "100%",
-              }}
+              style={{ height: b.count === 0 ? "2px" : `${Math.max(4, (b.count / peak) * 100)}%` }}
             />
             <div className="pointer-events-none absolute bottom-full left-1/2 z-10 mb-1.5 hidden -translate-x-1/2 whitespace-nowrap rounded-md border border-gray/20 bg-background px-2 py-1 font-mono text-[12px] text-gray-light group-hover:block">
               {b.count} × {bareAmount(b.lo, token)} – {bareAmount(b.hi, token)}
@@ -618,6 +601,7 @@ function YourPosition({
   depositsKnown,
   timesKnown,
   vaultHref,
+  now,
 }: {
   token: SupportedToken;
   notes: InboxNote[];
@@ -626,17 +610,19 @@ function YourPosition({
   depositsKnown: boolean;
   timesKnown: boolean;
   vaultHref: string;
+  /** The page's clock, so note ages and the 7-day count tick together. */
+  now: number | null;
 }) {
   const { hasKeys, isLoading: keysLoading, error: keysError } = useUTXOpiaKeys();
   const loadViewOnlyKeys = useUTXOpiaStore((s) => s.loadViewOnlyKeys);
   // autoOpen off: this page is meant to be readable signed out, so the modal
   // opens only when the user asks for it.
   const auth = usePayFlowAuth(hasKeys, { autoOpen: false });
-  const now = useNow();
 
   if (!hasKeys) {
     return (
-      <PrivatePanel
+      <Section
+        yours
         title="Your position"
         subtitle={`Unlock to check how exposed your own ${token.symbol} is. Notes are decrypted on this device — which amount you hold is never sent anywhere, and every check below runs against the public deposit list locally.`}
       >
@@ -662,30 +648,31 @@ function YourPosition({
             },
           }}
         />
-      </PrivatePanel>
+      </Section>
     );
   }
 
   if (notesLoading || now == null) {
     return (
-      <PrivatePanel title="Your position">
+      <Section yours title="Your position">
         <div className="h-24 animate-pulse rounded-xl bg-gray/[0.06]" />
-      </PrivatePanel>
+      </Section>
     );
   }
 
   if (notes.length === 0) {
     return (
-      <PrivatePanel title="Your position" subtitle={`You hold no ${token.symbol} in this pool.`}>
+      <Section yours title="Your position" subtitle={`You hold no ${token.symbol} in this pool.`}>
         <Link href={vaultHref} prefetch={false} className="btn-privacy">
           Shield {token.symbol}
         </Link>
-      </PrivatePanel>
+      </Section>
     );
   }
 
   return (
-    <PrivatePanel
+    <Section
+      yours
       title="Your position"
       subtitle={
         depositsKnown
@@ -743,7 +730,7 @@ function YourPosition({
           </div>
         </dl>
       )}
-    </PrivatePanel>
+    </Section>
   );
 }
 
@@ -863,6 +850,7 @@ export default function PoolTokenPage() {
             depositsKnown={depositsKnown}
             timesKnown={timesKnown}
             vaultHref={chainHref("/vault")}
+            now={now}
           />
 
           <Section
