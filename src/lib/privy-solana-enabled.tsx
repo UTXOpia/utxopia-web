@@ -8,6 +8,7 @@ import {
   useCreateWallet,
   useSignMessage,
   useSignTransaction,
+  useStandardWallets,
   useWallets,
   type ConnectedStandardSolanaWallet,
 } from "@privy-io/react-auth/solana";
@@ -43,6 +44,9 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
   const { login } = useLogin();
   const { logout } = useLogout();
   const { ready: walletsReady, wallets } = useWallets();
+  // Every standard wallet, connected or not — useWallets lists only the
+  // connected ones, and on iOS the embedded wallet does not connect itself.
+  const { wallets: standardWallets } = useStandardWallets();
   const { createWallet } = useCreateWallet();
   const { signTransaction } = useSignTransaction();
   const { signMessage } = useSignMessage();
@@ -84,32 +88,66 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
     return walletsRef.current.wallets;
   }, []);
 
+  const standardRef = useRef(standardWallets);
+  useEffect(() => {
+    standardRef.current = standardWallets;
+  }, [standardWallets]);
+
+  /**
+   * The embedded wallet, connecting it first if that is what is missing.
+   *
+   * `useWallets` reports *connected* wallets. On desktop the embedded one
+   * connects itself and the distinction never shows; on iOS Safari it does not,
+   * so the list stays empty for an account that owns a wallet — indistinguishable
+   * from having none, which is what "Your wallet is still loading" was really
+   * reporting. The standard-wallet registry lists it either way, so connect it
+   * and wait for the connected list to catch up.
+   */
+  const embeddedWallet = useCallback(async (): Promise<ConnectedStandardSolanaWallet | null> => {
+    const alreadyConnected = findEmbeddedWallet(await settledWallets());
+    if (alreadyConnected) return alreadyConnected;
+
+    // By name only. Connecting whatever else happens to be registered would
+    // pop somebody's extension open for a wallet this account never used.
+    const standard = standardRef.current.find((w) => w.name === "Privy");
+    const connect = standard?.features["standard:connect"]?.connect;
+    if (!connect) return null;
+    await connect();
+
+    const deadline = Date.now() + 10_000;
+    for (;;) {
+      const connected = findEmbeddedWallet(walletsRef.current.wallets);
+      if (connected || Date.now() > deadline) return connected ?? null;
+      await new Promise((resolve) => setTimeout(resolve, 200));
+    }
+  }, [settledWallets]);
+
   const ensureWallet = useCallback(async () => {
     if (!authenticated) {
       login();
       return null;
     }
 
-    const currentWallet = findEmbeddedWallet(await settledWallets());
+    const currentWallet = await embeddedWallet();
     if (currentWallet?.address) return new PublicKey(currentWallet.address);
 
     try {
       const created = await createWallet({ createAdditional: false });
       return created.wallet.address ? new PublicKey(created.wallet.address) : null;
     } catch (cause) {
-      // Privy refuses a second embedded wallet. Reaching here means the list
-      // was still empty when the timeout ran out, not that anything is wrong —
-      // so wait for the one it says exists rather than surfacing its message.
+      // Privy refuses a second embedded wallet. Reaching here means this
+      // account owns one that never reached the connected list — try once more
+      // rather than surfacing a message about a wallet the member does have.
       if (!/already has an embedded wallet/i.test(String(cause))) throw cause;
-      const late = findEmbeddedWallet(await settledWallets(15_000));
+      const late = await embeddedWallet();
       if (late?.address) return new PublicKey(late.address);
       throw new Error("Your wallet is still loading. Try again in a moment.");
     }
-  }, [authenticated, createWallet, login, settledWallets]);
+  }, [authenticated, createWallet, embeddedWallet, login]);
 
   const signPrivyTransaction = useCallback(
     async (transaction: Transaction) => {
-      const signingWallet = findEmbeddedWallet(await settledWallets());
+      const signingWallet = await embeddedWallet();
       if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
 
       const { signedTransaction } = await signTransaction({
@@ -119,12 +157,12 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       });
       return Transaction.from(signedTransaction);
     },
-    [settledWallets, signTransaction, solanaChain],
+    [embeddedWallet, signTransaction, solanaChain],
   );
 
   const signPrivyMessage = useCallback(
     async (message: Uint8Array) => {
-      const signingWallet = findEmbeddedWallet(await settledWallets());
+      const signingWallet = await embeddedWallet();
       if (!signingWallet) throw new Error("Privy Solana wallet is not ready");
 
       const { signature } = await signMessage({ message, wallet: signingWallet });
@@ -144,7 +182,7 @@ function PrivySolanaBridge({ children }: { children: ReactNode }) {
       if (drift) console.error(drift);
       return signature;
     },
-    [settledWallets, signMessage],
+    [embeddedWallet, signMessage],
   );
 
   // Whatever the member would recognise. Privy links several account types and
