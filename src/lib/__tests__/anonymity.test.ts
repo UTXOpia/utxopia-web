@@ -6,7 +6,10 @@ import {
   buildHistogram,
   countDepositsAtLeast,
   countExactDeposits,
+  countDepositsSince,
   countSimilarDeposits,
+  buildDailyActivity,
+  DAY_MS,
   isDecadeEdge,
   RECENT_MS,
   VERY_RECENT_MS,
@@ -207,5 +210,52 @@ describe("crowdNote", () => {
 
   it("no note without an amount", () => {
     expect(crowdNote(deposits, 0, "USDC")).toBeNull();
+  });
+});
+
+describe("arrivals since a note", () => {
+  const t = (amount: number, blockTime: number) => ({ amount, blockTime });
+
+  it("counts only deposits strictly after the moment", () => {
+    const deposits = [t(1, 100), t(1, 200), t(1, 300)];
+    expect(countDepositsSince(deposits, 200_000)).toBe(1);
+  });
+
+  it("ignores deposits with no block time instead of dating them to 1970", () => {
+    expect(countDepositsSince([t(1, 0), t(1, 0)], 0)).toBe(0);
+  });
+
+  it("reports an unjoined note through assessNote", () => {
+    const created = 5_000_000;
+    const alone = assessNote(100, created, [t(100, created / 1000 - 60)], created + 1);
+    expect(alone.laterCount).toBe(0);
+    expect(alone.isUnjoined).toBe(true);
+
+    const joined = assessNote(100, created, [t(100, created / 1000 + 60)], created + 1);
+    expect(joined.laterCount).toBe(1);
+    expect(joined.isUnjoined).toBe(false);
+  });
+});
+
+describe("daily activity", () => {
+  const now = 1_000 * DAY_MS + 3_600_000; // mid-day on day 1000
+
+  it("returns one bucket per day, oldest first, ending today", () => {
+    const days = buildDailyActivity([], now, 14);
+    expect(days).toHaveLength(14);
+    expect(days[13].start).toBe(1_000 * DAY_MS);
+    expect(days[0].start).toBe(987 * DAY_MS);
+  });
+
+  it("bins deposits into their UTC day and drops ones outside the window", () => {
+    const deposits = [
+      { amount: 1, blockTime: (999 * DAY_MS) / 1000 },
+      { amount: 1, blockTime: (999 * DAY_MS + 7_200_000) / 1000 },
+      { amount: 1, blockTime: (900 * DAY_MS) / 1000 }, // older than the window
+      { amount: 1, blockTime: 0 }, // no block time
+    ];
+    const days = buildDailyActivity(deposits, now, 14);
+    expect(days[12].count).toBe(2);
+    expect(days.reduce((n, d) => n + d.count, 0)).toBe(2);
   });
 });

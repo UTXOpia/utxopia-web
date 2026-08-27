@@ -58,12 +58,28 @@ export function countDepositsAtLeast(deposits: DepositPoint[], amount: number): 
   return deposits.reduce((n, d) => (d.amount >= amount ? n + 1 : n), 0);
 }
 
+/**
+ * Deposits that landed strictly after `sinceMs` — the crowd that grew around a
+ * note while it sat still.
+ *
+ * Deposits with no block time are skipped: 0 would decode as 1970 and read as
+ * "before everything", which is the wrong answer in the unsafe direction.
+ */
+export function countDepositsSince(deposits: DepositPoint[], sinceMs: number): number {
+  return deposits.reduce(
+    (n, d) => (d.blockTime > 0 && d.blockTime * 1000 > sinceMs ? n + 1 : n),
+    0,
+  );
+}
+
 export interface NoteExposure {
   similarCount: number;
   exactCount: number;
   /** Deposits at least this size — the candidate sources in the simple case. */
   atLeastCount: number;
   ageMs: number;
+  /** Deposits that landed after this note was created — the timing crowd. */
+  laterCount: number;
   /** Exactly one deposit carries this amount — almost certainly this note's own. */
   isFingerprint: boolean;
   /**
@@ -77,6 +93,9 @@ export interface NoteExposure {
   /** At most one deposit is big enough to be the source, and it is probably
    *  this note's own — a stronger tell than a thin look-alike band. */
   isSoleSource: boolean;
+  /** Nothing has entered the pool since this note. A withdrawal now sits next
+   *  to its own deposit in the ledger with nothing in between. */
+  isUnjoined: boolean;
   isVeryRecent: boolean;
   isRecent: boolean;
 }
@@ -91,14 +110,17 @@ export function assessNote(
   const exactCount = countExactDeposits(deposits, amount);
   const atLeastCount = countDepositsAtLeast(deposits, amount);
   const ageMs = Math.max(0, nowMs - createdAtMs);
+  const laterCount = countDepositsSince(deposits, createdAtMs);
   return {
     similarCount,
     exactCount,
     atLeastCount,
     ageMs,
+    laterCount,
     isFingerprint: exactCount === 1,
     isThin: atLeastCount < THIN_CROWD,
     isSoleSource: atLeastCount === 1,
+    isUnjoined: laterCount === 0,
     isVeryRecent: ageMs < VERY_RECENT_MS,
     isRecent: ageMs < RECENT_MS,
   };
@@ -205,6 +227,40 @@ export function bucketIndexOf(buckets: HistogramBucket[], amount: number): numbe
     }
   }
   return -1;
+}
+
+export interface ActivityBucket {
+  /** Start of the day, unix ms, UTC. */
+  start: number;
+  count: number;
+}
+
+export const DAY_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Deposits per day over the trailing `days`, oldest bucket first.
+ *
+ * The size histogram answers "who else is my size"; this answers "how fast does
+ * the crowd grow", which is what turns "wait longer" from advice into a number.
+ * UTC days, not local: the bucket a deposit lands in should not depend on who
+ * is looking at the chart.
+ */
+export function buildDailyActivity(
+  deposits: DepositPoint[],
+  nowMs: number,
+  days = 14,
+): ActivityBucket[] {
+  const first = Math.floor(nowMs / DAY_MS) - days + 1;
+  const buckets: ActivityBucket[] = Array.from({ length: days }, (_, i) => ({
+    start: (first + i) * DAY_MS,
+    count: 0,
+  }));
+  for (const d of deposits) {
+    if (d.blockTime <= 0) continue;
+    const i = Math.floor((d.blockTime * 1000) / DAY_MS) - first;
+    if (i >= 0 && i < days) buckets[i].count += 1;
+  }
+  return buckets;
 }
 
 /**
