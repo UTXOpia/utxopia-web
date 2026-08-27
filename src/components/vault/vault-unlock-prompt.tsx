@@ -15,6 +15,7 @@
  */
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import { AlertCircle, Fingerprint, KeyRound, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePasskey } from "@/hooks/use-passkey";
@@ -117,9 +118,15 @@ export function VaultUnlockPrompt({
 
   return (
     <div className="flex flex-col items-center py-6">
-      <div className="mb-5 flex h-[72px] w-[72px] items-center justify-center rounded-full border border-privacy/20 bg-privacy/10">
-        <Icon className="h-8 w-8 text-privacy" aria-hidden />
-      </div>
+      {/* No ring around it: the mark draws its own, and two at this size reads
+          as a badge inside a badge. */}
+      <Image
+        src="/brand/logo-transparent-128.png"
+        alt=""
+        width={72}
+        height={72}
+        className="mb-5 object-contain"
+      />
       <h1 className="mb-1.5 text-[22px] font-bold text-foreground">Welcome back</h1>
       <p className="mb-6 max-w-[34ch] text-balance text-center text-caption text-gray-light/70">
         Your vault is on this device. Unlock it to see your balance — nothing left this browser.
