@@ -202,9 +202,22 @@ export function getTokenByFilter(filterId: TokenFilterId): SupportedToken | unde
   return EXPLORER_FILTER_TOKENS.find((t) => t.explorerFilter === filterId);
 }
 
-/** Look up token config by symbol */
+/**
+ * Look up token config by symbol or shielded symbol, case-insensitively.
+ *
+ * Case-insensitive because one symbol in the registry is mixed-case (zkBTC)
+ * and callers include a URL segment, which is lowercase. Matching on exact
+ * case made /pool/zkbtc a 404 while /pool/btc — the same pool — resolved.
+ *
+ * Order matters: BTC carries "zkBTC" as its shielded symbol and comes first,
+ * so a shielded symbol resolves to the underlying asset rather than to its
+ * own registry entry. That is what callers want — there is one pool per asset.
+ */
 export function getTokenBySymbol(symbol: string): SupportedToken | undefined {
-  return SUPPORTED_TOKENS.find((t) => t.symbol === symbol || t.shieldedSymbol === symbol);
+  const want = symbol.toLowerCase();
+  return SUPPORTED_TOKENS.find(
+    (t) => t.symbol.toLowerCase() === want || t.shieldedSymbol.toLowerCase() === want,
+  );
 }
 
 /**

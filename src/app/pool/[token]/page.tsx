@@ -754,7 +754,9 @@ const LEAKS: [string, string][] = [
 
 export default function PoolTokenPage() {
   const params = useParams<{ token: string }>();
-  const token = getTokenBySymbol((params?.token ?? "").toUpperCase());
+  // No case normalising: the lookup handles it, and upper-casing the slug is
+  // what hid zkBTC behind a 404.
+  const token = getTokenBySymbol(params?.token ?? "");
 
   const { networkId, vaultId } = useChainEnvironment();
   // Both pools, always: the picker's whole job is to compare crowds, and a
