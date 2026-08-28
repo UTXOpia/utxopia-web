@@ -48,6 +48,7 @@ import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview"
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
 import { BtcFaucetPrompt } from "@/components/shield-flow/btc-faucet-prompt";
+import { BtcSyncBanner } from "@/components/btc-sync-banner";
 import { SolTestFundsHelper, SplTestFundsHelper } from "@/components/shield-flow/test-funds-helper";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { isChainHybridNetwork } from "@/lib/chain-registry";
@@ -505,11 +506,10 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
 
     if (usesBtcFaucet) {
       return (
-        <BtcFaucetPrompt
-          networkId={networkId}
-          tokenSelector={tokenSelector}
-          className={className}
-        />
+        <div className={cn("space-y-5", className)}>
+          <BtcSyncBanner />
+          <BtcFaucetPrompt networkId={networkId} tokenSelector={tokenSelector} />
+        </div>
       );
     }
 
@@ -528,6 +528,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
     // Main BTC form — unified layout
     return (
       <div className={cn("space-y-5", className)}>
+        <BtcSyncBanner />
         {/* BTC Wallet bar */}
         <div className="flex items-center justify-between gap-2">
           {btcWallet.connected ? (
