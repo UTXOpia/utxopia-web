@@ -92,10 +92,13 @@ export function getEsploraApiUrl(network?: NetworkId): string {
   return getConfig().esploraUrl;
 }
 
-/** scure-btc-signer network — only knows "mainnet" | "testnet" */
-export function getBtcSignerNetwork(network?: NetworkId): "mainnet" | "testnet" {
+/** scure-btc-signer network. Regtest is distinct from testnet here: it shares
+ *  the version bytes but uses the "bcrt" hrp, and collapsing it made every
+ *  bcrt1 deposit address fail to decode in buildDepositPsbt. */
+export function getBtcSignerNetwork(network?: NetworkId): "mainnet" | "testnet" | "regtest" {
   const net = network ? getNetworkConfig(network).bitcoin.network : getConfig().bitcoinNetwork;
-  return net === "mainnet" ? "mainnet" : "testnet";
+  if (net === "mainnet") return "mainnet";
+  return net === "regtest" ? "regtest" : "testnet";
 }
 
 // =============================================================================

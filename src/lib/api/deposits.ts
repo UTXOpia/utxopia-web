@@ -47,6 +47,9 @@ export interface RegisterDepositRequest {
   note_public_key: string;
   amount_sats: number;
   ephemeral_pubkey?: string;
+  /** Absent means op_return — every client predating the tweak flow derived its
+   *  address that way, and guessing wrong makes the deposit uncreditable. */
+  deposit_scheme?: "op_return" | "tweak";
 }
 
 export interface RegisterDepositResponse {
@@ -174,7 +177,10 @@ export interface StealthDepositStatusUpdate {
  * @param taprootAddress - The Bitcoin taproot address
  * @param notePublicKeyHex - Deposit note public key from the OP_RETURN payload
  * @param amountSats - Expected amount in satoshis
- * @param ephemeralPubkeyHex - Deposit ephemeral public key from the OP_RETURN payload
+ * @param ephemeralPubkeyHex - Deposit ephemeral public key
+ * @param depositScheme - `"tweak"` for the OP_RETURN-free flow. It decides which
+ *   on-chain instruction can ever credit this deposit, and the two derive
+ *   different addresses, so it cannot be corrected later.
  */
 export async function registerDeposit(
   taprootAddress: string,
@@ -182,12 +188,14 @@ export async function registerDeposit(
   amountSats: number,
   ephemeralPubkeyHex?: string,
   network?: NetworkId,
+  depositScheme?: "op_return" | "tweak",
 ): Promise<RegisterDepositResponse> {
   const body: RegisterDepositRequest = {
     taproot_address: taprootAddress,
     note_public_key: notePublicKeyHex,
     amount_sats: amountSats,
     ephemeral_pubkey: ephemeralPubkeyHex,
+    ...(depositScheme ? { deposit_scheme: depositScheme } : {}),
   };
 
   const response = await fetch(withNetworkQuery("/api/deposits", network), {

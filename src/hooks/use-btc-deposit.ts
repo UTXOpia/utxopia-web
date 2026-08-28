@@ -10,6 +10,7 @@ import type { StealthMetaAddress } from "@utxopia/sdk";
 import { useBitcoinWalletStore, type WalletUtxo } from "@/stores/bitcoin-wallet-store";
 import { useNotesStore } from "@/stores/notes-store";
 import { registerDeposit } from "@/lib/api/deposits";
+import { prepareTweakDeposit, tweakDepositsEnabled } from "@/lib/tweak-deposit";
 import { getBtcSignerNetwork } from "@/lib/btc-network";
 import { notifyError } from "@/lib/notifications";
 import { BTC_DUST_LIMIT } from "@/lib/btc-constants";
@@ -24,7 +25,11 @@ export interface DepositPreview {
   depositAddress: string;
   depositAmountSats: number;
   opReturnHex: string;
-  opReturnPayload: Uint8Array;
+  /** Absent for the OP_RETURN-free flow, where the transaction is a plain payment. */
+  opReturnPayload?: Uint8Array;
+  npk: Uint8Array;
+  ephemeralPub: Uint8Array;
+  scheme: "op_return" | "tweak";
   cachedUtxos: WalletUtxo[];
 }
 
@@ -88,8 +93,18 @@ export function useBtcDeposit({
       const client = UTXOpiaClient.instance();
       const opReturnContext = depositOpReturnContextForNetworkConfig(networkConfig);
       const network = depositAddressNetworkForNetworkConfig(networkConfig);
+      // An OP_RETURN-free deposit binds the note keys through its address's
+      // tapleaf, so the transaction is a plain payment. Self-deposit only: the
+      // ephemeral key is indexed off this wallet's viewing key, and only that key
+      // can rebuild the leaf to recover the coins.
+      const tweak = tweakDepositsEnabled(networkConfig)
+        ? await prepareTweakDeposit(networkConfig, resolvedMeta)
+        : null;
+
       const [deposit, utxos] = await Promise.all([
-        client.prepareDeposit({ recipient: resolvedMeta, network, opReturnContext }),
+        tweak
+          ? Promise.resolve(tweak)
+          : client.prepareDeposit({ recipient: resolvedMeta, network, opReturnContext }),
         btcWallet.getPaymentUtxos(networkId),
       ]);
 
@@ -107,8 +122,11 @@ export function useBtcDeposit({
       setDepositPreview({
         depositAddress: deposit.btcAddress,
         depositAmountSats: amountSats,
-        opReturnHex: bytesToHex(deposit.opReturnPayload),
+        opReturnHex: deposit.opReturnPayload ? bytesToHex(deposit.opReturnPayload) : "",
         opReturnPayload: deposit.opReturnPayload,
+        npk: deposit.npk,
+        ephemeralPub: deposit.ephemeralPub,
+        scheme: tweak ? "tweak" : "op_return",
         cachedUtxos: utxos,
       });
     } catch (err) {
@@ -144,6 +162,30 @@ export function useBtcDeposit({
         network: getBtcSignerNetwork(networkId),
       });
 
+      // Register before broadcasting, not after. Nothing on chain identifies a
+      // tweak deposit, so the tracker's only way to find it is polling addresses
+      // it was told about — and coins at an unregistered address are coins nobody
+      // is watching, with no refund path yet. The OP_RETURN flow keeps its
+      // fire-and-forget registration: the tracker can rediscover those by scanning.
+      if (depositPreview.scheme === "tweak") {
+        try {
+          await registerDeposit(
+            depositPreview.depositAddress,
+            bytesToHex(depositPreview.npk),
+            depositPreview.depositAmountSats,
+            bytesToHex(depositPreview.ephemeralPub),
+            networkId,
+            "tweak",
+          );
+        } catch (e) {
+          onError(
+            `Not sending: the deposit could not be registered, and an unregistered ` +
+              `address is one nobody is watching. ${e instanceof Error ? e.message : String(e)}`,
+          );
+          return;
+        }
+      }
+
       const { txid } = await btcWallet.signAndBroadcastPsbt(psbtResult.psbtBase64, networkId);
 
       const opReturnHex = depositPreview.opReturnHex;
@@ -155,7 +197,15 @@ export function useBtcDeposit({
         expiresAt: Math.floor(Date.now() / 1000) + 86400 * 30,
       });
 
-      // Register with backend (fire-and-forget with retry)
+      // Register with backend (fire-and-forget with retry). Tweak deposits already
+      // registered above, before any coins moved.
+      if (depositPreview.scheme === "tweak") {
+        setWalletDepositResult({ txid, depositAddress: depositPreview.depositAddress, opReturnHex, noteId });
+        setDepositPreview(null);
+        btcWallet.refreshBalance(networkId);
+        onStatusChange("done");
+        return;
+      }
       const { ephemeralPubkeyHex, notePublicKeyHex } = parseDepositOpReturnHex(opReturnHex);
       (async () => {
         for (let attempt = 0; attempt < 3; attempt++) {

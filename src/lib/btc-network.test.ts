@@ -29,7 +29,7 @@ describe("btc-network URL helpers", () => {
   it("maps active app networks to the BTC signer network", () => {
     expect(getBtcSignerNetwork("mainnet")).toBe("mainnet");
     expect(getBtcSignerNetwork("devnet")).toBe("testnet");
-    expect(getBtcSignerNetwork("devnet-regtest")).toBe("testnet");
+    expect(getBtcSignerNetwork("devnet-regtest")).toBe("regtest");
   });
 
   it("decodes witness scripts with the selected Bitcoin network HRP", () => {

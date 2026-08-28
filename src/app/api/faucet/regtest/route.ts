@@ -51,6 +51,8 @@ import {
   createNonInteractiveDeposit,
   createDirectVaultDeposit,
   decodeStealthMetaAddress,
+  deriveDepositAddress,
+  depositTweakCommitment,
 } from "@utxopia/sdk";
 
 const exec = promisify(execFile);
@@ -183,6 +185,11 @@ const bootstrapState: { confirmed: boolean } = (() => {
 interface DepositBody {
   stealthAddress?: string;
   amountSats?: number;
+  /** Client-derived deposit address for the OP_RETURN-free flow, with the keys it
+   *  was derived from. See `tweakDepositFromBody` for why the client derives it. */
+  depositAddress?: string;
+  notePublicKey?: string;
+  ephemeralPubkey?: string;
 }
 
 interface FaucetNetworkConfig {
@@ -205,6 +212,7 @@ async function callBackendFaucet(
     amountSats: number;
     opReturn?: string;
     recipientKey?: string;
+    depositScheme?: "op_return" | "tweak";
   },
   config?: NetworkConfig | null,
 ): Promise<{ response: NextResponse; succeeded: boolean } | null> {
@@ -351,6 +359,129 @@ function getDeploymentBitcoinNetwork(): string | undefined {
     return getNetworkConfig(deploymentNetwork as NetworkId, { applyEnvOverrides: false }).bitcoin.network;
   } catch {
     return undefined;
+  }
+}
+
+type FaucetDeposit = {
+  btcAddress: string;
+  npk: Uint8Array;
+  ephemeralPub: Uint8Array;
+} & (
+  | { scheme: "op_return"; opReturnPayload: Uint8Array }
+  | { scheme: "tweak"; opReturnPayload?: undefined }
+);
+
+/**
+ * Opt in to the OP_RETURN-free deposit flow (`verify_deposit`, disc 25).
+ *
+ * A flag rather than a swap: a tweak deposit can only be credited by a program
+ * with disc 25 deployed, so a network still running the old one would strand
+ * every coin the faucet sent. Flip it per deployment, after the deploy.
+ */
+function tweakDepositsEnabled(): boolean {
+  return (process.env.FAUCET_DEPOSIT_SCHEME || "").trim() === "tweak";
+}
+
+/**
+ * Validate a client-derived tweak deposit address.
+ *
+ * This route CANNOT derive one itself. A recoverable deposit address indexes its
+ * ephemeral key off the recipient's viewing *private* key, and a stealth
+ * meta-address carries only `viewingPubKey`. Deriving one here would mean a random
+ * ephemeral key — and since the address commits to it through the tapleaf while
+ * the key path is a NUMS point, losing that key burns the coins outright. So the
+ * client derives (`UTXOpiaClient.prepareTweakDeposit`) and this route checks.
+ *
+ * The check needs no secret: recompute the address from the supplied public keys
+ * and refuse if it differs. That catches a broken client before coins move rather
+ * than after.
+ */
+function tweakDepositFromBody(
+  body: DepositBody,
+  cfg: NetworkConfig | FaucetNetworkConfig,
+): { deposit: FaucetDeposit } | { error: string } {
+  const { depositAddress, notePublicKey, ephemeralPubkey } = body;
+  if (!depositAddress || !notePublicKey || !ephemeralPubkey) {
+    return {
+      error:
+        "tweak deposits need depositAddress, notePublicKey and ephemeralPubkey — " +
+        "derive them client-side with prepareTweakDeposit",
+    };
+  }
+
+  const vaultKeyHex = cfg?.ika?.dwalletXOnlyPubkey;
+  if (!vaultKeyHex || /^0+$/.test(vaultKeyHex)) {
+    return { error: "network has no Ika dWallet key configured" };
+  }
+
+  let npk: Uint8Array;
+  let eph: Uint8Array;
+  try {
+    npk = hexToBytes(notePublicKey);
+    eph = hexToBytes(ephemeralPubkey);
+  } catch {
+    return { error: "notePublicKey and ephemeralPubkey must be hex" };
+  }
+  if (npk.length !== 32 || eph.length !== 32) {
+    return { error: "notePublicKey and ephemeralPubkey must be 32 bytes" };
+  }
+
+  const network = cfg?.bitcoin?.network === "regtest" ? "regtest" : "testnet";
+  let derived: string;
+  try {
+    derived = deriveDepositAddress(
+      depositTweakCommitment(npk, eph),
+      hexToBytes(vaultKeyHex),
+      network,
+    ).address;
+  } catch (e) {
+    return {
+      error: `could not derive deposit address: ${truncate(e instanceof Error ? e.message : String(e), 200)}`,
+    };
+  }
+
+  if (derived !== depositAddress) {
+    return { error: `depositAddress does not match its keys: those keys derive ${derived}` };
+  }
+
+  return {
+    deposit: { scheme: "tweak", btcAddress: depositAddress, npk, ephemeralPub: eph },
+  };
+}
+
+/**
+ * Register a tweak deposit with the tracker BEFORE any coins move.
+ *
+ * A deposit with no OP_RETURN is invisible to block scanning — the tracker's only
+ * way to find it is polling the addresses it was told about. Send first and a
+ * failed registration leaves coins at an address nobody is watching, with no
+ * refund path yet to get them back.
+ */
+async function registerTweakDeposit(
+  network: NetworkId,
+  deposit: FaucetDeposit,
+  amountSats: number,
+  cfg: NetworkConfig | FaucetNetworkConfig,
+): Promise<string | null> {
+  const backendUrl = faucetBackendUrl(network, cfg as NetworkConfig);
+  try {
+    const res = await fetch(`${backendUrl}/api/deposits`, {
+      method: "POST",
+      headers: applyBackendAuthHeaders({ "Content-Type": "application/json" }),
+      cache: "no-store",
+      body: JSON.stringify({
+        taproot_address: deposit.btcAddress,
+        note_public_key: hex(deposit.npk),
+        ephemeral_pubkey: hex(deposit.ephemeralPub),
+        amount_sats: amountSats,
+        deposit_scheme: "tweak",
+      }),
+    });
+    if (!res.ok) return `tracker rejected the registration (HTTP ${res.status})`;
+    const body = (await res.json()) as { deposit_id?: string };
+    return body.deposit_id ? null : "tracker accepted the registration without an id";
+  } catch (e) {
+    return `tracker unreachable: ${truncate(e instanceof Error ? e.message : String(e), 200)}`;
   }
 }
 
@@ -611,7 +742,12 @@ export async function GET(req: NextRequest): Promise<NextResponse> {
       if (vaultsSupported(network) && "solana" in config) {
         config = getVaultNetworkConfig(network, config as NetworkConfig, vaultId);
       }
-      const deposit = await createDepositForStealth(stealthAddress, config);
+      // The quota probe only needs a bucket key, and `recipientKey` is what the
+      // limiter actually binds to. Under the tweak flow there is no OP_RETURN to
+      // derive, and deriving one here would need the recipient's viewing key.
+      const deposit = tweakDepositsEnabled()
+        ? { btcAddress: "", opReturnPayload: new Uint8Array(0) }
+        : await createDepositForStealth(stealthAddress, config);
       quota = tighterQuota(
         quota,
         await backendQuota(
@@ -718,16 +854,45 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   let btcAddress: string;
   let opReturnHex: string;
+  let tweakDeposit: FaucetDeposit | null = null;
   let depositVout: number | undefined;
-  try {
-    const deposit = await createDepositForStealth(stealthAddress, activeConfig);
-    btcAddress = deposit.btcAddress;
-    opReturnHex = hex(deposit.opReturnPayload);
-  } catch (e) {
-    return NextResponse.json(
-      { ok: false, error: `invalid stealth address or deposit config: ${truncate(e instanceof Error ? e.message : String(e), 300)}` },
-      { status: 400 },
+  if (tweakDepositsEnabled()) {
+    const derived = tweakDepositFromBody(body, activeConfig);
+    if ("error" in derived) {
+      return NextResponse.json({ ok: false, error: derived.error }, { status: 400 });
+    }
+    tweakDeposit = derived.deposit;
+    btcAddress = tweakDeposit.btcAddress;
+    opReturnHex = "";
+  } else {
+    try {
+      const deposit = await createDepositForStealth(stealthAddress, activeConfig);
+      btcAddress = deposit.btcAddress;
+      opReturnHex = hex(deposit.opReturnPayload);
+    } catch (e) {
+      return NextResponse.json(
+        { ok: false, error: `invalid stealth address or deposit config: ${truncate(e instanceof Error ? e.message : String(e), 300)}` },
+        { status: 400 },
+      );
+    }
+  }
+
+  // Register before sending, never after. Nothing on chain identifies a tweak
+  // deposit, so an address the tracker was never told about is one nobody is
+  // watching.
+  if (tweakDeposit) {
+    const registrationError = await registerTweakDeposit(
+      activeNetwork,
+      tweakDeposit,
+      amountSats,
+      activeConfig,
     );
+    if (registrationError) {
+      return NextResponse.json(
+        { ok: false, error: `not sending: ${registrationError}` },
+        { status: 502 },
+      );
+    }
   }
 
   if (REMOTE_FAUCET_MODE === "backend") {
@@ -738,6 +903,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         amountSats,
         opReturn: opReturnHex,
         recipientKey: recipientQuotaKey(stealthAddress),
+        depositScheme: tweakDeposit ? "tweak" : "op_return",
       },
       activeConfig as NetworkConfig,
     );
@@ -764,14 +930,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     );
   }
 
-  // 1. Create and broadcast a UTXOpia deposit transaction: payment output to
-  // the pool/vault plus compact OP_RETURN metadata.
+  // 1. Create and broadcast the deposit transaction. A tweak deposit is nothing
+  // but a payment — exactly what an exchange withdrawal looks like — so it gets
+  // no data output at all.
   let txid: string;
   try {
-    const outputs = JSON.stringify([
-      { [btcAddress]: Number(satsToBtcDecimal(amountSats)) },
-      { data: opReturnHex },
-    ]);
+    const outputs = JSON.stringify(
+      tweakDeposit
+        ? [{ [btcAddress]: Number(satsToBtcDecimal(amountSats)) }]
+        : [
+            { [btcAddress]: Number(satsToBtcDecimal(amountSats)) },
+            { data: opReturnHex },
+          ],
+    );
     const inputs = FIXED_ADDRESS
       ? await pinnedInputs(Number(satsToBtcDecimal(amountSats)))
       : "[]";
@@ -846,7 +1017,9 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     mode: "vault_deposit",
     depositAddress: btcAddress,
     depositVout,
+    // Empty for a tweak deposit: there is no OP_RETURN to report.
     opReturn: opReturnHex,
+    depositScheme: tweakDeposit ? "tweak" : "op_return",
     amountSats,
     dailyLimit: DAILY_LIMIT,
     remaining: localQuota(quotaKeys).remaining,

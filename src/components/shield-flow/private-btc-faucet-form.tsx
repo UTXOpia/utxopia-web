@@ -7,6 +7,7 @@ import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { deriveTweakDepositForFaucet } from "@/lib/tweak-deposit";
 import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 import { cn } from "@/lib/utils";
 
@@ -52,7 +53,7 @@ function formatCooldown(seconds: number): string {
 }
 
 export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
-  const { vaultId } = useChainEnvironment();
+  const { vaultId, config: networkConfig } = useChainEnvironment();
   const [amountSats, setAmountSats] = useState(100_000);
   const [submitting, setSubmitting] = useState(false);
   const [result, setResult] = useState<DripResult | null>(null);
@@ -146,11 +147,16 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
     setResult(null);
 
     try {
+      // An OP_RETURN-free deposit address can only be derived here: it indexes its
+      // ephemeral key off the viewing PRIVATE key, which never leaves the client.
+      // The route re-derives from the public keys we send and refuses a mismatch.
+      const tweak = await deriveTweakDepositForFaucet(networkConfig, stealthAddress);
+
       const params = new URLSearchParams({ network, vault: vaultId });
       const response = await fetch(`/api/faucet/regtest?${params.toString()}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ stealthAddress, amountSats }),
+        body: JSON.stringify({ stealthAddress, amountSats, ...tweak }),
       });
       const text = await response.text();
       let body: FaucetResponse;
