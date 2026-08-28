@@ -11,7 +11,6 @@ import { useChainEnvironment } from "@/lib/chain-environment";
 interface BtcStatus {
   enabled: boolean;
   tip_height?: number;
-  finalized_height?: number;
   btc_tip?: number | null;
   blocks_behind?: number | null;
   synced?: boolean | null;
