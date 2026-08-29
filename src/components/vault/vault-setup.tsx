@@ -247,7 +247,7 @@ export function VaultSetup({
         <RecoveryStringCard
           value={recoveryString}
           onConfirmed={onDone}
-          confirmLabel="Open my vault"
+          confirmLabel="Open vault"
         />
       </div>
     );

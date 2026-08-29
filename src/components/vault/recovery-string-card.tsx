@@ -74,11 +74,23 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
       </div>
 
       {showQr ? (
-        <div className="flex flex-col items-center gap-2 rounded-[8px] border border-gray/15 bg-white px-3 py-4">
-          {/* On white regardless of theme: a QR inverted for dark mode is a QR
-              half the phone cameras in the world will not read. */}
-          <QRCodeSVG value={value} size={188} level="M" marginSize={2} />
-          <p className="text-center text-[11px] leading-relaxed text-black/60">
+        <div className="flex flex-col items-center gap-2 rounded-[8px] border border-gray/15 bg-black px-3 py-4">
+          {/* Inverted on request: light modules on black, so the code sits in the dark theme
+              instead of punching a white tile through it. The tradeoff is real and worth
+              knowing — the QR spec assumes dark-on-light, and decoders are not required to try
+              the inverse. iOS Camera does; Android decoders vary by vendor. Error correction is
+              raised from M to H to buy back margin, and the text below stays as the route that
+              always works. If a member ever reports the code not scanning, this is the first
+              thing to revert. */}
+          <QRCodeSVG
+            value={value}
+            size={188}
+            level="H"
+            marginSize={2}
+            bgColor="#000000"
+            fgColor="#ffffff"
+          />
+          <p className="text-center text-[11px] leading-relaxed text-white/60">
             Point your other phone&apos;s camera at this, then paste what it copies.
           </p>
         </div>
@@ -88,69 +100,84 @@ export function RecoveryStringCard({ value, onConfirmed, confirmLabel = "I saved
         </code>
       )}
 
-      <div className="flex flex-wrap items-center gap-2">
-        <SaveAction
-          onClick={() => {
-            copy(value);
-            notifyCopied("Recovery string");
-          }}
-          icon={copied ? <Check className="h-3.5 w-3.5 text-green-400" /> : <Copy className="h-3.5 w-3.5" />}
-          label={copied ? "Copied" : "Copy"}
-        />
-        <SaveAction
-          onClick={() => downloadRecoveryString(value)}
-          icon={<Download className="h-3.5 w-3.5" />}
-          label="File"
-        />
+      {/* Two groups, not four bands. Everything about GETTING the string out sits together;
+          everything about LEAVING sits together below it, with the space between them doing the
+          separating. Four evenly-spaced rows made every element look equally important, which is
+          most of why this read as crowded. */}
+      <div className="flex flex-col gap-2">
+        <div className="flex flex-wrap items-center gap-2">
+          <SaveAction
+            onClick={() => {
+              copy(value);
+              notifyCopied("Recovery string");
+            }}
+            icon={copied ? <Check className="h-4 w-4 text-green-400" /> : <Copy className="h-4 w-4" />}
+            label={copied ? "Copied" : "Copy recovery string"}
+          />
+          <SaveAction
+            onClick={() => downloadRecoveryString(value)}
+            icon={<Download className="h-4 w-4" />}
+            label="Download as a file"
+          />
+        </div>
 
-        {onConfirmed && (
+        {/* QR sat beside Copy as if it were a third way to save this, which it is
+            not — a photo of a screen is a worse password manager than a password
+            manager. It does one job, and naming that job is what keeps it out of
+            the way of the two that everybody needs. */}
+        <button
+          type="button"
+          onClick={() => setShowQr((shown) => !shown)}
+          className="flex items-center gap-1.5 self-start px-0.5 text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+        >
+          <QrCode className="h-3.5 w-3.5" aria-hidden />
+          {showQr ? "Show the text instead" : "Moving to another device? Show a QR code"}
+        </button>
+      </div>
+
+      {/* The gate now precedes what it gates. A disabled button above the checkbox that enables
+          it asks the reader to work backwards for the one thing they must not skim. */}
+      {onConfirmed && (
+        <div className="mt-1 flex flex-col gap-2.5">
+          <label className="flex cursor-pointer items-start gap-2 px-0.5 text-caption text-gray">
+            <input
+              type="checkbox"
+              checked={acknowledged}
+              onChange={(e) => setAcknowledged(e.target.checked)}
+              className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-privacy"
+            />
+            {/* There is no second half to keep apart any more, so the only thing
+                left to ask about is the two ways this actually goes wrong: saved
+                nowhere, or saved somewhere other people can read. */}
+            I have saved this somewhere I will still have it if I lose this device, and where nobody
+            else can read it.
+          </label>
+
           <button
             type="button"
             onClick={onConfirmed}
             disabled={!acknowledged}
             className={cn(
-              "inline-flex min-h-11 flex-1 items-center justify-center rounded-[9px] px-4",
+              "inline-flex min-h-11 w-full items-center justify-center rounded-[9px] px-4",
               "bg-foreground text-caption font-semibold text-background transition-colors cursor-pointer",
               "hover:bg-white disabled:cursor-not-allowed disabled:bg-gray/25 disabled:text-gray",
             )}
           >
             {confirmLabel}
           </button>
-        )}
-      </div>
-
-      {/* QR sat beside Copy as if it were a third way to save this, which it is
-          not — a photo of a screen is a worse password manager than a password
-          manager. It does one job, and naming that job is what keeps it out of
-          the way of the two that everybody needs. */}
-      <button
-        type="button"
-        onClick={() => setShowQr((shown) => !shown)}
-        className="flex items-center gap-1.5 self-start px-0.5 text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
-      >
-        <QrCode className="h-3.5 w-3.5" aria-hidden />
-        {showQr ? "Show the text instead" : "Moving to another device? Show a QR code"}
-      </button>
-
-      {onConfirmed && (
-        <label className="flex cursor-pointer items-start gap-2 px-0.5 text-caption text-gray">
-          <input
-            type="checkbox"
-            checked={acknowledged}
-            onChange={(e) => setAcknowledged(e.target.checked)}
-            className="mt-0.5 h-3.5 w-3.5 shrink-0 cursor-pointer accent-privacy"
-          />
-          {/* There is no second half to keep apart any more, so the only thing
-              left to ask about is the two ways this actually goes wrong: saved
-              nowhere, or saved somewhere other people can read. */}
-          I have saved this somewhere I will still have it if I lose this device, and where nobody
-          else can read it.
-        </label>
+        </div>
       )}
     </div>
   );
 }
 
+/**
+ * Icon-only, because three labelled controls in a row read as three decisions when they are
+ * really one — save this — offered two ways. The word is not deleted, it moves to the
+ * accessible name and the tooltip: `Copy` and `Download` are among the few icons with no
+ * plausible second reading, which is what makes dropping the visible text safe here and not
+ * in general.
+ */
 function SaveAction({
   onClick,
   icon,
@@ -164,14 +191,15 @@ function SaveAction({
     <button
       type="button"
       onClick={onClick}
+      aria-label={label}
+      title={label}
       className={cn(
-        "inline-flex min-h-11 items-center gap-1.5 rounded-[9px] px-3",
-        "border border-gray/20 bg-muted/40 text-caption text-foreground",
+        "inline-flex size-11 shrink-0 items-center justify-center rounded-[9px]",
+        "border border-gray/20 bg-muted/40 text-foreground",
         "hover:bg-muted/70 transition-colors cursor-pointer",
       )}
     >
       {icon}
-      {label}
     </button>
   );
 }
