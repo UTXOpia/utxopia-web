@@ -18,7 +18,7 @@ import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { hasDeviceEnvelope } from "@/lib/vault-identity";
+import { dropDeviceEnvelope, hasDeviceEnvelope } from "@/lib/vault-identity";
 import { getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
 import { newSalt } from "@/lib/vault-envelope";
 import { PinField } from "@/components/vault/pin-field";
@@ -119,7 +119,13 @@ export function VaultSetup({
     login: { keyMaterial: Uint8Array; salt: Uint8Array } | null,
     device?: Uint8Array,
   ): Promise<void> => {
-    if (!login || !privy.accountId) return;
+    if (!login || !privy.accountId) {
+      // The silent branch, and the expensive one: no PIN means no copy, which
+      // is indistinguishable on screen from a copy that saved. The member finds
+      // out on their next phone, with their funds on the other side of it.
+      setNotice("No PIN set, so nothing was saved for this login. A new device will need the recovery string below.");
+      return;
+    }
     // `sealLoginEnvelope` refuses to mint portable authority on a
     // passkey-armed device without the passkey answering. Here it just did,
     // moments ago, so hand that answer along rather than asking twice.
@@ -140,7 +146,17 @@ export function VaultSetup({
       setNotice(
         "We could not save your PIN backup. If this login already has one under a different PIN, delete it under PIN backup in Settings, then restore from the recovery string below to save a new one. Until then a new device will need that string.",
       );
+      return;
     }
+    // The published copy is now the only one, on a browser with no passkey to
+    // wrap a second under. Both would open on the same PIN and the same
+    // signature; only one of them counts the tries. Keeping the local one would
+    // leave the whole PIN gate decided by which copy an attacker reaches first.
+    //
+    // Strictly after a confirmed save, and never where a passkey holds this
+    // device's wrapping: publishing is best effort, and a member whose upload
+    // failed keeps exactly what they had.
+    if (!device) dropDeviceEnvelope(scope);
   };
 
   const handleCreate = () =>
@@ -220,12 +236,12 @@ export function VaultSetup({
       const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
       const { keyMaterial, signer } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
       const device = await deviceMaterial(authenticatePasskey);
-      await restoreFromLoginEnvelope(
-        envelope,
-        keyMaterial,
-        device ?? keyMaterial,
-        device ? undefined : envelope.kdf.salt,
-      );
+      // No `?? keyMaterial` fallback any more. A browser without PRF now keeps
+      // no wrapping at all and comes back through the blob store every time,
+      // which is the only path where a wrong PIN costs the attacker something.
+      // getRemoteEnvelope records that a copy exists, so the next visit knows
+      // to come back here rather than looking for a wrapping that is not there.
+      await restoreFromLoginEnvelope(envelope, keyMaterial, device);
       if (!device) privy.remember(signer);
       setPin("");
       onDone();
@@ -290,7 +306,12 @@ export function VaultSetup({
             <span className="block text-caption text-gray/60">I have a recovery string</span>
           </span>
         </button>
-        {privy.authenticated && (
+        {/* Not gated on being signed in. A member on a new phone has not logged
+            in yet, so gating this left them the two options that are both wrong
+            for them — start over, or produce the string they came here to
+            avoid. Signing in is a step on the next screen, not a price of
+            seeing that the door exists. */}
+        {privy.available && (
           <button
             type="button"
             onClick={() => setMode("unlock-login")}
@@ -398,7 +419,7 @@ export function VaultSetup({
             if (!busy && pin.trim()) void handleLoginUnlock();
           }}
         >
-          <PinField value={pin} onChange={setPin} disabled={busy} autoFocus />
+          <PinField value={pin} onChange={setPin} disabled={busy || !privy.authenticated} autoFocus />
 
           {notice && <Notice text={notice} />}
 
@@ -410,8 +431,9 @@ export function VaultSetup({
           )}
 
           <button
-            type="submit"
-            disabled={busy || !pin.trim()}
+            type={privy.authenticated ? "submit" : "button"}
+            onClick={privy.authenticated ? undefined : () => privy.login()}
+            disabled={busy || (privy.authenticated && !pin.trim())}
             className={cn(
               "flex min-h-11 items-center justify-center gap-2 rounded-[10px] px-4",
               "bg-foreground text-body2 font-semibold text-background transition-colors cursor-pointer",
@@ -419,7 +441,7 @@ export function VaultSetup({
             )}
           >
             {busy && <Loader2 className="h-4 w-4 animate-spin" aria-hidden />}
-            {busy ? "Unlocking…" : "Unlock vault"}
+            {!privy.authenticated ? "Sign in to continue" : busy ? "Unlocking…" : "Unlock vault"}
           </button>
         </form>
 
@@ -484,14 +506,14 @@ export function VaultSetup({
           value={pin}
           onChange={setPin}
           disabled={busy}
-          label="PIN (optional)"
+          label="PIN — opens this vault on a new device"
           // Permanence belongs on the screen where it is chosen, not on the one
           // where somebody goes looking for a control that is not there. It is
           // not enforced by a missing button — it falls out of the design: the
           // wrapping is sealed under this PIN and the row is released against a
           // proof of it, so replacing it takes the old one, and there is
           // deliberately nothing that lets a stolen session skip that.
-          hint="Choose carefully — there is no way to change it later. This is how you open the vault on a new device. We hold a locked copy and a check of this PIN, never the PIN itself and never the signature that opens the copy."
+          hint="Optional, and the only thing that makes a second device possible without your recovery string. Choose carefully — there is no way to change it later. This is how you open the vault on a new device. We hold a locked copy and a check of this PIN, never the PIN itself and never the signature that opens the copy."
         />
       )}
 

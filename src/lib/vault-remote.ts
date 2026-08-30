@@ -100,6 +100,39 @@ export function remoteCredentials(input: {
   return { id, proof: pinProof(id, input.pin) };
 }
 
+// ---------------------------------------------------------------------------
+// Did this device publish a copy?
+//
+// A device-local record of a write we already made, not a question asked of the
+// server. An exists endpoint keyed by the blob id alone would be the unmetered
+// oracle every verb's shared counter exists to prevent: the id is derivable by
+// anyone who can reach the member's account, so a stranger holding a stolen
+// session could ask whether they had found a real member without spending a
+// try. What the member actually needs answered — "will my new phone work?" —
+// was known here at write time and needs nobody asked.
+//
+// ponytail: local, so it cannot see a copy deleted from another device, and a
+// browser whose storage was cleared reports nothing rather than reporting no.
+// Both fail toward telling the member to keep their recovery string, which is
+// the safe direction. Revisit if members routinely hold two armed devices.
+// ---------------------------------------------------------------------------
+
+const SAVED_PREFIX = "utxo:blob-saved:v1:";
+
+function savedKey(scope: VaultScope): string {
+  return `${SAVED_PREFIX}${scope.networkId}:${scope.vaultId}`;
+}
+
+/** A member who forgets this device should stop being told a copy backs it. */
+export function clearRemoteBackupFlag(scope: VaultScope): void {
+  if (typeof window !== "undefined") localStorage.removeItem(savedKey(scope));
+}
+
+export function remoteBackupSaved(scope: VaultScope): boolean {
+  if (typeof window === "undefined") return false;
+  return localStorage.getItem(savedKey(scope)) === "1";
+}
+
 export class RemoteLockedError extends Error {
   constructor(until: number) {
     const hours = Math.max(1, Math.ceil((until * 1000 - Date.now()) / 3_600_000));
@@ -150,6 +183,7 @@ export async function putRemoteEnvelope(input: {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ id, proof, envelope: envelopeToHex(input.envelope) }),
     });
+    if (response.ok) localStorage.setItem(savedKey(input.scope), "1");
     return response.ok;
   } catch {
     return false;
@@ -169,6 +203,7 @@ export async function deleteRemoteEnvelope(input: {
   accountId: string;
 }): Promise<void> {
   await send(ENDPOINT, "DELETE", remoteCredentials(input));
+  localStorage.removeItem(savedKey(input.scope));
 }
 
 /** One place that turns a status code into the right thing to say. Every verb
@@ -200,5 +235,9 @@ export async function getRemoteEnvelope(input: {
   const response = await send(ENDPOINT, "POST", remoteCredentials(input));
   const body = (await response.json()) as { envelope?: string };
   if (!body.envelope) throw new RemoteMissingError();
+  // A release is proof of a copy, the same as a write is. Set here too, or a
+  // device armed by an unlock rather than by a publish would go on believing it
+  // has no backup — and go on keeping a local wrapping to make up for it.
+  localStorage.setItem(savedKey(input.scope), "1");
   return envelopeFromHex(body.envelope);
 }

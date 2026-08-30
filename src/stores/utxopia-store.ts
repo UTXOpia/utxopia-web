@@ -17,6 +17,7 @@ import {
   workingSeedFor,
   type VaultScope,
 } from "@/lib/vault-identity";
+import { clearRemoteBackupFlag } from "@/lib/vault-remote";
 import type { VaultEnvelope } from "@/lib/vault-envelope";
 import {
   UTXOpiaClient,
@@ -823,6 +824,11 @@ export const useUTXOpiaStore = create<UTXOpiaState>((set, get) => ({
   forgetVaultOnThisDevice: async () => {
     const { scope } = await envelopeContext();
     clearDeviceEnvelope(scope);
+    // Our copy is untouched and the member can still come back to it with their
+    // PIN. What has to go is this browser's belief that it is backed by one —
+    // it is the last thing standing between a forgotten device and the screen
+    // that offers to create a vault.
+    clearRemoteBackupFlag(scope);
     get().clearKeys();
   },
 

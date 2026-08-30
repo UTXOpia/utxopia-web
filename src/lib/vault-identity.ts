@@ -38,6 +38,31 @@ import {
 const DEVICE_ENVELOPE_PREFIX = "utxo:envelope:v1:";
 
 /**
+ * Ask the browser to stop treating this origin as cache.
+ *
+ * Script-writable storage is evictable by default, and Safari clears it after
+ * seven days without a visit. A member who does not open the app for a week
+ * comes back to a browser holding nothing — funds untouched on chain, and a
+ * screen offering to create a new vault. Persisted storage is the only opt-out
+ * there is, and Safari honours it least, which is why the published copy exists
+ * rather than this being the whole answer.
+ *
+ * Called when this browser first stores something worth keeping rather than on
+ * load: Firefox raises a permission prompt, and a prompt makes sense the moment
+ * a member has a vault to keep and reads as noise before that.
+ */
+let persistenceAsked = false;
+function requestPersistence(): void {
+  if (persistenceAsked || typeof navigator === "undefined" || !navigator.storage?.persist) return;
+  persistenceAsked = true;
+  // Fire and forget. A refusal changes nothing we would do differently, and the
+  // member has a published copy and a recovery string either way.
+  void navigator.storage.persisted().then((already) => {
+    if (!already) return navigator.storage.persist();
+  }).catch(() => {});
+}
+
+/**
  * FROZEN. Scope binding, in three places at once:
  *
  *   - HKDF info for the wrapping key, so one pool's wrapping cannot produce
@@ -117,7 +142,24 @@ export function readDeviceEnvelope(scope: VaultScope): VaultEnvelope | null {
 }
 
 export function writeDeviceEnvelope(scope: VaultScope, envelope: VaultEnvelope): void {
+  requestPersistence();
   localStorage.setItem(deviceKey(scope), envelopeToHex(envelope));
+}
+
+/**
+ * Drop the wrapping, keep the signer note.
+ *
+ * What a login-armed device does once its copy is published: the remote one is
+ * the same seed under the same key, and it is the only copy whose PIN attempts
+ * are counted. Keeping a second one here would leave twenty bits sitting in
+ * storage with no limiter in front of them — reachable by anyone who can drive
+ * this member's provider session, whatever the unlock screen chooses to offer.
+ *
+ * The note stays because it is still true: a login armed this browser, and the
+ * unlock screen still has to ask for a PIN rather than a passkey.
+ */
+export function dropDeviceEnvelope(scope: VaultScope): void {
+  localStorage.removeItem(deviceKey(scope));
 }
 
 export function clearDeviceEnvelope(scope: VaultScope): void {
@@ -162,6 +204,9 @@ export function readDeviceSigner(scope: VaultScope): string | null {
 }
 
 export function writeDeviceSigner(scope: VaultScope, signer: string): void {
+  // A login-armed browser keeps no wrapping, so this note and the saved-copy
+  // flag are the whole of what says a member has been here.
+  requestPersistence();
   localStorage.setItem(signerKey(scope), signer);
 }
 

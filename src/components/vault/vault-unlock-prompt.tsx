@@ -19,10 +19,11 @@ import Image from "next/image";
 import { AlertCircle, Fingerprint, KeyRound, Loader2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { usePasskey } from "@/hooks/use-passkey";
-import { useLoginArmed, usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
+import { LoginRequiredError, useLoginArmed, usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { NoDeviceEnvelopeError, hasDeviceEnvelope, readDeviceEnvelope } from "@/lib/vault-identity";
+import { getRemoteEnvelope, remoteBackupSaved } from "@/lib/vault-remote";
 import { PinField } from "@/components/vault/pin-field";
 
 export function useHasLocalVault(): boolean {
@@ -33,7 +34,11 @@ export function useHasLocalVault(): boolean {
   // localStorage is not readable during render on the server, and the answer
   // changes when a vault is created or forgotten in this tab.
   useEffect(() => {
-    setPresent(hasDeviceEnvelope({ networkId, vaultId }));
+    // A published copy counts as much as a local wrapping. Since a login-armed
+    // browser keeps no wrapping, the wrapping alone would send a returning
+    // member to "create a new vault" — the one screen whose options are both
+    // wrong for somebody whose funds are already on chain.
+    setPresent(hasDeviceEnvelope({ networkId, vaultId }) || remoteBackupSaved({ networkId, vaultId }));
   }, [networkId, vaultId, hasKeys]);
 
   return present;
@@ -55,6 +60,7 @@ export function VaultUnlockPrompt({
   const loginArmed = useLoginArmed();
   const unlockEnvelopeVault = useUTXOpiaStore((s) => s.unlockEnvelopeVault);
   const armThisDeviceWithPasskey = useUTXOpiaStore((s) => s.armThisDeviceWithPasskey);
+  const restoreFromLoginEnvelope = useUTXOpiaStore((s) => s.restoreFromLoginEnvelope);
   const [pin, setPin] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -84,12 +90,31 @@ export function VaultUnlockPrompt({
     setBusy(true);
     try {
       if (loginArmed) {
-        // The salt this browser's wrapping was written under is what the
-        // signature is bound to, so it has to be read before asking for one.
-        const envelope = readDeviceEnvelope({ networkId, vaultId });
-        if (!envelope) throw new NoDeviceEnvelopeError();
-        const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
-        await unlockEnvelopeVault(keyMaterial, "pin");
+        // Published copy first, and no falling back to a local one when it
+        // cannot be reached. The whole point of coming through the blob store
+        // is that a wrong PIN spends one of ten tries; a fallback that a
+        // dropped connection can trigger hands that back for free.
+        //
+        // The `saved` branch is also the migration: browsers armed before the
+        // local wrapping was dropped still hold one and keep using it, and move
+        // over the next time a copy is published or fetched.
+        const scope = { networkId, vaultId };
+        if (remoteBackupSaved(scope)) {
+          if (!privy.accountId) throw new LoginRequiredError();
+          // Fetch before signing: the salt the signature is bound to lives in
+          // the wrapping this returns, and the counted PIN check is passed here
+          // rather than against a tag nobody is counting.
+          const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
+          const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
+          await restoreFromLoginEnvelope(envelope, keyMaterial);
+        } else {
+          // The salt this browser's wrapping was written under is what the
+          // signature is bound to, so it has to be read before asking for one.
+          const envelope = readDeviceEnvelope(scope);
+          if (!envelope) throw new NoDeviceEnvelopeError();
+          const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
+          await unlockEnvelopeVault(keyMaterial, "pin");
+        }
         setPin("");
         await handOverToPasskey();
         onUnlocked?.();

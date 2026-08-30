@@ -18,6 +18,27 @@ import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { assertPin, buildUnlockMessage, deriveFromPin } from "@/lib/vault-envelope";
 import { assertDeviceSigner, readDeviceSigner, writeDeviceSigner } from "@/lib/vault-identity";
 
+/**
+ * The member closed the provider's prompt. Not an error about the vault, and
+ * the provider's own wording ("The user rejected the request") reads on this
+ * screen as if the member was the one rejected — beside a PIN field, which is
+ * the factor that was never asked about.
+ */
+export class SignatureDeclinedError extends Error {
+  constructor() {
+    super("You closed the signature prompt. Tap unlock to try again.");
+    this.name = "SignatureDeclinedError";
+  }
+}
+
+/** Every provider words this differently; none of them word it for a member. */
+function declined(caught: unknown): boolean {
+  const code = (caught as { code?: unknown })?.code;
+  if (code === 4001 || code === "ACTION_REJECTED") return true;
+  const message = caught instanceof Error ? caught.message : String(caught ?? "");
+  return /reject|denied|declin|cancel|dismiss|closed/i.test(message);
+}
+
 export class LoginRequiredError extends Error {
   constructor() {
     super("Sign in first, then unlock with your PIN.");
@@ -68,9 +89,15 @@ export function usePrivyVaultKey() {
       // wallet fails naming that, rather than as a PIN that no longer works.
       assertDeviceSigner({ networkId, vaultId }, signer);
 
+      // Mapped here rather than at either call site: both the setup flow and
+      // the unlock screen surface `caught.message` verbatim, so a provider
+      // string left unmapped reaches the member on whichever one they are on.
       const signature = await signMessage(
         new TextEncoder().encode(buildUnlockMessage(networkId, salt)),
-      );
+      ).catch((caught) => {
+        if (declined(caught)) throw new SignatureDeclinedError();
+        throw caught;
+      });
       return { keyMaterial: deriveFromPin(pin, signature), signer, signature };
     },
     [authenticated, ensureWallet, networkId, signMessage, vaultId],

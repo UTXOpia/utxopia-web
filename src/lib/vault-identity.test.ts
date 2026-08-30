@@ -12,6 +12,7 @@ import {
   buildRecoveryString,
   clearDeviceEnvelope,
   createVault,
+  dropDeviceEnvelope,
   hasDeviceEnvelope,
   assertDeviceSigner,
   readDeviceEnvelope,
@@ -400,5 +401,25 @@ describe("a wrong factor cannot open a different vault", () => {
     }).catch((caught: Error) => caught.message);
     expect(passkey).toContain("passkey");
     expect(passkey).toContain("recovery string");
+  });
+});
+
+/**
+ * The published copy replacing the local one rests entirely on this: the
+ * wrapping goes, the signer note stays. Clear both and the unlock screen offers
+ * a passkey this browser never had; clear neither and twenty bits of PIN sit in
+ * storage with nothing counting attempts against them.
+ */
+describe("dropDeviceEnvelope", () => {
+  it("takes the wrapping and leaves the note that says a login armed this browser", async () => {
+    freshBrowser();
+    await createVault({ scope: SCOPE, deviceKeyMaterial: device(1), metaAddressFor });
+    writeDeviceSigner(SCOPE, "signer-1");
+
+    dropDeviceEnvelope(SCOPE);
+
+    expect(hasDeviceEnvelope(SCOPE)).toBe(false);
+    expect(readDeviceSigner(SCOPE)).toBe("signer-1");
+    freshBrowser();
   });
 });

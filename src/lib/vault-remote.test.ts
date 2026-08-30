@@ -11,6 +11,7 @@
 import { describe, expect, it } from "bun:test";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@utxopia/sdk";
+import { remoteBackupSaved } from "@/lib/vault-remote";
 import { remoteCredentials } from "@/lib/vault-remote";
 import { deriveFromPin } from "@/lib/vault-envelope";
 
@@ -85,5 +86,22 @@ describe("vault-remote", () => {
 
   it("refuses to address a row with no account", () => {
     expect(() => remoteCredentials({ scope, pin: PIN, accountId: "" })).toThrow();
+  });
+});
+
+/**
+ * The saved-copy flag is per pool, for the same reason the row is: a member
+ * with a backup for Open and none for Verified must not be told the second
+ * phone will work. Scope lives in `savedKey`, and nothing else would fail if it
+ * stopped.
+ */
+describe("remoteBackupSaved", () => {
+  it("does not answer for a pool it was never set on", () => {
+    localStorage.clear();
+    localStorage.setItem("utxo:blob-saved:v1:devnet:open", "1");
+    expect(remoteBackupSaved({ networkId: "devnet", vaultId: "open" })).toBe(true);
+    expect(remoteBackupSaved({ networkId: "devnet", vaultId: "verified" })).toBe(false);
+    expect(remoteBackupSaved({ networkId: "mainnet", vaultId: "open" })).toBe(false);
+    localStorage.clear();
   });
 });
