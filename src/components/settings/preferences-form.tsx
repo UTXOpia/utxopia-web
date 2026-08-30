@@ -96,7 +96,7 @@ export function PreferencesForm() {
  * optional one-line hint, then its children as a flat hairline-separated
  * list. Children should be Row primitives, not cards.
  */
-function Section({
+export function Section({
   label,
   hint,
   hintNode,
@@ -122,6 +122,91 @@ function Section({
         {children}
       </div>
     </section>
+  );
+}
+
+/**
+ * Action row — the same shape as ToggleRow/SnsNameRow, with a button where the
+ * control goes. The account sections used to draw filled cards instead, which
+ * on one screen meant three visual languages and two shades of red saying
+ * different things. Explanations belong in the tip, not in the row.
+ */
+export function SettingsRow({
+  title,
+  tip,
+  value,
+  action,
+  disabled,
+}: {
+  title: string;
+  tip?: React.ReactNode;
+  /** Shown before the action — an account label, a name, a status. */
+  value?: React.ReactNode;
+  action?: React.ReactNode;
+  disabled?: boolean;
+}) {
+  return (
+    <div className={cn("py-4 px-1", disabled && "opacity-60")}>
+      <div className="flex items-center justify-between gap-4">
+        <div className="flex min-w-0 flex-wrap items-center gap-2">
+          <span className="text-sm font-medium text-foreground">{title}</span>
+          {tip && <InfoTip label={`About ${title}`}>{tip}</InfoTip>}
+        </div>
+        <div className="flex min-w-0 items-center gap-2">
+          {value}
+          {action}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * The row's control. Danger is carried by the label alone — a red fill next to
+ * a red-bordered error box makes the destructive action the quietest red on
+ * screen, which is backwards.
+ */
+export function RowButton({
+  children,
+  onClick,
+  disabled,
+  busy,
+  danger,
+}: {
+  children: React.ReactNode;
+  onClick: () => void;
+  disabled?: boolean;
+  busy?: boolean;
+  danger?: boolean;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      disabled={disabled || busy}
+      className={cn(
+        "shrink-0 inline-flex items-center gap-1.5 rounded-md px-3 py-1.5",
+        "text-[11px] font-medium transition-all",
+        disabled || busy
+          ? "bg-muted/40 text-gray cursor-not-allowed"
+          : danger
+            ? "bg-muted/40 text-red-400/90 hover:bg-red-500/10 hover:text-red-400 cursor-pointer"
+            : "bg-muted/40 text-gray-light hover:bg-muted/60 hover:text-foreground cursor-pointer",
+      )}
+    >
+      {busy && <Loader2 className="h-3 w-3 animate-spin" aria-hidden />}
+      {children}
+    </button>
+  );
+}
+
+/** One quiet line under a row. Not a box: a cancelled passkey prompt and a
+ *  failed delete are not the same event, and neither is a page-wide alarm. */
+export function RowNote({ children, tone = "muted" }: { children: React.ReactNode; tone?: "muted" | "error" }) {
+  return (
+    <p className={cn("px-1 pb-3 text-[11px] leading-relaxed", tone === "error" ? "text-red-400/90" : "text-gray/60")}>
+      {children}
+    </p>
   );
 }
 

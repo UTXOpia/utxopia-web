@@ -14,10 +14,9 @@
  */
 
 import { useState } from "react";
-import { LogOut, Loader2 } from "lucide-react";
-import { cn } from "@/lib/utils";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { RowButton, Section, SettingsRow } from "@/components/settings/preferences-form";
 
 export function LoginSection() {
   const privy = usePrivySolanaAuthority();
@@ -39,43 +38,28 @@ export function LoginSection() {
   };
 
   return (
-    <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-[11px] font-medium uppercase tracking-wider text-gray/50">Login</h2>
-
-      <div className="flex flex-col gap-3 rounded-[12px] border border-gray/15 bg-muted/25 p-4">
-        <div className="flex items-center justify-between gap-3">
-          <div className="min-w-0">
-            <p className="text-caption text-gray">Signed in as</p>
-            <p className="truncate font-mono text-body2 text-foreground">
-              {privy.accountLabel ?? "your account"}
-            </p>
-          </div>
-          <button
-            type="button"
-            onClick={() => void signOut()}
-            disabled={busy}
-            className={cn(
-              "flex shrink-0 items-center gap-1.5 rounded-[10px] border border-gray/20 px-3 py-2",
-              "text-caption font-semibold text-foreground transition-colors",
-              "hover:border-gray/40 disabled:cursor-not-allowed disabled:opacity-60",
-            )}
-          >
-            {busy ? (
-              <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden />
-            ) : (
-              <LogOut className="h-3.5 w-3.5" aria-hidden />
-            )}
+    <Section label="Login">
+      <SettingsRow
+        title="Signed in as"
+        tip={
+          <>
+            Signing out does not forget your vault — the wrapping stays on this device, and this
+            same account plus your PIN reopens it. A different account will not: the wrapping is
+            bound to the login that made it. To remove the vault from this browser, use{" "}
+            <span className="text-gray-light">This vault on this device</span> under Recovery.
+          </>
+        }
+        value={
+          <span className="truncate font-mono text-[12px] text-privacy">
+            {privy.accountLabel ?? "your account"}
+          </span>
+        }
+        action={
+          <RowButton onClick={() => void signOut()} busy={busy}>
             Sign out
-          </button>
-        </div>
-
-        <p className="text-caption leading-relaxed text-gray">
-          This does not forget your vault — the wrapping stays on this device, and this same
-          account plus your PIN reopens it. A different account will not: the wrapping is bound to
-          the login that made it. To remove the vault from this browser, use{" "}
-          <span className="text-gray-light">Forget this vault</span> under Recovery.
-        </p>
-      </div>
-    </section>
+          </RowButton>
+        }
+      />
+    </Section>
   );
 }

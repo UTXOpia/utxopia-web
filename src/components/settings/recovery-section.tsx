@@ -10,15 +10,16 @@
  *
  * Issuing is the real safety net in this design: as long as one device still
  * opens, a lost string is an inconvenience rather than a loss. It has to stay
- * findable.
+ * findable — which is why it is a row in the same list as everything else and
+ * not a card shouting beside them.
  */
 
 import { useState } from "react";
-import { AlertCircle, ShieldAlert } from "lucide-react";
-import { cn } from "@/lib/utils";
+import { ShieldAlert } from "lucide-react";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
+import { RowButton, RowNote, Section, SettingsRow } from "@/components/settings/preferences-form";
 
 export function RecoverySection() {
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
@@ -28,7 +29,7 @@ export function RecoverySection() {
   const { authenticate } = usePasskey();
 
   const [result, setResult] = useState("");
-  const [busy, setBusy] = useState(false);
+  const [busy, setBusy] = useState<"issue" | "forget" | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   if (!hasKeys) return null;
@@ -38,24 +39,18 @@ export function RecoverySection() {
   // that cannot work.
   if (!hasSeed) {
     return (
-      <section className="flex flex-col gap-2">
-        <h2 className="px-1 text-[11px] font-medium uppercase tracking-wider text-gray/50">Recovery</h2>
-        <p className="rounded-[12px] border border-gray/15 bg-muted/25 p-4 text-caption leading-relaxed text-gray">
+      <Section label="Recovery">
+        <RowNote>
           This vault was unlocked with a passkey or wallet signature, so it has no recovery string.
           Sign in with a recovery-string vault to manage one.
-        </p>
-      </section>
+        </RowNote>
+      </Section>
     );
   }
 
-  const reset = () => {
-    setResult("");
-    setError(null);
-  };
-
   const run = async () => {
     setError(null);
-    setBusy(true);
+    setBusy("issue");
     try {
       // A recovery string is portable, permanent spend authority. Minting one
       // straight off an unlocked tab would turn a few seconds of physical
@@ -69,97 +64,69 @@ export function RecoverySection() {
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not build a recovery string.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
   const forget = async () => {
     setError(null);
-    setBusy(true);
+    setBusy("forget");
     try {
       await forgetVaultOnThisDevice();
-      reset();
+      setResult("");
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Could not forget this vault.");
     } finally {
-      setBusy(false);
+      setBusy(null);
     }
   };
 
-  return (
-    <section className="flex flex-col gap-2">
-      <h2 className="px-1 text-[11px] font-medium uppercase tracking-wider text-gray/50">Recovery</h2>
-
-      {result ? (
-        <div className="flex flex-col gap-3">
+  if (result) {
+    return (
+      <Section label="Recovery">
+        <div className="flex flex-col gap-3 py-4">
           <RecoveryStringCard value={result} />
-          <div className="flex items-start gap-2 rounded-[10px] border border-warning/25 bg-warning/5 p-3">
-            <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-warning" aria-hidden />
-            <p className="text-caption leading-relaxed text-gray">
-              <span className="font-semibold text-foreground">Every string you have issued still
-              works.</span>{" "}
-              Each carries its own key and a string already written down cannot be revoked. If you
-              think an old one leaked, move your funds to a new vault — nothing else retires it.
+          <div className="flex items-start gap-2 px-1">
+            <ShieldAlert className="mt-0.5 h-3.5 w-3.5 shrink-0 text-warning" aria-hidden />
+            <p className="text-[11px] leading-relaxed text-gray/70">
+              <span className="text-gray-light">Every string you have issued still works.</span>{" "}
+              Each carries its own key and one already written down cannot be revoked. If you think
+              an old one leaked, move your funds to a new vault — nothing else retires it.
             </p>
           </div>
           <button
             type="button"
-            onClick={reset}
-            className="self-start text-caption text-gray/50 hover:text-foreground transition-colors cursor-pointer"
+            onClick={() => setResult("")}
+            className="self-start px-1 text-[11px] text-gray/50 hover:text-foreground transition-colors cursor-pointer"
           >
             Done
           </button>
         </div>
-      ) : (
-        <div className="flex flex-col gap-2">
-          {error && (
-            <div className="flex items-start gap-2 rounded-[10px] border border-red-500/20 bg-red-500/10 p-2.5">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-400" aria-hidden />
-              <span className="text-caption text-red-400">{error}</span>
-            </div>
-          )}
-          <SettingsAction
-            title={busy ? "Working…" : "Issue a recovery string"}
-            detail="A fresh one, with its own key. Keep it somewhere only you can read."
-            onClick={() => void run()}
-          />
-          <SettingsAction
-            title="Forget this vault on this device"
-            detail="Your recovery string becomes the only way back in, here and anywhere."
-            onClick={forget}
-            danger
-          />
-        </div>
-      )}
-    </section>
-  );
-}
+      </Section>
+    );
+  }
 
-export function SettingsAction({
-  title,
-  detail,
-  onClick,
-  danger,
-}: {
-  title: string;
-  detail: string;
-  onClick: () => void;
-  danger?: boolean;
-}) {
   return (
-    <button
-      type="button"
-      onClick={onClick}
-      className={cn(
-        "flex min-h-[52px] flex-col justify-center rounded-[12px] border px-4 py-2.5",
-        "transition-colors cursor-pointer text-left",
-        danger
-          ? "border-red-500/20 bg-red-500/5 hover:bg-red-500/10"
-          : "border-gray/15 bg-muted/25 hover:bg-muted/50",
-      )}
-    >
-      <span className={cn("text-body2-semibold", danger ? "text-red-400" : "text-foreground")}>{title}</span>
-      <span className="text-caption text-gray/60">{detail}</span>
-    </button>
+    <Section label="Recovery">
+      <SettingsRow
+        title="Recovery string"
+        tip="A fresh string, with its own key — the way back into this vault from any device. Keep it somewhere only you can read. Issuing one does not retire the ones you already have."
+        action={
+          <RowButton onClick={() => void run()} busy={busy === "issue"} disabled={busy !== null}>
+            Issue
+          </RowButton>
+        }
+      />
+      <SettingsRow
+        title="This vault on this device"
+        tip="Removes the wrapping this browser holds. Your funds are untouched, but your recovery string becomes the only way back in — here and anywhere."
+        action={
+          <RowButton onClick={() => void forget()} busy={busy === "forget"} disabled={busy !== null} danger>
+            Forget
+          </RowButton>
+        }
+      />
+      {error && <RowNote tone="error">{error}</RowNote>}
+    </Section>
   );
 }
