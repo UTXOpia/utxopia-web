@@ -42,3 +42,18 @@ export function activeStepIndex(status: SubmitStatus): number {
   const i = REVIEW_STEPS.findIndex((s) => s.keys.includes(status));
   return i === -1 ? 0 : i;
 }
+
+/**
+ * What the page-level error becomes when the review modal closes.
+ *
+ * Dismissing the modal is not an acknowledgement: Escape and an overlay click
+ * both route through the same close handler, and clearing the failure there
+ * left the member with an empty form and no reason given — the decoded program
+ * error survived only in the console.
+ */
+export function errorAfterClose(
+  status: SubmitStatus,
+  submitError: string | null | undefined,
+): string | null {
+  return status === "error" ? (submitError ?? "The payment could not be completed.") : null;
+}

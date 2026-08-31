@@ -14,6 +14,7 @@ import { SolanaAddressField } from "@/components/ui/solana-address-field";
 import { TokenSourcePicker } from "./token-source-picker";
 import { AmountField } from "./amount-field";
 import { FeeSummary } from "./fee-summary";
+import { errorAfterClose } from "@/components/send/review-modal-view";
 import { ReviewModal } from "./review-modal";
 import { ClaimLinkModal, type ClaimLinkResult } from "./claim-link-modal";
 import { useUTXOpia } from "@/hooks/use-utxopia";
@@ -758,8 +759,12 @@ export function SendForm({
   const closeReview = useCallback(() => {
     if (isSubmittingInFlight) return;
     if (submitter.status === "success") dispatch({ type: "reset" });
+    // A failure has to outlive the modal. Dismissing it — Escape, a click on the
+    // overlay — is not an acknowledgement, and resetting the hook here used to be
+    // the only record the member had: the form came back empty with no reason
+    // given, and the decoded program error survived only in the console.
+    setError(errorAfterClose(submitter.status, submitter.error));
     submitter.reset();
-    setError(null);
     dispatch({ type: "close_review" });
   }, [isSubmittingInFlight, submitter]);
 
@@ -999,7 +1004,14 @@ export function SendForm({
         />
       )}
 
-      {error && <div className="text-xs text-red-500">{error}</div>}
+      {error && (
+        <div
+          role="alert"
+          className="rounded-lg border border-red-500/35 bg-red-500/10 px-3 py-2.5 text-sm leading-relaxed text-red-400"
+        >
+          {error}
+        </div>
+      )}
 
       {(recipientValid || mode === "cashout") && !relayerReady && (
         <div className="text-xs text-amber-600">

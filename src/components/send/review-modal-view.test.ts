@@ -1,5 +1,5 @@
 import { describe, expect, it } from "bun:test";
-import { activeStepIndex, selectReviewView } from "./review-modal-view";
+import { activeStepIndex, selectReviewView, errorAfterClose } from "./review-modal-view";
 
 describe("selectReviewView", () => {
   it("shows the confirm view before submission", () => {
@@ -46,5 +46,23 @@ describe("activeStepIndex", () => {
     expect(activeStepIndex("preparing")).toBe(0);
     expect(activeStepIndex("processing")).toBe(1);
     expect(activeStepIndex("submitting")).toBe(2);
+  });
+});
+
+describe("errorAfterClose", () => {
+  it("keeps a failure visible after the modal is dismissed", () => {
+    expect(errorAfterClose("error", "One of the notes this spends has already been spent."))
+      .toBe("One of the notes this spends has already been spent.");
+  });
+
+  it("falls back to a reason rather than closing silently", () => {
+    expect(errorAfterClose("error", null)).toBe("The payment could not be completed.");
+    expect(errorAfterClose("error", undefined)).toBe("The payment could not be completed.");
+  });
+
+  it("clears on every non-error close", () => {
+    for (const s of ["idle", "preparing", "processing", "submitting", "success"] as const) {
+      expect(errorAfterClose(s, "stale")).toBeNull();
+    }
   });
 });
