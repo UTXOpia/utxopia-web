@@ -16,9 +16,9 @@ const hex = (b: Uint8Array) =>
 /**
  * Derive an OP_RETURN-free deposit address for this wallet.
  *
- * Returns `{}` when the network has no Ika dWallet key configured, which leaves
- * the caller on the OP_RETURN path — the route decides which flow it is running,
- * and sending these fields when it is not expecting them is harmless.
+ * Throws when the network has no Ika dWallet key: the faucet has no other flow
+ * to fall back to, and the route would reject the request anyway with a message
+ * about missing fields rather than the actual cause.
  *
  * The index is claimed from persistent storage and never reused. Reusing one
  * re-derives the same address: safe on chain, but it links the two deposits for
@@ -27,9 +27,11 @@ const hex = (b: Uint8Array) =>
 export async function deriveTweakDepositForFaucet(
   config: NetworkConfig,
   identity: string,
-): Promise<TweakDepositRequest | Record<string, never>> {
+): Promise<TweakDepositRequest> {
   const vaultKeyHex = config?.ika?.dwalletXOnlyPubkey;
-  if (!vaultKeyHex || /^0+$/.test(vaultKeyHex)) return {};
+  if (!vaultKeyHex || /^0+$/.test(vaultKeyHex)) {
+    throw new Error("this network has no Ika dWallet key configured — no deposit address can be derived");
+  }
 
   const network =
     config?.bitcoin?.network === "regtest"

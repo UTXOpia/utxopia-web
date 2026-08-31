@@ -27,7 +27,6 @@ interface FaucetResponse {
   blocksMined?: number;
   warning?: string;
   depositAddress?: string;
-  opReturn?: string;
   amountSats?: number;
   dailyLimit?: number;
   remaining?: number;
@@ -191,7 +190,6 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
           stealthAddress,
           amountSats: body.amountSats ?? amountSats,
           txid: body.txid ?? "",
-          opReturn: body.opReturn,
           depositAddress: body.depositAddress,
           blocksMined: body.blocksMined,
         });
