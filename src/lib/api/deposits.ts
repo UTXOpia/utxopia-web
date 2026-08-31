@@ -17,11 +17,14 @@ const getTrackerWsUrl = (network?: NetworkId) => {
   return base.replace("http://", "ws://").replace("https://", "wss://");
 };
 
-function withNetworkQuery(path: string, network?: NetworkId): string {
-  if (!network) return path;
+function withNetworkQuery(path: string, network?: NetworkId, vault?: string): string {
+  if (!network && !vault) return path;
   const [base, search = ""] = path.split("?");
   const params = new URLSearchParams(search);
-  params.set("network", network);
+  if (network) params.set("network", network);
+  // Without it the proxy answers for Open, so a Verified deposit is registered
+  // with the wrong tracker and never credited.
+  if (vault) params.set("vault", vault);
   return `${base}?${params.toString()}`;
 }
 
@@ -181,6 +184,8 @@ export interface StealthDepositStatusUpdate {
  * @param depositScheme - `"tweak"` for the OP_RETURN-free flow. It decides which
  *   on-chain instruction can ever credit this deposit, and the two derive
  *   different addresses, so it cannot be corrected later.
+ * @param vault - Destination vault. Omitting it registers with Open's tracker
+ *   whatever the deposit was derived for.
  */
 export async function registerDeposit(
   taprootAddress: string,
@@ -189,6 +194,7 @@ export async function registerDeposit(
   ephemeralPubkeyHex?: string,
   network?: NetworkId,
   depositScheme?: "op_return" | "tweak",
+  vault?: string,
 ): Promise<RegisterDepositResponse> {
   const body: RegisterDepositRequest = {
     taproot_address: taprootAddress,
@@ -198,7 +204,7 @@ export async function registerDeposit(
     ...(depositScheme ? { deposit_scheme: depositScheme } : {}),
   };
 
-  const response = await fetch(withNetworkQuery("/api/deposits", network), {
+  const response = await fetch(withNetworkQuery("/api/deposits", network, vault), {
     method: "POST",
     headers: {
       "Content-Type": "application/json",

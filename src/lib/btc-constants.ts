@@ -6,6 +6,10 @@ export const BTC_DUST_LIMIT = 546;
 /** Estimated miner fee for sweep/withdrawal transactions (satoshis) */
 export const BTC_MINER_FEE_ESTIMATE = 1000;
 
+/** Below this the tracker ignores a direct-vault deposit — the backend's
+ *  UTXOPIA_MIN_DEPOSIT_SATS, whose default this mirrors. */
+export const MIN_DEPOSIT_SATS = 5_000;
+
 /** Default deposit amount for BTC deposit flow (satoshis) */
 export const DEFAULT_DEPOSIT_SATS = 10_000;
 

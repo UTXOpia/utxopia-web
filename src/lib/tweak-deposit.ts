@@ -1,4 +1,4 @@
-import { UTXOpiaClient } from "@utxopia/sdk";
+import { UTXOpiaClient, decodeStealthMetaAddress } from "@utxopia/sdk";
 import type { StealthMetaAddress } from "@utxopia/sdk";
 import type { NetworkConfig } from "@/lib/network-config";
 import { useDepositIndexStore } from "@/stores/deposit-index-store";
@@ -26,7 +26,7 @@ const hex = (b: Uint8Array) =>
  */
 export async function deriveTweakDepositForFaucet(
   config: NetworkConfig,
-  identity: string,
+  stealthAddress: string,
 ): Promise<TweakDepositRequest> {
   const vaultKeyHex = config?.ika?.dwalletXOnlyPubkey;
   if (!vaultKeyHex || /^0+$/.test(vaultKeyHex)) {
@@ -40,7 +40,7 @@ export async function deriveTweakDepositForFaucet(
         ? "mainnet"
         : "testnet";
 
-  const depositIndex = useDepositIndexStore.getState().claim(identity);
+  const depositIndex = claimDepositIndex(stealthAddress);
   const deposit = await UTXOpiaClient.instance().prepareTweakDeposit({
     depositIndex,
     ikaXOnlyPubkey: Uint8Array.from(
@@ -75,8 +75,7 @@ export async function prepareTweakDeposit(
         ? "mainnet"
         : "testnet";
 
-  const identity = bytesToHexLocal(recipient.mpk);
-  const depositIndex = useDepositIndexStore.getState().claim(identity);
+  const depositIndex = useDepositIndexStore.getState().claim(bytesToHexLocal(recipient.mpk));
 
   const deposit = await UTXOpiaClient.instance().prepareTweakDeposit({
     depositIndex,
@@ -94,3 +93,20 @@ export async function prepareTweakDeposit(
 
 const bytesToHexLocal = (b: Uint8Array) =>
   Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
+
+/**
+ * Claim the next deposit index for the wallet behind an encoded meta-address.
+ *
+ * Keyed by mpk, the same key the recipient-passing path uses. They used to
+ * disagree — this one keyed on the encoded address — which gave one wallet two
+ * counters both starting at 0, so its first faucet deposit and its first wallet
+ * deposit derived the same address and linked themselves to each other. The
+ * legacy counter is carried forward so an existing wallet does not restart.
+ */
+export function claimDepositIndex(stealthAddress: string): number {
+  const identity = bytesToHexLocal(decodeStealthMetaAddress(stealthAddress).mpk);
+  const store = useDepositIndexStore.getState();
+  const legacy = store.peek(stealthAddress);
+  if (legacy > 0) store.observe(identity, legacy - 1);
+  return useDepositIndexStore.getState().claim(identity);
+}

@@ -43,7 +43,7 @@ export function useBtcDeposit({
   onError,
 }: UseBtcDepositParams) {
   const btcWallet = useBitcoinWalletStore();
-  const { networkId, config: networkConfig } = useChainEnvironment();
+  const { networkId, vaultId, config: networkConfig } = useChainEnvironment();
 
   const [btcAmount, setBtcAmount] = useState("");
   const [walletDepositing, setWalletDepositing] = useState(false);
@@ -153,6 +153,7 @@ export function useBtcDeposit({
           bytesToHex(depositPreview.ephemeralPub),
           networkId,
           "tweak",
+          vaultId,
         );
         depositId = res.deposit_id;
       } catch (e) {
@@ -187,7 +188,7 @@ export function useBtcDeposit({
     } finally {
       setWalletDepositing(false);
     }
-  }, [depositPreview, selectedUtxoKeys, btcWallet, networkId, onStatusChange, onError]);
+  }, [depositPreview, selectedUtxoKeys, btcWallet, networkId, vaultId, onStatusChange, onError]);
 
   return {
     btcWallet,

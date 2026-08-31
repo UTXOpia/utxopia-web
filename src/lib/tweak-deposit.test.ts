@@ -1,6 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { deriveDepositAddress, depositTweakCommitment, bytesToHex } from "@utxopia/sdk";
 import { useDepositIndexStore } from "@/stores/deposit-index-store";
+import { claimDepositIndex } from "./tweak-deposit";
 
 /**
  * The faucet route re-derives the address from the public keys the client sends
@@ -34,5 +35,23 @@ describe("tweak deposit request", () => {
     const claimed = [s.claim("me"), s.claim("me"), s.claim("me")];
     expect(claimed).toEqual([0, 1, 2]);
     expect(new Set(claimed).size).toBe(3);
+  });
+
+  /// Both deposit paths must land on ONE counter. They used to key it
+  /// differently — encoded address here, mpk there — so a wallet's first faucet
+  /// deposit and its first wallet deposit derived the same address.
+  test("one wallet has one counter, and an existing one is not restarted", () => {
+    const mpk = "44".repeat(32);
+    const encoded = `utxo:${"55".repeat(32)}${"66".repeat(32)}${mpk}`;
+
+    useDepositIndexStore.setState({ next: {} });
+    expect(claimDepositIndex(encoded)).toBe(0);
+    expect(useDepositIndexStore.getState().claim(mpk)).toBe(1);
+
+    // A wallet that already spent indices under the legacy key resumes above
+    // them rather than re-deriving addresses it has already handed out.
+    useDepositIndexStore.setState({ next: { [encoded]: 7 } });
+    expect(claimDepositIndex(encoded)).toBe(7);
+    expect(claimDepositIndex(encoded)).toBe(8);
   });
 });

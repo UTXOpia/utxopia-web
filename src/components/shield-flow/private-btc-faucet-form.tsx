@@ -7,6 +7,7 @@ import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { deriveTweakDepositForFaucet } from "@/lib/tweak-deposit";
 import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 import { cn } from "@/lib/utils";
@@ -15,6 +16,7 @@ type DripResult =
   | {
       kind: "ok";
       txid: string;
+      depositAddress?: string;
       warning?: string;
       credited?: boolean;
     }
@@ -196,6 +198,9 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         setResult({
           kind: "ok",
           txid: body.txid ?? "",
+          // The route echoes back the address it paid. Falling back to the one
+          // derived here keeps the box filled if a deployment stops echoing it.
+          depositAddress: body.depositAddress ?? tweak.depositAddress,
           warning: body.warning,
           credited: false,
         });
@@ -313,8 +318,34 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
               )}
             </div>
           </div>
-          <div className="break-all rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono text-success/80">
-            {result.txid || "(see backend log)"}
+          <div className="space-y-2">
+            {result.depositAddress && (
+              <div>
+                <p className="mb-0.5 text-[10px] uppercase tracking-wider text-success/60">
+                  Deposit address
+                </p>
+                <a
+                  href={`${getMempoolExplorerUrl(network)}/address/${result.depositAddress}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="block break-all rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono text-success/80 transition-colors hover:border-success/30"
+                >
+                  {result.depositAddress}
+                </a>
+                <p className="mt-1 text-[10px] text-success/60">
+                  Derived by this browser and used once. The payment carries no
+                  metadata — the address itself binds it to your private balance.
+                </p>
+              </div>
+            )}
+            <div>
+              <p className="mb-0.5 text-[10px] uppercase tracking-wider text-success/60">
+                Bitcoin transaction
+              </p>
+              <div className="break-all rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono text-success/80">
+                {result.txid || "(see backend log)"}
+              </div>
+            </div>
           </div>
           {result.warning && (
             <div className="border-t border-success/10 pt-1 text-warning">{result.warning}</div>

@@ -45,6 +45,7 @@ import { BTC_DUST_LIMIT, TOKEN_2022_PROGRAM_ID_STR } from "@/lib/btc-constants";
 import { useTokenBalance } from "@/hooks/use-token-balance";
 import { useBtcDeposit } from "@/hooks/use-btc-deposit";
 import { BtcDepositPreview } from "@/components/shield-flow/btc-deposit-preview";
+import { BtcAddressDeposit } from "@/components/shield-flow/btc-address-deposit";
 import { ShieldSuccess } from "@/components/shield-flow/shield-success";
 import { TokenSelector } from "@/components/shield-flow/token-selector";
 import { BtcFaucetPrompt } from "@/components/shield-flow/btc-faucet-prompt";
@@ -502,13 +503,23 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
   if (selectedToken.isBtcNative) {
     const btcAmountSats = Math.floor(parseFloat(btcAmount || "0") * 1e8);
     const canSubmitBtc = btcAmountSats > 0 && !!resolvedMeta && !!keys;
-    const usesBtcFaucet = chainEnv.config.bitcoin.network !== "mainnet";
-
-    if (usesBtcFaucet) {
+    // Regtest hands out test coins; every other non-mainnet network has real
+    // coins the member already holds somewhere, so it hands out an address.
+    const btcNetwork = chainEnv.config.bitcoin.network;
+    if (btcNetwork === "regtest") {
       return (
         <div className={cn("space-y-5", className)}>
           <BtcSyncBanner />
           <BtcFaucetPrompt networkId={networkId} tokenSelector={tokenSelector} />
+        </div>
+      );
+    }
+
+    if (btcNetwork !== "mainnet") {
+      return (
+        <div className={cn("space-y-5", className)}>
+          <BtcSyncBanner />
+          <BtcAddressDeposit tokenSelector={tokenSelector} />
         </div>
       );
     }
