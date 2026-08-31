@@ -3,8 +3,8 @@
  *
  * Talks to the `utxopia-esplora-regtest` container via `docker exec`, calling
  * bitcoin-cli the same way `scripts/hybrid/send-to.ts` does. It supports:
- *   - `utxo:...` private vault deposits, where the route builds the actual
- *     UTXOpia deposit tx with the compact deposit OP_RETURN.
+ *   - `utxo:...` private vault deposits, paid to the client-derived deposit
+ *     address as a plain payment — no data output of any kind.
  *
  * Guard rails:
  *   - regtest-only: refuses unless the active network config uses regtest BTC
@@ -181,8 +181,8 @@ const bootstrapState: { confirmed: boolean } = (() => {
 interface DepositBody {
   stealthAddress?: string;
   amountSats?: number;
-  /** Client-derived deposit address for the OP_RETURN-free flow, with the keys it
-   *  was derived from. See `tweakDepositFromBody` for why the client derives it. */
+  /** Client-derived deposit address, with the keys it was derived from.
+   *  See `tweakDepositFromBody` for why the client derives it. */
   depositAddress?: string;
   notePublicKey?: string;
   ephemeralPubkey?: string;
@@ -480,11 +480,10 @@ function getLimitStatus(keys: string[]): { ok: true } | { ok: false; remaining: 
 /**
  * Stable per-recipient quota key for the backend limiter.
  *
- * The backend can't identify the depositor from the deposit: the pool address
- * is shared by everyone and the OP_RETURN carries a fresh ephemeral pubkey per
- * call, so quotaing on either gives every request its own bucket. Hashing the
- * private address gives it something that repeats without handing it the
- * address itself.
+ * The backend can't identify the depositor from the deposit: every deposit has
+ * its own address, so quotaing on that gives every request its own bucket.
+ * Hashing the private address gives it something that repeats without handing
+ * it the address itself.
  */
 function recipientQuotaKey(stealthAddress: string): string {
   return createHash("sha256").update(stealthAddress.toLowerCase()).digest("hex");
@@ -721,10 +720,10 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
 
   const activeNetwork = getRequestNetwork(req);
   let activeConfig = getRequestNetworkConfig(activeNetwork);
-  // Vault-scope the deposit: the OP_RETURN pool tag must match the destination
-  // pool (Open vs Verified are distinct pools with distinct mints/tags). Open
-  // needs the overlay too — the base network config can point at an older
-  // deployment, and a tag no tracker recognises strands the deposit silently.
+  // Vault-scope the deposit: the address is tweaked against the destination
+  // pool's Ika key (Open vs Verified are distinct pools with distinct keys).
+  // Open needs the overlay too — the base network config can point at an older
+  // deployment, and a key no tracker watches strands the deposit silently.
   const vaultId = parseVaultId(new URL(req.url).searchParams.get("vault"));
   if (vaultsSupported(activeNetwork) && "solana" in activeConfig) {
     activeConfig = getVaultNetworkConfig(activeNetwork, activeConfig as NetworkConfig, vaultId);

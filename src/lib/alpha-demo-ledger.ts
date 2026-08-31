@@ -13,7 +13,6 @@ interface AlphaDemoDeposit {
   stealthAddress: string;
   amountSats: number;
   txid: string;
-  opReturn?: string;
   createdAt: number;
 }
 
@@ -66,7 +65,6 @@ export function recordAlphaDemoDeposit(input: {
   stealthAddress: string;
   amountSats: number;
   txid: string;
-  opReturn?: string;
 }): void {
   if (!alphaDemoLedgerEnabled(input.networkId)) return;
   const txid = input.txid || `local-${Date.now()}`;
@@ -79,7 +77,6 @@ export function recordAlphaDemoDeposit(input: {
     stealthAddress: input.stealthAddress,
     amountSats: input.amountSats,
     txid,
-    opReturn: input.opReturn,
     createdAt: Date.now(),
   });
   writeLedger({ ...ledger, deposits: deposits.slice(-20) });
@@ -99,12 +96,10 @@ export function getAlphaDemoNetworkInboxNotes(networkId: string, stealthAddress?
       return !stealthAddress || deposit.stealthAddress === stealthAddress;
     })
     .map((deposit, index) => {
-      const seed = new TextEncoder().encode(`${deposit.id}:${deposit.opReturn ?? ""}`);
+      const seed = new TextEncoder().encode(deposit.id);
       const commitment = sha256(seed);
       const commitmentHex = bytesToHex(commitment);
-      const ephemeralPub = deposit.opReturn && deposit.opReturn.length >= 82
-        ? hexToBytes(deposit.opReturn.slice(18, 82))
-        : commitment.slice(0, 32);
+      const ephemeralPub = commitment.slice(0, 32);
 
       return {
         id: `alpha-demo-${commitmentHex.slice(0, 16)}`,

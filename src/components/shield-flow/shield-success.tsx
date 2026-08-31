@@ -42,7 +42,7 @@ export function ShieldSuccess({
           ? "Your BTC deposit was broadcast. It will appear in your private balance after confirmation."
           : `Your ${selectedToken.symbol} is now in your private balance.`}
       </p>
-      {isBtc && walletDepositResult?.opReturnHex && (
+      {isBtc && walletDepositResult && (
         <DepositStatusTracker noteId={walletDepositResult.noteId} className="pt-1" />
       )}
       {txSig && (

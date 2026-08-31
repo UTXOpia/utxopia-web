@@ -9,7 +9,6 @@ export interface PendingFaucetActivity {
   stealthAddress: string;
   amountSats: number;
   txid: string;
-  opReturn?: string;
   depositAddress?: string;
   blocksMined?: number;
   createdAt: number;
@@ -57,7 +56,6 @@ export function recordPendingFaucetActivity(input: {
   stealthAddress: string;
   amountSats: number;
   txid: string;
-  opReturn?: string;
   depositAddress?: string;
   blocksMined?: number;
 }): void {
@@ -72,7 +70,6 @@ export function recordPendingFaucetActivity(input: {
     stealthAddress: input.stealthAddress,
     amountSats: Math.max(0, Math.trunc(input.amountSats)),
     txid,
-    opReturn: input.opReturn,
     depositAddress: input.depositAddress,
     blocksMined: input.blocksMined,
     createdAt: now,

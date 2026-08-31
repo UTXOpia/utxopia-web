@@ -42,7 +42,6 @@ describe("alpha demo ledger", () => {
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 25_000,
       txid: "faucet-tx-1",
-      opReturn: `6a28${"00".repeat(40)}`,
     });
 
     const notes = getAlphaDemoInboxNotes("devnet-regtest", STEALTH_ADDRESS);

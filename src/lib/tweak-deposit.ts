@@ -14,7 +14,7 @@ const hex = (b: Uint8Array) =>
   Array.from(b, (x) => x.toString(16).padStart(2, "0")).join("");
 
 /**
- * Derive an OP_RETURN-free deposit address for this wallet.
+ * Derive a deposit address for this wallet.
  *
  * Throws when the network has no Ika dWallet key: the faucet has no other flow
  * to fall back to, and the route would reject the request anyway with a message
@@ -56,30 +56,12 @@ export async function deriveTweakDepositForFaucet(
   };
 }
 
-/**
- * Whether this network can credit an OP_RETURN-free deposit.
- *
- * Gated on the Ika key being configured, because the address's tapleaf names it.
- * A network without one has no disc-25 deposit path at all.
- */
-export function tweakDepositsEnabled(config: NetworkConfig): boolean {
-  const key = config?.ika?.dwalletXOnlyPubkey;
-  return Boolean(key) && !/^0+$/.test(key!);
-}
-
-/**
- * Derive an OP_RETURN-free deposit for this wallet, in the shape the deposit
- * hooks already consume.
- *
- * `opReturnPayload` is deliberately absent rather than empty: `buildDepositPsbt`
- * adds a data output when it is present, and an empty one would still add it.
- */
+/** Derive a deposit for this wallet, in the shape the deposit hooks consume. */
 export async function prepareTweakDeposit(
   config: NetworkConfig,
   recipient: StealthMetaAddress,
 ): Promise<{
   btcAddress: string;
-  opReturnPayload?: undefined;
   npk: Uint8Array;
   ephemeralPub: Uint8Array;
 }> {
