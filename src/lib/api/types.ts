@@ -19,45 +19,7 @@ export interface PrepareDepositResponse {
   expires_at: number;
 }
 
-export type EscrowStatus =
-  | "waiting_payment"
-  | "confirming"
-  | "screening"
-  | "passed"
-  | "blocked"
-  | "in_custody"
-  | "minted"
-  | "refunded"
-  | "expired";
-
 export type ScreeningStatus = "pending" | "screening" | "passed" | "blocked";
-
-export interface ScreeningInfo {
-  status: ScreeningStatus;
-  checked_at?: number;
-  risk_score: number;
-  flags: string[];
-  blocklist_match?: string;
-}
-
-export interface DepositStatusResponse {
-  found: boolean;
-  taproot_address?: string;
-  commitment?: string;
-  amount_sats?: number; // Detected from BTC chain
-  btc_txid?: string;
-  confirmations: number;
-  required_confirmations: number;
-  status: string;
-  escrow_status: EscrowStatus;
-  screening?: ScreeningInfo;
-  can_claim: boolean;
-  claimed: boolean;
-  refund_available: boolean;
-  refund_available_at?: number;
-  /** Deposit OP_RETURN payload hex: header(1) + poolTag(8) + ephemeralPubkey(32) + notePublicKey(32) */
-  op_return_hex?: string;
-}
 
 export interface BlocklistResponse {
   addresses: string[];
