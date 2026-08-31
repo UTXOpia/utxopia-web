@@ -11,7 +11,7 @@
 import { describe, expect, it } from "bun:test";
 import { sha256 } from "@noble/hashes/sha2";
 import { bytesToHex } from "@utxopia/sdk";
-import { remoteBackupSaved } from "@/lib/vault-remote";
+import { canWriteRemoteBackup, remoteBackupSaved } from "@/lib/vault-remote";
 import { remoteCredentials } from "@/lib/vault-remote";
 import { deriveFromPin } from "@/lib/vault-envelope";
 
@@ -103,5 +103,38 @@ describe("remoteBackupSaved", () => {
     expect(remoteBackupSaved({ networkId: "devnet", vaultId: "verified" })).toBe(false);
     expect(remoteBackupSaved({ networkId: "mainnet", vaultId: "open" })).toBe(false);
     localStorage.clear();
+  });
+});
+
+/**
+ * The row id carries no origin, so two deployments on one Privy app address the
+ * same row and the second one to publish overwrites the first. Until that id
+ * changes — which it cannot without stranding every existing row — this guard
+ * is the whole of what keeps a preview from destroying a real backup.
+ */
+describe("canWriteRemoteBackup", () => {
+  const set = (hostname: string) =>
+    Object.defineProperty(window, "location", {
+      value: { hostname },
+      configurable: true,
+      writable: true,
+    });
+
+  it("allows the canonical host and localhost, and nothing else", () => {
+    for (const host of ["app.utxopia.com", "localhost", "127.0.0.1"]) {
+      set(host);
+      expect(canWriteRemoteBackup()).toBe(true);
+    }
+    // www is not a near-miss to be forgiven: it is the origin that actually
+    // overwrote a member's copy.
+    for (const host of [
+      "www.utxopia.com",
+      "utxopia.com",
+      "utxopia-web-git-branch.vercel.app",
+      "app.utxopia.com.evil.test",
+    ]) {
+      set(host);
+      expect(canWriteRemoteBackup()).toBe(false);
+    }
   });
 });

@@ -19,7 +19,7 @@ import { usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { dropDeviceEnvelope, hasDeviceEnvelope } from "@/lib/vault-identity";
-import { getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
+import { canWriteRemoteBackup, getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
 import { newSalt } from "@/lib/vault-envelope";
 import { PinField } from "@/components/vault/pin-field";
 import { RecoveryStringCard } from "@/components/vault/recovery-string-card";
@@ -45,6 +45,7 @@ export function VaultSetup({
   const restoreEnvelopeVault = useUTXOpiaStore((s) => s.restoreEnvelopeVault);
   const sealLoginEnvelope = useUTXOpiaStore((s) => s.sealLoginEnvelope);
   const restoreFromLoginEnvelope = useUTXOpiaStore((s) => s.restoreFromLoginEnvelope);
+  const armThisDeviceWithPasskey = useUTXOpiaStore((s) => s.armThisDeviceWithPasskey);
   const scope = useMemo(() => ({ networkId, vaultId }), [networkId, vaultId]);
 
   const [mode, setMode] = useState<Mode>("choose");
@@ -119,6 +120,16 @@ export function VaultSetup({
     login: { keyMaterial: Uint8Array; salt: Uint8Array } | null,
     device?: Uint8Array,
   ): Promise<void> => {
+    // Said before the generic failure below, because the cause and the fix are
+    // completely different: nothing is wrong with the member's PIN or their
+    // connection, they are simply on an origin whose vault is not the one the
+    // row describes.
+    if (!canWriteRemoteBackup()) {
+      setNotice(
+        "This is a preview or a different address, so no copy was saved — a saved copy belongs to one address. Set your PIN on app.utxopia.com. Keep the recovery string below either way.",
+      );
+      return;
+    }
     if (!login || !privy.accountId) {
       // The silent branch, and the expensive one: no PIN means no copy, which
       // is indistinguishable on screen from a copy that saved. The member finds
@@ -235,16 +246,30 @@ export function VaultSetup({
       // asked for anything.
       const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
       const { keyMaterial, signer } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
-      const device = await deviceMaterial(authenticatePasskey);
-      // No `?? keyMaterial` fallback any more. A browser without PRF now keeps
-      // no wrapping at all and comes back through the blob store every time,
-      // which is the only path where a wrong PIN costs the attacker something.
-      // getRemoteEnvelope records that a copy exists, so the next visit knows
-      // to come back here rather than looking for a wrapping that is not there.
-      await restoreFromLoginEnvelope(envelope, keyMaterial, device);
-      if (!device) privy.remember(signer);
+      // Open the vault before going anywhere near the passkey. `authenticate`
+      // runs a full WebAuthn ceremony with userVerification "required" before
+      // it can discover PRF is missing, so on the browsers this screen exists
+      // for it raises an OS prompt that opens nothing — and until now it did so
+      // between the fetch and the restore, where an unanswered prompt left the
+      // member on "Unlocking…" with a vault that had already been released to
+      // them. The unlock screen has always had this order; this one did not.
+      //
+      // No `?? keyMaterial` fallback either. A browser without PRF now keeps no
+      // wrapping at all and comes back through the blob store every time, which
+      // is the only path where a wrong PIN costs the attacker something.
+      // getRemoteEnvelope records that a copy exists, so the next visit knows to
+      // come back here rather than look for a wrapping that is not there.
+      await restoreFromLoginEnvelope(envelope, keyMaterial);
+      privy.remember(signer);
       setPin("");
       onDone();
+
+      // An upgrade, not a step. Nothing below can fail the unlock that already
+      // happened, so it is deliberately not awaited before onDone.
+      void (async () => {
+        const device = await deviceMaterial(authenticatePasskey).catch(() => undefined);
+        if (device) await armThisDeviceWithPasskey(device);
+      })();
     });
 
   if (mode === "saved") {

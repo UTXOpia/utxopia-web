@@ -26,5 +26,18 @@
         }
       ]
     }
+  ],
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [
+        {
+          "type": "host",
+          "value": "(www\\.)?utxopia\\.com"
+        }
+      ],
+      "destination": "https://app.utxopia.com/:path*",
+      "permanent": false
+    }
   ]
 }

@@ -165,6 +165,52 @@ export class RemoteRejectedError extends Error {
 const ENDPOINT = "/api/vault-blob";
 
 /**
+ * FROZEN. Which origin owns the row.
+ *
+ * `blobId` is built from the scope and the provider account and deliberately
+ * not from the origin, so every deployment sharing a Privy app computes the
+ * same row id. localStorage is not shared, though: a second origin finds no
+ * wrapping, mints a fresh random seed, and publishes it — and because the PIN
+ * still proves out, the backend takes the `Matched` branch and overwrites the
+ * envelope in place. One member, two vaults, one surviving backup, and nothing
+ * on screen that says so. That is not hypothetical; it is what www. and app.
+ * did to each other.
+ *
+ * Preview deployments are the same hazard on a rolling basis — every preview
+ * URL is a new origin against the same Privy app and the same row.
+ *
+ * Reads stay open. Handing a preview the production wrapping costs nothing and
+ * is how somebody tests this path; it is writing and deleting that destroy the
+ * copy a member is relying on.
+ *
+ * Folding the origin into `blobId` would be the other fix and is not available:
+ * it changes every existing row's address at once, which locks out anybody
+ * without their recovery string.
+ *
+ * ponytail: localhost is allowed so the publish path stays testable, which
+ * means a developer pointed at the production backend can still overwrite a
+ * real row. Narrow the allowance to a non-production backend if that ever
+ * happens for real.
+ */
+const CANONICAL_HOST = "app.utxopia.com";
+const LOCAL_HOSTS = new Set(["localhost", "127.0.0.1", "[::1]"]);
+
+export function canWriteRemoteBackup(): boolean {
+  if (typeof window === "undefined") return false;
+  const host = window.location.hostname;
+  return host === CANONICAL_HOST || LOCAL_HOSTS.has(host);
+}
+
+export class NonCanonicalHostError extends Error {
+  constructor() {
+    super(
+      `This is not ${CANONICAL_HOST}, and a saved copy belongs to one address. Open ${CANONICAL_HOST} to save or delete it.`,
+    );
+    this.name = "NonCanonicalHostError";
+  }
+}
+
+/**
  * Publish this member's login wrapping. Best-effort by design: a member whose
  * vault exists locally and whose recovery string is written down has lost
  * nothing if this fails, and failing the whole vault creation over a backup
@@ -176,6 +222,9 @@ export async function putRemoteEnvelope(input: {
   accountId: string;
   envelope: VaultEnvelope;
 }): Promise<boolean> {
+  // Guarded here rather than at the call site: this is the only write path,
+  // and a check in the ceremony above would not cover the next caller.
+  if (!canWriteRemoteBackup()) return false;
   const { id, proof } = remoteCredentials(input);
   try {
     const response = await fetch(ENDPOINT, {
@@ -202,6 +251,7 @@ export async function deleteRemoteEnvelope(input: {
   pin: string;
   accountId: string;
 }): Promise<void> {
+  if (!canWriteRemoteBackup()) throw new NonCanonicalHostError();
   await send(ENDPOINT, "DELETE", remoteCredentials(input));
   localStorage.removeItem(savedKey(input.scope));
 }
