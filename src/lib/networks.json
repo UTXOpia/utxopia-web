@@ -120,7 +120,8 @@
       "network": "mainnet",
       "poolAddress": "",
       "groupPubkey": "",
-      "explorerUrl": "https://mempool.space"
+      "explorerUrl": "https://mempool.space",
+      "requireRegisteredExit": true
     },
     "backend": {
       "url": ""

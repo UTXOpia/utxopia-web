@@ -10,6 +10,8 @@ import { registerDeposit } from "@/lib/api/deposits";
 import { deriveTweakDepositForFaucet } from "@/lib/tweak-deposit";
 import { DepositStatusTracker } from "@/components/shield-flow/deposit-status-tracker";
 import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
+import { BtcExitGate } from "@/components/vault/btc-exit-gate";
+import type { BtcNetwork } from "@/lib/exit-registry";
 import { MIN_DEPOSIT_SATS } from "@/lib/btc-constants";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
 import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
@@ -32,12 +34,12 @@ interface Handout {
  * not control, so there is no moment later at which showing it would still be
  * safe.
  *
- * Only sound where the tracker runs with BTC_REQUIRE_REGISTERED_EXIT off, which
- * is why this is not the mainnet path. With it on (the compose default) the
- * tracker holds any deposit whose SENDING address has no registered BTC exit,
- * and paying from an arbitrary wallet is exactly how you get one. Offering this
- * on such a network means first asking which address the payment will come from
- * and registering an exit for it — a flow, not a routing change.
+ * Where the tracker runs with BTC_REQUIRE_REGISTERED_EXIT on, it holds any
+ * deposit whose SENDING address has no registered exit — so on those networks
+ * <BtcExitGate /> runs first and no address is handed out until the payer has
+ * one. Only the Verified vault has an exit registry, so that pairing is not a
+ * coincidence: a network that requires an exit has nowhere to register one from
+ * the Open vault.
  */
 export function BtcAddressDeposit({
   tokenSelector,
@@ -51,6 +53,10 @@ export function BtcAddressDeposit({
   const hasVault = Boolean(stealthAddress && /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress));
 
   const [amountSats, setAmountSats] = useState(20_000);
+  // Where the tracker requires it, an address is only handed out once the payer
+  // has an exit registered. Elsewhere there is nothing to gate on.
+  const needsExit = Boolean(config.bitcoin.requireRegisteredExit) && vaultId === "verified";
+  const [exitAddress, setExitAddress] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [handout, setHandout] = useState<Handout | null>(null);
@@ -100,7 +106,17 @@ export function BtcAddressDeposit({
 
       {!hasVault && <VaultIdentityUnlock />}
 
-      {hasVault && !handout && (
+      {hasVault && needsExit && !exitAddress && (
+        <BtcExitGate
+          programId={config.solana.utxopiaProgramId}
+          poolState={config.solana.poolState ?? ""}
+          btcNetwork={config.bitcoin.network === "mainnet" ? "mainnet" : "testnet"}
+          networkId={networkId}
+          onReady={setExitAddress}
+        />
+      )}
+
+      {hasVault && (!needsExit || exitAddress) && !handout && (
         <div className="space-y-3 rounded-[12px] border border-btc/20 bg-btc/5 p-4">
           <div className="flex items-start gap-3">
             <div className="mt-0.5 rounded-[9px] bg-btc/10 p-2">
@@ -191,6 +207,12 @@ export function BtcAddressDeposit({
             <p className="mt-1 pl-1 text-caption text-gray">
               Single use. Coming back here gives you a different address — reusing one
               links the two deposits for anyone watching.
+              {exitAddress && (
+                <>
+                  {" "}Pay from <span className="font-mono">{exitAddress}</span>: a
+                  deposit from anywhere else is held until its sender is registered.
+                </>
+              )}
             </p>
           </div>
 

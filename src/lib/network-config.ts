@@ -49,6 +49,10 @@ export interface NetworkConfig {
     groupPubkey: string;
     depositMode?: "sweep" | "direct" | "direct_vault" | "ika_direct";
     explorerUrl: string;
+    /** Mirrors the tracker's BTC_REQUIRE_REGISTERED_EXIT. With it on, a deposit
+     *  whose sending address has no registered exit is held, so the UI must get
+     *  one registered before it hands out an address to pay. */
+    requireRegisteredExit?: boolean;
   };
   ika?: {
     programId: string;

@@ -13,11 +13,16 @@ export const dynamic = "force-dynamic";
 /**
  * Proxy for the Verified vault's invite endpoints.
  *
- * Only `challenge` and `redeem` are reachable. Minting codes is deliberately
- * absent: it is gated by a separate operator key on the backend and has no
- * business behind a public origin.
+ * Only `challenge`, `redeem` and `btc-destination` are reachable. Minting codes
+ * is deliberately absent: it is gated by a separate operator key on the backend
+ * and has no business behind a public origin.
+ *
+ * `btc-destination` adds a bitcoin exit to a wallet that is already a member —
+ * the same registration `redeem` performs when a code is redeemed with one, for
+ * everyone who redeemed without. It needs a signed challenge, so opening it
+ * hands out nothing a member could not already do at redeem time.
  */
-const ALLOWED = new Set(["challenge", "redeem"]);
+const ALLOWED = new Set(["challenge", "redeem", "btc-destination"]);
 
 export async function POST(
   request: NextRequest,
