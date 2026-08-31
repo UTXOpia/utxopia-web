@@ -31,6 +31,13 @@ interface Handout {
  * address is that we said so — and here the payment comes from a wallet we do
  * not control, so there is no moment later at which showing it would still be
  * safe.
+ *
+ * Only sound where the tracker runs with BTC_REQUIRE_REGISTERED_EXIT off, which
+ * is why this is not the mainnet path. With it on (the compose default) the
+ * tracker holds any deposit whose SENDING address has no registered BTC exit,
+ * and paying from an arbitrary wallet is exactly how you get one. Offering this
+ * on such a network means first asking which address the payment will come from
+ * and registering an exit for it — a flow, not a routing change.
  */
 export function BtcAddressDeposit({
   tokenSelector,
