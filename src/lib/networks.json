@@ -18,7 +18,8 @@
       "poolAddress": "tb1p8f4tszapf0q9puzgaclqka7cjddd7n79ut6eguc37fkv9j6m6x2qtcnqsg",
       "groupPubkey": "3a6ab80ba14bc050f048ee3e0b77d8935adf4fc5e2f5947311f26cc2cb5bd194",
       "depositMode": "direct",
-      "explorerUrl": "https://mempool.space/testnet4"
+      "explorerUrl": "https://mempool.space/testnet4",
+      "requireRegisteredExit": true
     },
     "ika": {
       "programId": "87W54kGYFQ1rgWqMeu4XTPHWXWmXSQCcjm8vCTfiq1oY",
