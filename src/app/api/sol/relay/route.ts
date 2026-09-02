@@ -352,16 +352,36 @@ export async function POST(request: NextRequest) {
         : recipientPubkeys.map(r => getAssociatedTokenAddressSync(unshieldMint, r, false, tokenProgramId));
       const poolVault = getAssociatedTokenAddressSync(unshieldMint, poolState, true, tokenProgramId);
 
+      // Cashing out to an address you registered needs no approval at all — the
+      // registry entry is the authorisation (`unshield.rs:275`). That is not an
+      // emergency route, it is the faster one: no coordinator round trip and no
+      // dependency on the operator being awake. Take it whenever every recipient
+      // qualifies, and fall back to the approval path when any does not.
+      if (cfg.solana.permissioned) {
+        registeredExits = await resolveRegisteredExits(
+          connection, programId, poolState, recipientPubkeys,
+        );
+      }
+
+      // The program no longer infers the optional account tail from the list's
+      // shape — it reads what we declare here and refuses anything that does not
+      // line up. Whatever is appended below must be declared, and vice versa.
       ixData = buildUnshieldInstructionData({
         nInputs, nOutputs,
         nPublicOutputs,
+        proofSource: 1,
+        hasFrozenSourceTree: sourceTreeKey != null,
+        policyTail: !cfg.solana.permissioned
+          ? "none"
+          : registeredExits
+            ? "ragequit"
+            : "verified",
         merkleRoot: merkleRootBytes,
         boundParamsHash: boundParamsHashBytes,
         nullifiers: nullifierBytes,
         commitmentsOut: commitmentBytes,
         stealthData: stealthDataBytes,
         unshieldAmounts: unshieldAmounts.map(a => BigInt(a)),
-        proofSource: 1,
       });
 
       // Accounts: pool_state, tree, vk, user, system, token_config, vault, token_program, recipients..., nullifiers...
@@ -384,17 +404,6 @@ export async function POST(request: NextRequest) {
       for (const pda of nullifierPDAs) keys.push({ pubkey: pda, isSigner: false, isWritable: true });
       if (sourceTreeKey) keys.push({ pubkey: sourceTreeKey, isSigner: false, isWritable: false });
       keys.push({ pubkey: bufferPubkey, isSigner: false, isWritable: false });
-
-      // Cashing out to an address you registered needs no approval at all — the
-      // registry entry is the authorisation (`unshield.rs:275`). That is not an
-      // emergency route, it is the faster one: no coordinator round trip and no
-      // dependency on the operator being awake. Take it whenever every recipient
-      // qualifies, and fall back to the approval path when any does not.
-      if (cfg.solana.permissioned) {
-        registeredExits = await resolveRegisteredExits(
-          connection, programId, poolState, recipientPubkeys,
-        );
-      }
 
       // Native SOL recipients receive lamports directly. Ordinary SPL outputs
       // still require an ATA.
@@ -443,8 +452,15 @@ export async function POST(request: NextRequest) {
       );
       const [tokenConfigPDA] = deriveTokenConfigPDA(zkbtcMint, programId, poolState);
 
+      // The program no longer infers the optional account tail from the list's
+      // shape — it reads what we declare here and refuses anything that does not
+      // line up. Whatever is appended below must be declared, and vice versa.
       ixData = buildRedeemInstructionData({
         nInputs, nOutputs,
+        hasFrozenSourceTree: sourceTreeKey != null,
+        // The relay only ever takes the approval path for these two; the
+        // registry route is resolved for unshield alone.
+        policyTail: cfg.solana.permissioned ? "verified" : "none",
         nPublicOutputs,
         merkleRoot: merkleRootBytes,
         boundParamsHash: boundParamsHashBytes,
@@ -479,8 +495,15 @@ export async function POST(request: NextRequest) {
         );
       }
 
+      // The program no longer infers the optional account tail from the list's
+      // shape — it reads what we declare here and refuses anything that does not
+      // line up. Whatever is appended below must be declared, and vice versa.
       ixData = buildTransactInstructionData({
         nInputs, nOutputs,
+        hasFrozenSourceTree: sourceTreeKey != null,
+        // The relay only ever takes the approval path for these two; the
+        // registry route is resolved for unshield alone.
+        policyTail: cfg.solana.permissioned ? "verified" : "none",
         merkleRoot: merkleRootBytes,
         boundParamsHash: boundParamsHashBytes,
         nullifiers: nullifierBytes,
