@@ -79,10 +79,42 @@ type ShieldStatus = "idle" | "processing" | "unknown" | "done" | "error";
 
 export function ShieldFlow({ className }: ShieldFlowProps) {
   const wallet = useWallet();
-  const { publicKey, sendTransaction } = wallet;
+  const { publicKey, sendTransaction, signTransaction } = wallet;
   const { connection } = useConnection();
   const chainEnv = useChainEnvironment();
   const { networkId } = chainEnv;
+
+  /**
+   * Sponsored path: relayer pays the SOL fee, the wallet only signs as token owner.
+   * Falls back to a wallet-paid send when the relayer is unavailable or the wallet
+   * cannot partial-sign (some mobile adapters), so shielding never depends on it.
+   */
+  const submitShield = useCallback(async (tx: Transaction): Promise<string> => {
+    const q = `network=${encodeURIComponent(chainEnv.networkId)}&vault=${encodeURIComponent(chainEnv.vaultId)}`;
+    try {
+      if (!signTransaction) throw new Error("wallet cannot partial-sign");
+      const meta = await fetch(`/api/sol/relay?${q}`).then((r) => (r.ok ? r.json() : null));
+      if (!meta?.relayerPubkey) throw new Error("relayer unavailable");
+      tx.feePayer = new PublicKey(meta.relayerPubkey);
+      tx.recentBlockhash = (await connection.getLatestBlockhash()).blockhash;
+      const signed = await signTransaction(tx);
+      const res = await fetch(`/api/sol/shield?${q}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ transaction: signed.serialize({ requireAllSignatures: false }).toString("base64") }),
+      });
+      const body = await res.json();
+      if (!res.ok || !body.signature) throw new Error(body.error ?? "sponsored shield failed");
+      return body.signature as string;
+    } catch (e) {
+      // A rejected wallet prompt is the user's answer, not a reason to ask again.
+      if (e instanceof Error && /reject|denied|cancel/i.test(e.message)) throw e;
+      console.warn("[Shield] sponsored path unavailable, paying fee from wallet:", e);
+      tx.feePayer = undefined;
+      tx.recentBlockhash = undefined;
+      return sendTransaction(tx, connection);
+    }
+  }, [chainEnv.networkId, chainEnv.vaultId, connection, sendTransaction, signTransaction]);
   const { permissioned: poolPermissioned } = usePoolPermissioned();
   const { setVisible: openWalletModal } = useWalletModal();
   const { keys, stealthAddress } = useUTXOpia();
@@ -379,7 +411,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
         }));
       }
 
-      const sig = await sendTransaction(tx, connection);
+      const sig = await submitShield(tx);
       setTxSig(sig);
       try {
         await confirmSubmittedSignature(connection, sig);
@@ -410,7 +442,7 @@ export function ShieldFlow({ className }: ShieldFlowProps) {
       setError(err instanceof Error ? err.message : "Add funds failed");
       setStatus("error");
     }
-  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, sendTransaction,
+  }, [publicKey, keys, selectedToken, amount, resolvedMeta, connection, submitShield,
       chainEnv.config, chainEnv.networkId, chainEnv.vaultId, poolFees]);
 
   const amountRaw = BigInt(Math.max(0, Math.floor(parseFloat(amount || "0") * (10 ** selectedToken.decimals))));
