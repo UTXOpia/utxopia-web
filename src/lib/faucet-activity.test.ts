@@ -2,17 +2,12 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import {
   getPendingFaucetActivities,
-  isOutdatedFaucetPool,
   recordPendingFaucetActivity,
 } from "./faucet-activity";
 
 const STEALTH_ADDRESS = `utxo:${"ab".repeat(96)}`;
 
 describe("faucet activity", () => {
-  it("detects a faucet transaction sent to an outdated pool", () => {
-    expect(isOutdatedFaucetPool({ depositAddress: "bcrt1pold" }, "bcrt1pcurrent")).toBe(true);
-    expect(isOutdatedFaucetPool({ depositAddress: "bcrt1pcurrent" }, "bcrt1pcurrent")).toBe(false);
-  });
   beforeEach(() => {
     localStorage.clear();
   });
@@ -44,20 +39,19 @@ describe("faucet activity", () => {
     })).toHaveLength(0);
   });
 
-  it("silently removes activity recorded for a previous pool configuration", () => {
+  it("keeps a tweak deposit whose per-deposit address differs from the pool address", () => {
     recordPendingFaucetActivity({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
       amountSats: 100_000,
-      txid: "btc-tx-old-pool",
-      depositAddress: "bcrt1pold",
+      txid: "btc-tx-tweak",
+      depositAddress: "bcrt1pqxme9z463udgpegavmgfewjw4lc38gymurqjmryfdh2d2j2v97qs5zfxgg",
     });
 
     expect(getPendingFaucetActivities({
       networkId: "devnet-regtest",
       stealthAddress: STEALTH_ADDRESS,
-      currentPoolAddress: "bcrt1pcurrent",
-    })).toHaveLength(0);
+    })).toHaveLength(1);
   });
 
   it("removes pending faucet activity only when the credited BTC txid matches", () => {

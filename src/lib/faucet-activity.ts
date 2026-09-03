@@ -20,17 +20,6 @@ interface FaucetActivityLedger {
   pending: PendingFaucetActivity[];
 }
 
-export function isOutdatedFaucetPool(
-  activity: Pick<PendingFaucetActivity, "depositAddress">,
-  currentPoolAddress?: string,
-): boolean {
-  return Boolean(
-    activity.depositAddress
-      && currentPoolAddress
-      && activity.depositAddress !== currentPoolAddress,
-  );
-}
-
 function readLedger(): FaucetActivityLedger {
   if (typeof window === "undefined") return { pending: [] };
   try {
@@ -84,7 +73,6 @@ export function getPendingFaucetActivities(input: {
   stealthAddress: string | null;
   /** BTC txids that the explorer has linked to a completed shield transaction. */
   creditedBtcTxids?: ReadonlySet<string>;
-  currentPoolAddress?: string;
 }): PendingFaucetActivity[] {
   if (!input.stealthAddress) return [];
   const cutoff = Date.now() - MAX_AGE_MS;
@@ -93,7 +81,9 @@ export function getPendingFaucetActivities(input: {
     if (activity.updatedAt < cutoff) return false;
     if (activity.networkId !== input.networkId) return false;
     if (activity.stealthAddress !== input.stealthAddress) return false;
-    if (isOutdatedFaucetPool(activity, input.currentPoolAddress)) return false;
+    // depositAddress is per-deposit under the tweak scheme, so it says nothing
+    // about which pool the coins went to. The old shared-pool-address check here
+    // dropped every tweak deposit as "outdated" before it could be shown.
     // Only reconcile the pending and credited rows when both point to the
     // exact same Bitcoin transaction. Amount/time proximity is not identity.
     return !input.creditedBtcTxids?.has(activity.txid);

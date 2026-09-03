@@ -27,6 +27,9 @@ const hex = (b: Uint8Array) =>
 export async function deriveTweakDepositForFaucet(
   config: NetworkConfig,
   stealthAddress: string,
+  /** `claim` reserves the index (the address is about to be paid); `peek` only
+   *  shows what the next claim will derive, so a preview never burns an index. */
+  mode: "claim" | "peek" = "claim",
 ): Promise<TweakDepositRequest> {
   const vaultKeyHex = config?.ika?.dwalletXOnlyPubkey;
   if (!vaultKeyHex || /^0+$/.test(vaultKeyHex)) {
@@ -40,7 +43,7 @@ export async function deriveTweakDepositForFaucet(
         ? "mainnet"
         : "testnet";
 
-  const depositIndex = claimDepositIndex(stealthAddress);
+  const depositIndex = mode === "claim" ? claimDepositIndex(stealthAddress) : peekDepositIndex(stealthAddress);
   const deposit = await UTXOpiaClient.instance().prepareTweakDeposit({
     depositIndex,
     ikaXOnlyPubkey: Uint8Array.from(
@@ -103,6 +106,13 @@ const bytesToHexLocal = (b: Uint8Array) =>
  * deposit derived the same address and linked themselves to each other. The
  * legacy counter is carried forward so an existing wallet does not restart.
  */
+/** The index the next `claimDepositIndex` will return, without reserving it. */
+export function peekDepositIndex(stealthAddress: string): number {
+  const identity = bytesToHexLocal(decodeStealthMetaAddress(stealthAddress).mpk);
+  const store = useDepositIndexStore.getState();
+  return Math.max(store.peek(identity), store.peek(stealthAddress));
+}
+
 export function claimDepositIndex(stealthAddress: string): number {
   const identity = bytesToHexLocal(decodeStealthMetaAddress(stealthAddress).mpk);
   const store = useDepositIndexStore.getState();

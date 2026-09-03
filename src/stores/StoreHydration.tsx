@@ -195,10 +195,9 @@ export function StoreHydration(): JSX.Element {
     const waitingOnBtc = getPendingFaucetActivities({
       networkId,
       stealthAddress,
-      currentPoolAddress: networkConfig.bitcoin.poolAddress,
     }).some((activity) => Date.now() - activity.createdAt < BTC_WINDOW_MS);
     return waitingOnBtc ? PENDING_BTC_MS : IDLE_MS;
-  }, [fastRefreshUntil, networkId, stealthAddress, networkConfig.bitcoin.poolAddress]);
+  }, [fastRefreshUntil, networkId, stealthAddress]);
 
   useEffect(() => {
     if (!hasAnyKeys) return;

@@ -863,7 +863,6 @@ function ActivityFeed() {
         networkId,
         stealthAddress,
         creditedBtcTxids,
-        currentPoolAddress: config.bitcoin.poolAddress,
       }));
     };
     sync();
@@ -873,7 +872,7 @@ function ActivityFeed() {
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:faucet-activity", sync);
     };
-  }, [config.bitcoin.poolAddress, indexedTransactions, networkId, stealthAddress]);
+  }, [indexedTransactions, networkId, stealthAddress]);
 
   useEffect(() => {
     const sync = () =>

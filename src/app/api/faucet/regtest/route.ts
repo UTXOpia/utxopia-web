@@ -206,6 +206,8 @@ async function callBackendFaucet(
     depositScheme?: "tweak";
   },
   config?: NetworkConfig | null,
+  /** Merged into a successful reply. The tracker id is known only to this route. */
+  extra: Record<string, unknown> = {},
 ): Promise<{ response: NextResponse; succeeded: boolean } | null> {
   const backendUrl = faucetBackendUrl(network, config);
   const headers = applyBackendAuthHeaders({ "Content-Type": "application/json" });
@@ -267,6 +269,7 @@ async function callBackendFaucet(
     }
   }
 
+  if (succeeded) body = { ...(body as Record<string, unknown>), ...extra };
   return { succeeded, response: NextResponse.json(body, { status: res.status }) };
 }
 
@@ -439,7 +442,7 @@ async function registerTweakDeposit(
   deposit: FaucetDeposit,
   amountSats: number,
   cfg: NetworkConfig | FaucetNetworkConfig,
-): Promise<string | null> {
+): Promise<{ error: string } | { depositId: string }> {
   const backendUrl = faucetBackendUrl(network, cfg as NetworkConfig);
   try {
     const res = await fetch(`${backendUrl}/api/deposits`, {
@@ -454,11 +457,11 @@ async function registerTweakDeposit(
         deposit_scheme: "tweak",
       }),
     });
-    if (!res.ok) return `tracker rejected the registration (HTTP ${res.status})`;
+    if (!res.ok) return { error: `tracker rejected the registration (HTTP ${res.status})` };
     const body = (await res.json()) as { deposit_id?: string };
-    return body.deposit_id ? null : "tracker accepted the registration without an id";
+    return body.deposit_id ? { depositId: body.deposit_id } : { error: "tracker accepted the registration without an id" };
   } catch (e) {
-    return `tracker unreachable: ${truncate(e instanceof Error ? e.message : String(e), 200)}`;
+    return { error: `tracker unreachable: ${truncate(e instanceof Error ? e.message : String(e), 200)}` };
   }
 }
 
@@ -804,18 +807,19 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
   // Register before sending, never after. Nothing on chain identifies a tweak
   // deposit, so an address the tracker was never told about is one nobody is
   // watching.
-  const registrationError = await registerTweakDeposit(
+  const registration = await registerTweakDeposit(
     activeNetwork,
     tweakDeposit,
     amountSats,
     activeConfig,
   );
-  if (registrationError) {
+  if ("error" in registration) {
     return NextResponse.json(
-      { ok: false, error: `not sending: ${registrationError}` },
+      { ok: false, error: `not sending: ${registration.error}` },
       { status: 502 },
     );
   }
+  const depositId = registration.depositId;
 
   if (REMOTE_FAUCET_MODE === "backend") {
     const remote = await callBackendFaucet(
@@ -827,6 +831,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
         depositScheme: "tweak",
       },
       activeConfig as NetworkConfig,
+      { depositId, depositAddress: btcAddress },
     );
     if (remote) {
       // Record here too: this path returns before the local send, so without it
@@ -929,6 +934,7 @@ export async function POST(req: NextRequest): Promise<NextResponse> {
     ok: true,
     txid,
     mode: "vault_deposit",
+    depositId,
     depositAddress: btcAddress,
     depositVout,
     depositScheme: "tweak",

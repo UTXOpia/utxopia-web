@@ -2,13 +2,16 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertCircle, CheckCircle2, Droplets } from "lucide-react";
+import { AlertCircle, Check, CheckCircle2, Copy, Droplets, ExternalLink, Loader2 } from "lucide-react";
 import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { recordPendingFaucetActivity } from "@/lib/faucet-activity";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
+import { useNotesStore } from "@/stores/notes-store";
 import { getMempoolExplorerUrl } from "@/lib/btc-network";
-import { deriveTweakDepositForFaucet } from "@/lib/tweak-deposit";
+import { deriveTweakDepositForFaucet, type TweakDepositRequest } from "@/lib/tweak-deposit";
+import { useCopyToClipboard } from "@/hooks/use-copy-to-clipboard";
+import { DepositStatusTracker } from "@/components/shield-flow/deposit-status-tracker";
 import { VaultIdentityUnlock } from "@/components/vault/vault-identity-unlock";
 import { cn } from "@/lib/utils";
 
@@ -16,7 +19,10 @@ type DripResult =
   | {
       kind: "ok";
       txid: string;
-      depositAddress?: string;
+      depositAddress: string;
+      amountSats: number;
+      /** Local note id carrying the tracker's deposit id; null when the route did not return one. */
+      noteId: string | null;
       warning?: string;
       credited?: boolean;
     }
@@ -28,6 +34,7 @@ interface FaucetResponse {
   txid?: string;
   blocksMined?: number;
   warning?: string;
+  depositId?: string;
   depositAddress?: string;
   amountSats?: number;
   dailyLimit?: number;
@@ -60,12 +67,36 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
   const [result, setResult] = useState<DripResult | null>(null);
   const [cooldownLeft, setCooldownLeft] = useState(0);
   const [quota, setQuota] = useState<Quota | null>(null);
+  // The address shown before sending. Peeked, not claimed: looking never burns an index.
+  const [preview, setPreview] = useState<TweakDepositRequest | null>(null);
+  const [previewError, setPreviewError] = useState<string | null>(null);
+  const [previewKey, setPreviewKey] = useState(0);
+  const { copied, copy } = useCopyToClipboard();
   const stealthAddress = useUTXOpiaStore((state) => state.stealthAddressEncoded);
   const privateBtcBalance = useUTXOpiaStore((state) => state.inboxBalancesByToken.zkBTC ?? 0n);
 
+  const hasVault = Boolean(stealthAddress && /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress));
+
   useEffect(() => {
-    setResult(null);
+    setResult((current) => (current?.kind === "ok" ? current : null));
   }, [amountSats, stealthAddress]);
+
+  useEffect(() => {
+    if (!hasVault || !stealthAddress) {
+      setPreview(null);
+      return;
+    }
+    let cancelled = false;
+    setPreviewError(null);
+    deriveTweakDepositForFaucet(networkConfig, stealthAddress, "peek")
+      .then((next) => { if (!cancelled) setPreview(next); })
+      .catch((cause) => {
+        if (cancelled) return;
+        setPreview(null);
+        setPreviewError(cause instanceof Error ? cause.message : String(cause));
+      });
+    return () => { cancelled = true; };
+  }, [hasVault, networkConfig, stealthAddress, previewKey]);
 
   // Ask up front how many drips are left, so an exhausted allowance disables the
   // button instead of being discovered by spending a click on a 429.
@@ -107,8 +138,6 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
     return () => clearInterval(interval);
   }, [result]);
 
-  const hasVault = Boolean(stealthAddress && /^utxo:[0-9a-fA-F]{192}$/.test(stealthAddress));
-
   async function mineMissingConfirmations(blocksAlreadyMined?: number): Promise<void> {
     const blocks = Math.max(0, 6 - Math.max(0, Number(blocksAlreadyMined ?? 0)));
     if (blocks === 0) return;
@@ -148,9 +177,8 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
     setResult(null);
 
     try {
-      // An OP_RETURN-free deposit address can only be derived here: it indexes its
-      // ephemeral key off the viewing PRIVATE key, which never leaves the client.
-      // The route re-derives from the public keys we send and refuses a mismatch.
+      // Claim the index now. Normally this is the address previewed above; if
+      // another tab claimed it first, the paid address is the one shown after.
       const tweak = await deriveTweakDepositForFaucet(networkConfig, stealthAddress);
 
       const params = new URLSearchParams({ network, vault: vaultId });
@@ -187,20 +215,34 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
       } else if (!response.ok || !body.ok) {
         setResult({ kind: "err", message: body.error ?? `HTTP ${response.status}` });
       } else {
+        const paidAmount = body.amountSats ?? amountSats;
+        const depositAddress = body.depositAddress ?? tweak.depositAddress;
         recordPendingFaucetActivity({
           networkId: network,
           stealthAddress,
-          amountSats: body.amountSats ?? amountSats,
+          amountSats: paidAmount,
           txid: body.txid ?? "",
-          depositAddress: body.depositAddress,
+          depositAddress,
           blocksMined: body.blocksMined,
         });
+        // Same note the manual deposit path saves: it is what the status tracker
+        // reads the deposit id from.
+        const noteId = body.depositId
+          ? useNotesStore.getState().saveNote({
+              commitment: tweak.notePublicKey,
+              noteExport: "",
+              amountSats: paidAmount,
+              taprootAddress: depositAddress,
+              depositId: body.depositId,
+              expiresAt: Math.floor(Date.now() / 1000) + 86400 * 30,
+            })
+          : null;
         setResult({
           kind: "ok",
           txid: body.txid ?? "",
-          // The route echoes back the address it paid. Falling back to the one
-          // derived here keeps the box filled if a deployment stops echoing it.
-          depositAddress: body.depositAddress ?? tweak.depositAddress,
+          depositAddress,
+          amountSats: paidAmount,
+          noteId,
           warning: body.warning,
           credited: false,
         });
@@ -219,10 +261,94 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
     }
   }
 
+  function reset() {
+    setResult(null);
+    // The paid address is spent; the next peek shows the one after it.
+    setPreviewKey((key) => key + 1);
+  }
+
   const cooldownActive = result?.kind === "cooldown" && cooldownLeft > 0;
   const exhausted = quota?.remaining === 0;
-  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive || exhausted;
+  const disabled = !hasVault || submitting || amountSats <= 0 || cooldownActive || exhausted || !preview;
 
+  // Page 2: sent. Nothing to check again — show what was paid, where it stands, and when it lands.
+  if (result?.kind === "ok") {
+    return (
+      <div className="space-y-4 py-2 text-center">
+        <div className="inline-flex rounded-full border border-btc/20 bg-btc/10 p-3">
+          {result.credited
+            ? <CheckCircle2 className="h-8 w-8 text-btc" />
+            : <Loader2 className="h-8 w-8 animate-spin text-btc" />}
+        </div>
+        <h3 className="text-lg font-semibold text-foreground">
+          {result.credited ? "Private BTC balance updated" : "Test BTC sent"}
+        </h3>
+        <p className="text-caption text-gray">
+          {result.credited
+            ? `${(Number(privateBtcBalance) / 1e8).toFixed(8)} BTC is ready in your private balance.`
+            : "Confirming on regtest and crediting your private balance. No second deposit is needed."}
+        </p>
+
+        <div className="space-y-3 rounded-[12px] border border-btc/20 bg-btc/5 p-4 text-left">
+          <div>
+            <p className="mb-1 pl-1 text-[10px] uppercase tracking-wider text-gray">
+              {result.amountSats.toLocaleString()} sats paid to
+            </p>
+            <div className="break-all rounded-[8px] border border-gray/15 bg-background/40 p-2 font-mono text-caption text-foreground">
+              {result.depositAddress}
+            </div>
+          </div>
+          <div>
+            <p className="mb-1 pl-1 text-[10px] uppercase tracking-wider text-gray">Bitcoin transaction</p>
+            <div className="break-all rounded-[8px] border border-gray/15 bg-background/40 p-2 font-mono text-caption text-foreground">
+              {result.txid || "(see backend log)"}
+            </div>
+          </div>
+          {result.noteId
+            ? <DepositStatusTracker noteId={result.noteId} showRefresh />
+            : !result.credited && (
+              <div className="flex items-center justify-center gap-2 text-caption text-gray">
+                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                <span>Updating private balance…</span>
+              </div>
+            )}
+          {result.warning && (
+            <div className="border-t border-gray/10 pt-2 text-caption text-warning">{result.warning}</div>
+          )}
+        </div>
+
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          {result.txid && (
+            <a
+              href={`${getMempoolExplorerUrl(network)}/tx/${result.txid}`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-1.5 text-caption text-btc transition-colors hover:text-btc/80"
+            >
+              View on explorer <ExternalLink className="h-3 w-3" />
+            </a>
+          )}
+          <Link
+            href={hrefWithChain("/vault/activity?refresh=inbox", network)}
+            className="inline-flex items-center gap-1.5 text-caption text-gray transition-colors hover:text-foreground"
+          >
+            View activity
+          </Link>
+        </div>
+        <div className="pt-1">
+          <button
+            type="button"
+            onClick={reset}
+            className="cursor-pointer rounded-[10px] border border-gray/15 bg-muted px-5 py-2 text-body2 text-gray-light transition-colors hover:bg-muted/80 hover:text-foreground"
+          >
+            Get more
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Page 1: what will be paid, and where.
   return (
     <div className="space-y-4">
       <div>
@@ -270,6 +396,39 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         </p>
       </div>
 
+      {hasVault && (
+        <div>
+          <label className="mb-2 block pl-2 text-body2 text-gray-light">
+            Deposit address
+          </label>
+          {preview ? (
+            <button
+              type="button"
+              onClick={() => copy(preview.depositAddress)}
+              className="flex w-full items-start gap-2 rounded-[12px] border border-btc/20 bg-btc/5 p-3 text-left font-mono text-caption text-foreground transition-colors hover:border-btc/40"
+            >
+              <span className="min-w-0 flex-1 break-all">{preview.depositAddress}</span>
+              {copied
+                ? <Check className="mt-0.5 h-3.5 w-3.5 shrink-0 text-success" />
+                : <Copy className="mt-0.5 h-3.5 w-3.5 shrink-0 text-gray" />}
+            </button>
+          ) : previewError ? (
+            <div className="rounded-[10px] border border-error/30 bg-error/5 p-3 text-caption text-error">
+              {previewError}
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 rounded-[12px] border border-gray/15 bg-muted p-3 text-caption text-gray">
+              <Loader2 className="h-3.5 w-3.5 animate-spin" />
+              Deriving address…
+            </div>
+          )}
+          <p className="mt-1 pl-2 text-caption text-gray">
+            Derived by this browser and used once. The payment carries no metadata —
+            the address itself binds it to your private balance.
+          </p>
+        </div>
+      )}
+
       {/* Unlock here rather than sending them to /vault and back. The old copy
           named the cause correctly and then made it someone else's page. */}
       {!hasVault && <VaultIdentityUnlock />}
@@ -288,76 +447,15 @@ export function PrivateBtcFaucetForm({ network }: { network: NetworkId }) {
         title={!hasVault ? "Initialize your private vault first" : undefined}
         className="btn-primary w-full"
       >
-        <Droplets className="h-5 w-5" />
+        {submitting ? <Loader2 className="h-5 w-5 animate-spin" /> : <Droplets className="h-5 w-5" />}
         {submitting
-          ? "Creating Bitcoin transaction..."
+          ? "Sending test BTC..."
           : cooldownActive
             ? `Try again in ${formatCooldown(cooldownLeft)}`
             : exhausted
               ? `Daily limit reached — resets in ${formatCooldown(quota?.resetAfterSec ?? 0)}`
               : "Get private test BTC"}
       </button>
-
-      {result?.kind === "ok" && (
-        <div className="space-y-3 rounded-[10px] border border-success/30 bg-success/5 p-3 text-caption text-success">
-          <div className="flex items-start gap-2">
-            <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0" />
-            <div>
-              <p className="font-semibold text-success">
-                {result.credited ? "Private BTC balance updated" : "Bitcoin transaction confirmed"}
-              </p>
-              <p className="mt-0.5 text-success/75">
-                {result.credited
-                  ? "The funds are ready in your private balance."
-                  : "Updating your private balance automatically. No second deposit is needed."}
-              </p>
-              {result.credited && (
-                <p className="mt-1 font-mono text-success">
-                  Private balance: {(Number(privateBtcBalance) / 1e8).toFixed(8)} BTC
-                </p>
-              )}
-            </div>
-          </div>
-          <div className="space-y-2">
-            {result.depositAddress && (
-              <div>
-                <p className="mb-0.5 text-[10px] uppercase tracking-wider text-success/60">
-                  Deposit address
-                </p>
-                <a
-                  href={`${getMempoolExplorerUrl(network)}/address/${result.depositAddress}`}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="block break-all rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono text-success/80 transition-colors hover:border-success/30"
-                >
-                  {result.depositAddress}
-                </a>
-                <p className="mt-1 text-[10px] text-success/60">
-                  Derived by this browser and used once. The payment carries no
-                  metadata — the address itself binds it to your private balance.
-                </p>
-              </div>
-            )}
-            <div>
-              <p className="mb-0.5 text-[10px] uppercase tracking-wider text-success/60">
-                Bitcoin transaction
-              </p>
-              <div className="break-all rounded-[8px] border border-success/10 bg-background/30 p-2 font-mono text-success/80">
-                {result.txid || "(see backend log)"}
-              </div>
-            </div>
-          </div>
-          {result.warning && (
-            <div className="border-t border-success/10 pt-1 text-warning">{result.warning}</div>
-          )}
-          <Link
-            href={hrefWithChain("/vault/activity?refresh=inbox", network)}
-            className="inline-flex min-h-11 items-center justify-center rounded-[8px] border border-success/25 px-3 text-[11px] font-semibold text-success transition-colors hover:bg-success/10"
-          >
-            View activity
-          </Link>
-        </div>
-      )}
 
       {result?.kind === "cooldown" && (
         <div className="rounded-[10px] border border-warning/30 bg-warning/5 p-3 text-caption text-warning">

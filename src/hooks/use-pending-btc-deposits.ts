@@ -37,7 +37,6 @@ export function usePendingBtcDeposits(networkId: NetworkId, config: NetworkConfi
         networkId,
         stealthAddress,
         creditedBtcTxids: credited,
-        currentPoolAddress: config.bitcoin.poolAddress,
       }).length;
       setCount((prev) => (prev === next ? prev : next));
     };
@@ -48,7 +47,7 @@ export function usePendingBtcDeposits(networkId: NetworkId, config: NetworkConfi
       window.removeEventListener("storage", sync);
       window.removeEventListener("utxopia:faucet-activity", sync);
     };
-  }, [networkId, stealthAddress, creditedKey, config.bitcoin.poolAddress]);
+  }, [networkId, stealthAddress, creditedKey]);
 
   return count;
 }
