@@ -417,7 +417,7 @@ export default function Home() {
           <div className="pointer-events-none absolute -right-[120px] top-[60px] h-[520px] w-[520px] bg-[radial-gradient(50%_50%_at_50%_50%,rgba(247,147,26,0.10),transparent_70%)]" />
 
           <div className="relative mx-auto grid max-w-[1180px] items-center gap-12 lg:grid-cols-[1.05fr_0.95fr] lg:gap-16">
-            <ScrollReveal>
+            <ScrollReveal immediate>
               <div className="flex flex-col items-start gap-6">
                 <div className="inline-flex items-center gap-2 rounded-full border border-privacy/25 bg-privacy/[0.08] py-1.5 pl-2 pr-3 font-mono text-xs font-semibold tracking-[0.06em] text-privacy">
                   <span className="h-1.5 w-1.5 rounded-full bg-privacy" />
@@ -471,7 +471,7 @@ export default function Home() {
               </div>
             </ScrollReveal>
 
-            <ScrollReveal delay={0.15}>
+            <ScrollReveal immediate delay={0.15}>
               <PoolCard
                 holdings={holdings}
                 tvlUsd={tvlUsd}

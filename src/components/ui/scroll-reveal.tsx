@@ -26,6 +26,9 @@ interface ScrollRevealProps {
   delay?: number;
   duration?: number;
   className?: string;
+  /** Play on mount instead of on scroll. Use for anything above the fold: a
+   *  scroll-gated hero paints as opacity 0 until JS and the observer run. */
+  immediate?: boolean;
 }
 
 /**
@@ -38,11 +41,12 @@ export function ScrollReveal({
   delay = 0,
   duration = 0.6,
   className = "",
+  immediate = false,
 }: ScrollRevealProps) {
   return (
     <motion.div
       initial="hidden"
-      whileInView="visible"
+      {...(immediate ? { animate: "visible" } : { whileInView: "visible" })}
       viewport={{ once: true, margin: "-30px" }}
       variants={variants[variant]}
       transition={{ duration: duration * 0.85, delay: delay * 0.7, ease: [0.22, 1, 0.36, 1] }}

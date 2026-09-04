@@ -8,9 +8,11 @@ import { hrefWithChain, type NetworkId } from "@/lib/network-config";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { cn } from "@/lib/utils";
 import { SolanaAddressField } from "@/components/ui/solana-address-field";
+import { PrivateBtcFaucetForm } from "@/components/shield-flow/private-btc-faucet-form";
 
-type FaucetToken = "USDC" | "USDT";
-type FaucetAmounts = Record<FaucetToken, number>;
+type SplFaucetToken = "USDC" | "USDT";
+type FaucetToken = "BTC" | SplFaucetToken;
+type FaucetAmounts = Record<SplFaucetToken, number>;
 
 const FAUCET_PREFERENCES_KEY = "utxopia:faucet-preferences:v1";
 const DEFAULT_FAUCET_AMOUNTS: FaucetAmounts = {
@@ -24,10 +26,12 @@ const DEFAULT_FAUCET_AMOUNTS: FaucetAmounts = {
  */
 export default function FaucetPage() {
   const [mounted, setMounted] = useState(false);
-  const [faucetToken, setFaucetToken] = useState<FaucetToken>("USDC");
+  // BTC first where it exists: it is the asset the vault is built around, and it
+  // used to live only inside Add funds where nobody looked for it.
+  const [faucetToken, setFaucetToken] = useState<FaucetToken>("BTC");
   const [solanaAddress, setSolanaAddress] = useState("");
   const [amounts, setAmounts] = useState<FaucetAmounts>(DEFAULT_FAUCET_AMOUNTS);
-  const { networkId: activeNetwork } = useChainEnvironment();
+  const { networkId: activeNetwork, config } = useChainEnvironment();
 
   useEffect(() => {
     setMounted(true);
@@ -54,9 +58,10 @@ export default function FaucetPage() {
   const network = mounted ? activeNetwork : null;
   const isHybrid = !!network && isHybridNetwork(network);
   const chainHref = (href: string) => network ? hrefWithChain(href, network) : href;
-  const tokenOptions: readonly FaucetToken[] = ["USDC", "USDT"];
+  const hasBtcFaucet = config.bitcoin.network === "regtest";
+  const tokenOptions: readonly FaucetToken[] = hasBtcFaucet ? ["BTC", "USDC", "USDT"] : ["USDC", "USDT"];
   const activeToken = tokenOptions.includes(faucetToken) ? faucetToken : tokenOptions[0];
-  const setAmount = (token: FaucetToken, value: number) => {
+  const setAmount = (token: SplFaucetToken, value: number) => {
     setAmounts((current) => ({ ...current, [token]: value }));
   };
 
@@ -99,7 +104,9 @@ export default function FaucetPage() {
               Test {activeToken} faucet
             </h1>
             <p className="text-caption text-gray">
-              Send test {activeToken} to your Solana wallet.
+              {activeToken === "BTC"
+                ? "Test BTC goes straight into your private vault."
+                : `Send test ${activeToken} to your Solana wallet.`}
             </p>
           </div>
         </div>
@@ -125,6 +132,8 @@ export default function FaucetPage() {
 
         {!isHybrid ? (
           <NotAvailableNotice network={network ?? "unknown"} />
+        ) : activeToken === "BTC" ? (
+          <PrivateBtcFaucetForm network={network} />
         ) : (
           <SplFaucetForm
             token={activeToken}
