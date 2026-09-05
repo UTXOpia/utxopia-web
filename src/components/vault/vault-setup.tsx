@@ -18,7 +18,7 @@ import { PrfUnavailableError, usePasskey } from "@/hooks/use-passkey";
 import { usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
 import { useChainEnvironment } from "@/lib/chain-environment";
-import { dropDeviceEnvelope, hasDeviceEnvelope } from "@/lib/vault-identity";
+import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { canWriteRemoteBackup, getRemoteEnvelope, putRemoteEnvelope } from "@/lib/vault-remote";
 import { newSalt } from "@/lib/vault-envelope";
 import { PinField } from "@/components/vault/pin-field";
@@ -119,7 +119,7 @@ export function VaultSetup({
   const publishLogin = async (
     login: { keyMaterial: Uint8Array; salt: Uint8Array } | null,
     device?: Uint8Array,
-  ): Promise<void> => {
+  ): Promise<boolean> => {
     // Said before the generic failure below, because the cause and the fix are
     // completely different: nothing is wrong with the member's PIN or their
     // connection, they are simply on an origin whose vault is not the one the
@@ -128,14 +128,14 @@ export function VaultSetup({
       setNotice(
         "This is a preview or a different address, so no copy was saved — a saved copy belongs to one address. Set your PIN on app.utxopia.com. Keep the recovery string below either way.",
       );
-      return;
+      return false;
     }
     if (!login || !privy.accountId) {
       // The silent branch, and the expensive one: no PIN means no copy, which
       // is indistinguishable on screen from a copy that saved. The member finds
       // out on their next phone, with their funds on the other side of it.
       setNotice("No PIN set, so nothing was saved for this login. A new device will need the recovery string below.");
-      return;
+      return false;
     }
     // `sealLoginEnvelope` refuses to mint portable authority on a
     // passkey-armed device without the passkey answering. Here it just did,
@@ -157,17 +157,9 @@ export function VaultSetup({
       setNotice(
         "We could not save your PIN backup. If this login already has one under a different PIN, delete it under PIN backup in Settings, then restore from the recovery string below to save a new one. Until then a new device will need that string.",
       );
-      return;
+      return false;
     }
-    // The published copy is now the only one, on a browser with no passkey to
-    // wrap a second under. Both would open on the same PIN and the same
-    // signature; only one of them counts the tries. Keeping the local one would
-    // leave the whole PIN gate decided by which copy an attacker reaches first.
-    //
-    // Strictly after a confirmed save, and never where a passkey holds this
-    // device's wrapping: publishing is best effort, and a member whose upload
-    // failed keeps exactly what they had.
-    if (!device) dropDeviceEnvelope(scope);
+    return true;
   };
 
   const handleCreate = () =>
@@ -184,24 +176,20 @@ export function VaultSetup({
       // identity — was sealed under the first credential's PRF output.
       const askDevice = hasPasskeyCredential ? authenticatePasskey : registerPasskey;
       const device = await deviceMaterial(askDevice);
-      // Minted before the signature, because the signature is over it. Every
-      // wrapping written in this ceremony — the device one and the published
-      // one — is sealed under this exact salt, or the key the login just
-      // produced opens neither.
+      // Minted before the signature, because the signature is over it: the
+      // published wrapping is sealed under this exact salt, or the key the
+      // login just produced does not open it.
       const salt = newSalt();
       const login = await loginMaterial(salt);
-      setRecoveryString(
-        await createEnvelopeVault(device ?? login?.keyMaterial, {
-          replaceExisting: alreadyHere,
-          salt: login && !device ? salt : undefined,
-        }),
-      );
-      // Only once the wrapping it describes exists, and only when the login is
-      // what armed *this* device: the note is what decides whether the unlock
-      // screen asks for a PIN, and asking for one on a browser whose passkey
-      // holds the wrapping names the wrong factor.
-      if (!device && login) privy.remember(login.signer);
-      await publishLogin(login, device);
+      // No local wrapping under the login. The published copy is the only one,
+      // because it is the only one whose PIN tries are counted; a second copy
+      // here would leave six digits in storage with no limiter in front.
+      setRecoveryString(await createEnvelopeVault(device, { replaceExisting: alreadyHere }));
+      // The signer note is what makes the unlock screen ask for a PIN, so it
+      // goes only once there is a published copy for that PIN to open. A
+      // failed publish leaves this browser un-armed and the next visit on the
+      // setup screen, where the recovery string re-publishes.
+      if ((await publishLogin(login, device)) && !device && login) privy.remember(login.signer);
       setPin("");
       setMode("saved");
     });
@@ -214,15 +202,11 @@ export function VaultSetup({
       const device = await deviceMaterial(authenticatePasskey);
       const salt = newSalt();
       const login = await loginMaterial(salt);
-      await restoreEnvelopeVault(
-        recoveryInput,
-        device ?? login?.keyMaterial,
-        login && !device ? salt : undefined,
-      );
-      if (!device && login) privy.remember(login.signer);
+      await restoreEnvelopeVault(recoveryInput, device);
       // A restore is the moment the string was needed. Publishing here is what
-      // stops it being needed again on the next device.
-      await publishLogin(login, device);
+      // stops it being needed again on the next device. Same rule as create:
+      // the note only once the copy it points at exists.
+      if ((await publishLogin(login, device)) && !device && login) privy.remember(login.signer);
       setPin("");
       setRecoveryInput("");
       onDone();

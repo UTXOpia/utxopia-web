@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from "react";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { usePrivySolanaAuthority } from "@/lib/privy-solana-context";
 import { assertPin, buildUnlockMessage, deriveFromPin } from "@/lib/vault-envelope";
-import { assertDeviceSigner, readDeviceSigner, writeDeviceSigner } from "@/lib/vault-identity";
+import { assertDeviceSigner, dropDeviceEnvelope, readDeviceSigner, writeDeviceSigner } from "@/lib/vault-identity";
 
 /**
  * The member closed the provider's prompt. Not an error about the vault, and
@@ -53,7 +53,13 @@ export function useLoginArmed(): boolean {
 
   // localStorage is not readable during render on the server.
   useEffect(() => {
-    setArmed(readDeviceSigner({ networkId, vaultId }) !== null);
+    const scope = { networkId, vaultId };
+    const isArmed = readDeviceSigner(scope) !== null;
+    // A login-armed browser keeps no wrapping; one left here predates that
+    // rule and is the uncounted copy. Next reload lands on the setup screen,
+    // where the recovery string publishes a counted one.
+    if (isArmed) dropDeviceEnvelope(scope);
+    setArmed(isArmed);
   }, [networkId, vaultId]);
 
   return armed;

@@ -147,16 +147,10 @@ export function writeDeviceEnvelope(scope: VaultScope, envelope: VaultEnvelope):
 }
 
 /**
- * Drop the wrapping, keep the signer note.
- *
- * What a login-armed device does once its copy is published: the remote one is
- * the same seed under the same key, and it is the only copy whose PIN attempts
- * are counted. Keeping a second one here would leave twenty bits sitting in
- * storage with no limiter in front of them — reachable by anyone who can drive
- * this member's provider session, whatever the unlock screen chooses to offer.
- *
- * The note stays because it is still true: a login armed this browser, and the
- * unlock screen still has to ask for a PIN rather than a passkey.
+ * Legacy sweep. Browsers armed before the published copy became the only copy
+ * still hold a login wrapping here — twenty bits of PIN with nothing counting
+ * attempts against them. The signer note is the tell; `useLoginArmed` calls
+ * this whenever it finds one.
  */
 export function dropDeviceEnvelope(scope: VaultScope): void {
   localStorage.removeItem(deviceKey(scope));

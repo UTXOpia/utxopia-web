@@ -22,7 +22,7 @@ import { usePasskey } from "@/hooks/use-passkey";
 import { LoginRequiredError, useLoginArmed, usePrivyVaultKey } from "@/hooks/use-privy-vault-key";
 import { useChainEnvironment } from "@/lib/chain-environment";
 import { useUTXOpiaStore } from "@/stores/utxopia-store";
-import { NoDeviceEnvelopeError, hasDeviceEnvelope, readDeviceEnvelope } from "@/lib/vault-identity";
+import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { getRemoteEnvelope, remoteBackupSaved } from "@/lib/vault-remote";
 import { PinField } from "@/components/vault/pin-field";
 
@@ -90,31 +90,17 @@ export function VaultUnlockPrompt({
     setBusy(true);
     try {
       if (loginArmed) {
-        // Published copy first, and no falling back to a local one when it
-        // cannot be reached. The whole point of coming through the blob store
-        // is that a wrong PIN spends one of ten tries; a fallback that a
-        // dropped connection can trigger hands that back for free.
-        //
-        // The `saved` branch is also the migration: browsers armed before the
-        // local wrapping was dropped still hold one and keep using it, and move
-        // over the next time a copy is published or fetched.
+        // One path, through the blob store, with no local wrapping to fall back
+        // to: a wrong PIN has to spend one of the counted tries. A login-armed
+        // browser keeps no wrapping (see vault-setup), so a missing copy means
+        // the recovery string, which re-publishes one.
+        if (!privy.accountId) throw new LoginRequiredError();
+        // Fetch before signing: the salt the signature is bound to lives in
+        // the wrapping this returns.
         const scope = { networkId, vaultId };
-        if (remoteBackupSaved(scope)) {
-          if (!privy.accountId) throw new LoginRequiredError();
-          // Fetch before signing: the salt the signature is bound to lives in
-          // the wrapping this returns, and the counted PIN check is passed here
-          // rather than against a tag nobody is counting.
-          const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
-          const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
-          await restoreFromLoginEnvelope(envelope, keyMaterial);
-        } else {
-          // The salt this browser's wrapping was written under is what the
-          // signature is bound to, so it has to be read before asking for one.
-          const envelope = readDeviceEnvelope(scope);
-          if (!envelope) throw new NoDeviceEnvelopeError();
-          const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
-          await unlockEnvelopeVault(keyMaterial, "pin");
-        }
+        const envelope = await getRemoteEnvelope({ scope, pin, accountId: privy.accountId });
+        const { keyMaterial } = await privy.keyMaterialFor(pin, envelope.kdf.salt);
+        await restoreFromLoginEnvelope(envelope, keyMaterial);
         setPin("");
         await handOverToPasskey();
         onUnlocked?.();
