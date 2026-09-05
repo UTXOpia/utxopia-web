@@ -124,6 +124,8 @@ export function clearStoredCredential(): void {
   try {
     localStorage.removeItem(CREDENTIAL_STORAGE_KEY);
     localStorage.removeItem(SEED_STORAGE_KEY);
+    // A new credential gets one fresh attempt at the post-PIN handover.
+    localStorage.removeItem("utxo:passkey-handover:v1");
   } catch {
     // ignore
   }

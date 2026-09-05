@@ -17,6 +17,11 @@ describe("login-armed browsers keep no local wrapping", () => {
   it("a login-armed browser sweeps any wrapping left from before", () => {
     expect(src("../../hooks/use-privy-vault-key.ts")).toMatch(/if \(isArmed\) dropDeviceEnvelope\(scope\)/);
   });
+  it("asks the passkey to take over at most once per browser", () => {
+    const s = src("./vault-unlock-prompt.tsx");
+    expect(s).toMatch(/if \(!hasPasskey \|\| localStorage\.getItem\(HANDOVER_KEY\)\) return;/);
+    expect(s).toMatch(/localStorage\.setItem\(HANDOVER_KEY, "1"\)/);
+  });
   it("setup arms the login only after a confirmed publish", () => {
     const s = src("./vault-setup.tsx");
     expect(s).not.toMatch(/login\?\.keyMaterial|dropDeviceEnvelope/);

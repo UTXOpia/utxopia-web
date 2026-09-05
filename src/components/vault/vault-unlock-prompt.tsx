@@ -26,6 +26,9 @@ import { hasDeviceEnvelope } from "@/lib/vault-identity";
 import { getRemoteEnvelope, remoteBackupSaved } from "@/lib/vault-remote";
 import { PinField } from "@/components/vault/pin-field";
 
+/** Set once the passkey handover after a PIN unlock has been tried and failed. */
+export const HANDOVER_KEY = "utxo:passkey-handover:v1";
+
 export function useHasLocalVault(): boolean {
   const { networkId, vaultId } = useChainEnvironment();
   const hasKeys = useUTXOpiaStore((s) => s.hasKeys);
@@ -76,13 +79,21 @@ export function VaultUnlockPrompt({
    * already has; minting one is a decision, not a side effect of unlocking.
    */
   const handOverToPasskey = async () => {
-    if (!hasPasskey) return;
+    // Once per browser. A passkey that answers without PRF, or a member who
+    // closes the prompt, would otherwise be asked again after every PIN unlock
+    // for as long as this browser lives — which is exactly what happened.
+    // ponytail: never retried; re-registering the passkey clears the note.
+    if (!hasPasskey || localStorage.getItem(HANDOVER_KEY)) return;
     try {
       const material = await authenticate({ requirePrf: true });
-      if (material) await armThisDeviceWithPasskey(material);
+      if (material) {
+        await armThisDeviceWithPasskey(material);
+        return;
+      }
     } catch {
       // Stay on the PIN. Nothing was lost — the wrapping it opens is untouched.
     }
+    localStorage.setItem(HANDOVER_KEY, "1");
   };
 
   const unlock = async () => {
